@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use ROBERT, please cite the project using this metadata."
+title: "ROBERT: exoplanet atmospheric retrieval architecture and software"
+authors:
+  - name: "ROBERT contributors"
+version: "0.2.0"
+date-released: "2026-06-26"
+license: "MIT"

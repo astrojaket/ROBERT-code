@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Local files
+.DS_Store
+*.log
+
+# ROBERT runtime outputs
+outputs/
+ROBERT_output/
+retrieval_runs/
+
+# Large scientific data should be referenced, not committed.
+opacity_data/
+opacities/
+input_data/
