@@ -1,5 +1,6 @@
 """Diagnostics and reference calculations."""
 
+from .benchmarks import EmissionBenchmark, load_emission_benchmark_csv
 from .blackbody import (
     blackbody_eclipse_depth,
     blackbody_eclipse_depth_spectrum,
@@ -7,7 +8,9 @@ from .blackbody import (
 )
 
 __all__ = [
+    "EmissionBenchmark",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
+    "load_emission_benchmark_csv",
     "planck_radiance_wavelength",
 ]

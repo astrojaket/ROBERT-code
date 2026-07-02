@@ -29,3 +29,13 @@ Likely future use:
   validated opacity reader and reference emission solver.
 - Treat the `.kta` files as external local inputs for exploratory development,
   not as committed test fixtures.
+
+Current local diagnostic:
+
+```bash
+python examples/plot_hat_p_32b_benchmark.py
+```
+
+Set `HAT_P_32B_EMISSION_CSV` to point at a different copy of
+`emission_R1000.csv`. The generated plot is written under `examples/outputs/`,
+which is intentionally ignored by git.

@@ -28,6 +28,14 @@ python -m pip install -e ".[dev]"
 The plotting example writes local figures under `examples/outputs/`, which is
 ignored by git.
 
+If the external HAT-P-32b benchmark is available locally, you can also run:
+
+```bash
+python examples/plot_hat_p_32b_benchmark.py
+```
+
+Set `HAT_P_32B_EMISSION_CSV` to override the default Dropbox benchmark path.
+
 ## What Exists Today
 
 - A minimal `robert_exoplanets` Python package.

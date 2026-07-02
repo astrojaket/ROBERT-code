@@ -11,6 +11,9 @@
 - Added a runnable minimal forward-model example.
 - Added blackbody reference diagnostics and a plotting example for visual
   emission-spectrum sanity checks.
+- Added a GitHub Actions CI workflow.
+- Added a local-only HAT-P-32b benchmark plotting example and reusable external
+  emission benchmark CSV loader.
 
 ## v0.2.0 - Core Domain Foundation
 

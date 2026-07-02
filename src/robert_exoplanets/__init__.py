@@ -9,8 +9,10 @@ from .atmosphere import (
 from .bodies import Planet, Star
 from .core import PressureGrid, SpectralGrid, Spectrum
 from .diagnostics import (
+    EmissionBenchmark,
     blackbody_eclipse_depth,
     blackbody_eclipse_depth_spectrum,
+    load_emission_benchmark_csv,
     planck_radiance_wavelength,
 )
 from .forward import ForwardModel, ModelPrediction, PlaceholderEmissionBackend
@@ -31,6 +33,7 @@ __all__ = [
     "ConstantChemistry",
     "CoverageReport",
     "EmissionModel",
+    "EmissionBenchmark",
     "EvaluatedOpacity",
     "FixtureOpacityProvider",
     "ForwardModel",
@@ -52,6 +55,7 @@ __all__ = [
     "Star",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
+    "load_emission_benchmark_csv",
     "planck_radiance_wavelength",
     "run_stub_retrieval",
 ]
