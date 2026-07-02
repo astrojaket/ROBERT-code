@@ -3,11 +3,13 @@
 from .builder import AtmosphereBuilder
 from .chemistry import ConstantChemistry
 from .state import AtmosphereState
-from .temperature import IsothermalTemperatureProfile
+from .temperature import IsothermalTemperatureProfile, TabulatedTemperatureProfile, TemperatureProfile
 
 __all__ = [
     "AtmosphereBuilder",
     "AtmosphereState",
     "ConstantChemistry",
     "IsothermalTemperatureProfile",
+    "TabulatedTemperatureProfile",
+    "TemperatureProfile",
 ]

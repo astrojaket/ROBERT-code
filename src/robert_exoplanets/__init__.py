@@ -5,6 +5,8 @@ from .atmosphere import (
     AtmosphereState,
     ConstantChemistry,
     IsothermalTemperatureProfile,
+    TabulatedTemperatureProfile,
+    TemperatureProfile,
 )
 from .bodies import Planet, Star
 from .core import PressureGrid, SpectralGrid, Spectrum
@@ -53,6 +55,8 @@ __all__ = [
     "SpectralGrid",
     "Spectrum",
     "Star",
+    "TabulatedTemperatureProfile",
+    "TemperatureProfile",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
     "load_emission_benchmark_csv",

@@ -32,9 +32,11 @@ If the external HAT-P-32b benchmark is available locally, you can also run:
 
 ```bash
 python examples/plot_hat_p_32b_benchmark.py
+python examples/plot_hat_p_32b_pt_profile.py
 ```
 
 Set `HAT_P_32B_EMISSION_CSV` to override the default Dropbox benchmark path.
+Set `HAT_P_32B_PT_CSV` to override the default Dropbox P-T profile path.
 
 ## What Exists Today
 

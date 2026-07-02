@@ -16,6 +16,8 @@
   emission benchmark CSV loader.
 - Added a v0.3 audit and next-build plan grounded in the NemesisPy HAT-P-32b
   workflow.
+- Added tabulated temperature-profile support and a local HAT-P-32b P-T
+  diagnostic plotting example.
 
 ## v0.2.0 - Core Domain Foundation
 

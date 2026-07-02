@@ -9,7 +9,7 @@ from robert_exoplanets.core import PressureGrid
 
 from .chemistry import ConstantChemistry
 from .state import AtmosphereState
-from .temperature import IsothermalTemperatureProfile
+from .temperature import TemperatureProfile
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class AtmosphereBuilder:
     """Build an `AtmosphereState` from simple v0.3 components."""
 
     pressure_grid: PressureGrid
-    temperature_profile: IsothermalTemperatureProfile
+    temperature_profile: TemperatureProfile
     chemistry_model: ConstantChemistry
     mean_molecular_weight: float = 2.3
 

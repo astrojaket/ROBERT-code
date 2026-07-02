@@ -11,6 +11,7 @@ from robert_exoplanets import (
     ConstantChemistry,
     IsothermalTemperatureProfile,
     PressureGrid,
+    TabulatedTemperatureProfile,
 )
 
 
@@ -33,6 +34,87 @@ def test_isothermal_profile_can_read_parameter_value() -> None:
 
     np.testing.assert_allclose(temperature, np.array([950.0, 950.0]))
     assert profile.required_parameters() == ("temperature",)
+
+
+def test_tabulated_temperature_profile_interpolates_in_log_pressure() -> None:
+    grid = PressureGrid(edges=[0.5, 2.0, 20.0], centers=[1.0, 10.0])
+    profile = TabulatedTemperatureProfile(
+        pressure=np.array([1.0, 10.0]),
+        temperature=np.array([1000.0, 2000.0]),
+    )
+
+    temperature = profile.evaluate({}, grid)
+
+    np.testing.assert_allclose(temperature, np.array([1000.0, 2000.0]))
+    assert temperature.flags.writeable is False
+    assert profile.required_parameters() == ()
+
+
+def test_tabulated_temperature_profile_sorts_pressure_values() -> None:
+    grid = PressureGrid(edges=[0.5, 2.0, 20.0], centers=[1.0, 10.0])
+    profile = TabulatedTemperatureProfile(
+        pressure=np.array([10.0, 1.0]),
+        temperature=np.array([2000.0, 1000.0]),
+    )
+
+    np.testing.assert_allclose(profile.pressure, np.array([1.0, 10.0]))
+    np.testing.assert_allclose(profile.evaluate({}, grid), np.array([1000.0, 2000.0]))
+
+
+def test_tabulated_temperature_profile_converts_pressure_units() -> None:
+    grid = PressureGrid(edges=[0.5, 2.0, 20.0], centers=[1.0, 10.0], unit="bar")
+    profile = TabulatedTemperatureProfile(
+        pressure=np.array([1.0e5, 1.0e6]),
+        temperature=np.array([1000.0, 2000.0]),
+        pressure_unit="Pa",
+    )
+
+    np.testing.assert_allclose(profile.evaluate({}, grid), np.array([1000.0, 2000.0]))
+
+
+def test_tabulated_temperature_profile_rejects_out_of_range_grid() -> None:
+    grid = PressureGrid(edges=[0.25, 0.75, 2.0], centers=[0.5, 1.0])
+    profile = TabulatedTemperatureProfile(
+        pressure=np.array([1.0, 10.0]),
+        temperature=np.array([1000.0, 2000.0]),
+    )
+
+    with pytest.raises(ValueError, match="outside tabulated"):
+        profile.evaluate({}, grid)
+
+
+def test_tabulated_temperature_profile_can_clip_out_of_range_grid() -> None:
+    grid = PressureGrid(
+        edges=[0.25, 0.75, 2.0, 20.0, 30.0],
+        centers=[0.5, 1.0, 10.0, 20.0],
+    )
+    profile = TabulatedTemperatureProfile(
+        pressure=np.array([1.0, 10.0]),
+        temperature=np.array([1000.0, 2000.0]),
+        extrapolation="clip",
+    )
+
+    np.testing.assert_allclose(
+        profile.evaluate({}, grid),
+        np.array([1000.0, 1000.0, 2000.0, 2000.0]),
+    )
+
+
+def test_tabulated_temperature_profile_loads_csv(tmp_path) -> None:
+    profile_path = tmp_path / "pt.csv"
+    profile_path.write_text(
+        "level,pressure_bar,temperature_K\n"
+        "1,1.0,1000.0\n"
+        "2,10.0,2000.0\n",
+        encoding="utf-8",
+    )
+    grid = PressureGrid(edges=[0.5, 2.0, 20.0], centers=[1.0, 10.0])
+
+    profile = TabulatedTemperatureProfile.from_csv(profile_path)
+
+    assert profile.source_path == profile_path
+    assert profile.metadata["pressure_column"] == "pressure_bar"
+    np.testing.assert_allclose(profile.evaluate({}, grid), np.array([1000.0, 2000.0]))
 
 
 def test_constant_chemistry_repeats_mixing_ratios_by_layer() -> None:

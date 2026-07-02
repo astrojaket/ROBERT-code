@@ -39,3 +39,11 @@ python examples/plot_hat_p_32b_benchmark.py
 Set `HAT_P_32B_EMISSION_CSV` to point at a different copy of
 `emission_R1000.csv`. The generated plot is written under `examples/outputs/`,
 which is intentionally ignored by git.
+
+The external P-T profile used by the same workflow can be inspected with:
+
+```bash
+python examples/plot_hat_p_32b_pt_profile.py
+```
+
+Set `HAT_P_32B_PT_CSV` to point at a different copy of the P-T CSV.
