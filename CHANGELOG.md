@@ -14,6 +14,8 @@
 - Added a GitHub Actions CI workflow.
 - Added a local-only HAT-P-32b benchmark plotting example and reusable external
   emission benchmark CSV loader.
+- Added a v0.3 audit and next-build plan grounded in the NemesisPy HAT-P-32b
+  workflow.
 
 ## v0.2.0 - Core Domain Foundation
 
