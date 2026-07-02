@@ -47,6 +47,7 @@ class Observation:
         flux_unit: str = "eclipse_depth",
         observable: str = "eclipse_depth",
         instrument: str | None = None,
+        mask: ArrayLike | None = None,
     ) -> "Observation":
         """Build an observation from array-like inputs and validate it."""
 
@@ -58,6 +59,7 @@ class Observation:
             flux_unit=flux_unit,
             observable=observable,
             instrument=instrument,
+            mask=None if mask is None else np.asarray(mask, dtype=bool),
         )
 
     def __post_init__(self) -> None:

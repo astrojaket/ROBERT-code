@@ -3,6 +3,6 @@ message: "If you use ROBERT, please cite the project using this metadata."
 title: "ROBERT: exoplanet atmospheric retrieval architecture and software"
 authors:
   - name: "ROBERT contributors"
-version: "0.2.0"
-date-released: "2026-06-26"
+version: "0.3.0"
+date-released: "2026-07-02"
 license: "MIT"

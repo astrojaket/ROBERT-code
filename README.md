@@ -11,10 +11,22 @@ The project architecture is governed by [RFC-0001: ROBERT Architectural Specific
 ## Quick Start
 
 ```bash
-python -m pip install -e ".[dev]"
+conda env create --prefix ./.conda --file environment.yml
+conda activate ./.conda
 pytest
 python examples/stub_emission_retrieval.py
+python examples/minimal_forward_model.py
+python examples/plot_blackbody_reference.py
 ```
+
+For an already-created environment, refresh the editable install with:
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+The plotting example writes local figures under `examples/outputs/`, which is
+ignored by git.
 
 ## What Exists Today
 
@@ -23,6 +35,9 @@ python examples/stub_emission_retrieval.py
 - Retrieval configuration containers.
 - A placeholder emission model.
 - A stub retrieval runner that returns deterministic mock results.
+- A minimal non-retrieval forward-model pipeline with explicit placeholder
+  atmosphere, opacity, instrument-response, and likelihood components.
+- Blackbody reference diagnostics for visual sanity checks.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later

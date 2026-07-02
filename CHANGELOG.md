@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.3.0 - Minimal Forward Model Foundation
+
+- Added atmospheric state, isothermal temperature, constant chemistry, and
+  atmosphere-builder components.
+- Added a zero-opacity fixture provider for pipeline wiring only.
+- Added linear observation-grid response and independent Gaussian likelihood.
+- Added a placeholder forward-model pipeline that returns native and observed
+  spectra without claiming physical radiative-transfer behavior.
+- Added a runnable minimal forward-model example.
+- Added blackbody reference diagnostics and a plotting example for visual
+  emission-spectrum sanity checks.
+
 ## v0.2.0 - Core Domain Foundation
 
 - Renamed the target import namespace to `robert_exoplanets`.
