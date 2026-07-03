@@ -18,6 +18,10 @@
   workflow.
 - Added tabulated temperature-profile support and a local HAT-P-32b P-T
   diagnostic plotting example.
+- Added retrieval-facing spline, Madhusudhan-Seager 2009, and
+  Parmentier-Guillot 2014 style temperature-profile parameterizations.
+- Added retrieval-facing free chemistry with explicit H2/He background-fill
+  support and a VMR plotting diagnostic.
 
 ## v0.2.0 - Core Domain Foundation
 

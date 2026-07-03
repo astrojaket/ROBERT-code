@@ -7,7 +7,7 @@ from typing import Mapping
 
 from robert_exoplanets.core import PressureGrid
 
-from .chemistry import ConstantChemistry
+from .chemistry import ChemistryModel
 from .state import AtmosphereState
 from .temperature import TemperatureProfile
 
@@ -18,7 +18,7 @@ class AtmosphereBuilder:
 
     pressure_grid: PressureGrid
     temperature_profile: TemperatureProfile
-    chemistry_model: ConstantChemistry
+    chemistry_model: ChemistryModel
     mean_molecular_weight: float = 2.3
 
     @property

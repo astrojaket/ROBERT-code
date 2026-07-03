@@ -36,3 +36,5 @@ jobs:
           python examples/stub_emission_retrieval.py
           python examples/minimal_forward_model.py
           python examples/plot_blackbody_reference.py
+          python examples/plot_temperature_profile_families.py
+          python examples/plot_free_chemistry_profiles.py
