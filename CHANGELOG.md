@@ -26,6 +26,8 @@
   complete VMR chemistry outputs.
 - Added lightweight timing diagnostics and an atmosphere-build benchmark
   example for performance smoke testing.
+- Added a model-setup factory that maps HAT-P-32b-style atmosphere config
+  blocks into ROBERT pressure, temperature, chemistry, and MMW components.
 
 ## v0.2.0 - Core Domain Foundation
 

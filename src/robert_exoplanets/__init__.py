@@ -30,7 +30,7 @@ from .diagnostics import (
 )
 from .forward import ForwardModel, ModelPrediction, PlaceholderEmissionBackend
 from .instruments import LinearObservationResponse, Observation, PreparedObservationResponse
-from .io import RobertConfig
+from .io import AtmosphereModelSetup, RobertConfig, build_atmosphere_setup
 from .likelihoods import GaussianLikelihood
 from .opacity import CoverageReport, EvaluatedOpacity, FixtureOpacityProvider, PreparedOpacity
 from .retrieval import (
@@ -42,6 +42,7 @@ from .retrieval import (
 
 __all__ = [
     "AtmosphereBuilder",
+    "AtmosphereModelSetup",
     "AtmosphereState",
     "BackgroundGasMixture",
     "ChemistryModel",
@@ -80,6 +81,7 @@ __all__ = [
     "TimingResult",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
+    "build_atmosphere_setup",
     "load_emission_benchmark_csv",
     "planck_radiance_wavelength",
     "run_stub_retrieval",
