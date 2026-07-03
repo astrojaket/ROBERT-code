@@ -24,6 +24,8 @@
   support and a VMR plotting diagnostic.
 - Added optional composition-derived mean-molecular-weight calculation for
   complete VMR chemistry outputs.
+- Added lightweight timing diagnostics and an atmosphere-build benchmark
+  example for performance smoke testing.
 
 ## v0.2.0 - Core Domain Foundation
 

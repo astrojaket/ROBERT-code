@@ -38,3 +38,4 @@ jobs:
           python examples/plot_blackbody_reference.py
           python examples/plot_temperature_profile_families.py
           python examples/plot_free_chemistry_profiles.py
+          ROBERT_BENCH_REPEAT=3 ROBERT_BENCH_WARMUP=1 python examples/benchmark_atmosphere_build.py

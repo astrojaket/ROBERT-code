@@ -21,10 +21,12 @@ from .bodies import Planet, Star
 from .core import PressureGrid, SpectralGrid, Spectrum
 from .diagnostics import (
     EmissionBenchmark,
+    TimingResult,
     blackbody_eclipse_depth,
     blackbody_eclipse_depth_spectrum,
     load_emission_benchmark_csv,
     planck_radiance_wavelength,
+    time_callable,
 )
 from .forward import ForwardModel, ModelPrediction, PlaceholderEmissionBackend
 from .instruments import LinearObservationResponse, Observation, PreparedObservationResponse
@@ -75,11 +77,13 @@ __all__ = [
     "Star",
     "TabulatedTemperatureProfile",
     "TemperatureProfile",
+    "TimingResult",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
     "load_emission_benchmark_csv",
     "planck_radiance_wavelength",
     "run_stub_retrieval",
+    "time_callable",
 ]
 
 __version__ = "0.3.0"

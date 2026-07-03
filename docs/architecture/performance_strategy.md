@@ -10,6 +10,12 @@ ROBERT optimizes only after correctness, tests, and interfaces are stable.
 - Runtime configuration is explicit.
 - Import-time performance side effects are forbidden.
 
+For Python specifically, ROBERT should be fast by keeping the hot path small:
+use NumPy arrays for layer/spectral calculations, precompute reusable indices
+and matrices before repeated model calls, avoid Python loops inside opacity and
+radiative-transfer kernels, and only add compiled acceleration after profiling
+identifies a stable bottleneck.
+
 ## 2. Backend Strategy
 
 ### NumPy
@@ -180,6 +186,18 @@ Benchmarks should report:
 - Optional dependencies.
 - Data fixture.
 - Cache state.
+
+Current lightweight benchmark helpers live in `robert_exoplanets.diagnostics`.
+Use `time_callable` for smoke benchmarks that should stay dependency-free, and
+use dedicated profilers for deeper kernel work. The atmosphere-build smoke
+benchmark can be run with:
+
+```bash
+python examples/benchmark_atmosphere_build.py
+```
+
+Environment variables `ROBERT_BENCH_REPEAT` and `ROBERT_BENCH_WARMUP` control
+the number of measured and warmup calls.
 
 ## 9. Performance Anti-Patterns
 
