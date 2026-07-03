@@ -1,7 +1,15 @@
 """Atmospheric state and construction helpers."""
 
 from .builder import AtmosphereBuilder
-from .chemistry import BackgroundGasMixture, ChemistryModel, ConstantChemistry, FreeChemistry
+from .chemistry import (
+    BackgroundGasMixture,
+    ChemistryModel,
+    CompositionMeanMolecularWeight,
+    ConstantChemistry,
+    FixedMeanMolecularWeight,
+    FreeChemistry,
+    MeanMolecularWeightModel,
+)
 from .state import AtmosphereState
 from .temperature import (
     IsothermalTemperatureProfile,
@@ -17,8 +25,11 @@ __all__ = [
     "AtmosphereState",
     "BackgroundGasMixture",
     "ChemistryModel",
+    "CompositionMeanMolecularWeight",
     "ConstantChemistry",
+    "FixedMeanMolecularWeight",
     "FreeChemistry",
+    "MeanMolecularWeightModel",
     "IsothermalTemperatureProfile",
     "MadhusudhanSeager2009TemperatureProfile",
     "ParmentierGuillot2014TemperatureProfile",

@@ -7,7 +7,7 @@ from typing import Mapping
 
 from robert_exoplanets.core import PressureGrid
 
-from .chemistry import ChemistryModel
+from .chemistry import ChemistryModel, MeanMolecularWeightModel
 from .state import AtmosphereState
 from .temperature import TemperatureProfile
 
@@ -20,6 +20,7 @@ class AtmosphereBuilder:
     temperature_profile: TemperatureProfile
     chemistry_model: ChemistryModel
     mean_molecular_weight: float = 2.3
+    mean_molecular_weight_model: MeanMolecularWeightModel | None = None
 
     @property
     def species(self) -> tuple[str, ...]:
@@ -37,9 +38,20 @@ class AtmosphereBuilder:
             self.pressure_grid,
             temperature,
         )
+        if self.mean_molecular_weight_model is None:
+            mean_molecular_weight = self.mean_molecular_weight
+            mean_molecular_weight_unit = "amu"
+        else:
+            mean_molecular_weight = self.mean_molecular_weight_model.evaluate(
+                composition,
+                self.pressure_grid,
+            )
+            mean_molecular_weight_unit = self.mean_molecular_weight_model.unit
+
         return AtmosphereState(
             pressure_grid=self.pressure_grid,
             temperature=temperature,
             composition=composition,
-            mean_molecular_weight=self.mean_molecular_weight,
+            mean_molecular_weight=mean_molecular_weight,
+            mean_molecular_weight_unit=mean_molecular_weight_unit,
         )

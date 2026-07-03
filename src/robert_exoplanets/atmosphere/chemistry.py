@@ -11,6 +11,24 @@ from numpy.typing import NDArray
 from robert_exoplanets.core import PressureGrid, RobertConfigError, RobertValidationError
 
 
+DEFAULT_MOLECULAR_MASSES: Mapping[str, float] = {
+    "H2": 2.01588,
+    "He": 4.002602,
+    "H2O": 18.01528,
+    "CO": 28.0101,
+    "CO2": 44.0095,
+    "CH4": 16.04246,
+    "NH3": 17.03052,
+    "HCN": 27.0253,
+    "N2": 28.0134,
+    "O2": 31.9988,
+    "Na": 22.98976928,
+    "K": 39.0983,
+    "SO2": 64.066,
+    "H2S": 34.0809,
+}
+
+
 class ChemistryModel(Protocol):
     """Protocol shared by chemistry parameterizations."""
 
@@ -31,6 +49,19 @@ class ChemistryModel(Protocol):
         temperature: NDArray[np.float64],
     ) -> dict[str, NDArray[np.float64]]:
         """Evaluate composition on a pressure grid."""
+
+
+class MeanMolecularWeightModel(Protocol):
+    """Protocol shared by mean-molecular-weight models."""
+
+    unit: str
+
+    def evaluate(
+        self,
+        composition: Mapping[str, NDArray[np.float64]],
+        pressure_grid: PressureGrid,
+    ) -> NDArray[np.float64]:
+        """Evaluate mean molecular weight on a pressure grid."""
 
 
 def _validate_species_name(species: str) -> str:
@@ -69,6 +100,22 @@ def _readonly_constant_profile(value: float, n_layers: int) -> NDArray[np.float6
     profile = np.full(n_layers, value, dtype=float)
     profile.setflags(write=False)
     return profile
+
+
+def _readonly_layer_array(
+    values: NDArray[np.float64],
+    name: str,
+    n_layers: int,
+) -> NDArray[np.float64]:
+    array = np.array(values, dtype=float, copy=True)
+    if array.ndim != 1:
+        raise RobertValidationError(f"{name} must be one-dimensional")
+    if array.shape != (n_layers,):
+        raise RobertValidationError(f"{name} must match pressure grid layers")
+    if not np.all(np.isfinite(array)):
+        raise RobertValidationError(f"{name} must contain only finite values")
+    array.setflags(write=False)
+    return array
 
 
 @dataclass(frozen=True)
@@ -121,6 +168,103 @@ class BackgroundGasMixture:
         """Background species in insertion order."""
 
         return tuple(self.fractions)
+
+
+@dataclass(frozen=True)
+class FixedMeanMolecularWeight:
+    """Layer-constant mean molecular weight model."""
+
+    value: float = 2.3
+    unit: str = "amu"
+
+    def __post_init__(self) -> None:
+        value = float(self.value)
+        if not np.isfinite(value) or value <= 0.0:
+            raise RobertValidationError("mean molecular weight must be finite and positive")
+        if not self.unit:
+            raise RobertValidationError("mean molecular weight unit must not be empty")
+        object.__setattr__(self, "value", value)
+
+    def evaluate(
+        self,
+        composition: Mapping[str, NDArray[np.float64]],
+        pressure_grid: PressureGrid,
+    ) -> NDArray[np.float64]:
+        """Return a fixed mean molecular weight for every layer."""
+
+        return _readonly_constant_profile(self.value, pressure_grid.n_layers)
+
+
+@dataclass(frozen=True)
+class CompositionMeanMolecularWeight:
+    """Mean molecular weight derived from VMR composition profiles.
+
+    Molecular masses are in atomic mass units. With the default
+    `normalization="require"` policy, each layer's VMR sum must be close to
+    one so trace-only chemistry cannot accidentally define a bulk atmosphere.
+    """
+
+    molecular_masses: Mapping[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_MOLECULAR_MASSES)
+    )
+    normalization: str = "require"
+    sum_tolerance: float = 1.0e-8
+    unit: str = "amu"
+
+    def __post_init__(self) -> None:
+        if self.normalization not in {"require", "normalize"}:
+            raise RobertValidationError("normalization must be 'require' or 'normalize'")
+        if not self.unit:
+            raise RobertValidationError("mean molecular weight unit must not be empty")
+        tolerance = float(self.sum_tolerance)
+        if not np.isfinite(tolerance) or tolerance < 0.0:
+            raise RobertValidationError("sum_tolerance must be finite and non-negative")
+
+        masses: dict[str, float] = {}
+        for species, value in self.molecular_masses.items():
+            name = _validate_species_name(species)
+            mass = float(value)
+            if not np.isfinite(mass) or mass <= 0.0:
+                raise RobertValidationError("molecular masses must be finite and positive")
+            masses[name] = mass
+
+        object.__setattr__(self, "molecular_masses", masses)
+        object.__setattr__(self, "sum_tolerance", tolerance)
+
+    def evaluate(
+        self,
+        composition: Mapping[str, NDArray[np.float64]],
+        pressure_grid: PressureGrid,
+    ) -> NDArray[np.float64]:
+        """Return composition-weighted mean molecular weight by layer."""
+
+        if not composition:
+            raise RobertValidationError("composition must contain at least one species")
+
+        numerator = np.zeros(pressure_grid.n_layers, dtype=float)
+        total = np.zeros(pressure_grid.n_layers, dtype=float)
+        for species, values in composition.items():
+            name = _validate_species_name(species)
+            if name not in self.molecular_masses:
+                raise RobertValidationError(f"missing molecular mass for species: {name}")
+            profile = _readonly_layer_array(
+                values,
+                f"{name} composition",
+                pressure_grid.n_layers,
+            )
+            if np.any(profile < 0.0):
+                raise RobertValidationError("composition values must be non-negative")
+            numerator += profile * self.molecular_masses[name]
+            total += profile
+
+        if np.any(total <= 0.0):
+            raise RobertValidationError("composition VMR sums must be positive")
+        if self.normalization == "require" and np.any(np.abs(total - 1.0) > self.sum_tolerance):
+            raise RobertValidationError("composition VMRs must sum to one to derive mean molecular weight")
+
+        mean_molecular_weight = numerator / total
+        mean_molecular_weight.setflags(write=False)
+        return mean_molecular_weight
 
 
 @dataclass(frozen=True)

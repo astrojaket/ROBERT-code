@@ -15,7 +15,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from robert_exoplanets import BackgroundGasMixture, FreeChemistry, PressureGrid
+from robert_exoplanets import (
+    BackgroundGasMixture,
+    CompositionMeanMolecularWeight,
+    FreeChemistry,
+    PressureGrid,
+)
 
 
 def main() -> Path:
@@ -39,6 +44,10 @@ def main() -> Path:
         {"log_H2O": -3.0, "log_CO": -4.0},
         pressure_grid,
         np.full(pressure_grid.n_layers, 1500.0),
+    )
+    mean_molecular_weight = CompositionMeanMolecularWeight().evaluate(
+        composition,
+        pressure_grid,
     )
 
     output_path = Path(__file__).resolve().parent / "outputs" / "free_chemistry_profiles.png"
@@ -70,6 +79,15 @@ def main() -> Path:
     ax.set_ylim(float(max(pressure_grid.centers)), float(min(pressure_grid.centers)))
     ax.grid(alpha=0.25, which="both")
     ax.legend(frameon=False, loc="lower left", fontsize=8.5)
+    ax.text(
+        0.97,
+        0.04,
+        f"Mean molecular weight: {mean_molecular_weight[0]:.3f} amu",
+        transform=ax.transAxes,
+        fontsize=8,
+        color="#333333",
+        ha="right",
+    )
 
     fig.savefig(output_path, dpi=180)
     plt.close(fig)

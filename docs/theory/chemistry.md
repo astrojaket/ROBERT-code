@@ -14,6 +14,10 @@ Current chemistry types:
   split between inactive/background gases.
 - `FreeChemistry`: evaluates layer-constant free abundances for active gases
   and can fill the remaining VMR budget with a background mixture.
+- `CompositionMeanMolecularWeight`: derives layer mean molecular weight from
+  evaluated VMR profiles and molecular masses.
+- `FixedMeanMolecularWeight`: returns one fixed mean molecular weight for every
+  atmospheric layer.
 
 ## Free Chemistry
 
@@ -41,6 +45,31 @@ more than one. `excess_policy="normalize"` exists for controlled comparison
 workflows, but it changes the meaning of the active abundance parameters and
 should not be used silently in retrieval production runs.
 
+## Mean Molecular Weight
+
+ROBERT can now derive mean molecular weight from the evaluated composition:
+
+```python
+builder = AtmosphereBuilder(
+    pressure_grid=pressure_grid,
+    temperature_profile=temperature_profile,
+    chemistry_model=free_chemistry,
+    mean_molecular_weight_model=CompositionMeanMolecularWeight(),
+)
+```
+
+For VMR composition, the layer mean molecular weight is the VMR-weighted sum of
+species molecular masses. The built-in mass table covers the common gases used
+in the current free-chemistry workflow, including H2, He, H2O, CO, CO2, CH4,
+NH3, HCN, SO2, and H2S. Additional or renamed species should be supplied through
+the `molecular_masses` mapping.
+
+The default normalization policy is strict: `normalization="require"` checks
+that the VMRs sum to one in every layer. This is deliberate. A trace-only
+composition should not silently define the bulk atmosphere. For controlled
+comparison workflows, `normalization="normalize"` can renormalize the supplied
+composition before calculating mean molecular weight.
+
 ## Not Yet Implemented
 
 The current chemistry layer intentionally does not implement:
@@ -48,7 +77,6 @@ The current chemistry layer intentionally does not implement:
 - FastChem or other equilibrium chemistry backends.
 - Quench chemistry.
 - Photochemical profile overlays.
-- Mean-molecular-weight calculation from species molecular masses.
 
 Those should be added as separate adapters or post-processing components, not
 as hidden branches inside the free-chemistry model.

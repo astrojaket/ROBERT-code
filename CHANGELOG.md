@@ -22,6 +22,8 @@
   Parmentier-Guillot 2014 style temperature-profile parameterizations.
 - Added retrieval-facing free chemistry with explicit H2/He background-fill
   support and a VMR plotting diagnostic.
+- Added optional composition-derived mean-molecular-weight calculation for
+  complete VMR chemistry outputs.
 
 ## v0.2.0 - Core Domain Foundation
 

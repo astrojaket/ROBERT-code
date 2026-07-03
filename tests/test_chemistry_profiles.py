@@ -8,6 +8,8 @@ import pytest
 from robert_exoplanets import (
     AtmosphereBuilder,
     BackgroundGasMixture,
+    CompositionMeanMolecularWeight,
+    FixedMeanMolecularWeight,
     FreeChemistry,
     IsothermalTemperatureProfile,
     PressureGrid,
@@ -111,6 +113,64 @@ def test_free_chemistry_rejects_active_background_overlap() -> None:
         )
 
 
+def test_fixed_mean_molecular_weight_returns_layer_profile() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=3)
+    model = FixedMeanMolecularWeight(2.33)
+
+    mean_molecular_weight = model.evaluate({}, grid)
+
+    np.testing.assert_allclose(mean_molecular_weight, np.full(3, 2.33))
+    assert mean_molecular_weight.flags.writeable is False
+
+
+def test_composition_mean_molecular_weight_uses_vmr_weighted_masses() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    composition = {
+        "H2": np.full(2, 0.8),
+        "He": np.full(2, 0.19),
+        "H2O": np.full(2, 0.01),
+    }
+    model = CompositionMeanMolecularWeight()
+
+    mean_molecular_weight = model.evaluate(composition, grid)
+
+    expected = 0.8 * 2.01588 + 0.19 * 4.002602 + 0.01 * 18.01528
+    np.testing.assert_allclose(mean_molecular_weight, np.full(2, expected))
+    assert mean_molecular_weight.flags.writeable is False
+
+
+def test_composition_mean_molecular_weight_rejects_missing_species_mass() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    model = CompositionMeanMolecularWeight()
+
+    with pytest.raises(ValueError, match="missing molecular mass"):
+        model.evaluate({"MysteryGas": np.full(2, 1.0)}, grid)
+
+
+def test_composition_mean_molecular_weight_requires_complete_vmr_budget() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    model = CompositionMeanMolecularWeight()
+
+    with pytest.raises(ValueError, match="sum to one"):
+        model.evaluate({"H2O": np.full(2, 1.0e-3)}, grid)
+
+
+def test_composition_mean_molecular_weight_can_normalize_partial_budget() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    model = CompositionMeanMolecularWeight(normalization="normalize")
+
+    mean_molecular_weight = model.evaluate(
+        {
+            "H2": np.full(2, 0.4),
+            "He": np.full(2, 0.1),
+        },
+        grid,
+    )
+
+    expected = (0.4 * 2.01588 + 0.1 * 4.002602) / (0.4 + 0.1)
+    np.testing.assert_allclose(mean_molecular_weight, np.full(2, expected))
+
+
 def test_atmosphere_builder_accepts_free_chemistry_model() -> None:
     grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=3)
     builder = AtmosphereBuilder(
@@ -126,3 +186,22 @@ def test_atmosphere_builder_accepts_free_chemistry_model() -> None:
 
     assert atmosphere.species == ("H2O", "H2", "He")
     np.testing.assert_allclose(atmosphere.composition["H2O"], np.full(3, 1.0e-3))
+
+
+def test_atmosphere_builder_can_derive_mean_molecular_weight_from_composition() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=3)
+    builder = AtmosphereBuilder(
+        pressure_grid=grid,
+        temperature_profile=IsothermalTemperatureProfile(temperature=1200.0),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            fixed_mixing_ratios={"H2O": 1.0e-3},
+            background=BackgroundGasMixture({"H2": 0.75, "He": 0.25}),
+        ),
+        mean_molecular_weight_model=CompositionMeanMolecularWeight(),
+    )
+
+    atmosphere = builder.build()
+
+    expected = 1.0e-3 * 18.01528 + 0.999 * 0.75 * 2.01588 + 0.999 * 0.25 * 4.002602
+    np.testing.assert_allclose(atmosphere.mean_molecular_weight, np.full(3, expected))
