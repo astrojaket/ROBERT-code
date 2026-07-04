@@ -7,7 +7,9 @@ ROBERT now has the first RT-facing reference building blocks:
   runs,
 - layer optical-depth contributors for CIA and Rayleigh scattering extinction,
 - a NumPy clear-sky thermal-emission solver with Planck source-function
-  integration.
+  integration,
+- explicit disc geometry objects for normal-emission, uniform thermal-disc, and
+  NemesisPy-style phase quadrature calculations.
 
 These are not the full mature NEMESIS RT path yet. They are the explicit bridge
 between atmosphere, chemistry, opacity, and later cloud, aerosol, and
@@ -52,12 +54,33 @@ composition is interpreted as volume mixing ratio.
 - Planck layer source functions,
 - layer thermal-emission contribution diagnostics,
 - total optical depth used by the solver,
-- optional disk-averaged emission quadrature.
+- optional point-spectrum diagnostics and disc-averaged geometry.
 
 The solver can also consume additional layer optical depths, such as H2-H2/H2-He
 CIA and H2/He Rayleigh scattering extinction. Its metadata records whether
 scattering is absent or treated as extinction-only, so later scattering-capable
 solvers can be distinguished from this reference path.
+
+## Geometry and Source Function
+
+`DiscGeometry` is the RT-facing angular container. It stores a sequence of
+`DiscPoint` samples with emission zenith cosine, normalized disc weight, and
+optional projected-disc, latitude/longitude, stellar zenith, and stellar azimuth
+metadata. The current clear-sky solver uses the emission cosine and weight to
+calculate point spectra and the disc average. The stellar-angle metadata is
+reserved for reflected-light and scattering-source-function kernels.
+
+The available helpers are:
+
+- `normal_emission_geometry()` for a single `mu=1` point,
+- `gauss_legendre_disk_geometry(n_mu)` for the current uniform thermal-disc
+  integral,
+- `nemesis_lobatto_phase_geometry(phase_angle_deg, n_mu)` for a projected-disc
+  quadrature following NemesisPy's phase convention.
+
+The current source function is thermal Planck emission only. Rayleigh terms are
+included as extinction when supplied, but the scattering source function is
+explicitly recorded as not included.
 
 ## Tau and Weighting Plots
 
@@ -99,8 +122,8 @@ loads the external HAT-P-32b P-T CSV, R1000 `.kta` files, the local NEMESIS-styl
 CIA table, and the external emission CSV. It compares ROBERT's current
 clear-sky result to the benchmark and writes both a plot and a JSON metric
 report. This is a diagnostic benchmark, not a strict pass/fail validation,
-because the current ROBERT path still omits FastChem abundance profiles, exact
-NEMESIS layering/path parity, clouds/aerosols, and scattering source functions.
+because the current ROBERT path still omits exact NEMESIS layering/path parity,
+clouds/aerosols, and scattering source functions.
 
 ## Scattering Boundary
 

@@ -11,6 +11,12 @@ from numpy.typing import ArrayLike, NDArray
 from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
 from robert_exoplanets.opacity import spectral_grid_values_in_unit
 
+from .geometry import (
+    DiscGeometry,
+    gauss_legendre_disk_geometry,
+    geometry_from_emission_angles,
+    normal_emission_geometry,
+)
 from .optical_depth import GasOpticalDepth
 
 PLANCK_CONSTANT_J_S = 6.62607015e-34
@@ -30,6 +36,10 @@ class ClearSkyEmissionResult:
     bottom_contribution_radiance: ArrayLike
     emission_angle_cosines: ArrayLike
     emission_angle_weights: ArrayLike
+    geometry: DiscGeometry | None = None
+    point_radiance: ArrayLike | None = None
+    point_layer_contribution_radiance: ArrayLike | None = None
+    point_bottom_contribution_radiance: ArrayLike | None = None
     total_optical_depth: ArrayLike | None = None
     eclipse_depth: Spectrum | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -69,6 +79,50 @@ class ClearSkyEmissionResult:
             self.emission_angle_cosines,
             self.emission_angle_weights,
         )
+        geometry = self.geometry
+        if geometry is None:
+            geometry = geometry_from_emission_angles(
+                mu,
+                weights,
+                name="result_emission_quadrature",
+                quadrature="result_mu",
+            )
+        else:
+            if geometry.emission_angle_cosines.shape != mu.shape:
+                raise RobertValidationError("geometry and emission angle quadrature must have matching shapes")
+            if not np.allclose(geometry.emission_angle_cosines, mu, rtol=1.0e-12, atol=0.0):
+                raise RobertValidationError("geometry emission angles must match emission_angle_cosines")
+            if not np.allclose(geometry.emission_angle_weights, weights, rtol=1.0e-12, atol=0.0):
+                raise RobertValidationError("geometry weights must match emission_angle_weights")
+
+        point_radiance = None
+        if self.point_radiance is not None:
+            point_radiance = _readonly_array(
+                self.point_radiance,
+                "point_radiance",
+                (mu.size, n_spectral),
+            )
+            if np.any(point_radiance < 0.0):
+                raise RobertValidationError("point_radiance must be non-negative")
+        point_layer_contribution = None
+        if self.point_layer_contribution_radiance is not None:
+            point_layer_contribution = _readonly_array(
+                self.point_layer_contribution_radiance,
+                "point_layer_contribution_radiance",
+                (mu.size, n_layers, n_spectral),
+            )
+            if np.any(point_layer_contribution < 0.0):
+                raise RobertValidationError("point_layer_contribution_radiance must be non-negative")
+        point_bottom_contribution = None
+        if self.point_bottom_contribution_radiance is not None:
+            point_bottom_contribution = _readonly_array(
+                self.point_bottom_contribution_radiance,
+                "point_bottom_contribution_radiance",
+                (mu.size, n_spectral),
+            )
+            if np.any(point_bottom_contribution < 0.0):
+                raise RobertValidationError("point_bottom_contribution_radiance must be non-negative")
+
         if self.eclipse_depth is not None:
             if self.eclipse_depth.spectral_grid.values.shape != self.radiance.spectral_grid.values.shape:
                 raise RobertValidationError("eclipse depth and radiance grids must have matching shapes")
@@ -85,6 +139,10 @@ class ClearSkyEmissionResult:
         object.__setattr__(self, "bottom_contribution_radiance", bottom)
         object.__setattr__(self, "emission_angle_cosines", mu)
         object.__setattr__(self, "emission_angle_weights", weights)
+        object.__setattr__(self, "geometry", geometry)
+        object.__setattr__(self, "point_radiance", point_radiance)
+        object.__setattr__(self, "point_layer_contribution_radiance", point_layer_contribution)
+        object.__setattr__(self, "point_bottom_contribution_radiance", point_bottom_contribution)
         object.__setattr__(self, "total_optical_depth", total_tau)
         object.__setattr__(self, "metadata", dict(self.metadata))
 
@@ -107,6 +165,7 @@ def solve_clear_sky_emission(
     *,
     emission_angle_cosines: ArrayLike | None = None,
     emission_angle_weights: ArrayLike | None = None,
+    geometry: DiscGeometry | None = None,
     bottom_boundary: str = "blackbody",
     additional_optical_depths: Sequence[object] | None = None,
     planet_radius_m: float | None = None,
@@ -125,17 +184,13 @@ def solve_clear_sky_emission(
     if bottom_mode not in {"blackbody", "none"}:
         raise RobertValidationError("bottom_boundary must be 'blackbody' or 'none'")
 
-    if emission_angle_cosines is None and emission_angle_weights is None:
-        mu, mu_weights = _normal_emission_quadrature()
-    elif emission_angle_cosines is not None and emission_angle_weights is not None:
-        mu, mu_weights = _validate_emission_angle_quadrature(
-            emission_angle_cosines,
-            emission_angle_weights,
-        )
-    else:
-        raise RobertValidationError(
-            "emission_angle_cosines and emission_angle_weights must be provided together"
-        )
+    emission_geometry = _resolve_emission_geometry(
+        geometry,
+        emission_angle_cosines,
+        emission_angle_weights,
+    )
+    mu = emission_geometry.emission_angle_cosines
+    mu_weights = emission_geometry.emission_angle_weights
 
     wavelength = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
     output_grid = SpectralGrid.from_array(
@@ -153,50 +208,65 @@ def solve_clear_sky_emission(
     )
     tau_ordered = total_tau[order]
 
-    layer_contribution_ordered = np.zeros(
-        (gas_optical_depth.atmosphere.n_layers, wavelength.size),
+    point_layer_contribution_ordered = np.zeros(
+        (mu.size, gas_optical_depth.atmosphere.n_layers, wavelength.size),
         dtype=float,
     )
-    bottom_contribution = np.zeros(wavelength.size, dtype=float)
+    point_bottom_contribution = np.zeros((mu.size, wavelength.size), dtype=float)
+    bottom_source = None
+    if bottom_mode == "blackbody":
+        deepest_temperature = float(
+            gas_optical_depth.atmosphere.temperature[
+                int(np.argmax(gas_optical_depth.pressure_grid.centers))
+            ]
+        )
+        bottom_source = _planck_radiance_wavelength(wavelength, deepest_temperature)
 
-    for mu_value, mu_weight in zip(mu, mu_weights):
+    for point_index, mu_value in enumerate(mu):
         slant_tau = tau_ordered / mu_value
         cumulative_before = _exclusive_cumulative(slant_tau)
         transmission_before = np.exp(-cumulative_before)
         layer_escape = transmission_before * (-np.expm1(-slant_tau))
         layer_radiance_by_g = source_ordered[:, :, None] * layer_escape
-        layer_contribution_ordered += (
-            np.sum(layer_radiance_by_g * gas_optical_depth.g_weights[None, None, :], axis=-1)
-            * mu_weight
+        point_layer_contribution_ordered[point_index] = np.sum(
+            layer_radiance_by_g * gas_optical_depth.g_weights[None, None, :],
+            axis=-1,
         )
         if bottom_mode == "blackbody":
             total_transmission = np.exp(-np.sum(slant_tau, axis=0))
-            deepest_temperature = float(
-                gas_optical_depth.atmosphere.temperature[
-                    int(np.argmax(gas_optical_depth.pressure_grid.centers))
-                ]
-            )
-            bottom_source = _planck_radiance_wavelength(wavelength, deepest_temperature)
-            bottom_contribution += (
+            point_bottom_contribution[point_index] = (
                 np.sum(total_transmission * gas_optical_depth.g_weights[None, :], axis=-1)
                 * bottom_source
-                * mu_weight
             )
 
+    layer_contribution_ordered = np.tensordot(mu_weights, point_layer_contribution_ordered, axes=(0, 0))
+    bottom_contribution = np.tensordot(mu_weights, point_bottom_contribution, axes=(0, 0))
     layer_contribution = _restore_layer_order(layer_contribution_ordered, order)
+    point_layer_contribution = _restore_point_layer_order(point_layer_contribution_ordered, order)
+    point_radiance = np.sum(point_layer_contribution, axis=1) + point_bottom_contribution
+    point_radiance.setflags(write=False)
+    point_bottom_contribution.setflags(write=False)
     radiance_values = np.sum(layer_contribution, axis=0) + bottom_contribution
     radiance_values.setflags(write=False)
+    common_metadata = {
+        "rt_solver": "clear_sky_numpy_reference",
+        "bottom_boundary": bottom_mode,
+        "source_function": "thermal_planck",
+        "scattering_treatment": scattering_treatment,
+        "scattering_source_function": "not_included",
+        "opacity_sources": "+".join(opacity_sources),
+        "geometry": emission_geometry.name,
+        "geometry_quadrature": emission_geometry.quadrature,
+        "geometry_n_points": str(emission_geometry.n_points),
+    }
+    if emission_geometry.phase_angle_deg is not None:
+        common_metadata["phase_angle_deg"] = f"{emission_geometry.phase_angle_deg:.12g}"
     radiance = Spectrum(
         spectral_grid=output_grid,
         values=radiance_values,
         unit="W m^-3 sr^-1",
         observable="spectral_radiance",
-        metadata={
-            "rt_solver": "clear_sky_numpy_reference",
-            "bottom_boundary": bottom_mode,
-            "scattering_treatment": scattering_treatment,
-            "opacity_sources": "+".join(opacity_sources),
-        },
+        metadata=common_metadata,
     )
 
     eclipse_depth = None
@@ -212,17 +282,14 @@ def solve_clear_sky_emission(
         if not np.all(np.isfinite(depth)) or np.any(depth < 0.0):
             raise RobertValidationError("clear-sky eclipse-depth calculation produced invalid values")
         depth.setflags(write=False)
+        eclipse_metadata = dict(common_metadata)
+        eclipse_metadata["stellar_model"] = "blackbody"
         eclipse_depth = Spectrum(
             spectral_grid=output_grid,
             values=depth,
             unit="eclipse_depth",
             observable="eclipse_depth",
-            metadata={
-                "rt_solver": "clear_sky_numpy_reference",
-                "stellar_model": "blackbody",
-                "scattering_treatment": scattering_treatment,
-                "opacity_sources": "+".join(opacity_sources),
-            },
+            metadata=eclipse_metadata,
         )
 
     return ClearSkyEmissionResult(
@@ -234,13 +301,12 @@ def solve_clear_sky_emission(
         bottom_contribution_radiance=bottom_contribution,
         emission_angle_cosines=mu,
         emission_angle_weights=mu_weights,
+        geometry=emission_geometry,
+        point_radiance=point_radiance,
+        point_layer_contribution_radiance=point_layer_contribution,
+        point_bottom_contribution_radiance=point_bottom_contribution,
         total_optical_depth=total_tau,
-        metadata={
-            "rt_solver": "clear_sky_numpy_reference",
-            "bottom_boundary": bottom_mode,
-            "scattering_treatment": scattering_treatment,
-            "opacity_sources": "+".join(opacity_sources),
-        },
+        metadata=common_metadata,
     )
 
 
@@ -251,24 +317,34 @@ def disk_average_quadrature(n_mu: int = 4) -> tuple[NDArray[np.float64], NDArray
     to one for a constant specific intensity.
     """
 
-    n = int(n_mu)
-    if n < 1:
-        raise RobertValidationError("n_mu must be at least one")
-    nodes, weights = np.polynomial.legendre.leggauss(n)
-    mu = 0.5 * (nodes + 1.0)
-    integral_weights = 0.5 * weights
-    disk_weights = 2.0 * mu * integral_weights
-    mu.setflags(write=False)
-    disk_weights.setflags(write=False)
-    return mu, disk_weights
+    geometry = gauss_legendre_disk_geometry(n_mu)
+    return geometry.emission_angle_cosines, geometry.emission_angle_weights
 
 
 def _normal_emission_quadrature() -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    mu = np.array([1.0], dtype=float)
-    weights = np.array([1.0], dtype=float)
-    mu.setflags(write=False)
-    weights.setflags(write=False)
-    return mu, weights
+    geometry = normal_emission_geometry()
+    return geometry.emission_angle_cosines, geometry.emission_angle_weights
+
+
+def _resolve_emission_geometry(
+    geometry: DiscGeometry | None,
+    emission_angle_cosines: ArrayLike | None,
+    emission_angle_weights: ArrayLike | None,
+) -> DiscGeometry:
+    if geometry is not None:
+        if emission_angle_cosines is not None or emission_angle_weights is not None:
+            raise RobertValidationError("geometry cannot be combined with emission angle quadrature inputs")
+        return geometry
+    if emission_angle_cosines is None and emission_angle_weights is None:
+        return normal_emission_geometry()
+    if emission_angle_cosines is not None and emission_angle_weights is not None:
+        return geometry_from_emission_angles(
+            emission_angle_cosines,
+            emission_angle_weights,
+            name="emission_angle_quadrature",
+            quadrature="custom_mu",
+        )
+    raise RobertValidationError("emission_angle_cosines and emission_angle_weights must be provided together")
 
 
 def _validate_emission_angle_quadrature(
@@ -380,6 +456,16 @@ def _restore_layer_order(
 ) -> NDArray[np.float64]:
     restored = np.empty_like(values_in_top_to_bottom_order)
     restored[order] = values_in_top_to_bottom_order
+    restored.setflags(write=False)
+    return restored
+
+
+def _restore_point_layer_order(
+    values_in_top_to_bottom_order: NDArray[np.float64],
+    order: NDArray[np.int64],
+) -> NDArray[np.float64]:
+    restored = np.empty_like(values_in_top_to_bottom_order)
+    restored[:, order, :] = values_in_top_to_bottom_order
     restored.setflags(write=False)
     return restored
 

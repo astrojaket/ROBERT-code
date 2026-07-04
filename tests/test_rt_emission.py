@@ -15,6 +15,8 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     disk_average_quadrature,
+    gauss_legendre_disk_geometry,
+    geometry_from_emission_angles,
     planck_radiance_wavelength,
     solve_clear_sky_emission,
 )
@@ -163,6 +165,78 @@ def test_disk_average_quadrature_weights_sum_to_one() -> None:
     assert np.all(mu > 0.0)
     assert np.all(mu <= 1.0)
     np.testing.assert_allclose(np.sum(weights), 1.0)
+
+
+def test_clear_sky_emission_geometry_matches_legacy_quadrature_inputs() -> None:
+    gas_tau = _gas_tau(
+        temperature=[900.0, 1200.0],
+        kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
+    )
+    mu, weights = disk_average_quadrature(3)
+    geometry = geometry_from_emission_angles(mu, weights, name="test_disc")
+
+    legacy = solve_clear_sky_emission(
+        gas_tau,
+        emission_angle_cosines=mu,
+        emission_angle_weights=weights,
+        bottom_boundary="none",
+    )
+    with_geometry = solve_clear_sky_emission(
+        gas_tau,
+        geometry=geometry,
+        bottom_boundary="none",
+    )
+
+    np.testing.assert_allclose(with_geometry.radiance.values, legacy.radiance.values)
+    np.testing.assert_allclose(
+        with_geometry.layer_contribution_radiance,
+        legacy.layer_contribution_radiance,
+    )
+    assert with_geometry.geometry is not None
+    assert with_geometry.geometry.name == "test_disc"
+    assert with_geometry.point_radiance is not None
+    np.testing.assert_allclose(
+        np.tensordot(geometry.emission_angle_weights, with_geometry.point_radiance, axes=(0, 0)),
+        with_geometry.radiance.values,
+    )
+    assert with_geometry.metadata["geometry"] == "test_disc"
+
+
+def test_clear_sky_emission_accepts_disk_geometry_object() -> None:
+    temperature = 1400.0
+    gas_tau = _gas_tau(
+        temperature=[temperature, temperature],
+        kcoeff=np.array([[[[5.0e-23, 8.0e-23]], [[2.0e-22, 4.0e-22]]]]),
+    )
+    geometry = gauss_legendre_disk_geometry(4)
+
+    result = solve_clear_sky_emission(
+        gas_tau,
+        geometry=geometry,
+        bottom_boundary="blackbody",
+    )
+
+    expected = planck_radiance_wavelength(result.radiance.spectral_grid.values, temperature)
+    np.testing.assert_allclose(result.radiance.values, expected, rtol=1.0e-12)
+    assert result.point_layer_contribution_radiance is not None
+    assert result.point_layer_contribution_radiance.shape[0] == geometry.n_points
+    assert result.metadata["geometry_quadrature"] == "gauss_legendre_mu"
+
+
+def test_clear_sky_emission_rejects_geometry_combined_with_legacy_angles() -> None:
+    gas_tau = _gas_tau(
+        temperature=[1000.0, 1000.0],
+        kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
+    )
+    geometry = gauss_legendre_disk_geometry(2)
+
+    with pytest.raises(RobertValidationError, match="geometry cannot be combined"):
+        solve_clear_sky_emission(
+            gas_tau,
+            geometry=geometry,
+            emission_angle_cosines=[1.0],
+            emission_angle_weights=[1.0],
+        )
 
 
 def test_clear_sky_emission_rejects_partial_eclipse_depth_inputs() -> None:

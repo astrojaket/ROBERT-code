@@ -27,8 +27,9 @@ from robert_exoplanets import (
     TabulatedTemperatureProfile,
     assemble_gas_optical_depth,
     cia_optical_depth,
-    disk_average_quadrature,
+    gauss_legendre_disk_geometry,
     load_emission_benchmark_csv,
+    nemesis_lobatto_phase_geometry,
     rayleigh_scattering_optical_depth,
     read_nemesis_cia_table,
     solve_clear_sky_emission,
@@ -135,6 +136,13 @@ def main() -> dict[str, object]:
     benchmark = load_emission_benchmark_csv(benchmark_csv, name="HAT-P-32b emission R1000")
     kta_paths = _species_paths(kta_dir, species)
     n_mu = int(os.environ.get("ROBERT_HAT_P_32B_RT_NMU", "4"))
+    geometry_mode = os.environ.get("ROBERT_HAT_P_32B_RT_GEOMETRY", "legendre_disk").strip().lower()
+    phase_angle_deg = float(os.environ.get("ROBERT_HAT_P_32B_PHASE_DEG", "0.0"))
+    geometry = _disc_geometry_from_env(
+        geometry_mode=geometry_mode,
+        n_mu=n_mu,
+        phase_angle_deg=phase_angle_deg,
+    )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     print("Benchmark: HAT-P-32b clear-sky emission RT")
@@ -150,6 +158,11 @@ def main() -> dict[str, object]:
     else:
         print(f"Chemistry: fixed VMRs {species_vmr}")
     print(f"Opacity species: {species}, gas_combination={gas_combination}, n_mu={n_mu}")
+    print(
+        "Geometry: "
+        f"{geometry.name} ({geometry.quadrature}, n_points={geometry.n_points}, "
+        f"phase={geometry.phase_angle_deg})"
+    )
     print(f"CIA: {'on' if include_cia else 'off'} ({cia_file})")
     print(f"Rayleigh: {'on' if include_rayleigh else 'off'}")
 
@@ -216,11 +229,9 @@ def main() -> dict[str, object]:
         additional_optical_depths.append(cia_optical_depth(gas_tau, cia_table))
     if include_rayleigh:
         additional_optical_depths.append(rayleigh_scattering_optical_depth(gas_tau))
-    mu, weights = disk_average_quadrature(n_mu)
     result = solve_clear_sky_emission(
         gas_tau,
-        emission_angle_cosines=mu,
-        emission_angle_weights=weights,
+        geometry=geometry,
         additional_optical_depths=additional_optical_depths,
         planet_radius_m=DEFAULT_PLANET_RADIUS_M,
         star_radius_m=DEFAULT_STAR_RADIUS_M,
@@ -235,6 +246,7 @@ def main() -> dict[str, object]:
         benchmark=benchmark.eclipse_depth,
     )
     plot_path = _plot_benchmark(benchmark, result, temperature, pressure_grid)
+    geometry_plot_path = _plot_geometry(result)
     summary_path = OUTPUT_DIR / "hat_p_32b_emission_rt_benchmark_summary.json"
     summary = {
         "benchmark": "HAT-P-32b clear-sky emission RT",
@@ -261,6 +273,7 @@ def main() -> dict[str, object]:
         "n_layers": atmosphere.n_layers,
         "n_wavelength": benchmark.n_points,
         "n_mu": n_mu,
+        "geometry": _geometry_summary(result.geometry),
         "planet_radius_m": DEFAULT_PLANET_RADIUS_M,
         "planet_mass_kg": DEFAULT_PLANET_MASS_KG,
         "star_radius_m": DEFAULT_STAR_RADIUS_M,
@@ -284,6 +297,7 @@ def main() -> dict[str, object]:
         "outputs": {
             "summary_json": str(summary_path),
             "plot_png": str(plot_path),
+            "geometry_plot_png": str(geometry_plot_path),
         },
     }
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -292,7 +306,45 @@ def main() -> dict[str, object]:
     print(f"Residual RMSE: {comparison['rmse_ppm']:.2f} ppm")
     print(f"Wrote {summary_path}")
     print(f"Wrote {plot_path}")
+    print(f"Wrote {geometry_plot_path}")
     return summary
+
+
+def _disc_geometry_from_env(
+    *,
+    geometry_mode: str,
+    n_mu: int,
+    phase_angle_deg: float,
+):
+    if geometry_mode in {"legendre", "legendre_disk", "gauss_legendre", "gauss_legendre_disk"}:
+        return gauss_legendre_disk_geometry(n_mu)
+    if geometry_mode in {"nemesis", "nemesis_lobatto", "lobatto", "phase"}:
+        return nemesis_lobatto_phase_geometry(phase_angle_deg=phase_angle_deg, n_mu=n_mu)
+    raise ValueError(
+        "ROBERT_HAT_P_32B_RT_GEOMETRY must be 'legendre_disk' or 'nemesis_lobatto'"
+    )
+
+
+def _geometry_summary(geometry) -> dict[str, object]:
+    if geometry is None:
+        return {}
+    mu = geometry.emission_angle_cosines
+    weights = geometry.emission_angle_weights
+    stellar_mu = geometry.stellar_mu
+    finite_stellar_mu = stellar_mu[np.isfinite(stellar_mu)]
+    return {
+        "name": geometry.name,
+        "quadrature": geometry.quadrature,
+        "phase_angle_deg": geometry.phase_angle_deg,
+        "n_points": geometry.n_points,
+        "mu_min": float(np.min(mu)),
+        "mu_max": float(np.max(mu)),
+        "weight_sum": float(np.sum(weights)),
+        "weight_max": float(np.max(weights)),
+        "stellar_mu_min": float(np.min(finite_stellar_mu)) if finite_stellar_mu.size else None,
+        "stellar_mu_max": float(np.max(finite_stellar_mu)) if finite_stellar_mu.size else None,
+        "metadata": dict(geometry.metadata),
+    }
 
 
 def _path_from_env(name: str, default: Path) -> Path:
@@ -505,6 +557,86 @@ def _plot_benchmark(
     lines = ax_profile.get_lines() + ax_weight.get_lines()
     labels = [line.get_label() for line in lines]
     ax_profile.legend(lines, labels, frameon=False, loc="lower right", fontsize=8.5)
+
+    fig.savefig(output_path, dpi=180)
+    plt.close(fig)
+    return output_path
+
+
+def _plot_geometry(result) -> Path:
+    output_path = OUTPUT_DIR / "hat_p_32b_disc_geometry.png"
+    geometry = result.geometry
+    if geometry is None:
+        raise RuntimeError("emission result did not include disc geometry")
+
+    mu = geometry.emission_angle_cosines
+    weights = geometry.emission_angle_weights
+    radii = geometry.projected_radius
+    azimuth = geometry.projected_azimuth_deg
+    stellar_mu = geometry.stellar_mu
+
+    unique_mu = np.array(sorted({round(float(value), 12) for value in mu}), dtype=float)
+    ring_weights = np.array([np.sum(weights[np.isclose(mu, value, rtol=0.0, atol=1.0e-12)]) for value in unique_mu])
+    ring_radii = np.sqrt(np.maximum(0.0, 1.0 - unique_mu**2))
+
+    fig, axes = plt.subplots(1, 2, figsize=(10.6, 4.8), constrained_layout=True)
+    ax_disc, ax_weights = axes
+
+    outer = plt.Circle((0.0, 0.0), 1.0, fill=False, color="#222222", linewidth=1.4)
+    ax_disc.add_patch(outer)
+    finite_projected = np.isfinite(radii) & np.isfinite(azimuth)
+    if np.count_nonzero(finite_projected) >= 2:
+        x = radii[finite_projected] * np.cos(np.radians(azimuth[finite_projected]))
+        y = radii[finite_projected] * np.sin(np.radians(azimuth[finite_projected]))
+        color_values = stellar_mu[finite_projected]
+        if not np.all(np.isfinite(color_values)):
+            color_values = weights[finite_projected]
+            color_label = "Point weight"
+            cmap = "viridis"
+        else:
+            color_label = "Stellar mu"
+            cmap = "coolwarm"
+        sizes = 1200.0 * weights[finite_projected] / np.max(weights[finite_projected]) + 25.0
+        scatter = ax_disc.scatter(
+            x,
+            y,
+            s=sizes,
+            c=color_values,
+            cmap=cmap,
+            edgecolor="#111111",
+            linewidth=0.45,
+            alpha=0.88,
+        )
+        fig.colorbar(scatter, ax=ax_disc, fraction=0.046, pad=0.04, label=color_label)
+    else:
+        for radius, weight in zip(ring_radii, ring_weights):
+            ring = plt.Circle(
+                (0.0, 0.0),
+                float(radius),
+                fill=False,
+                color="#1f77b4",
+                linewidth=0.8 + 5.0 * float(weight) / float(np.max(ring_weights)),
+                alpha=0.55,
+            )
+            ax_disc.add_patch(ring)
+        ax_disc.scatter([0.0], [0.0], s=36, color="#111111")
+
+    ax_disc.set_xlim(-1.08, 1.08)
+    ax_disc.set_ylim(-1.08, 1.08)
+    ax_disc.set_aspect("equal", adjustable="box")
+    ax_disc.set_xlabel("Projected x / R_p")
+    ax_disc.set_ylabel("Projected y / R_p")
+    ax_disc.set_title(f"{geometry.name}")
+    ax_disc.grid(alpha=0.2)
+
+    ax_weights.vlines(unique_mu, 0.0, ring_weights, color="#1f77b4", linewidth=1.7)
+    ax_weights.scatter(unique_mu, ring_weights, color="#1f77b4", s=50, zorder=3)
+    ax_weights.set_xlim(0.0, 1.04)
+    ax_weights.set_ylim(0.0, max(1.0e-12, float(np.max(ring_weights))) * 1.18)
+    ax_weights.set_xlabel("Emission mu")
+    ax_weights.set_ylabel("Disc weight per mu ring")
+    ax_weights.set_title(geometry.quadrature)
+    ax_weights.grid(alpha=0.25)
 
     fig.savefig(output_path, dpi=180)
     plt.close(fig)
