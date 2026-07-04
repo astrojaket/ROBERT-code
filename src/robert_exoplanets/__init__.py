@@ -76,7 +76,13 @@ from .retrieval import (
     RetrievalResult,
     run_stub_retrieval,
 )
-from .rt import GasOpticalDepth, assemble_gas_optical_depth
+from .rt import (
+    ClearSkyEmissionResult,
+    GasOpticalDepth,
+    assemble_gas_optical_depth,
+    disk_average_quadrature,
+    solve_clear_sky_emission,
+)
 
 __all__ = [
     "AtmosphereBuilder",
@@ -86,6 +92,7 @@ __all__ = [
     "ChemistryModel",
     "CompositionMeanMolecularWeight",
     "ConstantChemistry",
+    "ClearSkyEmissionResult",
     "CoverageReport",
     "CorrelatedKCoverageReport",
     "CorrelatedKOpacityProvider",
@@ -141,6 +148,7 @@ __all__ = [
     "assemble_gas_optical_depth",
     "compare_opacity_arrays",
     "convert_kta_to_robert_archive",
+    "disk_average_quadrature",
     "inspect_exomol_directory",
     "inspect_hitran_cia_file",
     "inspect_hitran_par_file",
@@ -155,6 +163,7 @@ __all__ = [
     "read_kta",
     "read_kta_header",
     "run_stub_retrieval",
+    "solve_clear_sky_emission",
     "time_callable",
     "write_robert_npy_directory",
     "write_robert_npz_archive",

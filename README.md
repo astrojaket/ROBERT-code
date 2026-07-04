@@ -37,6 +37,7 @@ python examples/plot_hat_p_32b_pt_profile.py
 python examples/inspect_opacity_metadata.py
 python examples/benchmark_opacity_archive_io.py
 python examples/benchmark_hat_p_32b_opacity.py
+python examples/benchmark_hat_p_32b_emission_rt.py
 ```
 
 Set `HAT_P_32B_EMISSION_CSV` to override the default Dropbox benchmark path.
@@ -67,12 +68,16 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
   slices.
 - Gas optical-depth assembly from evaluated correlated-k opacity, with
   plot-ready cumulative tau and transmission-weighting diagnostics.
+- A NumPy clear-sky thermal-emission reference solver with Planck source
+  integration, disk quadrature, eclipse-depth normalization, and layer
+  contribution diagnostics.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later
 
 - Real JWST data ingestion.
 - Atmospheric parameterization.
-- Full clear-sky emission radiative transfer.
+- CIA, scattering, clouds/aerosols, random-overlap multi-gas correlated-k, and
+  full NEMESIS-style RT parity.
 - Likelihood evaluation.
 - Sampler integration.

@@ -53,6 +53,12 @@
   cumulative tau, transmission, and layer weighting diagnostics for future
   RT contribution plots.
 - Added a synthetic tau and transmission-weighting plotting example.
+- Added a NumPy clear-sky thermal-emission reference solver with Planck
+  source-function integration, optional disk averaging, eclipse-depth output,
+  and layer contribution diagnostics.
+- Added a local HAT-P-32b clear-sky emission benchmark script that compares the
+  current gas-only ROBERT spectrum against the external NemesisPy benchmark and
+  records missing mature-NEMESIS physics explicitly.
 
 ## v0.2.0 - Core Domain Foundation
 
