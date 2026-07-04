@@ -12,6 +12,8 @@ from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, RobertValidationError, SpectralGrid
 from robert_exoplanets.opacity import EvaluatedCorrelatedKOpacity, pressure_values_in_unit
 
+from .random_overlap import random_overlap_species_tau
+
 ATOMIC_MASS_KG = 1.66053906660e-27
 
 
@@ -88,7 +90,16 @@ class GasOpticalDepth:
             raise RobertValidationError("species column densities must be non-negative")
         if np.any(species_tau < 0.0) or np.any(total_tau < 0.0):
             raise RobertValidationError("gas optical depths must be non-negative")
-        if not np.allclose(np.sum(species_tau, axis=0), total_tau, rtol=1.0e-12, atol=0.0):
+        metadata = dict(self.metadata)
+        gas_combination = metadata.get("gas_combination", "sum_by_g")
+        if gas_combination not in {"sum_by_g", "random_overlap"}:
+            raise RobertValidationError("gas_combination must be 'sum_by_g' or 'random_overlap'")
+        if gas_combination == "sum_by_g" and not np.allclose(
+            np.sum(species_tau, axis=0),
+            total_tau,
+            rtol=1.0e-12,
+            atol=0.0,
+        ):
             raise RobertValidationError("total_tau must equal the sum of species_tau")
         if not self.unit:
             raise RobertValidationError("gas optical-depth unit must not be empty")
@@ -100,7 +111,7 @@ class GasOpticalDepth:
         object.__setattr__(self, "species_column_density_molecules_m2", species_column)
         object.__setattr__(self, "species_tau", species_tau)
         object.__setattr__(self, "total_tau", total_tau)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", metadata)
 
     @property
     def pressure_grid(self) -> PressureGrid:
@@ -190,6 +201,7 @@ def assemble_gas_optical_depth(
     opacity: EvaluatedCorrelatedKOpacity,
     *,
     gravity_m_s2: float | ArrayLike,
+    gas_combination: str = "sum_by_g",
 ) -> GasOpticalDepth:
     """Assemble gas optical depth from evaluated correlated-k coefficients.
 
@@ -217,7 +229,11 @@ def assemble_gas_optical_depth(
     species_column_density = vmr * layer_column_density[None, :]
     kcoeff_m2_per_molecule = _kcoeff_m2_per_molecule(opacity.kcoeff, opacity.unit)
     species_tau = kcoeff_m2_per_molecule * species_column_density[:, :, None, None]
-    total_tau = np.sum(species_tau, axis=0)
+    combination = _gas_combination_mode(gas_combination)
+    if combination == "sum_by_g":
+        total_tau = np.sum(species_tau, axis=0)
+    else:
+        total_tau = random_overlap_species_tau(species_tau, opacity.prepared.g_weights)
 
     if not np.all(np.isfinite(species_tau)) or not np.all(np.isfinite(total_tau)):
         raise RobertValidationError("assembled gas optical depth must be finite")
@@ -236,6 +252,7 @@ def assemble_gas_optical_depth(
             "opacity_mode": "correlated_k",
             "opacity_unit": opacity.unit,
             "column_model": "hydrostatic_plane_parallel",
+            "gas_combination": combination,
         },
     )
 
@@ -305,6 +322,15 @@ def _kcoeff_m2_per_molecule(
         raise RobertValidationError(f"unsupported opacity unit for gas optical depth: {unit}")
     kcoeff.setflags(write=False)
     return kcoeff
+
+
+def _gas_combination_mode(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized in {"sum_by_g", "sum", "same_g_sum"}:
+        return "sum_by_g"
+    if normalized in {"random_overlap", "randomoverlap", "noverlap"}:
+        return "random_overlap"
+    raise RobertValidationError("gas_combination must be 'sum_by_g' or 'random_overlap'")
 
 
 def _top_to_bottom_order(pressure_grid: PressureGrid) -> NDArray[np.int64]:

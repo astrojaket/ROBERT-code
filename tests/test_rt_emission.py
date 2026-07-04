@@ -9,6 +9,7 @@ from robert_exoplanets import (
     AtmosphereState,
     EvaluatedCorrelatedKOpacity,
     GasOpticalDepth,
+    LayerOpticalDepth,
     PreparedCorrelatedKOpacity,
     PressureGrid,
     SpectralGrid,
@@ -72,6 +73,48 @@ def test_single_layer_without_bottom_matches_absorbing_slab_solution() -> None:
     expected = source * (-np.expm1(-gas_tau.total_tau[0, :, 0]))
     np.testing.assert_allclose(result.radiance.values, expected)
     np.testing.assert_allclose(result.bottom_contribution_radiance, 0.0)
+
+
+def test_clear_sky_emission_accepts_additional_layer_extinction() -> None:
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-5, 1.0e-3]),
+        centers=np.array([1.0e-4]),
+        unit="bar",
+    )
+    temperature = 1000.0
+    atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=np.array([temperature]),
+        composition={"H2O": np.array([1.0e-3])},
+        mean_molecular_weight=2.3,
+    )
+    spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")
+    opacity = _evaluated_opacity(
+        pressure_grid,
+        spectral_grid,
+        np.array([[[[1.0e-28]]]]),
+        unit="m^2/molecule",
+    )
+    gas_tau = assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=10.0)
+    continuum = LayerOpticalDepth(
+        name="test continuum",
+        tau=np.array([[0.3]]),
+        spectral_grid=gas_tau.spectral_grid,
+        pressure_grid=gas_tau.pressure_grid,
+    )
+
+    result = solve_clear_sky_emission(
+        gas_tau,
+        bottom_boundary="none",
+        additional_optical_depths=[continuum],
+    )
+
+    source = planck_radiance_wavelength([2.0], temperature)
+    expected_tau = gas_tau.total_tau[0, :, 0] + 0.3
+    expected = source * (-np.expm1(-expected_tau))
+    np.testing.assert_allclose(result.radiance.values, expected)
+    np.testing.assert_allclose(result.total_optical_depth[0, :, 0], expected_tau)
+    assert "test continuum" in result.metadata["opacity_sources"]
 
 
 def test_clear_sky_emission_returns_blackbody_eclipse_depth_when_star_is_blackbody() -> None:
