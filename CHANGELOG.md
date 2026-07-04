@@ -39,7 +39,16 @@
   I/O benchmark example.
 - Added a validated NEMESIS `.kta` reader for ExoMolOP/exo_k correlated-k
   products, including header coverage metadata, full k-coefficient loading, and
-  conversion into ROBERT native archives.
+  conversion into ROBERT native archives. The reader can optionally replace
+  non-finite k-coefficients with an in-memory runtime floor while preserving the
+  source table unchanged and recording replacement metadata.
+- Added a native-grid correlated-k opacity evaluator that produces
+  species-by-layer k-coefficients for exact pressure, temperature, wavelength,
+  and g-ordinate benchmark cases, plus optional pressure-temperature
+  interpolation in log-k.
+- Added a local HAT-P-32b opacity benchmark example that compares exact
+  evaluator slices against native `.kta` table values and writes diagnostic
+  opacity plots, including missing-table-region diagnostics.
 
 ## v0.2.0 - Core Domain Foundation
 

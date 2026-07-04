@@ -35,6 +35,7 @@ python examples/plot_hat_p_32b_benchmark.py
 python examples/plot_hat_p_32b_pt_profile.py
 python examples/inspect_opacity_metadata.py
 python examples/benchmark_opacity_archive_io.py
+python examples/benchmark_hat_p_32b_opacity.py
 ```
 
 Set `HAT_P_32B_EMISSION_CSV` to override the default Dropbox benchmark path.
@@ -54,9 +55,15 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - Opacity metadata, coverage checks, and lightweight inspectors for ExoMol,
   ExoMolOP/exo_k `.kta`, HITRAN `.par`, HITRAN CIA, and future ROBERT archives.
 - A validated ExoMolOP/exo_k/NEMESIS `.kta` reader and converter into ROBERT
-  native archives.
+  native archives, with an optional in-memory floor for missing non-finite
+  k-coefficients while leaving source tables unchanged.
 - ROBERT-native opacity archive helpers for readable-manifest `.npy`
   directories and compact `.npz` exchange files, with an I/O benchmark example.
+- A native-grid correlated-k opacity evaluator for exact benchmark cases and
+  optional log-pressure, temperature, log-k interpolation.
+- A local HAT-P-32b opacity benchmark example that reports exact evaluator
+  agreement, records missing opacity-table regions, and plots k-coefficient
+  slices.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later

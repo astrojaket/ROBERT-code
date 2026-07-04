@@ -9,6 +9,13 @@ from .archive import (
     write_robert_npy_directory,
     write_robert_npz_archive,
 )
+from .correlated_k import (
+    CorrelatedKCoverageReport,
+    CorrelatedKOpacityProvider,
+    CorrelatedKTable,
+    EvaluatedCorrelatedKOpacity,
+    PreparedCorrelatedKOpacity,
+)
 from .fixture import CoverageReport, EvaluatedOpacity, FixtureOpacityProvider, PreparedOpacity
 from .inspectors import (
     file_sha256,
@@ -40,7 +47,11 @@ from .metadata import (
 
 __all__ = [
     "CoverageReport",
+    "CorrelatedKCoverageReport",
+    "CorrelatedKOpacityProvider",
+    "CorrelatedKTable",
     "EvaluatedOpacity",
+    "EvaluatedCorrelatedKOpacity",
     "FixtureOpacityProvider",
     "GridCoverage",
     "NemesisKTable",
@@ -52,6 +63,7 @@ __all__ = [
     "OpacityMode",
     "OpacityStorageFormat",
     "PreparedOpacity",
+    "PreparedCorrelatedKOpacity",
     "RobertOpacityArchive",
     "SpectralCoverage",
     "convert_kta_to_robert_archive",

@@ -32,15 +32,27 @@ The current opacity implementation is metadata and coverage scaffolding. It can:
   native-shape metadata,
 - read `.kta` k-coefficients into ROBERT's native
   `(pressure, temperature, wavelength, g)` axis order,
+- optionally floor non-finite `.kta` k-coefficients in memory for incomplete
+  opacity products, recording replacement metadata while leaving source files
+  unchanged,
 - convert `.kta` products into ROBERT native archives,
+- evaluate correlated-k coefficients by exact native-grid lookup for
+  benchmark and validation cases,
+- evaluate correlated-k coefficients with optional log-pressure, linear
+  temperature, log-k interpolation while keeping spectral points on the native
+  opacity grid,
+- run a local HAT-P-32b opacity benchmark that checks exact evaluator slices
+  against native `.kta` values, records non-finite k-coefficient locations, and
+  plots wavelength and pressure-temperature opacity diagnostics with the same
+  explicit runtime floor policy available to future RT calls,
 - inspect HITRAN `.par` files enough to infer line-center coverage,
 - inspect HITRAN CIA headers enough to infer pair, spectral range, and
   temperature range,
 - read a ROBERT `.npz` archive manifest without loading large arrays,
 - validate whether an atmosphere request is covered by known metadata.
 
-It does not yet interpolate k-tables onto arbitrary model states, evaluate CIA,
-or perform radiative transfer.
+It does not yet interpolate or rebin k-tables onto arbitrary off-grid spectral
+grids, evaluate CIA coefficients, or perform radiative transfer.
 
 ## Native ROBERT Archive Candidates
 
@@ -88,13 +100,17 @@ can be added without changing the RT-facing contract.
 The next opacity increments should be:
 
 - validated `.kta` benchmark conversion for the HAT-P-32b ExoMolOP/exo_k files,
+- source-specific provenance checks for incomplete `.kta` products traced back
+  to ExoMol, HITRAN, or other upstream databases,
 - HITRAN CIA table reader for H2-H2 and H2-He first,
 - ROBERT native archive conversion from validated external opacity inputs,
 - prepared-opacity cache keys that include checksums, coverage, quadrature, and
-  interpolation policy,
+  source-table identity,
+- validated spectral-grid resampling/rebinning policy for correlated-k tables,
 - opacity benchmark reports that compare absorption or k-coefficients as a
   function of wavelength, pressure, and temperature,
-- NumPy reference interpolation kernels before any compiled acceleration.
+- NumPy reference kernels for optical-depth assembly before any compiled
+  acceleration.
 
 ## Benchmarking Requirement
 

@@ -7,7 +7,7 @@ directly so `.kta` can remain an import format rather than a native dependency.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from hashlib import sha256
 from pathlib import Path
 from typing import Mapping
@@ -33,6 +33,7 @@ _INT_DTYPE = np.dtype("<i4")
 _FLOAT_DTYPE = np.dtype("<f4")
 _FLOAT64 = np.float64
 _KDATA_SCALE = 1.0e-20
+_DEFAULT_NONFINITE_FILL_VALUE = 1.0e-300
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,7 @@ class NemesisKTable:
     header: NemesisKTableHeader
     kcoeff: NDArray[np.float64]
     unit: str = "cm^2/molecule"
+    metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         kcoeff = np.array(self.kcoeff, dtype=float, copy=True)
@@ -166,6 +168,7 @@ class NemesisKTable:
             raise RobertValidationError("kcoeff unit must not be empty")
         kcoeff.setflags(write=False)
         object.__setattr__(self, "kcoeff", kcoeff)
+        object.__setattr__(self, "metadata", dict(self.metadata))
 
 
 def read_kta_header(
@@ -249,8 +252,21 @@ def read_kta_header(
     )
 
 
-def read_kta(path: str | Path, *, checksum: bool = False) -> NemesisKTable:
-    """Read a NEMESIS `.kta` file into ROBERT's native axis order."""
+def read_kta(
+    path: str | Path,
+    *,
+    checksum: bool = False,
+    nonfinite_policy: str = "raise",
+    nonfinite_fill_value: float = _DEFAULT_NONFINITE_FILL_VALUE,
+) -> NemesisKTable:
+    """Read a NEMESIS `.kta` file into ROBERT's native axis order.
+
+    By default, ROBERT rejects tables with non-finite k-coefficients. For
+    incomplete legacy tables, set `nonfinite_policy="floor"` to map NaN or
+    infinite k-coefficients to `nonfinite_fill_value` in the returned runtime
+    array only. The source file is left unchanged and replacement counts are
+    recorded in the returned table metadata.
+    """
 
     header = read_kta_header(path, checksum=checksum)
     stored = np.fromfile(
@@ -262,7 +278,13 @@ def read_kta(path: str | Path, *, checksum: bool = False) -> NemesisKTable:
     if stored.size != header.n_kcoefficients:
         raise RobertDataError("`.kta` file ended before all k-coefficients could be read")
     kcoeff = stored.reshape(header.stored_shape)[::-1].transpose(1, 2, 0, 3).astype(_FLOAT64)
-    return NemesisKTable(header=header, kcoeff=kcoeff * _KDATA_SCALE)
+    kcoeff *= _KDATA_SCALE
+    kcoeff, metadata = _apply_nonfinite_policy(
+        kcoeff,
+        policy=nonfinite_policy,
+        fill_value=nonfinite_fill_value,
+    )
+    return NemesisKTable(header=header, kcoeff=kcoeff, metadata=metadata)
 
 
 def kta_product_from_header(
@@ -304,16 +326,25 @@ def convert_kta_to_robert_archive(
     archive: str = "npy",
     compressed: bool = False,
     overwrite: bool = False,
+    nonfinite_policy: str = "raise",
+    nonfinite_fill_value: float = _DEFAULT_NONFINITE_FILL_VALUE,
 ) -> OpacityDatabase:
     """Convert a `.kta` file into a ROBERT-native opacity archive."""
 
-    table = read_kta(path, checksum=True)
+    table = read_kta(
+        path,
+        checksum=True,
+        nonfinite_policy=nonfinite_policy,
+        nonfinite_fill_value=nonfinite_fill_value,
+    )
     species_name = species or _species_from_filename(Path(path))
+    product = kta_product_from_header(table.header, species=species_name, source=source)
+    product = replace(product, metadata={**dict(product.metadata), **dict(table.metadata)})
     database = OpacityDatabase(
-        products=(kta_product_from_header(table.header, species=species_name, source=source),),
+        products=(product,),
         name=f"{species_name}-kta-import",
         root=str(Path(path).expanduser()),
-        metadata={"converted_from": "nemesis_kta"},
+        metadata={"converted_from": "nemesis_kta", **dict(table.metadata)},
     )
     arrays = {
         "kcoeff": table.kcoeff,
@@ -352,6 +383,52 @@ def _read_float32(handle: object, count: int, name: str) -> NDArray[np.float64]:
     if values.size != count:
         raise RobertDataError(f"{name} ended early")
     return values.astype(float)
+
+
+def _apply_nonfinite_policy(
+    kcoeff: NDArray[np.float64],
+    *,
+    policy: str,
+    fill_value: float,
+) -> tuple[NDArray[np.float64], dict[str, str]]:
+    normalized_policy = policy.strip().lower()
+    if normalized_policy in {"strict", "error"}:
+        normalized_policy = "raise"
+    if normalized_policy not in {"raise", "floor"}:
+        raise RobertValidationError("nonfinite_policy must be 'raise' or 'floor'")
+    if not np.isfinite(fill_value) or fill_value <= 0.0:
+        raise RobertValidationError("nonfinite_fill_value must be finite and positive")
+
+    finite = np.isfinite(kcoeff)
+    nonfinite = ~finite
+    n_nonfinite = int(np.sum(nonfinite))
+    metadata = {
+        "kcoeff_nonfinite_policy": normalized_policy,
+        "kcoeff_nonfinite_fill_value": f"{float(fill_value):.17g}",
+        "kcoeff_nonfinite_replaced": "0",
+        "kcoeff_nan_replaced": "0",
+        "kcoeff_posinf_replaced": "0",
+        "kcoeff_neginf_replaced": "0",
+    }
+    if n_nonfinite == 0:
+        return kcoeff, metadata
+    if normalized_policy == "raise":
+        raise RobertValidationError(
+            f"kcoeff contains {n_nonfinite} non-finite values; "
+            "use nonfinite_policy='floor' for incomplete opacity tables"
+        )
+
+    sanitized = np.array(kcoeff, dtype=float, copy=True)
+    metadata.update(
+        {
+            "kcoeff_nonfinite_replaced": str(n_nonfinite),
+            "kcoeff_nan_replaced": str(int(np.sum(np.isnan(sanitized)))),
+            "kcoeff_posinf_replaced": str(int(np.sum(np.isposinf(sanitized)))),
+            "kcoeff_neginf_replaced": str(int(np.sum(np.isneginf(sanitized)))),
+        }
+    )
+    sanitized[nonfinite] = float(fill_value)
+    return sanitized, metadata
 
 
 def _require_kta_file(path: Path) -> None:

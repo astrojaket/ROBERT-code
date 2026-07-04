@@ -5,7 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
+from robert_exoplanets.core import RobertValidationError
 from robert_exoplanets.opacity import (
     OpacityDataSource,
     OpacityStorageFormat,
@@ -47,6 +49,34 @@ def test_read_kta_round_trips_kcoefficients(tmp_path: Path) -> None:
     assert table.header.molecule_id == 1
 
 
+def test_read_kta_rejects_nonfinite_kcoefficients_by_default(tmp_path: Path) -> None:
+    path, _expected = _write_synthetic_kta(
+        tmp_path / "CO_incomplete_test.kta",
+        nonfinite_index=(0, 1, 2, 1),
+    )
+
+    with pytest.raises(RobertValidationError, match="non-finite"):
+        read_kta(path)
+
+
+def test_read_kta_can_floor_nonfinite_kcoefficients_for_runtime(tmp_path: Path) -> None:
+    missing_index = (0, 1, 2, 1)
+    path, expected = _write_synthetic_kta(
+        tmp_path / "CO_floor_test.kta",
+        nonfinite_index=missing_index,
+    )
+    fill_value = 1.0e-300
+
+    table = read_kta(path, nonfinite_policy="floor", nonfinite_fill_value=fill_value)
+
+    expected = expected.copy()
+    expected[missing_index] = fill_value
+    np.testing.assert_allclose(table.kcoeff, expected)
+    assert table.metadata["kcoeff_nonfinite_policy"] == "floor"
+    assert table.metadata["kcoeff_nonfinite_replaced"] == "1"
+    assert table.metadata["kcoeff_nan_replaced"] == "1"
+
+
 def test_convert_kta_to_robert_archive_writes_native_directory(tmp_path: Path) -> None:
     path, expected = _write_synthetic_kta(tmp_path / "CH4_test.kta")
     archive_path = tmp_path / "CH4.robert-opacity"
@@ -68,7 +98,36 @@ def test_convert_kta_to_robert_archive_writes_native_directory(tmp_path: Path) -
     np.testing.assert_allclose(loaded.arrays["g_weights"], [0.4, 0.6])
 
 
-def _write_synthetic_kta(path: Path) -> tuple[Path, np.ndarray]:
+def test_convert_kta_to_robert_archive_preserves_floor_policy_metadata(tmp_path: Path) -> None:
+    missing_index = (0, 1, 2, 1)
+    path, expected = _write_synthetic_kta(
+        tmp_path / "NH3_incomplete_test.kta",
+        nonfinite_index=missing_index,
+    )
+    archive_path = tmp_path / "NH3.robert-opacity"
+
+    database = convert_kta_to_robert_archive(
+        path,
+        archive_path,
+        species="NH3",
+        archive="npy",
+        overwrite=True,
+        nonfinite_policy="floor",
+    )
+
+    expected = expected.copy()
+    expected[missing_index] = 1.0e-300
+    assert database.products[0].metadata["kcoeff_nonfinite_policy"] == "floor"
+    assert database.products[0].metadata["kcoeff_nonfinite_replaced"] == "1"
+    loaded = load_robert_npy_directory(archive_path)
+    np.testing.assert_allclose(loaded.arrays["kcoeff"], expected)
+
+
+def _write_synthetic_kta(
+    path: Path,
+    *,
+    nonfinite_index: tuple[int, int, int, int] | None = None,
+) -> tuple[Path, np.ndarray]:
     pressure = np.array([1.0e-5, 1.0], dtype=np.float32)
     temperature = np.array([500.0, 1000.0, 1500.0], dtype=np.float32)
     wavenumber = np.array([1000.0, 2000.0, 3000.0, 4000.0], dtype=np.float64)
@@ -83,6 +142,8 @@ def _write_synthetic_kta(path: Path) -> tuple[Path, np.ndarray]:
         ).reshape(pressure.size, temperature.size, wavenumber.size, g_samples.size)
         * 1.0e-32
     )
+    if nonfinite_index is not None:
+        kcoeff[nonfinite_index] = np.nan
 
     n_pressure, n_temperature, n_wavelength, n_g = kcoeff.shape
     irec0 = 11 + 2 * n_g + 2 + n_pressure + n_temperature + n_wavelength
