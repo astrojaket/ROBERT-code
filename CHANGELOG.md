@@ -49,6 +49,10 @@
 - Added a local HAT-P-32b opacity benchmark example that compares exact
   evaluator slices against native `.kta` table values and writes diagnostic
   opacity plots, including missing-table-region diagnostics.
+- Added gas optical-depth assembly from evaluated correlated-k opacity, plus
+  cumulative tau, transmission, and layer weighting diagnostics for future
+  RT contribution plots.
+- Added a synthetic tau and transmission-weighting plotting example.
 
 ## v0.2.0 - Core Domain Foundation
 

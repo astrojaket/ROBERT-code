@@ -17,6 +17,7 @@ pytest
 python examples/stub_emission_retrieval.py
 python examples/minimal_forward_model.py
 python examples/plot_blackbody_reference.py
+python examples/plot_synthetic_tau_weighting.py
 ```
 
 For an already-created environment, refresh the editable install with:
@@ -64,12 +65,14 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - A local HAT-P-32b opacity benchmark example that reports exact evaluator
   agreement, records missing opacity-table regions, and plots k-coefficient
   slices.
+- Gas optical-depth assembly from evaluated correlated-k opacity, with
+  plot-ready cumulative tau and transmission-weighting diagnostics.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later
 
 - Real JWST data ingestion.
 - Atmospheric parameterization.
-- Radiative transfer and opacity handling.
+- Full clear-sky emission radiative transfer.
 - Likelihood evaluation.
 - Sampler integration.

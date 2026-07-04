@@ -76,6 +76,7 @@ from .retrieval import (
     RetrievalResult,
     run_stub_retrieval,
 )
+from .rt import GasOpticalDepth, assemble_gas_optical_depth
 
 __all__ = [
     "AtmosphereBuilder",
@@ -97,6 +98,7 @@ __all__ = [
     "FixedMeanMolecularWeight",
     "ForwardModel",
     "FreeChemistry",
+    "GasOpticalDepth",
     "GaussianLikelihood",
     "GridCoverage",
     "IsothermalTemperatureProfile",
@@ -136,6 +138,7 @@ __all__ = [
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
     "build_atmosphere_setup",
+    "assemble_gas_optical_depth",
     "compare_opacity_arrays",
     "convert_kta_to_robert_archive",
     "inspect_exomol_directory",
