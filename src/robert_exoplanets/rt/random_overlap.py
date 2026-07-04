@@ -41,12 +41,16 @@ def random_overlap_species_tau(
         output.setflags(write=False)
         return output
 
+    random_weights = (weights[:, None] * weights[None, :]).reshape(-1)
+    target_edges = np.concatenate(([0.0], np.cumsum(weights)))
     combined = np.zeros((n_layers, n_spectral, n_g), dtype=float)
     for layer_index in range(n_layers):
         for spectral_index in range(n_spectral):
-            combined[layer_index, spectral_index] = random_overlap_tau_vectors(
+            combined[layer_index, spectral_index] = _random_overlap_tau_vectors_unchecked(
                 tau[:, layer_index, spectral_index, :],
                 weights,
+                random_weights,
+                target_edges,
                 cutoff=cutoff,
             )
 
@@ -74,17 +78,44 @@ def random_overlap_tau_vectors(
         output.setflags(write=False)
         return output
 
+    random_weights = (weights[:, None] * weights[None, :]).reshape(-1)
+    target_edges = np.concatenate(([0.0], np.cumsum(weights)))
+    combined = _random_overlap_tau_vectors_unchecked(
+        tau,
+        weights,
+        random_weights,
+        target_edges,
+        cutoff=cutoff,
+    )
+    combined.setflags(write=False)
+    return combined
+
+
+def _random_overlap_tau_vectors_unchecked(
+    tau: NDArray[np.float64],
+    weights: NDArray[np.float64],
+    random_weights: NDArray[np.float64],
+    target_edges: NDArray[np.float64],
+    *,
+    cutoff: float,
+) -> NDArray[np.float64]:
+    if tau.shape[0] == 1:
+        return np.array(tau[0], dtype=float, copy=True)
+
     active = [row for row in tau if np.max(row) >= cutoff]
     if not active:
         output = np.zeros(weights.size, dtype=float)
-        output.setflags(write=False)
         return output
 
     combined = np.array(active[0], dtype=float, copy=True)
     for next_tau in active[1:]:
-        combined = _combine_two_distributions(combined, next_tau, weights)
-
-    combined.setflags(write=False)
+        combined = _combine_two_distributions(
+            combined,
+            next_tau,
+            weights,
+            random_weights,
+            target_edges,
+        )
     return combined
 
 
@@ -101,20 +132,8 @@ def rank_rebin_distribution(
     if value_array.shape != source_weights.shape:
         raise RobertValidationError("values and weights must have the same shape")
 
-    order = np.argsort(value_array)
-    sorted_values = value_array[order]
-    sorted_weights = source_weights[order]
-    left_edges = np.concatenate(([0.0], np.cumsum(sorted_weights)[:-1]))
-    right_edges = np.cumsum(sorted_weights)
-    target_left = np.concatenate(([0.0], np.cumsum(target)[:-1]))
-    target_right = np.cumsum(target)
-
-    rebinned = np.zeros(target.size, dtype=float)
-    for index, (left, right, width) in enumerate(zip(target_left, target_right, target)):
-        overlap = np.minimum(right_edges, right) - np.maximum(left_edges, left)
-        overlap = np.maximum(overlap, 0.0)
-        rebinned[index] = np.sum(sorted_values * overlap) / width
-
+    target_edges = np.concatenate(([0.0], np.cumsum(target)))
+    rebinned = _rank_rebin_distribution_unchecked(value_array, source_weights, target, target_edges)
     rebinned.setflags(write=False)
     return rebinned
 
@@ -123,10 +142,33 @@ def _combine_two_distributions(
     left_tau: NDArray[np.float64],
     right_tau: NDArray[np.float64],
     g_weights: NDArray[np.float64],
+    random_weights: NDArray[np.float64],
+    target_edges: NDArray[np.float64],
 ) -> NDArray[np.float64]:
     random_values = (left_tau[:, None] + right_tau[None, :]).reshape(-1)
-    random_weights = (g_weights[:, None] * g_weights[None, :]).reshape(-1)
-    return rank_rebin_distribution(random_values, random_weights, g_weights)
+    return _rank_rebin_distribution_unchecked(
+        random_values,
+        random_weights,
+        g_weights,
+        target_edges,
+    )
+
+
+def _rank_rebin_distribution_unchecked(
+    values: NDArray[np.float64],
+    source_weights: NDArray[np.float64],
+    target_weights: NDArray[np.float64],
+    target_edges: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    order = np.argsort(values)
+    sorted_values = values[order]
+    sorted_weights = source_weights[order]
+    source_edges = np.concatenate(([0.0], np.cumsum(sorted_weights)))
+    source_edges[-1] = 1.0
+    cumulative_integral = np.concatenate(([0.0], np.cumsum(sorted_values * sorted_weights)))
+    integral_at_target_edges = np.interp(target_edges, source_edges, cumulative_integral)
+    rebinned = np.diff(integral_at_target_edges) / target_weights
+    return np.array(rebinned, dtype=float, copy=True)
 
 
 def _readonly_species_tau(values: ArrayLike) -> NDArray[np.float64]:
