@@ -21,6 +21,7 @@ from robert_exoplanets import (
     AtmosphereState,
     CompositionMeanMolecularWeight,
     CorrelatedKOpacityProvider,
+    FastChemEquilibriumChemistry,
     PressureGrid,
     SpectralGrid,
     TabulatedTemperatureProfile,
@@ -60,12 +61,18 @@ DEFAULT_CIA_FILE = (
     / "cia"
     / "exocia_hitran12_200-3800K.tab"
 )
+DEFAULT_FASTCHEM_PATH = Path.home() / "Dropbox" / "NemesisPy-Docker" / "fastchem"
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "hat_p_32b_emission_rt_benchmark"
 
 R_SUN_M = 6.957e8
 R_JUP_M = 7.1492e7
+M_JUP_KG = 1.898e27
+GRAVITATIONAL_CONSTANT = 6.67430e-11
 
 DEFAULT_SPECIES = ("H2O",)
+DEFAULT_FASTCHEM_ACTIVE_SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
+DEFAULT_FASTCHEM_SPECIES = ("H2O1", "C1O2", "C1O1", "C1H4", "H3N1", "C1H1N1_1", "H2", "He")
+DEFAULT_FASTCHEM_LABELS = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN", "H2", "He")
 DEFAULT_ACTIVE_VMR = {
     "H2O": 1.0e-2,
     "CO": 1.0e-4,
@@ -75,17 +82,22 @@ DEFAULT_ACTIVE_VMR = {
     "HCN": 1.0e-7,
 }
 DEFAULT_H2_FRACTION_OF_BACKGROUND = 0.8547
-DEFAULT_GRAVITY_M_S2 = 4.3
+DEFAULT_FASTCHEM_METALLICITY = 0.0
+DEFAULT_FASTCHEM_CTOO = 0.55
 DEFAULT_PLANET_RADIUS_M = 1.98 * R_JUP_M
+DEFAULT_PLANET_MASS_KG = 0.68 * M_JUP_KG
 DEFAULT_STAR_RADIUS_M = 1.32 * R_SUN_M
 DEFAULT_STAR_TEMPERATURE_K = 6001.0
+DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR = 100.0
+DEFAULT_REFERENCE_RADIUS_PRESSURE_PA = DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR * 101325.0
+DEFAULT_GRAVITY_M_S2 = GRAVITATIONAL_CONSTANT * DEFAULT_PLANET_MASS_KG / DEFAULT_PLANET_RADIUS_M**2
 RUNTIME_NONFINITE_FILL_VALUE = 1.0e-300
 
 MISSING_PHYSICS = (
-    "FastChem equilibrium abundance profiles for active gases",
     "scattering source-function treatment",
     "cloud and aerosol opacity/scattering",
-    "NEMESIS path-geometry/layering parity",
+    "NEMESIS/NemesisPy hydrostatic path-geometry parity",
+    "original 100-level pressure grid parity",
 )
 
 
@@ -96,8 +108,18 @@ def main() -> dict[str, object]:
     pt_csv = _path_from_env("HAT_P_32B_PT_CSV", DEFAULT_PT_CSV)
     kta_dir = _path_from_env("HAT_P_32B_KTA_DIR", DEFAULT_KTA_DIR)
     cia_file = _path_from_env("HAT_P_32B_CIA_FILE", DEFAULT_CIA_FILE)
-    species = _species_from_env(kta_dir)
-    species_vmr = _species_vmr(species)
+    chemistry_mode = os.environ.get("ROBERT_HAT_P_32B_CHEMISTRY", "fastchem").strip().lower()
+    if chemistry_mode not in {"fastchem", "fixed"}:
+        raise ValueError("ROBERT_HAT_P_32B_CHEMISTRY must be 'fastchem' or 'fixed'")
+    species = _species_from_env(kta_dir, chemistry_mode=chemistry_mode)
+    species_vmr = _species_vmr(species) if chemistry_mode == "fixed" else {}
+    fastchem_path = _path_from_env("ROBERT_FASTCHEM_PATH", DEFAULT_FASTCHEM_PATH)
+    fastchem_parameters = {
+        "metallicity": float(
+            os.environ.get("ROBERT_HAT_P_32B_FASTCHEM_METALLICITY", str(DEFAULT_FASTCHEM_METALLICITY))
+        ),
+        "CtoO": float(os.environ.get("ROBERT_HAT_P_32B_FASTCHEM_CTOO", str(DEFAULT_FASTCHEM_CTOO))),
+    }
     gas_combination = os.environ.get("ROBERT_HAT_P_32B_GAS_COMBINATION", "random_overlap")
     include_cia = _env_bool("ROBERT_HAT_P_32B_INCLUDE_CIA", True)
     include_rayleigh = _env_bool("ROBERT_HAT_P_32B_INCLUDE_RAYLEIGH", True)
@@ -119,7 +141,15 @@ def main() -> dict[str, object]:
     print(f"Benchmark CSV: {benchmark_csv}")
     print(f"P-T CSV: {pt_csv}")
     print(f"K-tables: {', '.join(str(path) for path in kta_paths.values())}")
-    print(f"Species VMRs: {species_vmr}, gas_combination={gas_combination}, n_mu={n_mu}")
+    if chemistry_mode == "fastchem":
+        print(
+            "Chemistry: FastChem "
+            f"(path={fastchem_path}, metallicity={fastchem_parameters['metallicity']}, "
+            f"C/O={fastchem_parameters['CtoO']})"
+        )
+    else:
+        print(f"Chemistry: fixed VMRs {species_vmr}")
+    print(f"Opacity species: {species}, gas_combination={gas_combination}, n_mu={n_mu}")
     print(f"CIA: {'on' if include_cia else 'off'} ({cia_file})")
     print(f"Rayleigh: {'on' if include_rayleigh else 'off'}")
 
@@ -143,8 +173,19 @@ def main() -> dict[str, object]:
         name="HAT-P-32b external PT",
     )
     temperature = profile.evaluate({}, pressure_grid)
-    composition = _composition(pressure_grid, species_vmr)
-    mean_molecular_weight = CompositionMeanMolecularWeight().evaluate(
+    if chemistry_mode == "fastchem":
+        chemistry = FastChemEquilibriumChemistry(
+            fastchem_path=fastchem_path,
+            fastchem_species=DEFAULT_FASTCHEM_SPECIES,
+            labels=DEFAULT_FASTCHEM_LABELS,
+            metadata={"source": "HAT-P-32b config_emission_clean.py"},
+        )
+        composition = chemistry.evaluate(fastchem_parameters, pressure_grid, temperature)
+        mmw_normalization = "raw_sum"
+    else:
+        composition = _fixed_composition(pressure_grid, species_vmr)
+        mmw_normalization = "require"
+    mean_molecular_weight = CompositionMeanMolecularWeight(normalization=mmw_normalization).evaluate(
         composition,
         pressure_grid,
     )
@@ -155,7 +196,8 @@ def main() -> dict[str, object]:
         mean_molecular_weight=mean_molecular_weight,
         metadata={
             "source": "HAT-P-32b local benchmark",
-            "chemistry": "fixed active gases plus H2/He background",
+            "chemistry": chemistry_mode,
+            "mmw_normalization": mmw_normalization,
         },
     )
     prepared = provider.prepare(spectral_grid, pressure_grid, species=species)
@@ -202,17 +244,40 @@ def main() -> dict[str, object]:
         "pt_csv": str(pt_csv),
         "kta_paths": {item: str(path) for item, path in kta_paths.items()},
         "cia_file": str(cia_file) if include_cia else None,
+        "chemistry_mode": chemistry_mode,
+        "fastchem_path": str(fastchem_path) if chemistry_mode == "fastchem" else None,
+        "fastchem_parameters": fastchem_parameters if chemistry_mode == "fastchem" else None,
         "species": list(species),
         "active_vmr": species_vmr,
+        "composition_summary": _composition_summary(composition),
+        "mean_molecular_weight_summary": {
+            "min_amu": float(np.min(mean_molecular_weight)),
+            "median_amu": float(np.median(mean_molecular_weight)),
+            "max_amu": float(np.max(mean_molecular_weight)),
+            "normalization": mmw_normalization,
+        },
         "gas_combination": gas_tau.metadata["gas_combination"],
         "additional_optical_depths": _optical_depth_summary(additional_optical_depths),
         "n_layers": atmosphere.n_layers,
         "n_wavelength": benchmark.n_points,
         "n_mu": n_mu,
         "planet_radius_m": DEFAULT_PLANET_RADIUS_M,
+        "planet_mass_kg": DEFAULT_PLANET_MASS_KG,
         "star_radius_m": DEFAULT_STAR_RADIUS_M,
         "star_temperature_k": DEFAULT_STAR_TEMPERATURE_K,
         "gravity_m_s2": DEFAULT_GRAVITY_M_S2,
+        "system_units": {
+            "planet_radius": "1.98 R_JUP_E = 1.98 * 7.1492e7 m",
+            "planet_mass": "0.68 M_JUP = 0.68 * 1.898e27 kg",
+            "star_radius": "1.32 R_SUN = 1.32 * 6.957e8 m",
+            "gravity": "G * M_plt / R_plt^2",
+        },
+        "reference_radius_pressure": {
+            "pref_bar_config": DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR,
+            "pref_pa_nemesispy_resolution": DEFAULT_REFERENCE_RADIUS_PRESSURE_PA,
+            "used_by_current_robert_emission_solver": False,
+            "note": "NemesisPy's HAT-P-32b emission path stores Pref but calls calc_hydrostat, not calc_hydrostat_pref_test.",
+        },
         "solver": result.metadata,
         "missing_physics_relative_to_mature_nemesis": list(MISSING_PHYSICS),
         "comparison": comparison,
@@ -248,9 +313,12 @@ def _species_paths(kta_dir: Path, species: tuple[str, ...]) -> dict[str, Path]:
     return {item: _species_path(kta_dir, item) for item in species}
 
 
-def _species_from_env(kta_dir: Path) -> tuple[str, ...]:
+def _species_from_env(kta_dir: Path, *, chemistry_mode: str) -> tuple[str, ...]:
     configured = os.environ.get("ROBERT_HAT_P_32B_RT_SPECIES")
     if configured is None or not configured.strip():
+        if chemistry_mode == "fastchem":
+            available = {path.name.split("_", maxsplit=1)[0] for path in kta_dir.glob("*.kta")}
+            return tuple(item for item in DEFAULT_FASTCHEM_ACTIVE_SPECIES if item in available)
         return DEFAULT_SPECIES
     normalized = configured.strip()
     if normalized.lower() == "all":
@@ -276,7 +344,7 @@ def _species_vmr(species: tuple[str, ...]) -> dict[str, float]:
     return vmr
 
 
-def _composition(
+def _fixed_composition(
     pressure_grid: PressureGrid,
     species_vmr: dict[str, float],
 ) -> dict[str, np.ndarray]:
@@ -290,6 +358,17 @@ def _composition(
     for species, vmr in species_vmr.items():
         composition[species] = np.full(pressure_grid.n_layers, vmr)
     return composition
+
+
+def _composition_summary(composition: dict[str, np.ndarray]) -> dict[str, dict[str, float]]:
+    return {
+        species: {
+            "min": float(np.min(values)),
+            "median": float(np.median(values)),
+            "max": float(np.max(values)),
+        }
+        for species, values in composition.items()
+    }
 
 
 def _env_bool(name: str, default: bool) -> bool:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,7 @@ from robert_exoplanets import (
     AtmosphereBuilder,
     BackgroundGasMixture,
     CompositionMeanMolecularWeight,
+    FastChemEquilibriumChemistry,
     FixedMeanMolecularWeight,
     FreeChemistry,
     IsothermalTemperatureProfile,
@@ -169,6 +172,47 @@ def test_composition_mean_molecular_weight_can_normalize_partial_budget() -> Non
 
     expected = (0.4 * 2.01588 + 0.1 * 4.002602) / (0.4 + 0.1)
     np.testing.assert_allclose(mean_molecular_weight, np.full(2, expected))
+
+
+def test_composition_mean_molecular_weight_can_preserve_raw_selected_species_sum() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    model = CompositionMeanMolecularWeight(normalization="raw_sum")
+
+    mean_molecular_weight = model.evaluate(
+        {
+            "H2": np.full(2, 0.4),
+            "He": np.full(2, 0.1),
+        },
+        grid,
+    )
+
+    expected = 0.4 * 2.01588 + 0.1 * 4.002602
+    np.testing.assert_allclose(mean_molecular_weight, np.full(2, expected))
+
+
+def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
+    pytest.importorskip("pyfastchem")
+    fastchem_path = Path.home() / "Dropbox" / "NemesisPy-Docker" / "fastchem"
+    if not fastchem_path.exists():
+        pytest.skip("local FastChem data files are not available")
+    grid = PressureGrid.logspace(1.0e-4, 1.0e-2, n_layers=2, unit="bar")
+    chemistry = FastChemEquilibriumChemistry(
+        fastchem_path=fastchem_path,
+        fastchem_species=("H2O1", "C1O1", "H2", "He"),
+        labels=("H2O", "CO", "H2", "He"),
+    )
+
+    composition = chemistry.evaluate(
+        {"metallicity": 0.0, "CtoO": 0.55},
+        grid,
+        np.full(grid.n_layers, 1500.0),
+    )
+
+    assert chemistry.required_parameters() == ("metallicity", "CtoO")
+    assert set(composition) == {"H2O", "CO", "H2", "He"}
+    assert np.all(composition["H2"] > 0.0)
+    assert np.all(composition["He"] > 0.0)
+    assert composition["H2"].flags.writeable is False
 
 
 def test_atmosphere_builder_accepts_free_chemistry_model() -> None:

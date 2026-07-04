@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from functools import cached_property
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Mapping, Protocol
 
 import numpy as np
@@ -119,6 +121,31 @@ def _readonly_layer_array(
 
 
 @dataclass(frozen=True)
+class _FastChemRuntime:
+    pyfastchem: object
+    fastchem: object
+    solar_abundances: NDArray[np.float64]
+    species_indices: NDArray[np.int64]
+
+
+def _pressure_values_pa(pressure_grid: PressureGrid) -> NDArray[np.float64]:
+    unit = pressure_grid.unit.strip().lower()
+    values = np.asarray(pressure_grid.centers, dtype=float)
+    if unit in {"pa", "pascal", "pascals"}:
+        pressure = np.array(values, dtype=float, copy=True)
+    elif unit in {"bar", "bars"}:
+        pressure = np.array(values * 1.0e5, dtype=float, copy=True)
+    elif unit in {"mbar", "millibar", "millibars"}:
+        pressure = np.array(values * 1.0e2, dtype=float, copy=True)
+    elif unit in {"atm", "atmosphere", "atmospheres"}:
+        pressure = np.array(values * 101325.0, dtype=float, copy=True)
+    else:
+        raise RobertValidationError(f"unsupported pressure unit for FastChem chemistry: {pressure_grid.unit}")
+    pressure.setflags(write=False)
+    return pressure
+
+
+@dataclass(frozen=True)
 class BackgroundGasMixture:
     """Relative split for background gases that fill unused VMR budget.
 
@@ -202,6 +229,8 @@ class CompositionMeanMolecularWeight:
     Molecular masses are in atomic mass units. With the default
     `normalization="require"` policy, each layer's VMR sum must be close to
     one so trace-only chemistry cannot accidentally define a bulk atmosphere.
+    `normalization="raw_sum"` preserves the direct weighted sum used by the
+    NemesisPy FastChem benchmark path when only selected species are retained.
     """
 
     molecular_masses: Mapping[str, float] = field(
@@ -212,8 +241,8 @@ class CompositionMeanMolecularWeight:
     unit: str = "amu"
 
     def __post_init__(self) -> None:
-        if self.normalization not in {"require", "normalize"}:
-            raise RobertValidationError("normalization must be 'require' or 'normalize'")
+        if self.normalization not in {"require", "normalize", "raw_sum"}:
+            raise RobertValidationError("normalization must be 'require', 'normalize', or 'raw_sum'")
         if not self.unit:
             raise RobertValidationError("mean molecular weight unit must not be empty")
         tolerance = float(self.sum_tolerance)
@@ -259,12 +288,178 @@ class CompositionMeanMolecularWeight:
 
         if np.any(total <= 0.0):
             raise RobertValidationError("composition VMR sums must be positive")
+        if self.normalization == "raw_sum":
+            mean_molecular_weight = numerator
+            mean_molecular_weight.setflags(write=False)
+            return mean_molecular_weight
         if self.normalization == "require" and np.any(np.abs(total - 1.0) > self.sum_tolerance):
             raise RobertValidationError("composition VMRs must sum to one to derive mean molecular weight")
 
         mean_molecular_weight = numerator / total
         mean_molecular_weight.setflags(write=False)
         return mean_molecular_weight
+
+
+@dataclass(frozen=True)
+class FastChemEquilibriumChemistry:
+    """FastChem equilibrium chemistry wrapper.
+
+    FastChem is an optional runtime dependency. This model mirrors the
+    HAT-P-32b NemesisPy workflow: metallicity is log10 relative to solar,
+    C/O is imposed by setting the carbon abundance relative to oxygen, and
+    pressure is passed to FastChem in bar.
+    """
+
+    fastchem_path: str | Path
+    fastchem_species: tuple[str, ...] = (
+        "H2O1",
+        "C1O2",
+        "C1O1",
+        "C1H4",
+        "H3N1",
+        "C1H1N1_1",
+        "H2",
+        "He",
+    )
+    labels: tuple[str, ...] = (
+        "H2O",
+        "CO2",
+        "CO",
+        "CH4",
+        "NH3",
+        "HCN",
+        "H2",
+        "He",
+    )
+    metallicity_parameter_name: str = "metallicity"
+    carbon_to_oxygen_parameter_name: str = "CtoO"
+    name: str = "fastchem-equilibrium"
+    convention: str = "volume_mixing_ratio"
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        path = Path(self.fastchem_path).expanduser()
+        if not self.name:
+            raise RobertValidationError("chemistry name must not be empty")
+        if self.convention != "volume_mixing_ratio":
+            raise RobertValidationError("FastChem chemistry currently returns volume_mixing_ratio")
+        if len(self.fastchem_species) != len(self.labels):
+            raise RobertValidationError("fastchem_species and labels must have the same length")
+        if not self.fastchem_species:
+            raise RobertValidationError("FastChem chemistry requires at least one species")
+        labels = tuple(_validate_species_name(label) for label in self.labels)
+        if len(set(labels)) != len(labels):
+            raise RobertValidationError("FastChem labels must be unique")
+        if not self.metallicity_parameter_name or not self.carbon_to_oxygen_parameter_name:
+            raise RobertValidationError("FastChem parameter names must not be empty")
+        object.__setattr__(self, "fastchem_path", path)
+        object.__setattr__(self, "fastchem_species", tuple(str(item) for item in self.fastchem_species))
+        object.__setattr__(self, "labels", labels)
+        object.__setattr__(self, "metadata", dict(self.metadata))
+
+    @property
+    def species(self) -> tuple[str, ...]:
+        """Species produced by this chemistry model."""
+
+        return self.labels
+
+    def required_parameters(self) -> tuple[str, ...]:
+        """Return required FastChem parameter names."""
+
+        return (self.metallicity_parameter_name, self.carbon_to_oxygen_parameter_name)
+
+    def evaluate(
+        self,
+        parameters: Mapping[str, float],
+        pressure_grid: PressureGrid,
+        temperature: NDArray[np.float64],
+    ) -> dict[str, NDArray[np.float64]]:
+        """Return FastChem VMR profiles on the supplied P-T grid."""
+
+        _validate_temperature_layers(temperature, pressure_grid)
+        metallicity_dex = _parameter_value(
+            parameters,
+            self.metallicity_parameter_name,
+            context="FastChem chemistry",
+        )
+        carbon_to_oxygen = _parameter_value(
+            parameters,
+            self.carbon_to_oxygen_parameter_name,
+            context="FastChem chemistry",
+        )
+        if carbon_to_oxygen < 0.0:
+            raise RobertValidationError("FastChem C/O must be non-negative")
+
+        runtime = self._runtime
+        element_abundances = np.array(runtime.solar_abundances, dtype=float, copy=True)
+        metallicity_scale = 10.0**metallicity_dex
+        for index in range(runtime.fastchem.getElementNumber()):
+            symbol = runtime.fastchem.getElementSymbol(index)
+            if symbol not in {"H", "He"}:
+                element_abundances[index] *= metallicity_scale
+
+        oxygen_index = runtime.fastchem.getElementIndex("O")
+        carbon_index = runtime.fastchem.getElementIndex("C")
+        element_abundances[carbon_index] = carbon_to_oxygen * element_abundances[oxygen_index]
+        runtime.fastchem.setElementAbundances(element_abundances)
+
+        pyfastchem = runtime.pyfastchem
+        pressure_pa = _pressure_values_pa(pressure_grid)
+        input_data = pyfastchem.FastChemInput()
+        input_data.pressure = pressure_pa / 1.0e5
+        input_data.temperature = np.asarray(temperature, dtype=float)
+
+        output_data = pyfastchem.FastChemOutput()
+        flag = runtime.fastchem.calcDensities(input_data, output_data)
+        if int(flag) != 0:
+            raise RobertValidationError(f"FastChem failed with status flag {flag}")
+
+        k_b_cgs = 1.380649e-16
+        gas_number_density = pressure_pa * 10.0 / (k_b_cgs * temperature)
+        number_densities = np.asarray(output_data.number_densities, dtype=float)
+        vmr = number_densities[:, runtime.species_indices] / gas_number_density[:, None]
+        if vmr.shape != (pressure_grid.n_layers, len(self.labels)):
+            raise RobertValidationError("FastChem returned an unexpected VMR shape")
+        if not np.all(np.isfinite(vmr)) or np.any(vmr < 0.0):
+            raise RobertValidationError("FastChem returned invalid VMR values")
+
+        profiles: dict[str, NDArray[np.float64]] = {}
+        for index, label in enumerate(self.labels):
+            profiles[label] = _readonly_layer_array(vmr[:, index], f"{label} FastChem VMR", pressure_grid.n_layers)
+        return profiles
+
+    @cached_property
+    def _runtime(self):
+        try:
+            import pyfastchem
+        except Exception as exc:  # pragma: no cover - dependency availability is environment-specific.
+            raise RobertConfigError("FastChem chemistry requires the optional pyfastchem package") from exc
+
+        abundances_path = self.fastchem_path / "input" / "element_abundances" / "asplund_2009.dat"
+        logk_path = self.fastchem_path / "input" / "logK" / "logK.dat"
+        if not abundances_path.exists() or not logk_path.exists():
+            raise RobertConfigError(
+                "FastChem chemistry could not find asplund_2009.dat and logK.dat "
+                f"under {self.fastchem_path}"
+            )
+
+        fastchem = pyfastchem.FastChem(str(abundances_path), str(logk_path), 0)
+        species_indices: list[int] = []
+        missing: list[str] = []
+        for species in self.fastchem_species:
+            index = fastchem.getGasSpeciesIndex(species)
+            if index == pyfastchem.FASTCHEM_UNKNOWN_SPECIES:
+                missing.append(species)
+            species_indices.append(int(index))
+        if missing:
+            raise RobertConfigError("FastChem does not know species: " + ", ".join(missing))
+
+        return _FastChemRuntime(
+            pyfastchem=pyfastchem,
+            fastchem=fastchem,
+            solar_abundances=np.array(fastchem.getElementAbundances(), dtype=float),
+            species_indices=np.array(species_indices, dtype=int),
+        )
 
 
 @dataclass(frozen=True)
