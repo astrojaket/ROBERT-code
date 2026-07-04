@@ -40,3 +40,4 @@ jobs:
           python examples/plot_free_chemistry_profiles.py
           python examples/build_atmosphere_from_config.py
           ROBERT_BENCH_REPEAT=3 ROBERT_BENCH_WARMUP=1 python examples/benchmark_atmosphere_build.py
+          ROBERT_OPACITY_IO_REPEAT=3 ROBERT_OPACITY_IO_WARMUP=1 python examples/benchmark_opacity_archive_io.py

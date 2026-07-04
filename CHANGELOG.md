@@ -28,6 +28,15 @@
   example for performance smoke testing.
 - Added a model-setup factory that maps HAT-P-32b-style atmosphere config
   blocks into ROBERT pressure, temperature, chemistry, and MMW components.
+- Added opacity metadata, coverage checks, and lightweight inspectors for
+  ExoMol/ExoMolOP, exo_k/NEMESIS `.kta`, HITRAN `.par`, HITRAN CIA, and future
+  ROBERT compressed archive manifests.
+- Added opacity-array benchmark diagnostics for future absorption and
+  k-coefficient validation across wavelength, pressure, temperature, and
+  g-ordinate axes.
+- Added ROBERT-native opacity archive helpers for readable-manifest `.npy`
+  directories and `.npz` exchange archives, plus a synthetic opacity archive
+  I/O benchmark example.
 
 ## v0.2.0 - Core Domain Foundation
 
