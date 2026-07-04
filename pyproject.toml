@@ -31,6 +31,9 @@ dev = [
   "matplotlib>=3.7",
   "pytest>=7.4"
 ]
+perf = [
+  "numba>=0.61"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

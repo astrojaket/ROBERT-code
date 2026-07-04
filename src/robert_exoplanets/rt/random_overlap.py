@@ -7,12 +7,21 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError
 
+try:  # pragma: no cover - exercised only when the optional perf extra is installed.
+    from numba import njit, prange
+except Exception:  # pragma: no cover - dependency availability is environment-specific.
+    njit = None
+    prange = range
+
+_NUMBA_AVAILABLE = njit is not None
+
 
 def random_overlap_species_tau(
     species_tau: ArrayLike,
     g_weights: ArrayLike,
     *,
     cutoff: float = 1.0e-12,
+    backend: str = "auto",
 ) -> NDArray[np.float64]:
     """Combine species optical-depth distributions with random overlap.
 
@@ -26,6 +35,10 @@ def random_overlap_species_tau(
         Species with optical depths below this threshold are skipped when more
         than one species is present. This mirrors the small-opacity guard used
         in the NEMESIS/NemesisPy random-overlap path.
+    backend
+        ``"auto"`` uses the optional Numba kernel when available and otherwise
+        uses the NumPy reference implementation. ``"numpy"`` and ``"numba"``
+        force a specific backend.
     """
 
     tau = _readonly_species_tau(species_tau)
@@ -40,6 +53,12 @@ def random_overlap_species_tau(
         output = np.array(tau[0], dtype=float, copy=True)
         output.setflags(write=False)
         return output
+
+    selected_backend = _random_overlap_backend(backend)
+    if selected_backend == "numba":
+        combined = _numba_random_overlap_species_tau(tau, weights, float(cutoff))
+        combined.setflags(write=False)
+        return combined
 
     random_weights = (weights[:, None] * weights[None, :]).reshape(-1)
     target_edges = np.concatenate(([0.0], np.cumsum(weights)))
@@ -63,6 +82,7 @@ def random_overlap_tau_vectors(
     g_weights: ArrayLike,
     *,
     cutoff: float = 1.0e-12,
+    backend: str = "auto",
 ) -> NDArray[np.float64]:
     """Combine one layer/wavelength set of species tau vectors."""
 
@@ -77,6 +97,14 @@ def random_overlap_tau_vectors(
         output = np.array(tau[0], dtype=float, copy=True)
         output.setflags(write=False)
         return output
+
+    selected_backend = _random_overlap_backend(backend)
+    if selected_backend == "numba":
+        tau_4d = tau[:, None, None, :]
+        combined_4d = _numba_random_overlap_species_tau(tau_4d, weights, float(cutoff))
+        combined = np.array(combined_4d[0, 0], dtype=float, copy=True)
+        combined.setflags(write=False)
+        return combined
 
     random_weights = (weights[:, None] * weights[None, :]).reshape(-1)
     target_edges = np.concatenate(([0.0], np.cumsum(weights)))
@@ -215,3 +243,116 @@ def _normalized_g_weights(values: ArrayLike) -> NDArray[np.float64]:
     normalized = np.array(weights / total, dtype=float, copy=True)
     normalized.setflags(write=False)
     return normalized
+
+
+def _random_overlap_backend(value: str) -> str:
+    normalized = value.strip().lower().replace("-", "_")
+    if normalized == "auto":
+        return "numba" if _NUMBA_AVAILABLE else "numpy"
+    if normalized == "numpy":
+        return "numpy"
+    if normalized == "numba":
+        if not _NUMBA_AVAILABLE:
+            raise RobertValidationError("random-overlap backend 'numba' requires the optional numba package")
+        return "numba"
+    raise RobertValidationError("random-overlap backend must be 'auto', 'numpy', or 'numba'")
+
+
+def _numba_random_overlap_species_tau(
+    tau: NDArray[np.float64],
+    weights: NDArray[np.float64],
+    cutoff: float,
+) -> NDArray[np.float64]:
+    if not _NUMBA_AVAILABLE:
+        raise RobertValidationError("random-overlap backend 'numba' requires the optional numba package")
+    return _numba_random_overlap_species_tau_kernel(tau, weights, cutoff)
+
+
+if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_random_overlap_species_tau_kernel(tau, weights, cutoff):
+        n_species, n_layers, n_spectral, n_g = tau.shape
+        output = np.zeros((n_layers, n_spectral, n_g), dtype=np.float64)
+        random_weights = np.empty(n_g * n_g, dtype=np.float64)
+        for i_g in range(n_g):
+            for j_g in range(n_g):
+                random_weights[i_g * n_g + j_g] = weights[i_g] * weights[j_g]
+
+        n_points = n_layers * n_spectral
+        for point_index in prange(n_points):
+            layer_index = point_index // n_spectral
+            spectral_index = point_index - layer_index * n_spectral
+            first_active = -1
+            for species_index in range(n_species):
+                max_tau = 0.0
+                for g_index in range(n_g):
+                    value = tau[species_index, layer_index, spectral_index, g_index]
+                    if value > max_tau:
+                        max_tau = value
+                if max_tau >= cutoff:
+                    first_active = species_index
+                    break
+
+            if first_active < 0:
+                continue
+
+            combined = np.empty(n_g, dtype=np.float64)
+            for g_index in range(n_g):
+                combined[g_index] = tau[first_active, layer_index, spectral_index, g_index]
+
+            for species_index in range(first_active + 1, n_species):
+                max_tau = 0.0
+                for g_index in range(n_g):
+                    value = tau[species_index, layer_index, spectral_index, g_index]
+                    if value > max_tau:
+                        max_tau = value
+                if max_tau < cutoff:
+                    continue
+
+                next_tau = np.empty(n_g, dtype=np.float64)
+                for g_index in range(n_g):
+                    next_tau[g_index] = tau[species_index, layer_index, spectral_index, g_index]
+                combined = _numba_combine_two_distributions(
+                    combined,
+                    next_tau,
+                    weights,
+                    random_weights,
+                )
+
+            for g_index in range(n_g):
+                output[layer_index, spectral_index, g_index] = combined[g_index]
+        return output
+
+
+    @njit
+    def _numba_combine_two_distributions(left_tau, right_tau, weights, random_weights):
+        n_g = weights.size
+        n_random = n_g * n_g
+        random_values = np.empty(n_random, dtype=np.float64)
+        for i_g in range(n_g):
+            for j_g in range(n_g):
+                random_values[i_g * n_g + j_g] = left_tau[i_g] + right_tau[j_g]
+
+        order = np.argsort(random_values)
+        rebinned = np.empty(n_g, dtype=np.float64)
+        target_left = 0.0
+        for target_index in range(n_g):
+            target_right = target_left + weights[target_index]
+            source_left = 0.0
+            integral = 0.0
+            for random_index in range(n_random):
+                ordered_index = order[random_index]
+                source_right = source_left + random_weights[ordered_index]
+                overlap = min(source_right, target_right) - max(source_left, target_left)
+                if overlap > 0.0:
+                    integral += random_values[ordered_index] * overlap
+                source_left = source_right
+            rebinned[target_index] = integral / weights[target_index]
+            target_left = target_right
+        return rebinned
+
+else:
+
+    def _numba_random_overlap_species_tau_kernel(tau, weights, cutoff):
+        raise RobertValidationError("random-overlap backend 'numba' requires the optional numba package")

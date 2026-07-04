@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from robert_exoplanets import (
     AtmosphereState,
@@ -51,6 +52,33 @@ def test_random_overlap_species_tau_preserves_single_species_distribution() -> N
     combined = random_overlap_species_tau(species_tau, [0.4, 0.6])
 
     np.testing.assert_allclose(combined, species_tau[0])
+
+
+def test_numba_random_overlap_backend_matches_numpy_when_available() -> None:
+    pytest.importorskip("numba")
+    species_tau = np.array(
+        [
+            [[
+                [0.1, 0.4, 0.2],
+                [0.3, 0.2, 0.8],
+            ]],
+            [[
+                [0.5, 0.2, 0.1],
+                [0.4, 0.7, 0.6],
+            ]],
+            [[
+                [0.0, 0.1, 0.3],
+                [0.2, 0.1, 0.5],
+            ]],
+        ],
+        dtype=float,
+    )
+    weights = np.array([0.2, 0.5, 0.3])
+
+    numpy_combined = random_overlap_species_tau(species_tau, weights, backend="numpy")
+    numba_combined = random_overlap_species_tau(species_tau, weights, backend="numba")
+
+    np.testing.assert_allclose(numba_combined, numpy_combined, rtol=1.0e-12, atol=1.0e-12)
 
 
 def test_assemble_gas_optical_depth_can_use_random_overlap_combination() -> None:
