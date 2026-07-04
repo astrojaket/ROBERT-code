@@ -28,14 +28,19 @@ The current opacity implementation is metadata and coverage scaffolding. It can:
 - describe opacity products with typed metadata,
 - inspect ExoMol/ExoMolOP-style directories by suffix,
 - inspect ExoMolOP or exo_k-generated `.kta` files as correlated-k products,
+  including header-derived spectral, pressure, temperature, g-ordinate, and
+  native-shape metadata,
+- read `.kta` k-coefficients into ROBERT's native
+  `(pressure, temperature, wavelength, g)` axis order,
+- convert `.kta` products into ROBERT native archives,
 - inspect HITRAN `.par` files enough to infer line-center coverage,
 - inspect HITRAN CIA headers enough to infer pair, spectral range, and
   temperature range,
 - read a ROBERT `.npz` archive manifest without loading large arrays,
 - validate whether an atmosphere request is covered by known metadata.
 
-It does not yet calculate opacities, interpolate k-tables, evaluate CIA, or
-perform radiative transfer.
+It does not yet interpolate k-tables onto arbitrary model states, evaluate CIA,
+or perform radiative transfer.
 
 ## Native ROBERT Archive Candidates
 
@@ -82,7 +87,7 @@ can be added without changing the RT-facing contract.
 
 The next opacity increments should be:
 
-- validated `.kta` header reader for ExoMolOP/exo_k/NEMESIS files,
+- validated `.kta` benchmark conversion for the HAT-P-32b ExoMolOP/exo_k files,
 - HITRAN CIA table reader for H2-H2 and H2-He first,
 - ROBERT native archive conversion from validated external opacity inputs,
 - prepared-opacity cache keys that include checksums, coverage, quadrature, and

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+
 from robert_exoplanets.opacity import (
     OpacityDataSource,
     OpacityMode,
@@ -17,7 +19,7 @@ from robert_exoplanets.opacity import (
 
 def test_inspect_kta_file_records_exomol_op_source_and_nemesis_storage(tmp_path: Path) -> None:
     path = tmp_path / "H2O_emission_R1000.kta"
-    path.write_bytes(b"synthetic-k-table")
+    _write_minimal_kta(path)
 
     product = inspect_kta_file(path)
 
@@ -25,7 +27,8 @@ def test_inspect_kta_file_records_exomol_op_source_and_nemesis_storage(tmp_path:
     assert product.mode == OpacityMode.CORRELATED_K
     assert product.source == OpacityDataSource.EXOMOL_OP
     assert product.storage_format == OpacityStorageFormat.NEMESIS_KTA
-    assert product.file_size_bytes == len(b"synthetic-k-table")
+    assert product.g_ordinates == 2
+    assert product.native_shape == (1, 1, 2, 2)
     assert product.checksum_sha256
 
 
@@ -91,3 +94,33 @@ def test_inspect_exomol_directory_discovers_line_list_and_k_table(tmp_path: Path
 
 def _hitran_line(*, molecule_id: int, isotopologue_id: int, wavenumber: float) -> str:
     return f"{molecule_id:>2}{isotopologue_id:1d}{wavenumber:12.6f}{1.0e-20:10.3E}\n"
+
+
+def _write_minimal_kta(path: Path) -> None:
+    pressure = np.array([1.0e-3], dtype=np.float32)
+    temperature = np.array([1000.0], dtype=np.float32)
+    wavelength = np.array([10.0, 5.0], dtype=np.float32)
+    g_samples = np.array([0.25, 0.75], dtype=np.float32)
+    g_weights = np.array([0.5, 0.5], dtype=np.float32)
+    kcoeff = np.ones((1, 1, 2, 2), dtype=np.float32) * 1.0e-10
+    n_pressure, n_temperature, n_wavelength, n_g = kcoeff.shape
+    irec0 = 11 + 2 * n_g + 2 + n_pressure + n_temperature + n_wavelength
+    with path.open("wb") as handle:
+        handle.write(np.int32(irec0).tobytes())
+        handle.write(np.int32(n_wavelength).tobytes())
+        handle.write(np.float32(wavelength[-1]).tobytes())
+        handle.write(np.float32(-1.0).tobytes())
+        handle.write(np.float32(0.0).tobytes())
+        handle.write(np.int32(n_pressure).tobytes())
+        handle.write(np.int32(n_temperature).tobytes())
+        handle.write(np.int32(n_g).tobytes())
+        handle.write(np.int32(1).tobytes())
+        handle.write(np.int32(0).tobytes())
+        handle.write(g_samples.tobytes())
+        handle.write(g_weights.tobytes())
+        handle.write(np.float32(0.0).tobytes())
+        handle.write(np.float32(0.0).tobytes())
+        handle.write(pressure.tobytes())
+        handle.write(temperature.tobytes())
+        handle.write(wavelength[::-1].tobytes())
+        handle.write((kcoeff[:, :, ::-1, :].transpose(2, 0, 1, 3) * 1.0e20).astype(np.float32).tobytes())

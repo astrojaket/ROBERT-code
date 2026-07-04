@@ -35,9 +35,21 @@ def main() -> None:
     print(f"Species: {', '.join(database.species)}")
     for product in database.products:
         size_mb = (product.file_size_bytes or 0) / 1024**2
+        spectral = product.spectral_coverage
+        grid = product.grid_coverage
+        spectral_text = "coverage=unknown"
+        if spectral is not None:
+            spectral_text = f"{spectral.min_value:.1f}-{spectral.max_value:.1f} {spectral.unit}"
+        grid_text = "P/T=unknown"
+        if grid is not None:
+            grid_text = (
+                f"P={grid.pressure_min:.2e}-{grid.pressure_max:.2e} {grid.pressure_unit}, "
+                f"T={grid.temperature_min:.0f}-{grid.temperature_max:.0f} {grid.temperature_unit}"
+            )
         print(
             f"- {product.species[0]}: source={product.source.value}, "
             f"format={product.storage_format.value}, mode={product.mode.value}, "
+            f"shape={product.native_shape}, {spectral_text}, {grid_text}, "
             f"size={size_mb:.1f} MiB, sha256={product.checksum_sha256[:12]}"
         )
 

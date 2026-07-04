@@ -17,6 +17,14 @@ from .inspectors import (
     inspect_hitran_par_file,
     inspect_kta_file,
 )
+from .kta import (
+    NemesisKTable,
+    NemesisKTableHeader,
+    convert_kta_to_robert_archive,
+    kta_product_from_header,
+    read_kta,
+    read_kta_header,
+)
 from .metadata import (
     GridCoverage,
     OpacityCoverageReport,
@@ -35,6 +43,8 @@ __all__ = [
     "EvaluatedOpacity",
     "FixtureOpacityProvider",
     "GridCoverage",
+    "NemesisKTable",
+    "NemesisKTableHeader",
     "OpacityCoverageReport",
     "OpacityDatabase",
     "OpacityDataProduct",
@@ -44,6 +54,7 @@ __all__ = [
     "PreparedOpacity",
     "RobertOpacityArchive",
     "SpectralCoverage",
+    "convert_kta_to_robert_archive",
     "file_sha256",
     "inspect_exomol_directory",
     "inspect_hitran_cia_file",
@@ -53,7 +64,10 @@ __all__ = [
     "inspect_robert_npz_archive",
     "load_robert_npy_directory",
     "load_robert_npz_archive",
+    "kta_product_from_header",
     "pressure_values_in_unit",
+    "read_kta",
+    "read_kta_header",
     "spectral_grid_values_in_unit",
     "write_robert_npy_directory",
     "write_robert_npz_archive",

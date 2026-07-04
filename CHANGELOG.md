@@ -37,6 +37,9 @@
 - Added ROBERT-native opacity archive helpers for readable-manifest `.npy`
   directories and `.npz` exchange archives, plus a synthetic opacity archive
   I/O benchmark example.
+- Added a validated NEMESIS `.kta` reader for ExoMolOP/exo_k correlated-k
+  products, including header coverage metadata, full k-coefficient loading, and
+  conversion into ROBERT native archives.
 
 ## v0.2.0 - Core Domain Foundation
 

@@ -53,6 +53,8 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - Blackbody reference diagnostics for visual sanity checks.
 - Opacity metadata, coverage checks, and lightweight inspectors for ExoMol,
   ExoMolOP/exo_k `.kta`, HITRAN `.par`, HITRAN CIA, and future ROBERT archives.
+- A validated ExoMolOP/exo_k/NEMESIS `.kta` reader and converter into ROBERT
+  native archives.
 - ROBERT-native opacity archive helpers for readable-manifest `.npy`
   directories and compact `.npz` exchange files, with an I/O benchmark example.
 - Tests that lock in the intended skeleton behavior.

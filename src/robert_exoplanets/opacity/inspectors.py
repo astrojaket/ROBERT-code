@@ -115,31 +115,20 @@ def inspect_kta_file(
     *,
     species: str | None = None,
     source: OpacityDataSource | str = OpacityDataSource.EXOMOL_OP,
-    spectral_coverage: SpectralCoverage | None = None,
-    grid_coverage: GridCoverage | None = None,
-    g_ordinates: int | None = None,
+    checksum: bool = True,
 ) -> OpacityDataProduct:
     """Inspect a NEMESIS-style `.kta` correlated-k file.
 
     ExoMolOP/exo_k products can use the NEMESIS `.kta` storage format, so the
     default source records ExoMolOP while preserving the binary format name.
-    Coverage is accepted as explicit metadata until ROBERT has a fully validated
-    `.kta` header reader.
     """
 
     item = Path(path).expanduser()
     inferred_species = species or _species_from_filename(item)
-    return _file_product(
-        item,
-        species=(inferred_species,),
-        mode=OpacityMode.CORRELATED_K,
-        source=source,
-        storage_format=OpacityStorageFormat.NEMESIS_KTA,
-        spectral_coverage=spectral_coverage,
-        grid_coverage=grid_coverage,
-        g_ordinates=g_ordinates,
-        metadata={"coverage": "explicit" if spectral_coverage or grid_coverage else "unknown"},
-    )
+    from .kta import kta_product_from_header, read_kta_header
+
+    header = read_kta_header(item, checksum=checksum)
+    return kta_product_from_header(header, species=inferred_species, source=source)
 
 
 def inspect_hitran_par_file(

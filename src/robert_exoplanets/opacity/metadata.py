@@ -165,12 +165,12 @@ class GridCoverage:
         temperature_max = _optional_float(self.temperature_max)
         if (pressure_min is None) != (pressure_max is None):
             raise RobertValidationError("pressure coverage must provide both min and max")
-        if pressure_min is not None and pressure_min >= pressure_max:
-            raise RobertValidationError("pressure coverage min must be smaller than max")
+        if pressure_min is not None and pressure_min > pressure_max:
+            raise RobertValidationError("pressure coverage min must be smaller than or equal to max")
         if (temperature_min is None) != (temperature_max is None):
             raise RobertValidationError("temperature coverage must provide both min and max")
-        if temperature_min is not None and temperature_min >= temperature_max:
-            raise RobertValidationError("temperature coverage min must be smaller than max")
+        if temperature_min is not None and temperature_min > temperature_max:
+            raise RobertValidationError("temperature coverage min must be smaller than or equal to max")
         if not self.pressure_unit:
             raise RobertValidationError("pressure coverage unit must not be empty")
         if not self.temperature_unit:
