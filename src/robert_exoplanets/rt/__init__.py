@@ -5,6 +5,7 @@ from .emission import (
     disk_average_quadrature,
     solve_clear_sky_emission,
 )
+from .clouds import CloudOpticalProperties, grey_cloud_deck, power_law_haze
 from .extinction import (
     CiaTable,
     LayerOpticalDepth,
@@ -33,9 +34,15 @@ from .scattering import (
     isotropic_phase_function,
     rayleigh_phase_function,
 )
+from .two_stream import (
+    TwoStreamScatteringDiagnostics,
+    two_stream_effective_optical_depth,
+    two_stream_scattering_diagnostics,
+)
 
 __all__ = [
     "ClearSkyEmissionResult",
+    "CloudOpticalProperties",
     "DirectStellarBeam",
     "DiscGeometry",
     "DiscPoint",
@@ -44,6 +51,7 @@ __all__ = [
     "LayerOpticalDepth",
     "CiaTable",
     "SingleScatteringSource",
+    "TwoStreamScatteringDiagnostics",
     "assemble_gas_optical_depth",
     "cia_optical_depth",
     "disk_average_quadrature",
@@ -53,6 +61,8 @@ __all__ = [
     "isotropic_phase_function",
     "lobatto_phase_geometry",
     "normal_emission_geometry",
+    "grey_cloud_deck",
+    "power_law_haze",
     "random_overlap_species_tau",
     "random_overlap_tau_vectors",
     "rank_rebin_distribution",
@@ -60,4 +70,6 @@ __all__ = [
     "rayleigh_scattering_optical_depth",
     "read_cia_table",
     "solve_clear_sky_emission",
+    "two_stream_effective_optical_depth",
+    "two_stream_scattering_diagnostics",
 ]

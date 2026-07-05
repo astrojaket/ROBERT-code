@@ -3,8 +3,8 @@
 ROBERT is an early-stage JWST exoplanet emission retrieval code. It now
 contains typed core domain objects, modular atmosphere and chemistry
 components, opacity import/archive helpers, RT-facing optical-depth objects, a
-NumPy emission reference solver, and benchmark examples. A full retrieval
-engine is not implemented yet.
+NumPy emission reference solver, first cloud/aerosol scattering hooks, and
+benchmark examples. A full retrieval engine is not implemented yet.
 
 The Python distribution name is `robert-exoplanets` to avoid colliding with the existing `robert` package on PyPI.
 
@@ -22,6 +22,7 @@ python examples/stub_emission_retrieval.py
 python examples/minimal_forward_model.py
 python examples/plot_blackbody_reference.py
 python examples/plot_synthetic_tau_weighting.py
+python examples/plot_cloud_scattering_reference.py
 ```
 
 For an already-created environment, refresh the editable install with:
@@ -78,15 +79,19 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - A NumPy clear-sky thermal-emission reference solver with Planck source
   integration, disk quadrature, eclipse-depth normalization, and layer
   contribution diagnostics.
+- Cloud/aerosol optical-property containers with extinction optical depth,
+  single-scattering albedo, asymmetry factor, and absorption/scattering splits.
 - First-order direct-beam single-scattering source diagnostics for phase-aware
   geometries.
+- A first conservative two-stream multiple-scattering reference backend behind
+  the RT interface, intended for benchmarking and replacement by fuller
+  scattering solvers.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later
 
 - Real JWST data ingestion.
 - Retrieval parameterization and sampler integration.
-- Cloud/aerosol optical properties, multiple scattering, reference-pressure
-  path geometry, and full benchmark RT parity.
+- PICASO/Virga cloud-scattering benchmark parity and fuller scattering solvers.
 - Likelihood evaluation.
 - Sampler integration.

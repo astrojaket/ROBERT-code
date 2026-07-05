@@ -20,6 +20,7 @@ from .geometry import (
 from .optical_depth import GasOpticalDepth
 from .path_geometry import HydrostaticPathGeometry
 from .scattering import SingleScatteringSource
+from .two_stream import two_stream_effective_optical_depth
 
 PLANCK_CONSTANT_J_S = 6.62607015e-34
 SPEED_OF_LIGHT_M_S = 299_792_458.0
@@ -46,6 +47,7 @@ class ClearSkyEmissionResult:
     point_scattering_source_function: ArrayLike | None = None
     point_scattering_contribution_radiance: ArrayLike | None = None
     total_optical_depth: ArrayLike | None = None
+    extinction_optical_depth: ArrayLike | None = None
     eclipse_depth: Spectrum | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
 
@@ -80,6 +82,16 @@ class ClearSkyEmissionResult:
             )
             if np.any(total_tau < 0.0):
                 raise RobertValidationError("total_optical_depth must be non-negative")
+        if self.extinction_optical_depth is None:
+            extinction_tau = total_tau
+        else:
+            extinction_tau = _readonly_array(
+                self.extinction_optical_depth,
+                "extinction_optical_depth",
+                self.gas_optical_depth.total_tau.shape,
+            )
+            if np.any(extinction_tau < 0.0):
+                raise RobertValidationError("extinction_optical_depth must be non-negative")
         mu, weights = _validate_emission_angle_quadrature(
             self.emission_angle_cosines,
             self.emission_angle_weights,
@@ -180,6 +192,7 @@ class ClearSkyEmissionResult:
         object.__setattr__(self, "point_scattering_source_function", point_scattering_source)
         object.__setattr__(self, "point_scattering_contribution_radiance", point_scattering_contribution)
         object.__setattr__(self, "total_optical_depth", total_tau)
+        object.__setattr__(self, "extinction_optical_depth", extinction_tau)
         object.__setattr__(self, "metadata", dict(self.metadata))
 
     def normalized_layer_contribution(self) -> NDArray[np.float64]:
@@ -206,6 +219,7 @@ def solve_clear_sky_emission(
     additional_optical_depths: Sequence[object] | None = None,
     path_geometry: HydrostaticPathGeometry | None = None,
     scattering_source: SingleScatteringSource | None = None,
+    multiple_scattering_backend: str = "none",
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
@@ -216,12 +230,18 @@ def solve_clear_sky_emission(
     depth plus any additional extinction optical depths. When a
     ``SingleScatteringSource`` is supplied, scattering optical depths in
     ``additional_optical_depths`` add a first-order direct-beam scattering
-    source term; otherwise scattering remains extinction-only.
+    source term; otherwise scattering remains extinction-only unless
+    ``multiple_scattering_backend="two_stream"`` is requested.
     """
 
     bottom_mode = bottom_boundary.strip().lower()
     if bottom_mode not in {"blackbody", "none"}:
         raise RobertValidationError("bottom_boundary must be 'blackbody' or 'none'")
+    scattering_backend = _normalize_multiple_scattering_backend(multiple_scattering_backend)
+    if scattering_backend != "none" and scattering_source is not None:
+        raise RobertValidationError(
+            "multiple_scattering_backend cannot yet be combined with scattering_source"
+        )
 
     emission_geometry = _resolve_emission_geometry(
         geometry,
@@ -248,12 +268,26 @@ def solve_clear_sky_emission(
         opacity_sources,
         scattering_treatment,
         scattering_tau,
+        transport_scattering_tau,
         scattering_sources,
     ) = _total_optical_depth(
         gas_optical_depth,
         additional_optical_depths,
     )
-    tau_ordered = total_tau[order]
+    solver_total_tau = total_tau
+    multiple_scattering_applied = "false"
+    if scattering_backend != "none":
+        if np.any(scattering_tau > 0.0):
+            solver_total_tau = two_stream_effective_optical_depth(
+                total_tau,
+                scattering_tau,
+                transport_scattering_tau,
+            )
+            scattering_treatment = "two_stream_multiple_scattering_reference"
+            multiple_scattering_applied = "true"
+        else:
+            multiple_scattering_applied = "false_no_scattering"
+    tau_ordered = solver_total_tau[order]
     scattering_tau_ordered = scattering_tau[order]
     emission_path_factors = _emission_path_factors(
         mu,
@@ -390,6 +424,11 @@ def solve_clear_sky_emission(
         "scattering_source_function": "not_included"
         if scattering_source is None
         else scattering_source.name,
+        "multiple_scattering_backend": scattering_backend,
+        "multiple_scattering_applied": multiple_scattering_applied,
+        "total_optical_depth_role": "two_stream_effective_extinction"
+        if multiple_scattering_applied == "true"
+        else "extinction",
         "opacity_sources": "+".join(opacity_sources),
         "geometry": emission_geometry.name,
         "geometry_quadrature": emission_geometry.quadrature,
@@ -459,7 +498,8 @@ def solve_clear_sky_emission(
         scattering_layer_contribution_radiance=scattering_layer_contribution,
         point_scattering_source_function=point_scattering_source,
         point_scattering_contribution_radiance=point_scattering_contribution,
-        total_optical_depth=total_tau,
+        total_optical_depth=solver_total_tau,
+        extinction_optical_depth=total_tau,
         metadata=common_metadata,
     )
 
@@ -565,9 +605,17 @@ def _exclusive_cumulative(values: NDArray[np.float64]) -> NDArray[np.float64]:
 def _total_optical_depth(
     gas_optical_depth: GasOpticalDepth,
     additional_optical_depths: Sequence[object] | None,
-) -> tuple[NDArray[np.float64], tuple[str, ...], str, NDArray[np.float64], tuple[str, ...]]:
+) -> tuple[
+    NDArray[np.float64],
+    tuple[str, ...],
+    str,
+    NDArray[np.float64],
+    NDArray[np.float64],
+    tuple[str, ...],
+]:
     total_tau = np.array(gas_optical_depth.total_tau, dtype=float, copy=True)
     scattering_tau = np.zeros_like(total_tau)
+    transport_scattering_tau = np.zeros_like(total_tau)
     sources = ["gas_correlated_k"]
     scattering_sources = []
     has_scattering_extinction = False
@@ -576,33 +624,176 @@ def _total_optical_depth(
             if contribution is None:
                 continue
             name = str(getattr(contribution, "name", "additional_extinction"))
+            if _looks_like_cloud_optical_properties(contribution):
+                _validate_contribution_grid_match(gas_optical_depth, contribution)
+                extinction_tau = _layer_spectral_tau_for_g(
+                    getattr(contribution, "extinction_tau"),
+                    total_tau.shape,
+                    "cloud extinction_tau",
+                )
+                single_scattering_albedo = _layer_property_for_g(
+                    getattr(contribution, "single_scattering_albedo"),
+                    total_tau.shape,
+                    "cloud single_scattering_albedo",
+                )
+                asymmetry_factor = _layer_property_for_g(
+                    getattr(contribution, "asymmetry_factor"),
+                    total_tau.shape,
+                    "cloud asymmetry_factor",
+                )
+                if np.any(single_scattering_albedo < 0.0) or np.any(single_scattering_albedo > 1.0):
+                    raise RobertValidationError("cloud single_scattering_albedo must be in [0, 1]")
+                if np.any(asymmetry_factor < -1.0) or np.any(asymmetry_factor > 1.0):
+                    raise RobertValidationError("cloud asymmetry_factor must be in [-1, 1]")
+                cloud_scattering_tau = extinction_tau * single_scattering_albedo
+                total_tau += extinction_tau
+                sources.append(name)
+                if np.any(cloud_scattering_tau > 0.0):
+                    has_scattering_extinction = True
+                    scattering_sources.append(name)
+                    scattering_tau += cloud_scattering_tau
+                    transport_scattering_tau += cloud_scattering_tau * (1.0 - asymmetry_factor)
+                continue
+
+            _validate_contribution_grid_match(gas_optical_depth, contribution)
             kind = str(getattr(contribution, "kind", "extinction"))
             tau_values = getattr(contribution, "tau", contribution)
-            tau = np.array(tau_values, dtype=float, copy=True)
-            if tau.shape == total_tau.shape[:2]:
-                tau_for_g = tau[:, :, None]
-            elif tau.shape == total_tau.shape:
-                tau_for_g = tau
-            else:
-                raise RobertValidationError(
-                    "additional optical depths must have shape layer x wavelength "
-                    "or layer x wavelength x g"
-                )
-            if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
-                raise RobertValidationError("additional optical depths must be finite and non-negative")
+            tau_for_g = _layer_spectral_tau_for_g(
+                tau_values,
+                total_tau.shape,
+                "additional optical depths",
+            )
             total_tau += tau_for_g
             sources.append(name)
             if "scattering" in kind.lower():
                 has_scattering_extinction = True
                 scattering_sources.append(name)
                 scattering_tau += tau_for_g
+                transport_scattering_tau += tau_for_g
 
     if not np.all(np.isfinite(total_tau)) or np.any(total_tau < 0.0):
         raise RobertValidationError("total optical depth must be finite and non-negative")
     total_tau.setflags(write=False)
     scattering_tau.setflags(write=False)
+    transport_scattering_tau.setflags(write=False)
     scattering_treatment = "extinction_only_no_scattering_source" if has_scattering_extinction else "none"
-    return total_tau, tuple(sources), scattering_treatment, scattering_tau, tuple(scattering_sources)
+    return (
+        total_tau,
+        tuple(sources),
+        scattering_treatment,
+        scattering_tau,
+        transport_scattering_tau,
+        tuple(scattering_sources),
+    )
+
+
+def _normalize_multiple_scattering_backend(value: str) -> str:
+    backend = str(value).strip().lower().replace("-", "_")
+    aliases = {
+        "none": "none",
+        "off": "none",
+        "false": "none",
+        "two_stream": "two_stream_reference",
+        "two_stream_reference": "two_stream_reference",
+    }
+    if backend not in aliases:
+        raise RobertValidationError(
+            "multiple_scattering_backend must be 'none' or 'two_stream'"
+        )
+    return aliases[backend]
+
+
+def _looks_like_cloud_optical_properties(contribution: object) -> bool:
+    return all(
+        hasattr(contribution, attribute)
+        for attribute in (
+            "extinction_tau",
+            "single_scattering_albedo",
+            "asymmetry_factor",
+        )
+    )
+
+
+def _validate_contribution_grid_match(
+    gas_optical_depth: GasOpticalDepth,
+    contribution: object,
+) -> None:
+    if hasattr(contribution, "spectral_grid"):
+        contribution_wavelength = spectral_grid_values_in_unit(
+            getattr(contribution, "spectral_grid"),
+            "micron",
+        )
+        gas_wavelength = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
+        if contribution_wavelength.shape != gas_wavelength.shape or not np.allclose(
+            contribution_wavelength,
+            gas_wavelength,
+            rtol=1.0e-12,
+            atol=0.0,
+        ):
+            raise RobertValidationError("additional optical-depth spectral grid must match gas grid")
+    if hasattr(contribution, "pressure_grid"):
+        contribution_pressure = pressure_values_in_unit(
+            getattr(contribution, "pressure_grid").centers,
+            getattr(contribution, "pressure_grid").unit,
+            "pa",
+        )
+        gas_pressure = pressure_values_in_unit(
+            gas_optical_depth.pressure_grid.centers,
+            gas_optical_depth.pressure_grid.unit,
+            "pa",
+        )
+        if contribution_pressure.shape != gas_pressure.shape or not np.allclose(
+            contribution_pressure,
+            gas_pressure,
+            rtol=1.0e-10,
+            atol=0.0,
+        ):
+            raise RobertValidationError("additional optical-depth pressure grid must match gas grid")
+
+
+def _layer_spectral_tau_for_g(
+    values: ArrayLike,
+    target_shape: tuple[int, int, int],
+    name: str,
+) -> NDArray[np.float64]:
+    tau = np.array(values, dtype=float, copy=True)
+    if tau.shape == target_shape[:2]:
+        tau_for_g = tau[:, :, None]
+    elif tau.shape == target_shape:
+        tau_for_g = tau
+    else:
+        raise RobertValidationError(
+            f"{name} must have shape layer x wavelength or layer x wavelength x g"
+        )
+    if not np.all(np.isfinite(tau_for_g)) or np.any(tau_for_g < 0.0):
+        raise RobertValidationError(f"{name} must be finite and non-negative")
+    return tau_for_g
+
+
+def _layer_property_for_g(
+    values: ArrayLike,
+    target_shape: tuple[int, int, int],
+    name: str,
+) -> NDArray[np.float64]:
+    array = np.array(values, dtype=float, copy=True)
+    if array.ndim == 0:
+        reshaped = np.full(target_shape, float(array), dtype=float)
+    elif array.shape == target_shape:
+        reshaped = array
+    elif array.shape == target_shape[:2]:
+        reshaped = array[:, :, None]
+    elif array.shape == (target_shape[0],):
+        reshaped = array[:, None, None]
+    elif array.shape == (target_shape[1],):
+        reshaped = array[None, :, None]
+    elif array.shape == (target_shape[2],):
+        reshaped = array[None, None, :]
+    else:
+        raise RobertValidationError(f"{name} has incorrect shape")
+    broadcast = np.array(np.broadcast_to(reshaped, target_shape), dtype=float, copy=True)
+    if not np.all(np.isfinite(broadcast)):
+        raise RobertValidationError(f"{name} must contain only finite values")
+    return broadcast
 
 
 def _validate_path_geometry_match(

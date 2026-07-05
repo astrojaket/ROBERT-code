@@ -13,11 +13,16 @@ ROBERT now has the first RT-facing reference building blocks:
 - hydrostatic radius/path geometry anchored at a configurable reference radius
   and pressure,
 - a first-order direct-beam single-scattering source treatment for Rayleigh-like
-  or isotropic scattering phase functions.
+  or isotropic scattering phase functions,
+- cloud/aerosol optical-property containers carrying extinction optical depth,
+  single-scattering albedo, and asymmetry factor,
+- a conservative two-stream multiple-scattering reference backend behind the
+  thermal-emission solver interface.
 
 These are not a full mature RT path yet. They are the explicit bridge between
 atmosphere, chemistry, opacity, and later cloud, aerosol, and
-scattering-source-function implementations.
+scattering-source-function implementations. The current two-stream closure is a
+benchmark hook, not the final cloud-scattering science solver.
 
 ## Current Scope
 
@@ -76,6 +81,20 @@ The solver can also consume additional layer optical depths, such as H2-H2/H2-He
 CIA and H2/He Rayleigh scattering extinction. Its metadata records whether
 scattering is absent or treated as extinction-only, so later scattering-capable
 solvers can be distinguished from this reference path.
+
+Cloud/aerosol opacity can enter in two equivalent ways:
+
+- pass a `CloudOpticalProperties` object containing layer-by-wavelength
+  extinction optical depth, single-scattering albedo, and asymmetry factor;
+- pass split `LayerOpticalDepth` objects from
+  `CloudOpticalProperties.as_layer_optical_depths()` for explicit absorption
+  and scattering diagnostics.
+
+Passing `multiple_scattering_backend="two_stream"` activates the first
+conservative multiple-scattering reference closure. The returned
+`total_optical_depth` is then the effective optical depth used by the solver,
+while `extinction_optical_depth` remains the physical extinction optical depth
+for tau plots and code-to-code comparisons.
 
 ## Geometry and Source Function
 
@@ -180,6 +199,36 @@ direct stellar beam. Clouds/aerosols, surfaces, and multiple-scattering source
 terms should be added as independent RT components rather than hidden inside
 gas opacity.
 
+The first cloud/aerosol object follows the same separation: it stores optical
+properties, but the RT backend decides whether scattering is extinction-only,
+single-scattering direct beam, two-stream reference, or a future fuller
+multiple-scattering solver.
+
+## Cloud-Scattering Benchmark Ladder
+
+ROBERT should benchmark scattering clouds in staged layers:
+
+1. Analytic limits: no cloud, pure absorption, pure scattering, optically thin
+   cloud, optically thick grey cloud, `omega0=0/1`, and isotropic versus
+   forward-scattering limits.
+2. Optical-property parity: compare ROBERT inputs against PICASO/Virga-style
+   layer `tau_ext`, single-scattering albedo, asymmetry factor, and later phase
+   moments before running RT.
+3. Code-to-code RT: run identical one-dimensional grey and haze cases through
+   ROBERT and PICASO, then move to Virga-generated condensate clouds.
+4. Published science cases: reproduce selected PICASO/Virga examples for
+   reflected light, cloudy thermal phase curves, and condensation-cloud
+   benchmark atmospheres.
+
+Useful reference targets include PICASO reflected-light benchmarking
+([Batalha et al. 2019](https://arxiv.org/abs/1904.09355)), cloudy thermal phase
+curves ([Robbins-Blanch et al. 2022](https://arxiv.org/abs/2204.03545)),
+PICASO/Virga reflected-light phase curves
+([Hamill et al. 2024](https://arxiv.org/abs/2411.14225)), Virga condensation
+cloud benchmarks ([Batalha et al. 2025](https://arxiv.org/abs/2508.15102)),
+and PICASO 4.0 cloud/climate updates
+([Mang et al. 2026](https://arxiv.org/abs/2602.22468)).
+
 ## Design Direction
 
 The RT package should keep a readable NumPy reference implementation first.
@@ -191,7 +240,7 @@ The mature correlated-k path needs:
 - Planck/source-function emission integration,
 - tested single-scattering diagnostics for Rayleigh and cloud/aerosol optical
   properties,
-- multiple-scattering source functions,
+- benchmarked multiple-scattering source functions,
 - contribution-function diagnostics,
 - performance backends only after the reference equations are tested.
 
