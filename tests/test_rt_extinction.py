@@ -8,16 +8,16 @@ import numpy as np
 
 from robert_exoplanets import (
     AtmosphereState,
+    CiaTable,
     EvaluatedCorrelatedKOpacity,
     LayerOpticalDepth,
-    NemesisCiaTable,
     PreparedCorrelatedKOpacity,
     PressureGrid,
     SpectralGrid,
     assemble_gas_optical_depth,
     cia_optical_depth,
     rayleigh_scattering_optical_depth,
-    read_nemesis_cia_table,
+    read_cia_table,
 )
 
 
@@ -42,7 +42,7 @@ def test_cia_optical_depth_uses_h2_h2_and_h2_he_pairs() -> None:
     k_cia = np.zeros((4, 2, 4), dtype=float)
     k_cia[2, :, :] = 2.0
     k_cia[3, :, :] = 1.0
-    cia_table = NemesisCiaTable(
+    cia_table = CiaTable(
         wavenumber_cm_inverse=wavenumber,
         temperature_K=temperature,
         k_cia=k_cia,
@@ -63,14 +63,14 @@ def test_cia_optical_depth_uses_h2_h2_and_h2_he_pairs() -> None:
     assert "H2-He_normal" in cia.metadata["active_pairs"]
 
 
-def test_read_nemesis_cia_table_reads_fortran_records(tmp_path) -> None:
+def test_read_cia_table_reads_fortran_records(tmp_path) -> None:
     path = tmp_path / "tiny_cia.tab"
     temperatures = np.array([500.0, 1000.0], dtype="<f8")
     coefficients = np.arange(4 * 2 * 4, dtype="<f4")
     _write_fortran_record(path, temperatures.tobytes(), mode="wb")
     _write_fortran_record(path, coefficients.tobytes(), mode="ab")
 
-    table = read_nemesis_cia_table(path, dnu=25.0, n_pairs=4, endian="<")
+    table = read_cia_table(path, dnu=25.0, n_pairs=4, endian="<")
 
     assert table.temperature_K.tolist() == [500.0, 1000.0]
     np.testing.assert_allclose(table.wavenumber_cm_inverse, [0.0, 25.0, 50.0, 75.0])

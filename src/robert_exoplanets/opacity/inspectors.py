@@ -86,7 +86,7 @@ def inspect_exomol_directory(
             )
         if suffix in _KTABLE_SUFFIXES:
             storage_format = (
-                OpacityStorageFormat.NEMESIS_KTA
+                OpacityStorageFormat.KTA_BINARY
                 if suffix == ".kta"
                 else OpacityStorageFormat.EXOMOL_KTABLE
             )
@@ -95,7 +95,7 @@ def inspect_exomol_directory(
                     item,
                     species=(species,),
                     mode=OpacityMode.CORRELATED_K,
-                    source=OpacityDataSource.EXOMOL_OP if storage_format == OpacityStorageFormat.NEMESIS_KTA else source,
+                    source=OpacityDataSource.EXOMOL_OP if storage_format == OpacityStorageFormat.KTA_BINARY else source,
                     storage_format=storage_format,
                     metadata={"coverage": "unknown"},
                 )
@@ -117,10 +117,10 @@ def inspect_kta_file(
     source: OpacityDataSource | str = OpacityDataSource.EXOMOL_OP,
     checksum: bool = True,
 ) -> OpacityDataProduct:
-    """Inspect a NEMESIS-style `.kta` correlated-k file.
+    """Inspect a `.kta` correlated-k file.
 
-    ExoMolOP/exo_k products can use the NEMESIS `.kta` storage format, so the
-    default source records ExoMolOP while preserving the binary format name.
+    ExoMolOP/exo_k products can use this storage format, so the default source
+    records ExoMolOP while preserving the binary format name.
     """
 
     item = Path(path).expanduser()

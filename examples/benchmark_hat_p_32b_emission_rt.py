@@ -31,9 +31,9 @@ from robert_exoplanets import (
     cia_optical_depth,
     gauss_legendre_disk_geometry,
     load_emission_benchmark_csv,
-    nemesis_lobatto_phase_geometry,
+    lobatto_phase_geometry,
     rayleigh_scattering_optical_depth,
-    read_nemesis_cia_table,
+    read_cia_table,
     solve_clear_sky_emission,
 )
 
@@ -54,17 +54,8 @@ DEFAULT_PT_CSV = (
     / "PTprofiles-Teq_1800-LogMet_0.0-LogDrag_0-Mstar_0.8-Rp_1.3-logG_1.8-TiOVO_false-daysideavg-w_mu_area.csv"
 )
 DEFAULT_KTA_DIR = Path.home() / "Dropbox" / "PostDoc4" / "Emission_Example" / "HAT-P-32b" / "kta_temp"
-DEFAULT_CIA_FILE = (
-    Path.home()
-    / "Dropbox"
-    / "NemesisPy-Docker"
-    / "nemesispy"
-    / "nemesispy"
-    / "data"
-    / "cia"
-    / "exocia_hitran12_200-3800K.tab"
-)
-DEFAULT_FASTCHEM_PATH = Path.home() / "Dropbox" / "NemesisPy-Docker" / "fastchem"
+DEFAULT_CIA_FILE: Path | None = None
+DEFAULT_FASTCHEM_PATH = Path.home() / "Dropbox" / "fastchem"
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "hat_p_32b_emission_rt_benchmark"
 
 R_SUN_M = 6.957e8
@@ -101,7 +92,7 @@ RUNTIME_NONFINITE_FILL_VALUE = 1.0e-300
 MISSING_PHYSICS = (
     "scattering source-function treatment",
     "cloud and aerosol opacity/scattering",
-    "NEMESIS/NemesisPy hydrostatic path-geometry parity",
+    "benchmark hydrostatic path-geometry parity",
     "original 100-level pressure grid parity",
 )
 
@@ -112,7 +103,7 @@ def main() -> dict[str, object]:
     benchmark_csv = _path_from_env("HAT_P_32B_EMISSION_CSV", DEFAULT_BENCHMARK_CSV)
     pt_csv = _path_from_env("HAT_P_32B_PT_CSV", DEFAULT_PT_CSV)
     kta_dir = _path_from_env("HAT_P_32B_KTA_DIR", DEFAULT_KTA_DIR)
-    cia_file = _path_from_env("HAT_P_32B_CIA_FILE", DEFAULT_CIA_FILE)
+    cia_file = _optional_path_from_env("HAT_P_32B_CIA_FILE", DEFAULT_CIA_FILE)
     chemistry_mode = os.environ.get("ROBERT_HAT_P_32B_CHEMISTRY", "fastchem").strip().lower()
     if chemistry_mode not in {"fastchem", "fixed"}:
         raise ValueError("ROBERT_HAT_P_32B_CHEMISTRY must be 'fastchem' or 'fixed'")
@@ -126,7 +117,7 @@ def main() -> dict[str, object]:
         "CtoO": float(os.environ.get("ROBERT_HAT_P_32B_FASTCHEM_CTOO", str(DEFAULT_FASTCHEM_CTOO))),
     }
     gas_combination = os.environ.get("ROBERT_HAT_P_32B_GAS_COMBINATION", "random_overlap")
-    include_cia = _env_bool("ROBERT_HAT_P_32B_INCLUDE_CIA", True)
+    include_cia = _env_bool("ROBERT_HAT_P_32B_INCLUDE_CIA", cia_file is not None)
     include_rayleigh = _env_bool("ROBERT_HAT_P_32B_INCLUDE_RAYLEIGH", True)
     include_scattering_source = _env_bool("ROBERT_HAT_P_32B_INCLUDE_SCATTERING_SOURCE", False)
 
@@ -150,7 +141,7 @@ def main() -> dict[str, object]:
         "gauss_legendre",
         "gauss_legendre_disk",
     }:
-        geometry_mode = "nemesis_lobatto"
+        geometry_mode = "lobatto_phase"
     geometry = _disc_geometry_from_env(
         geometry_mode=geometry_mode,
         n_mu=n_mu,
@@ -176,7 +167,7 @@ def main() -> dict[str, object]:
         f"{geometry.name} ({geometry.quadrature}, n_points={geometry.n_points}, "
         f"phase={geometry.phase_angle_deg})"
     )
-    print(f"CIA: {'on' if include_cia else 'off'} ({cia_file})")
+    print(f"CIA: {'on' if include_cia else 'off'} ({cia_file if cia_file is not None else 'not configured'})")
     print(f"Rayleigh: {'on' if include_rayleigh else 'off'}")
     print(f"Single-scattering source: {'on' if include_scattering_source else 'off'}")
 
@@ -237,9 +228,11 @@ def main() -> dict[str, object]:
     )
     additional_optical_depths = []
     if include_cia:
+        if cia_file is None:
+            raise FileNotFoundError("Set HAT_P_32B_CIA_FILE to enable the HAT-P-32b CIA benchmark term")
         if not cia_file.exists():
             raise FileNotFoundError(f"HAT-P-32b CIA file was not found: {cia_file}")
-        cia_table = read_nemesis_cia_table(cia_file)
+        cia_table = read_cia_table(cia_file)
         additional_optical_depths.append(cia_optical_depth(gas_tau, cia_table))
     if include_rayleigh:
         additional_optical_depths.append(rayleigh_scattering_optical_depth(gas_tau))
@@ -271,7 +264,10 @@ def main() -> dict[str, object]:
         model=result.eclipse_depth.values,
         benchmark=benchmark.eclipse_depth,
     )
-    output_suffix = "_single_scattering" if include_scattering_source else ""
+    output_suffix = _output_suffix(
+        geometry_mode=geometry_mode,
+        include_scattering_source=include_scattering_source,
+    )
     plot_path = _plot_benchmark(
         benchmark,
         result,
@@ -323,12 +319,12 @@ def main() -> dict[str, object]:
         },
         "reference_radius_pressure": {
             "pref_bar_config": DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR,
-            "pref_pa_nemesispy_resolution": DEFAULT_REFERENCE_RADIUS_PRESSURE_PA,
+            "pref_pa_benchmark_resolution": DEFAULT_REFERENCE_RADIUS_PRESSURE_PA,
             "used_by_current_robert_emission_solver": False,
-            "note": "NemesisPy's HAT-P-32b emission path stores Pref but calls calc_hydrostat, not calc_hydrostat_pref_test.",
+            "note": "The HAT-P-32b benchmark config records this pressure, but the current ROBERT emission solver does not yet use a reference-radius pressure path.",
         },
         "solver": result.metadata,
-        "missing_physics_relative_to_mature_nemesis": _missing_physics(include_scattering_source),
+        "remaining_benchmark_physics_gaps": _missing_physics(include_scattering_source),
         "comparison": comparison,
         "outputs": {
             "summary_json": str(summary_path),
@@ -354,11 +350,24 @@ def _disc_geometry_from_env(
 ):
     if geometry_mode in {"legendre", "legendre_disk", "gauss_legendre", "gauss_legendre_disk"}:
         return gauss_legendre_disk_geometry(n_mu)
-    if geometry_mode in {"nemesis", "nemesis_lobatto", "lobatto", "phase"}:
-        return nemesis_lobatto_phase_geometry(phase_angle_deg=phase_angle_deg, n_mu=n_mu)
+    if geometry_mode in {"lobatto", "lobatto_phase", "phase"}:
+        return lobatto_phase_geometry(phase_angle_deg=phase_angle_deg, n_mu=n_mu)
     raise ValueError(
-        "ROBERT_HAT_P_32B_RT_GEOMETRY must be 'legendre_disk' or 'nemesis_lobatto'"
+        "ROBERT_HAT_P_32B_RT_GEOMETRY must be 'legendre_disk' or 'lobatto_phase'"
     )
+
+
+def _output_suffix(
+    *,
+    geometry_mode: str,
+    include_scattering_source: bool,
+) -> str:
+    parts = []
+    if geometry_mode not in {"legendre", "legendre_disk", "gauss_legendre", "gauss_legendre_disk"}:
+        parts.append(geometry_mode)
+    if include_scattering_source:
+        parts.append("single_scattering")
+    return "" if not parts else "_" + "_".join(parts)
 
 
 def _geometry_summary(geometry) -> dict[str, object]:
@@ -387,6 +396,7 @@ def _scattering_source_summary(scattering_source) -> dict[str, object] | None:
     if scattering_source is None:
         return None
     return {
+        "enabled": True,
         "name": scattering_source.name,
         "phase_function": scattering_source.phase_function,
         "stellar_beam_unit": scattering_source.stellar_beam.unit,
@@ -404,6 +414,13 @@ def _missing_physics(include_scattering_source: bool) -> list[str]:
 
 
 def _path_from_env(name: str, default: Path) -> Path:
+    configured = os.environ.get(name)
+    if configured:
+        return Path(configured).expanduser()
+    return default
+
+
+def _optional_path_from_env(name: str, default: Path | None) -> Path | None:
     configured = os.environ.get(name)
     if configured:
         return Path(configured).expanduser()
@@ -553,7 +570,7 @@ def _plot_benchmark(
         benchmark_ppm,
         color="#111111",
         linewidth=1.6,
-        label="NemesisPy benchmark",
+        label="External benchmark",
     )
     ax_spectrum.plot(
         result.eclipse_depth.spectral_grid.values,

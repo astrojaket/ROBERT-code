@@ -9,12 +9,12 @@ ROBERT now has the first RT-facing reference building blocks:
 - a NumPy clear-sky thermal-emission solver with Planck source-function
   integration,
 - explicit disc geometry objects for normal-emission, uniform thermal-disc, and
-  NemesisPy-style phase quadrature calculations,
+  Lobatto phase quadrature calculations,
 - a first-order direct-beam single-scattering source treatment for Rayleigh-like
   or isotropic scattering phase functions.
 
-These are not the full mature NEMESIS RT path yet. They are the explicit bridge
-between atmosphere, chemistry, opacity, and later cloud, aerosol, and
+These are not a full mature RT path yet. They are the explicit bridge between
+atmosphere, chemistry, opacity, and later cloud, aerosol, and
 scattering-source-function implementations.
 
 ## Current Scope
@@ -77,8 +77,8 @@ The available helpers are:
 - `normal_emission_geometry()` for a single `mu=1` point,
 - `gauss_legendre_disk_geometry(n_mu)` for the current uniform thermal-disc
   integral,
-- `nemesis_lobatto_phase_geometry(phase_angle_deg, n_mu)` for a projected-disc
-  quadrature following NemesisPy's phase convention.
+- `lobatto_phase_geometry(phase_angle_deg, n_mu)` for projected-disc phase
+  quadrature.
 
 The default source function is thermal Planck emission only. If a
 `SingleScatteringSource` is supplied, the solver adds a first-order direct-beam
@@ -123,12 +123,16 @@ The local HAT-P-32b emission benchmark:
 python examples/benchmark_hat_p_32b_emission_rt.py
 ```
 
-loads the external HAT-P-32b P-T CSV, R1000 `.kta` files, the local NEMESIS-style
-CIA table, and the external emission CSV. It compares ROBERT's current
-clear-sky result to the benchmark and writes both a plot and a JSON metric
-report. This is a diagnostic benchmark, not a strict pass/fail validation,
-because the current ROBERT path still omits exact NEMESIS layering/path parity,
-clouds/aerosols, and multiple-scattering source functions.
+loads the external HAT-P-32b P-T CSV, R1000 `.kta` files, an optional local CIA
+table, and the external emission CSV. It compares ROBERT's current clear-sky
+result to the benchmark and writes both a plot and a JSON metric report. This is a
+diagnostic benchmark, not a strict pass/fail validation, because the current
+ROBERT path still omits exact benchmark layering/path parity, clouds/aerosols,
+and multiple-scattering source functions.
+
+Set `HAT_P_32B_CIA_FILE` to include a local CIA binary table in this benchmark.
+If that variable is not set, the script leaves the CIA term off unless
+`ROBERT_HAT_P_32B_INCLUDE_CIA=1` is requested explicitly.
 
 To exercise the first single-scattering source term in that benchmark, run:
 
@@ -165,7 +169,7 @@ gas opacity.
 ## Design Direction
 
 The RT package should keep a readable NumPy reference implementation first.
-NEMESIS and NemesisPy show that the mature correlated-k path needs:
+The mature correlated-k path needs:
 
 - validated gas optical-depth assembly,
 - reference-tested random-overlap handling for multiple opacity sources,

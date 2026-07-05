@@ -268,7 +268,7 @@ def _tiny_database(species: str, table: CorrelatedKTable) -> OpacityDatabase:
         species=(species,),
         mode=OpacityMode.CORRELATED_K,
         source=OpacityDataSource.EXOMOL_OP,
-        storage_format=OpacityStorageFormat.NEMESIS_KTA,
+        storage_format=OpacityStorageFormat.KTA_BINARY,
         spectral_coverage=SpectralCoverage(1000.0, 3000.0, unit="cm^-1", n_points=3),
         grid_coverage=GridCoverage(
             pressure_min=float(np.min(table.pressure_bar)),

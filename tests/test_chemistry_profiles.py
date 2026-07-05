@@ -192,7 +192,7 @@ def test_composition_mean_molecular_weight_can_preserve_raw_selected_species_sum
 
 def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     pytest.importorskip("pyfastchem")
-    fastchem_path = Path.home() / "Dropbox" / "NemesisPy-Docker" / "fastchem"
+    fastchem_path = Path.home() / "Dropbox" / "fastchem"
     if not fastchem_path.exists():
         pytest.skip("local FastChem data files are not available")
     grid = PressureGrid.logspace(1.0e-4, 1.0e-2, n_layers=2, unit="bar")

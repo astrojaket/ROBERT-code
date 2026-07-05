@@ -21,7 +21,7 @@ from robert_exoplanets import (
     AtmosphereState,
     CorrelatedKOpacityProvider,
     CorrelatedKTable,
-    NemesisKTableHeader,
+    KtaHeader,
     PressureGrid,
     SpectralGrid,
     compare_opacity_arrays,
@@ -125,16 +125,16 @@ def _benchmark_species(
     strict_load_passed = True
     strict_reader_error = None
     try:
-        nemesis_table = read_kta(path)
+        kta_table = read_kta(path)
     except Exception as exc:
         strict_load_passed = False
         strict_reader_error = f"{type(exc).__name__}: {exc}"
-        nemesis_table = read_kta(
+        kta_table = read_kta(
             path,
             nonfinite_policy="floor",
             nonfinite_fill_value=RUNTIME_NONFINITE_FILL_VALUE,
         )
-    table = CorrelatedKTable.from_nemesis(species, nemesis_table)
+    table = CorrelatedKTable.from_kta(species, kta_table)
     load_s = perf_counter() - start
 
     pressure_indices = _nearest_unique_indices(table.pressure_bar, TARGET_PRESSURES_BAR, log_space=True)
@@ -210,7 +210,7 @@ def _benchmark_species(
     }
 
 
-def _native_kcoeff_and_stats(header: NemesisKTableHeader) -> tuple[np.ndarray, dict[str, object]]:
+def _native_kcoeff_and_stats(header: KtaHeader) -> tuple[np.ndarray, dict[str, object]]:
     raw = np.fromfile(
         header.path,
         dtype=KTA_FLOAT_DTYPE,
@@ -363,7 +363,7 @@ def _plot_nonfinite_pt_summary(paths: dict[str, Path], output_path: Path) -> Pat
     n_species = len(paths)
     n_columns = min(3, n_species)
     n_rows = int(np.ceil(n_species / n_columns))
-    fractions: dict[str, tuple[NemesisKTableHeader, np.ndarray]] = {}
+    fractions: dict[str, tuple[KtaHeader, np.ndarray]] = {}
     global_vmax = 0.0
     for species, path in paths.items():
         header = read_kta_header(path)
@@ -409,7 +409,7 @@ def _plot_nonfinite_pt_summary(paths: dict[str, Path], output_path: Path) -> Pat
     return output_path
 
 
-def _native_nonfinite_mask(header: NemesisKTableHeader) -> np.ndarray:
+def _native_nonfinite_mask(header: KtaHeader) -> np.ndarray:
     raw = np.fromfile(
         header.path,
         dtype=KTA_FLOAT_DTYPE,

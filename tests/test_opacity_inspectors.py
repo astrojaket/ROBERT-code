@@ -17,7 +17,7 @@ from robert_exoplanets.opacity import (
 )
 
 
-def test_inspect_kta_file_records_exomol_op_source_and_nemesis_storage(tmp_path: Path) -> None:
+def test_inspect_kta_file_records_exomol_op_source_and_kta_storage(tmp_path: Path) -> None:
     path = tmp_path / "H2O_emission_R1000.kta"
     _write_minimal_kta(path)
 
@@ -26,7 +26,7 @@ def test_inspect_kta_file_records_exomol_op_source_and_nemesis_storage(tmp_path:
     assert product.species == ("H2O",)
     assert product.mode == OpacityMode.CORRELATED_K
     assert product.source == OpacityDataSource.EXOMOL_OP
-    assert product.storage_format == OpacityStorageFormat.NEMESIS_KTA
+    assert product.storage_format == OpacityStorageFormat.KTA_BINARY
     assert product.g_ordinates == 2
     assert product.native_shape == (1, 1, 2, 2)
     assert product.checksum_sha256
@@ -89,7 +89,7 @@ def test_inspect_exomol_directory_discovers_line_list_and_k_table(tmp_path: Path
     assert OpacityMode.CORRELATED_K in modes
     k_products = [product for product in database.products if product.mode == OpacityMode.CORRELATED_K]
     assert k_products[0].source == OpacityDataSource.EXOMOL_OP
-    assert k_products[0].storage_format == OpacityStorageFormat.NEMESIS_KTA
+    assert k_products[0].storage_format == OpacityStorageFormat.KTA_BINARY
 
 
 def _hitran_line(*, molecule_id: int, isotopologue_id: int, wavenumber: float) -> str:

@@ -230,7 +230,7 @@ class CompositionMeanMolecularWeight:
     `normalization="require"` policy, each layer's VMR sum must be close to
     one so trace-only chemistry cannot accidentally define a bulk atmosphere.
     `normalization="raw_sum"` preserves the direct weighted sum used by the
-    NemesisPy FastChem benchmark path when only selected species are retained.
+    local FastChem benchmark path when only selected species are retained.
     """
 
     molecular_masses: Mapping[str, float] = field(
@@ -304,10 +304,9 @@ class CompositionMeanMolecularWeight:
 class FastChemEquilibriumChemistry:
     """FastChem equilibrium chemistry wrapper.
 
-    FastChem is an optional runtime dependency. This model mirrors the
-    HAT-P-32b NemesisPy workflow: metallicity is log10 relative to solar,
-    C/O is imposed by setting the carbon abundance relative to oxygen, and
-    pressure is passed to FastChem in bar.
+    FastChem is an optional runtime dependency. Metallicity is log10 relative
+    to solar, C/O is imposed by setting the carbon abundance relative to
+    oxygen, and pressure is passed to FastChem in bar.
     """
 
     fastchem_path: str | Path

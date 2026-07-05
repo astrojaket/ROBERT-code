@@ -16,8 +16,8 @@ Current profile types:
 - `MadhusudhanSeager2009TemperatureProfile`: evaluates the piecewise parametric
   Madhusudhan & Seager (2009) profile used in many emission retrievals.
 - `ParmentierGuillot2014TemperatureProfile`: evaluates the dual-visible-channel
-  Parmentier & Guillot style irradiated profile used by the local NemesisPy
-  HAT-P-32b temperature engine.
+  Parmentier & Guillot style irradiated profile used by the local HAT-P-32b
+  benchmark configuration.
 
 `TabulatedTemperatureProfile` interpolates linearly in `log10(pressure)`, which
 matches the usual atmospheric convention for P-T profiles sampled across many
@@ -25,9 +25,9 @@ orders of magnitude in pressure. By default, it rejects pressure grids that
 extend outside the table coverage. A `clip` extrapolation policy exists for
 legacy comparison workflows, but it must be requested explicitly.
 
-The HAT-P-32b NemesisPy emission example uses an externally generated P-T CSV.
-ROBERT now supports this as an input profile without coupling the future
-radiative-transfer backend to the CSV file format.
+The HAT-P-32b emission benchmark uses an externally generated P-T CSV. ROBERT
+now supports this as an input profile without coupling the radiative-transfer
+backend to the CSV file format.
 
 ## Retrieval Profiles
 

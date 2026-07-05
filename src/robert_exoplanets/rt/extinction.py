@@ -69,8 +69,8 @@ class LayerOpticalDepth:
 
 
 @dataclass(frozen=True)
-class NemesisCiaTable:
-    """CIA coefficient table in the NEMESIS/NemesisPy pair ordering."""
+class CiaTable:
+    """CIA coefficient table in ROBERT's pair, temperature, wavenumber order."""
 
     wavenumber_cm_inverse: ArrayLike
     temperature_K: ArrayLike
@@ -112,18 +112,18 @@ class NemesisCiaTable:
         return len(self.pair_order)
 
 
-def read_nemesis_cia_table(
+def read_cia_table(
     path: str | Path,
     *,
     dnu: float = 10.0,
     n_pairs: int = 9,
     endian: str | None = None,
-) -> NemesisCiaTable:
-    """Read a NEMESIS/NemesisPy unformatted binary CIA table.
+) -> CiaTable:
+    """Read an unformatted binary CIA table.
 
     The file format stores one float64 temperature record followed by one
-    float32 coefficient record. Coefficients are ordered by wavenumber,
-    temperature, then CIA pair, matching NemesisPy's ``read_cia`` helper.
+    float32 coefficient record. Coefficients are stored by wavenumber,
+    temperature, then CIA pair.
     """
 
     table_path = Path(path).expanduser()
@@ -140,7 +140,7 @@ def read_nemesis_cia_table(
         if byte_order not in {"<", ">"}:
             raise RobertValidationError("CIA table endian must be '<', '>', or None")
         try:
-            return _read_nemesis_cia_table_with_endian(
+            return _read_cia_table_with_endian(
                 table_path,
                 dnu=float(dnu),
                 n_pairs=int(n_pairs),
@@ -150,22 +150,22 @@ def read_nemesis_cia_table(
             last_error = exc
     if last_error is not None:
         raise last_error
-    raise RobertValidationError("could not read NEMESIS CIA table")
+    raise RobertValidationError("could not read CIA table")
 
 
 def cia_optical_depth(
     gas_optical_depth: GasOpticalDepth,
-    cia_table: NemesisCiaTable,
+    cia_table: CiaTable,
     *,
     normal_hydrogen: bool = True,
     name: str = "H2-H2/H2-He CIA",
 ) -> LayerOpticalDepth:
     """Compute CIA optical depth using a uniform-layer path estimate.
 
-    NEMESIS computes CIA from layer amount and path length. ROBERT does not yet
-    carry a full height grid here, so this helper derives the path length from
-    the hydrostatic column density and ideal-gas number density at the layer
-    pressure and temperature. The approximation is recorded in metadata.
+    ROBERT does not yet carry a full height grid here, so this helper derives
+    the path length from the hydrostatic column density and ideal-gas number
+    density at the layer pressure and temperature. The approximation is
+    recorded in metadata.
     """
 
     atmosphere = gas_optical_depth.atmosphere
@@ -234,7 +234,7 @@ def cia_optical_depth(
         pressure_grid=gas_optical_depth.pressure_grid,
         kind="absorption_continuum",
         metadata={
-            "source_format": str(cia_table.metadata.get("source_format", "nemesis_cia")),
+            "source_format": str(cia_table.metadata.get("source_format", "cia_binary")),
             "source_path": str(cia_table.metadata.get("source_path", "")),
             "path_model": "uniform_layer_ideal_gas_from_hydrostatic_column",
             "hydrogen_spin_state": "normal" if normal_hydrogen else "equilibrium",
@@ -251,9 +251,8 @@ def rayleigh_scattering_optical_depth(
 ) -> LayerOpticalDepth:
     """Compute H2/He Rayleigh scattering extinction optical depth.
 
-    This ports the H2/He refractivity formula used by NemesisPy's
-    ``calc_tau_rayleigh`` and applies it only to the H2+He column when those
-    species are present in the atmosphere.
+    The calculation applies an H2/He refractivity model to the H2+He column
+    when those species are present in the atmosphere.
     """
 
     default_fraction = float(default_h2_fraction_of_h2_he)
@@ -310,20 +309,20 @@ def rayleigh_scattering_optical_depth(
         pressure_grid=gas_optical_depth.pressure_grid,
         kind="scattering_extinction",
         metadata={
-            "source": "NemesisPy calc_tau_rayleigh H2/He refractivity formula",
+            "source": "H2/He refractivity model",
             "column_model": "H2/He fraction of hydrostatic layer column",
             "scattering_source_function": "not_included",
         },
     )
 
 
-def _read_nemesis_cia_table_with_endian(
+def _read_cia_table_with_endian(
     path: Path,
     *,
     dnu: float,
     n_pairs: int,
     endian: str,
-) -> NemesisCiaTable:
+) -> CiaTable:
     file_size = path.stat().st_size
     with path.open("rb") as handle:
         temperature_record = _read_fortran_record(handle, endian=endian, file_size=file_size)
@@ -342,13 +341,13 @@ def _read_nemesis_cia_table_with_endian(
     pair_order = DEFAULT_CIA_PAIR_ORDER[:n_pairs]
     if len(pair_order) != n_pairs:
         pair_order = tuple(f"pair_{index}" for index in range(n_pairs))
-    return NemesisCiaTable(
+    return CiaTable(
         wavenumber_cm_inverse=wavenumber,
         temperature_K=temperature,
         k_cia=k_cia,
         pair_order=pair_order,
         metadata={
-            "source_format": "nemesis_cia_unformatted_binary",
+            "source_format": "fortran_unformatted_cia",
             "source_path": str(path),
             "dnu_cm^-1": f"{dnu:g}",
             "endian": endian,
@@ -374,7 +373,7 @@ def _read_fortran_record(handle, *, endian: str, file_size: int) -> bytes:
 
 
 def _interpolate_cia_coefficients(
-    table: NemesisCiaTable,
+    table: CiaTable,
     temperature_k: float,
     wavenumber_cm_inverse: NDArray[np.float64],
 ) -> NDArray[np.float64]:

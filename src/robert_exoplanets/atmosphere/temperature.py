@@ -498,8 +498,8 @@ class MadhusudhanSeager2009TemperatureProfile:
     """Madhusudhan & Seager (2009) piecewise parametric P-T profile.
 
     The transition-pressure parameters are interpreted as log10 pressure in
-    `pressure_unit`, matching the retrieval convention used by the HAT-P-32b
-    NemesisPy emission example.
+    `pressure_unit`, matching the retrieval convention used by the local
+    HAT-P-32b emission benchmark.
     """
 
     pressure_unit: str = "bar"
@@ -619,10 +619,9 @@ class MadhusudhanSeager2009TemperatureProfile:
 class ParmentierGuillot2014TemperatureProfile:
     """Dual-visible-channel irradiated P-T profile used for PG14-style retrievals.
 
-    This implementation follows the compact Parmentier & Guillot style form
-    used by the local NemesisPy HAT-P-32b temperature engine: pressure is
-    converted to Pa, `kappa_IR` is interpreted as m2 kg-1, and optical depth is
-    `tau = kappa_IR * pressure / gravity`.
+    This implementation follows a compact Parmentier & Guillot style form:
+    pressure is converted to Pa, `kappa_IR` is interpreted as m2 kg-1, and
+    optical depth is `tau = kappa_IR * pressure / gravity`.
     """
 
     gravity: float | None = None

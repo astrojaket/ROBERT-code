@@ -80,7 +80,7 @@ def _synthetic_database(
         species=("H2O",),
         mode=OpacityMode.CORRELATED_K,
         source=OpacityDataSource.EXOMOL_OP,
-        storage_format=OpacityStorageFormat.NEMESIS_KTA,
+        storage_format=OpacityStorageFormat.KTA_BINARY,
         spectral_coverage=SpectralCoverage(1000.0, 5000.0, unit="cm^-1", n_points=n_wavelength),
         grid_coverage=GridCoverage(
             pressure_min=1.0e-6,

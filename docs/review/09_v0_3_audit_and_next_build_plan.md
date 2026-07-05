@@ -2,6 +2,9 @@
 
 Date: 2026-07-02
 
+Status: historical note. The current v0.3 RT/benchmark audit is
+`docs/review/10_v0_3_rt_benchmark_audit.md`.
+
 This note audits the current ROBERT state after the v0.3 foundation work and
 maps the next steps against the NEMESIS/NemesisPy lessons and the local
 HAT-P-32b emission model.
@@ -352,4 +355,3 @@ Add validation manifest and tabulated P-T profile support for HAT-P-32b
 That is the best next step because it moves directly toward reproducing the
 NemesisPy HAT-P-32b setup while still avoiding premature radiative-transfer
 implementation.
-

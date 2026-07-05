@@ -4,20 +4,21 @@ ROBERT treats opacity data as a prepared scientific input, not as something
 radiative-transfer kernels discover from file paths. The opacity package now
 separates:
 
-- source database, such as ExoMol, ExoMolOP, HITRAN, HITEMP, or NEMESIS,
+- source database, such as ExoMol, ExoMolOP, HITRAN, HITEMP, or an unknown
+  upstream source,
 - storage format, such as ExoMol line-list files, HITRAN `.par`, HITRAN CIA,
-  NEMESIS `.kta`, or a future ROBERT compressed archive,
+  `.kta` binary tables, or a future ROBERT compressed archive,
 - numerical mode, such as correlated-k, opacity sampling, line-by-line, or CIA,
 - spectral, pressure, temperature, species, and checksum metadata.
 
 This matters because the same physical source can appear in several storage
 formats. The local HAT-P-32b k-tables are ExoMol-derived and binned with
-`exo_k`, but the on-disk product is a NEMESIS-style `.kta` correlated-k file.
+`exo_k`, and the on-disk product is a `.kta` correlated-k binary table.
 ROBERT records that as:
 
 ```python
 source = "exomol_op"
-storage_format = "nemesis_kta"
+storage_format = "kta_binary"
 mode = "correlated_k"
 ```
 
@@ -56,10 +57,10 @@ grids, evaluate CIA coefficients, or perform radiative transfer.
 
 ## Native ROBERT Archive Candidates
 
-The NEMESIS `.kta` format is useful for compatibility, especially for
+The `.kta` binary format is useful for compatibility, especially for
 ExoMolOP/exo_k products, but it is not a good long-term ROBERT working format:
-it is opaque, difficult to inspect, and awkward to benchmark without specialized
-readers.
+it is opaque, difficult to inspect, and awkward to benchmark without
+specialized readers.
 
 ROBERT's first native fast-read candidate is therefore:
 

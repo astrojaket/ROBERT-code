@@ -6,11 +6,11 @@ from .emission import (
     solve_clear_sky_emission,
 )
 from .extinction import (
+    CiaTable,
     LayerOpticalDepth,
-    NemesisCiaTable,
     cia_optical_depth,
     rayleigh_scattering_optical_depth,
-    read_nemesis_cia_table,
+    read_cia_table,
 )
 from .optical_depth import GasOpticalDepth, assemble_gas_optical_depth
 from .geometry import (
@@ -18,7 +18,7 @@ from .geometry import (
     DiscPoint,
     gauss_legendre_disk_geometry,
     geometry_from_emission_angles,
-    nemesis_lobatto_phase_geometry,
+    lobatto_phase_geometry,
     normal_emission_geometry,
 )
 from .random_overlap import (
@@ -40,7 +40,7 @@ __all__ = [
     "DiscPoint",
     "GasOpticalDepth",
     "LayerOpticalDepth",
-    "NemesisCiaTable",
+    "CiaTable",
     "SingleScatteringSource",
     "assemble_gas_optical_depth",
     "cia_optical_depth",
@@ -48,13 +48,13 @@ __all__ = [
     "gauss_legendre_disk_geometry",
     "geometry_from_emission_angles",
     "isotropic_phase_function",
-    "nemesis_lobatto_phase_geometry",
+    "lobatto_phase_geometry",
     "normal_emission_geometry",
     "random_overlap_species_tau",
     "random_overlap_tau_vectors",
     "rank_rebin_distribution",
     "rayleigh_phase_function",
     "rayleigh_scattering_optical_depth",
-    "read_nemesis_cia_table",
+    "read_cia_table",
     "solve_clear_sky_emission",
 ]

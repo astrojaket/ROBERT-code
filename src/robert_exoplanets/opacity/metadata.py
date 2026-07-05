@@ -34,7 +34,6 @@ class OpacityDataSource(str, Enum):
     EXOMOL_OP = "exomol_op"
     HITRAN = "hitran"
     HITEMP = "hitemp"
-    NEMESIS = "nemesis"
     ROBERT_ARCHIVE = "robert_archive"
     UNKNOWN = "unknown"
 
@@ -47,7 +46,7 @@ class OpacityStorageFormat(str, Enum):
     EXOMOL_KTABLE = "exomol_ktable"
     HITRAN_PAR = "hitran_par"
     HITRAN_CIA = "hitran_cia"
-    NEMESIS_KTA = "nemesis_kta"
+    KTA_BINARY = "kta_binary"
     ROBERT_NPY_DIRECTORY = "robert_npy_directory"
     ROBERT_NPZ = "robert_npz"
     UNKNOWN = "unknown"

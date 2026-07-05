@@ -37,7 +37,7 @@ src/robert_exoplanets/
     registry.py
   opacity/
     providers.py
-    nemesis_kta.py
+    kta.py
     cia.py
     cache.py
     coverage.py

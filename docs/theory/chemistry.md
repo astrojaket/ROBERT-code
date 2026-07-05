@@ -18,6 +18,9 @@ Current chemistry types:
   evaluated VMR profiles and molecular masses.
 - `FixedMeanMolecularWeight`: returns one fixed mean molecular weight for every
   atmospheric layer.
+- `FastChemEquilibriumChemistry`: optional adapter for local FastChem
+  equilibrium-chemistry tables when the external dependency and data files are
+  available.
 
 ## Free Chemistry
 
@@ -36,8 +39,8 @@ their parameter names through `required_parameters()`. Fixed species are stored
 in `fixed_mixing_ratios` and do not appear in `required_parameters()`.
 
 By default, `FreeChemistry` uses `BackgroundGasMixture({"H2": 0.8547,
-"He": 0.1453})`, matching the H2/He split used by the local NemesisPy
-HAT-P-32b free-chemistry path. Background fractions are relative shares of the
+"He": 0.1453})`, matching the H2/He split used by the local HAT-P-32b
+free-chemistry benchmark path. Background fractions are relative shares of the
 leftover VMR budget and are normalized during validation.
 
 The default `excess_policy="raise"` rejects active-gas abundances that sum to
@@ -74,9 +77,9 @@ composition before calculating mean molecular weight.
 
 The current chemistry layer intentionally does not implement:
 
-- FastChem or other equilibrium chemistry backends.
 - Quench chemistry.
 - Photochemical profile overlays.
+- Disequilibrium chemistry beyond tabulated or externally evaluated inputs.
 
 Those should be added as separate adapters or post-processing components, not
 as hidden branches inside the free-chemistry model.

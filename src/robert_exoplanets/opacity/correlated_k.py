@@ -14,7 +14,7 @@ from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, RobertCoverageError, RobertValidationError, SpectralGrid
 
 from .archive import load_robert_npy_directory, load_robert_npz_archive
-from .kta import NemesisKTable, read_kta
+from .kta import KtaTable, read_kta
 from .metadata import pressure_values_in_unit, spectral_grid_values_in_unit
 
 
@@ -96,8 +96,8 @@ class CorrelatedKTable:
         object.__setattr__(self, "metadata", dict(self.metadata))
 
     @classmethod
-    def from_nemesis(cls, species: str, table: NemesisKTable) -> "CorrelatedKTable":
-        """Build a correlated-k table from a loaded NEMESIS `.kta` table."""
+    def from_kta(cls, species: str, table: KtaTable) -> "CorrelatedKTable":
+        """Build a correlated-k table from a loaded `.kta` table."""
 
         return cls(
             species=species,
@@ -110,7 +110,7 @@ class CorrelatedKTable:
             kcoeff=table.kcoeff,
             unit=table.unit,
             metadata={
-                "source_format": "nemesis_kta",
+                "source_format": "kta_binary",
                 "source_path": table.header.path,
                 "checksum_sha256": "" if table.header.checksum_sha256 is None else table.header.checksum_sha256,
                 **dict(table.metadata),
@@ -276,7 +276,7 @@ class CorrelatedKOpacityProvider:
         """Build a provider from species-to-`.kta` file paths."""
 
         tables = {
-            str(species): CorrelatedKTable.from_nemesis(
+            str(species): CorrelatedKTable.from_kta(
                 str(species),
                 read_kta(
                     path,

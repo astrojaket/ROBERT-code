@@ -1,6 +1,10 @@
 # ROBERT
 
-ROBERT is a starter repository for a JWST exoplanet emission retrieval code. It currently provides the package layout, typed core domain objects, tests, and a stubbed end-to-end example. Full retrieval physics is not implemented yet.
+ROBERT is an early-stage JWST exoplanet emission retrieval code. It now
+contains typed core domain objects, modular atmosphere and chemistry
+components, opacity import/archive helpers, RT-facing optical-depth objects, a
+NumPy emission reference solver, and benchmark examples. A full retrieval
+engine is not implemented yet.
 
 The Python distribution name is `robert-exoplanets` to avoid colliding with the existing `robert` package on PyPI.
 
@@ -56,7 +60,7 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - Blackbody reference diagnostics for visual sanity checks.
 - Opacity metadata, coverage checks, and lightweight inspectors for ExoMol,
   ExoMolOP/exo_k `.kta`, HITRAN `.par`, HITRAN CIA, and future ROBERT archives.
-- A validated ExoMolOP/exo_k/NEMESIS `.kta` reader and converter into ROBERT
+- A validated ExoMolOP/exo_k `.kta` reader and converter into ROBERT
   native archives, with an optional in-memory floor for missing non-finite
   k-coefficients while leaving source tables unchanged.
 - ROBERT-native opacity archive helpers for readable-manifest `.npy`
@@ -66,18 +70,21 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - A local HAT-P-32b opacity benchmark example that reports exact evaluator
   agreement, records missing opacity-table regions, and plots k-coefficient
   slices.
-- Gas optical-depth assembly from evaluated correlated-k opacity, with
+- Gas optical-depth assembly from evaluated correlated-k opacity, including
+  random-overlap multi-gas mixing, CIA/Rayleigh optical-depth contributors, and
   plot-ready cumulative tau and transmission-weighting diagnostics.
 - A NumPy clear-sky thermal-emission reference solver with Planck source
   integration, disk quadrature, eclipse-depth normalization, and layer
   contribution diagnostics.
+- First-order direct-beam single-scattering source diagnostics for phase-aware
+  geometries.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later
 
 - Real JWST data ingestion.
-- Atmospheric parameterization.
-- CIA, scattering, clouds/aerosols, random-overlap multi-gas correlated-k, and
-  full NEMESIS-style RT parity.
+- Retrieval parameterization and sampler integration.
+- Cloud/aerosol optical properties, multiple scattering, reference-pressure
+  path geometry, and full benchmark RT parity.
 - Likelihood evaluation.
 - Sampler integration.

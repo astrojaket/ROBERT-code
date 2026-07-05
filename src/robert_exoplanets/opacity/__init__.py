@@ -25,8 +25,8 @@ from .inspectors import (
     inspect_kta_file,
 )
 from .kta import (
-    NemesisKTable,
-    NemesisKTableHeader,
+    KtaHeader,
+    KtaTable,
     convert_kta_to_robert_archive,
     kta_product_from_header,
     read_kta,
@@ -54,8 +54,8 @@ __all__ = [
     "EvaluatedCorrelatedKOpacity",
     "FixtureOpacityProvider",
     "GridCoverage",
-    "NemesisKTable",
-    "NemesisKTableHeader",
+    "KtaHeader",
+    "KtaTable",
     "OpacityCoverageReport",
     "OpacityDatabase",
     "OpacityDataProduct",

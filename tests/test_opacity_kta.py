@@ -1,4 +1,4 @@
-"""Tests for NEMESIS `.kta` opacity readers."""
+"""Tests for `.kta` opacity readers."""
 
 from __future__ import annotations
 

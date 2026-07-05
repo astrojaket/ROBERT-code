@@ -14,8 +14,8 @@
 - Added a GitHub Actions CI workflow.
 - Added a local-only HAT-P-32b benchmark plotting example and reusable external
   emission benchmark CSV loader.
-- Added a v0.3 audit and next-build plan grounded in the NemesisPy HAT-P-32b
-  workflow.
+- Added a v0.3 audit and next-build plan grounded in the local HAT-P-32b
+  benchmark workflow.
 - Added tabulated temperature-profile support and a local HAT-P-32b P-T
   diagnostic plotting example.
 - Added retrieval-facing spline, Madhusudhan-Seager 2009, and
@@ -29,7 +29,7 @@
 - Added a model-setup factory that maps HAT-P-32b-style atmosphere config
   blocks into ROBERT pressure, temperature, chemistry, and MMW components.
 - Added opacity metadata, coverage checks, and lightweight inspectors for
-  ExoMol/ExoMolOP, exo_k/NEMESIS `.kta`, HITRAN `.par`, HITRAN CIA, and future
+  ExoMol/ExoMolOP, exo_k `.kta`, HITRAN `.par`, HITRAN CIA, and future
   ROBERT compressed archive manifests.
 - Added opacity-array benchmark diagnostics for future absorption and
   k-coefficient validation across wavelength, pressure, temperature, and
@@ -37,7 +37,7 @@
 - Added ROBERT-native opacity archive helpers for readable-manifest `.npy`
   directories and `.npz` exchange archives, plus a synthetic opacity archive
   I/O benchmark example.
-- Added a validated NEMESIS `.kta` reader for ExoMolOP/exo_k correlated-k
+- Added a validated `.kta` reader for ExoMolOP/exo_k correlated-k
   products, including header coverage metadata, full k-coefficient loading, and
   conversion into ROBERT native archives. The reader can optionally replace
   non-finite k-coefficients with an in-memory runtime floor while preserving the
@@ -57,8 +57,13 @@
   source-function integration, optional disk averaging, eclipse-depth output,
   and layer contribution diagnostics.
 - Added a local HAT-P-32b clear-sky emission benchmark script that compares the
-  current gas-only ROBERT spectrum against the external NemesisPy benchmark and
-  records missing mature-NEMESIS physics explicitly.
+  current gas-only ROBERT spectrum against an external benchmark and records
+  remaining benchmark physics gaps explicitly.
+- Added CIA/Rayleigh layer optical-depth helpers, random-overlap gas mixing,
+  phase-aware Lobatto disc geometry, and a first diagnostic direct-beam
+  single-scattering source treatment.
+- Added a v0.3 RT benchmark audit with default, phase-geometry, and
+  single-scattering benchmark results.
 
 ## v0.2.0 - Core Domain Foundation
 

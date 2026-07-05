@@ -1,8 +1,8 @@
-"""NEMESIS `.kta` correlated-k reader.
+"""Legacy `.kta` correlated-k reader.
 
 The local HAT-P-32b k-tables were generated from ExoMol/ExoMolOP data and
-written by `exo_k` in the NEMESIS `.kta` binary layout. ROBERT reads that format
-directly so `.kta` can remain an import format rather than a native dependency.
+written by `exo_k` in a `.kta` binary layout. ROBERT reads that format directly
+so `.kta` can remain an import format rather than a native dependency.
 """
 
 from __future__ import annotations
@@ -37,8 +37,8 @@ _DEFAULT_NONFINITE_FILL_VALUE = 1.0e-300
 
 
 @dataclass(frozen=True)
-class NemesisKTableHeader:
-    """Metadata extracted from a NEMESIS `.kta` file header."""
+class KtaHeader:
+    """Metadata extracted from a `.kta` file header."""
 
     path: str
     irec0: int
@@ -150,10 +150,10 @@ class NemesisKTableHeader:
 
 
 @dataclass(frozen=True)
-class NemesisKTable:
-    """A loaded NEMESIS `.kta` table."""
+class KtaTable:
+    """A loaded `.kta` table."""
 
-    header: NemesisKTableHeader
+    header: KtaHeader
     kcoeff: NDArray[np.float64]
     unit: str = "cm^2/molecule"
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -175,8 +175,8 @@ def read_kta_header(
     path: str | Path,
     *,
     checksum: bool = False,
-) -> NemesisKTableHeader:
-    """Read metadata from a NEMESIS `.kta` file without loading k-coefficients."""
+) -> KtaHeader:
+    """Read metadata from a `.kta` file without loading k-coefficients."""
 
     file_path = Path(path).expanduser()
     _require_kta_file(file_path)
@@ -219,7 +219,7 @@ def read_kta_header(
     wavelength_micron = np.array(stored_wavelength[::-1], dtype=float, copy=True)
     wavenumber = 10000.0 / wavelength_micron
     data_offset_bytes = (irec0 - 1) * _FLOAT_DTYPE.itemsize
-    return NemesisKTableHeader(
+    return KtaHeader(
         path=str(file_path),
         irec0=irec0,
         n_wavelength=n_wavelength,
@@ -241,7 +241,7 @@ def read_kta_header(
         file_size_bytes=file_size,
         checksum_sha256=_file_sha256(file_path) if checksum else None,
         metadata={
-            "format": "nemesis_kta",
+            "format": "kta_binary",
             "kcoeff_unit": "cm^2/molecule",
             "pressure_unit": "bar",
             "temperature_unit": "K",
@@ -258,8 +258,8 @@ def read_kta(
     checksum: bool = False,
     nonfinite_policy: str = "raise",
     nonfinite_fill_value: float = _DEFAULT_NONFINITE_FILL_VALUE,
-) -> NemesisKTable:
-    """Read a NEMESIS `.kta` file into ROBERT's native axis order.
+) -> KtaTable:
+    """Read a `.kta` file into ROBERT's native axis order.
 
     By default, ROBERT rejects tables with non-finite k-coefficients. For
     incomplete legacy tables, set `nonfinite_policy="floor"` to map NaN or
@@ -284,11 +284,11 @@ def read_kta(
         policy=nonfinite_policy,
         fill_value=nonfinite_fill_value,
     )
-    return NemesisKTable(header=header, kcoeff=kcoeff, metadata=metadata)
+    return KtaTable(header=header, kcoeff=kcoeff, metadata=metadata)
 
 
 def kta_product_from_header(
-    header: NemesisKTableHeader,
+    header: KtaHeader,
     *,
     species: str,
     source: OpacityDataSource | str = OpacityDataSource.EXOMOL_OP,
@@ -299,7 +299,7 @@ def kta_product_from_header(
         species=(species,),
         mode=OpacityMode.CORRELATED_K,
         source=source,
-        storage_format=OpacityStorageFormat.NEMESIS_KTA,
+        storage_format=OpacityStorageFormat.KTA_BINARY,
         path=header.path,
         spectral_coverage=header.spectral_coverage,
         grid_coverage=header.grid_coverage,
@@ -344,7 +344,7 @@ def convert_kta_to_robert_archive(
         products=(product,),
         name=f"{species_name}-kta-import",
         root=str(Path(path).expanduser()),
-        metadata={"converted_from": "nemesis_kta", **dict(table.metadata)},
+        metadata={"converted_from": "kta_binary", **dict(table.metadata)},
     )
     arrays = {
         "kcoeff": table.kcoeff,

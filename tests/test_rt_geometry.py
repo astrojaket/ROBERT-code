@@ -11,7 +11,7 @@ from robert_exoplanets import (
     disk_average_quadrature,
     gauss_legendre_disk_geometry,
     geometry_from_emission_angles,
-    nemesis_lobatto_phase_geometry,
+    lobatto_phase_geometry,
     normal_emission_geometry,
 )
 from robert_exoplanets.core import RobertValidationError
@@ -48,11 +48,11 @@ def test_gauss_legendre_disk_geometry_matches_legacy_quadrature() -> None:
     np.testing.assert_allclose(np.sum(geometry.emission_angle_weights), 1.0)
 
 
-def test_nemesis_lobatto_phase_geometry_provides_scattering_angles() -> None:
-    geometry = nemesis_lobatto_phase_geometry(phase_angle_deg=180.0, n_mu=4)
+def test_lobatto_phase_geometry_provides_scattering_angles() -> None:
+    geometry = lobatto_phase_geometry(phase_angle_deg=180.0, n_mu=4)
 
-    assert geometry.name == "nemesis_lobatto_phase_disc"
-    assert geometry.quadrature == "nemesis_lobatto_projected_disc"
+    assert geometry.name == "lobatto_phase_disc"
+    assert geometry.quadrature == "lobatto_projected_disc"
     assert geometry.phase_angle_deg == 180.0
     assert geometry.n_points >= 4
     np.testing.assert_allclose(np.sum(geometry.emission_angle_weights), 1.0)
@@ -71,6 +71,6 @@ def test_disc_geometry_rejects_zero_total_weight() -> None:
         DiscGeometry(points=(DiscPoint(emission_mu=1.0, weight=0.0),))
 
 
-def test_nemesis_lobatto_phase_geometry_rejects_unsupported_nmu() -> None:
+def test_lobatto_phase_geometry_rejects_unsupported_nmu() -> None:
     with pytest.raises(RobertValidationError, match="2 <= n_mu <= 5"):
-        nemesis_lobatto_phase_geometry(phase_angle_deg=0.0, n_mu=6)
+        lobatto_phase_geometry(phase_angle_deg=0.0, n_mu=6)

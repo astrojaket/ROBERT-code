@@ -29,7 +29,7 @@ def test_opacity_database_reports_correlated_k_coverage() -> None:
         species=("H2O",),
         mode=OpacityMode.CORRELATED_K,
         source=OpacityDataSource.EXOMOL_OP,
-        storage_format=OpacityStorageFormat.NEMESIS_KTA,
+        storage_format=OpacityStorageFormat.KTA_BINARY,
         spectral_coverage=SpectralCoverage(3000.0, 11000.0, unit="cm^-1"),
         grid_coverage=GridCoverage(
             pressure_min=1.0e-6,
@@ -60,7 +60,7 @@ def test_opacity_database_rejects_unknown_or_missing_coverage() -> None:
         species=("CO",),
         mode="correlated_k",
         source="exomol_op",
-        storage_format="nemesis_kta",
+        storage_format="kta_binary",
     )
     database = OpacityDatabase(products=(product,))
     spectral_grid = SpectralGrid.from_array([1.0, 2.0], unit="micron")

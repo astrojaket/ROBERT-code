@@ -33,8 +33,8 @@ def random_overlap_species_tau(
         Correlated-k quadrature weights for the last axis.
     cutoff
         Species with optical depths below this threshold are skipped when more
-        than one species is present. This mirrors the small-opacity guard used
-        in the NEMESIS/NemesisPy random-overlap path.
+        than one species is present. This avoids spending time on effectively
+        transparent gases in multi-species random-overlap calculations.
     backend
         ``"auto"`` uses the optional Numba kernel when available and otherwise
         uses the NumPy reference implementation. ``"numpy"`` and ``"numba"``

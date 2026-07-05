@@ -226,21 +226,20 @@ def gauss_legendre_disk_geometry(n_mu: int = 4) -> DiscGeometry:
     )
 
 
-def nemesis_lobatto_phase_geometry(
+def lobatto_phase_geometry(
     phase_angle_deg: float,
     n_mu: int = 4,
 ) -> DiscGeometry:
-    """Return a NemesisPy-style projected-disc phase quadrature.
+    """Return a projected-disc phase quadrature using Lobatto mu rings.
 
-    The geometry follows the projected-disc convention used by NemesisPy:
-    orbital phase is 0 degrees at primary transit and 180 degrees at secondary
-    eclipse. The returned points carry stellar zenith and azimuth metadata for
-    future scattering source-function calculations.
+    The orbital phase convention is 0 degrees at primary transit and 180
+    degrees at secondary eclipse. The returned points carry stellar zenith and
+    azimuth metadata for scattering source-function calculations.
     """
 
     n = _positive_int(n_mu, "n_mu")
     if n < 2 or n > 5:
-        raise RobertValidationError("Nemesis-style Lobatto geometry supports 2 <= n_mu <= 5")
+        raise RobertValidationError("Lobatto phase geometry supports 2 <= n_mu <= 5")
     phase = _finite_float(phase_angle_deg, "phase_angle_deg") % 360.0
     mu, wtmu = _lobatto_mu_weights(n)
     dtr = np.pi / 180.0
@@ -332,12 +331,12 @@ def nemesis_lobatto_phase_geometry(
 
     return DiscGeometry(
         points=tuple(points),
-        name="nemesis_lobatto_phase_disc",
-        quadrature="nemesis_lobatto_projected_disc",
+        name="lobatto_phase_disc",
+        quadrature="lobatto_projected_disc",
         phase_angle_deg=phase,
         metadata={
             "phase_convention": "0 deg primary transit, 180 deg secondary eclipse",
-            "source": "NemesisPy calc_trig.gauss_lobatto_weights convention",
+            "disc_model": "projected_disc_lobatto_mu_trapezoid_azimuth",
         },
     )
 
