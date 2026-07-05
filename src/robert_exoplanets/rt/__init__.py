@@ -13,6 +13,7 @@ from .extinction import (
     read_cia_table,
 )
 from .optical_depth import GasOpticalDepth, assemble_gas_optical_depth
+from .path_geometry import HydrostaticPathGeometry, hydrostatic_path_geometry
 from .geometry import (
     DiscGeometry,
     DiscPoint,
@@ -39,6 +40,7 @@ __all__ = [
     "DiscGeometry",
     "DiscPoint",
     "GasOpticalDepth",
+    "HydrostaticPathGeometry",
     "LayerOpticalDepth",
     "CiaTable",
     "SingleScatteringSource",
@@ -47,6 +49,7 @@ __all__ = [
     "disk_average_quadrature",
     "gauss_legendre_disk_geometry",
     "geometry_from_emission_angles",
+    "hydrostatic_path_geometry",
     "isotropic_phase_function",
     "lobatto_phase_geometry",
     "normal_emission_geometry",

@@ -2,6 +2,9 @@
 
 Date: 2026-07-05
 
+Status: superseded for hydrostatic path results by
+`docs/review/11_hydrostatic_path_benchmark_note.md`.
+
 This note records the current ROBERT state after the v0.3 forward-model
 foundation work, compares it to the original staged plan, and keeps the
 historical source inspiration in documentation rather than runtime code strings

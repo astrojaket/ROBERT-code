@@ -73,6 +73,8 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
 - Gas optical-depth assembly from evaluated correlated-k opacity, including
   random-overlap multi-gas mixing, CIA/Rayleigh optical-depth contributors, and
   plot-ready cumulative tau and transmission-weighting diagnostics.
+- Hydrostatic radius/path geometry anchored at a reference pressure, available
+  as an optional spherical-shell path model for RT experiments.
 - A NumPy clear-sky thermal-emission reference solver with Planck source
   integration, disk quadrature, eclipse-depth normalization, and layer
   contribution diagnostics.

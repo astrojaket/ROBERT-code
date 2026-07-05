@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
-from robert_exoplanets.opacity import spectral_grid_values_in_unit
+from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 
 from .geometry import (
     DiscGeometry,
@@ -18,6 +18,7 @@ from .geometry import (
     normal_emission_geometry,
 )
 from .optical_depth import GasOpticalDepth
+from .path_geometry import HydrostaticPathGeometry
 from .scattering import SingleScatteringSource
 
 PLANCK_CONSTANT_J_S = 6.62607015e-34
@@ -203,6 +204,7 @@ def solve_clear_sky_emission(
     geometry: DiscGeometry | None = None,
     bottom_boundary: str = "blackbody",
     additional_optical_depths: Sequence[object] | None = None,
+    path_geometry: HydrostaticPathGeometry | None = None,
     scattering_source: SingleScatteringSource | None = None,
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
@@ -228,6 +230,8 @@ def solve_clear_sky_emission(
     )
     mu = emission_geometry.emission_angle_cosines
     mu_weights = emission_geometry.emission_angle_weights
+    if path_geometry is not None:
+        _validate_path_geometry_match(gas_optical_depth, path_geometry)
 
     wavelength = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
     output_grid = SpectralGrid.from_array(
@@ -251,6 +255,12 @@ def solve_clear_sky_emission(
     )
     tau_ordered = total_tau[order]
     scattering_tau_ordered = scattering_tau[order]
+    emission_path_factors = _emission_path_factors(
+        mu,
+        gas_optical_depth.atmosphere.n_layers,
+        order=order,
+        path_geometry=path_geometry,
+    )
     scattering_beam = None
     scattering_phase = None
     stellar_mu = None
@@ -286,7 +296,7 @@ def solve_clear_sky_emission(
         bottom_source = _planck_radiance_wavelength(wavelength, deepest_temperature)
 
     for point_index, mu_value in enumerate(mu):
-        slant_tau = tau_ordered / mu_value
+        slant_tau = tau_ordered * emission_path_factors[point_index, :, None, None]
         cumulative_before = _exclusive_cumulative(slant_tau)
         transmission_before = np.exp(-cumulative_before)
         layer_escape = transmission_before * (-np.expm1(-slant_tau))
@@ -306,7 +316,13 @@ def solve_clear_sky_emission(
                 raise RobertValidationError("single-scattering source was not initialized")
             mu0 = float(stellar_mu[point_index])
             if mu0 > 0.0:
-                incoming_midpoint_tau = (cumulative_before + 0.5 * tau_ordered) / mu0
+                incoming_slant_tau = tau_ordered * _stellar_path_factors(
+                    mu0,
+                    gas_optical_depth.atmosphere.n_layers,
+                    order=order,
+                    path_geometry=path_geometry,
+                )[:, None, None]
+                incoming_midpoint_tau = _exclusive_cumulative(incoming_slant_tau) + 0.5 * incoming_slant_tau
                 incoming_transmission = np.exp(-incoming_midpoint_tau)
                 single_scattering_albedo = np.divide(
                     scattering_tau_ordered,
@@ -333,11 +349,12 @@ def solve_clear_sky_emission(
                     point_index
                 ]
         if bottom_mode == "blackbody":
-            total_transmission = np.exp(-np.sum(slant_tau, axis=0))
-            point_bottom_contribution[point_index] = (
-                np.sum(total_transmission * gas_optical_depth.g_weights[None, :], axis=-1)
-                * bottom_source
-            )
+            if path_geometry is None or bool(path_geometry.bottom_visible([mu_value])[0]):
+                total_transmission = np.exp(-np.sum(slant_tau, axis=0))
+                point_bottom_contribution[point_index] = (
+                    np.sum(total_transmission * gas_optical_depth.g_weights[None, :], axis=-1)
+                    * bottom_source
+                )
 
     layer_contribution_ordered = np.tensordot(mu_weights, point_layer_contribution_ordered, axes=(0, 0))
     bottom_contribution = np.tensordot(mu_weights, point_bottom_contribution, axes=(0, 0))
@@ -377,7 +394,19 @@ def solve_clear_sky_emission(
         "geometry": emission_geometry.name,
         "geometry_quadrature": emission_geometry.quadrature,
         "geometry_n_points": str(emission_geometry.n_points),
+        "path_geometry": "plane_parallel_secant"
+        if path_geometry is None
+        else str(path_geometry.metadata.get("path_model", "hydrostatic_spherical_shell")),
     }
+    if path_geometry is not None:
+        common_metadata.update(
+            {
+                "reference_radius_m": f"{path_geometry.reference_radius_m:.12g}",
+                "reference_pressure_pa": f"{path_geometry.reference_pressure_pa:.12g}",
+                "top_radius_m": f"{path_geometry.top_radius_m:.12g}",
+                "bottom_radius_m": f"{path_geometry.bottom_radius_m:.12g}",
+            }
+        )
     if emission_geometry.phase_angle_deg is not None:
         common_metadata["phase_angle_deg"] = f"{emission_geometry.phase_angle_deg:.12g}"
     if scattering_source is not None:
@@ -574,6 +603,64 @@ def _total_optical_depth(
     scattering_tau.setflags(write=False)
     scattering_treatment = "extinction_only_no_scattering_source" if has_scattering_extinction else "none"
     return total_tau, tuple(sources), scattering_treatment, scattering_tau, tuple(scattering_sources)
+
+
+def _validate_path_geometry_match(
+    gas_optical_depth: GasOpticalDepth,
+    path_geometry: HydrostaticPathGeometry,
+) -> None:
+    gas_edges = pressure_values_in_unit(
+        gas_optical_depth.pressure_grid.edges,
+        gas_optical_depth.pressure_grid.unit,
+        "pa",
+    )
+    path_edges = pressure_values_in_unit(
+        path_geometry.pressure_grid.edges,
+        path_geometry.pressure_grid.unit,
+        "pa",
+    )
+    if gas_edges.shape != path_edges.shape or not np.allclose(gas_edges, path_edges, rtol=1.0e-10, atol=0.0):
+        raise RobertValidationError("path_geometry pressure grid must match gas optical-depth pressure grid")
+
+
+def _emission_path_factors(
+    mu: NDArray[np.float64],
+    n_layers: int,
+    *,
+    order: NDArray[np.int64],
+    path_geometry: HydrostaticPathGeometry | None,
+) -> NDArray[np.float64]:
+    if path_geometry is None:
+        factors = np.ones((mu.size, n_layers), dtype=float) / mu[:, None]
+    else:
+        factors = np.array(path_geometry.emission_path_factors(mu), dtype=float, copy=True)
+    if factors.shape != (mu.size, n_layers):
+        raise RobertValidationError("path geometry factors have incorrect shape")
+    if not np.all(np.isfinite(factors)) or np.any(factors < 0.0):
+        raise RobertValidationError("path geometry factors must be finite and non-negative")
+    ordered = factors[:, order]
+    ordered.setflags(write=False)
+    return ordered
+
+
+def _stellar_path_factors(
+    stellar_mu: float,
+    n_layers: int,
+    *,
+    order: NDArray[np.int64],
+    path_geometry: HydrostaticPathGeometry | None,
+) -> NDArray[np.float64]:
+    if path_geometry is None:
+        factors = np.ones(n_layers, dtype=float) / stellar_mu
+    else:
+        factors = np.array(path_geometry.emission_path_factors([stellar_mu])[0], dtype=float, copy=True)
+    if factors.shape != (n_layers,):
+        raise RobertValidationError("stellar path geometry factors have incorrect shape")
+    if not np.all(np.isfinite(factors)) or np.any(factors < 0.0):
+        raise RobertValidationError("stellar path geometry factors must be finite and non-negative")
+    ordered = factors[order]
+    ordered.setflags(write=False)
+    return ordered
 
 
 def _top_to_bottom_order(gas_optical_depth: GasOpticalDepth) -> NDArray[np.int64]:

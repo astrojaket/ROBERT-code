@@ -30,6 +30,7 @@ from robert_exoplanets import (
     assemble_gas_optical_depth,
     cia_optical_depth,
     gauss_legendre_disk_geometry,
+    hydrostatic_path_geometry,
     load_emission_benchmark_csv,
     lobatto_phase_geometry,
     rayleigh_scattering_optical_depth,
@@ -120,6 +121,14 @@ def main() -> dict[str, object]:
     include_cia = _env_bool("ROBERT_HAT_P_32B_INCLUDE_CIA", cia_file is not None)
     include_rayleigh = _env_bool("ROBERT_HAT_P_32B_INCLUDE_RAYLEIGH", True)
     include_scattering_source = _env_bool("ROBERT_HAT_P_32B_INCLUDE_SCATTERING_SOURCE", False)
+    path_geometry_mode = os.environ.get("ROBERT_HAT_P_32B_PATH_GEOMETRY", "plane_parallel").strip().lower()
+    if path_geometry_mode not in {"hydrostatic_spherical", "spherical", "none", "plane_parallel"}:
+        raise ValueError(
+            "ROBERT_HAT_P_32B_PATH_GEOMETRY must be 'hydrostatic_spherical' or 'plane_parallel'"
+        )
+    eclipse_radius_mode = os.environ.get("ROBERT_HAT_P_32B_ECLIPSE_RADIUS", "reference").strip().lower()
+    if eclipse_radius_mode not in {"reference", "top", "bottom"}:
+        raise ValueError("ROBERT_HAT_P_32B_ECLIPSE_RADIUS must be 'reference', 'top', or 'bottom'")
 
     for path, label in (
         (benchmark_csv, "benchmark CSV"),
@@ -170,6 +179,7 @@ def main() -> dict[str, object]:
     print(f"CIA: {'on' if include_cia else 'off'} ({cia_file if cia_file is not None else 'not configured'})")
     print(f"Rayleigh: {'on' if include_rayleigh else 'off'}")
     print(f"Single-scattering source: {'on' if include_scattering_source else 'off'}")
+    print(f"Path geometry: {path_geometry_mode}, eclipse radius={eclipse_radius_mode}")
 
     start = perf_counter()
     provider = CorrelatedKOpacityProvider.from_kta_paths(
@@ -226,6 +236,26 @@ def main() -> dict[str, object]:
         gravity_m_s2=DEFAULT_GRAVITY_M_S2,
         gas_combination=gas_combination,
     )
+    path_geometry = None
+    if path_geometry_mode in {"hydrostatic_spherical", "spherical"}:
+        path_geometry = hydrostatic_path_geometry(
+            atmosphere,
+            gravity_m_s2=DEFAULT_GRAVITY_M_S2,
+            reference_radius_m=DEFAULT_PLANET_RADIUS_M,
+            reference_pressure=DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR,
+            reference_pressure_unit="bar",
+        )
+        print(
+            "Hydrostatic radii: "
+            f"bottom={path_geometry.bottom_radius_m:.3e} m, "
+            f"reference={path_geometry.reference_radius_m:.3e} m at "
+            f"{DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR:g} bar, "
+            f"top={path_geometry.top_radius_m:.3e} m"
+        )
+    planet_radius_for_depth = _planet_radius_for_eclipse_depth(
+        path_geometry=path_geometry,
+        eclipse_radius_mode=eclipse_radius_mode,
+    )
     additional_optical_depths = []
     if include_cia:
         if cia_file is None:
@@ -251,8 +281,9 @@ def main() -> dict[str, object]:
         gas_tau,
         geometry=geometry,
         additional_optical_depths=additional_optical_depths,
+        path_geometry=path_geometry,
         scattering_source=scattering_source,
-        planet_radius_m=DEFAULT_PLANET_RADIUS_M,
+        planet_radius_m=planet_radius_for_depth,
         star_radius_m=DEFAULT_STAR_RADIUS_M,
         star_temperature_k=DEFAULT_STAR_TEMPERATURE_K,
     )
@@ -266,6 +297,8 @@ def main() -> dict[str, object]:
     )
     output_suffix = _output_suffix(
         geometry_mode=geometry_mode,
+        path_geometry_mode=path_geometry_mode,
+        eclipse_radius_mode=eclipse_radius_mode,
         include_scattering_source=include_scattering_source,
     )
     plot_path = _plot_benchmark(
@@ -304,6 +337,11 @@ def main() -> dict[str, object]:
         "n_wavelength": benchmark.n_points,
         "n_mu": n_mu,
         "geometry": _geometry_summary(result.geometry),
+        "path_geometry": _path_geometry_summary(path_geometry),
+        "eclipse_radius": {
+            "mode": eclipse_radius_mode,
+            "radius_m": planet_radius_for_depth,
+        },
         "planet_radius_m": DEFAULT_PLANET_RADIUS_M,
         "planet_mass_kg": DEFAULT_PLANET_MASS_KG,
         "semi_major_axis_m": DEFAULT_SEMI_MAJOR_AXIS_M,
@@ -320,8 +358,8 @@ def main() -> dict[str, object]:
         "reference_radius_pressure": {
             "pref_bar_config": DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR,
             "pref_pa_benchmark_resolution": DEFAULT_REFERENCE_RADIUS_PRESSURE_PA,
-            "used_by_current_robert_emission_solver": False,
-            "note": "The HAT-P-32b benchmark config records this pressure, but the current ROBERT emission solver does not yet use a reference-radius pressure path.",
+            "used_by_current_robert_emission_solver": path_geometry is not None,
+            "note": "ROBERT anchors the hydrostatic radius grid at this pressure when hydrostatic spherical path geometry is enabled.",
         },
         "solver": result.metadata,
         "remaining_benchmark_physics_gaps": _missing_physics(include_scattering_source),
@@ -360,14 +398,36 @@ def _disc_geometry_from_env(
 def _output_suffix(
     *,
     geometry_mode: str,
+    path_geometry_mode: str,
+    eclipse_radius_mode: str,
     include_scattering_source: bool,
 ) -> str:
     parts = []
+    if path_geometry_mode in {"hydrostatic_spherical", "spherical"}:
+        parts.append("hydrostatic_spherical")
+    if eclipse_radius_mode != "reference":
+        parts.append(f"{eclipse_radius_mode}_radius")
     if geometry_mode not in {"legendre", "legendre_disk", "gauss_legendre", "gauss_legendre_disk"}:
         parts.append(geometry_mode)
     if include_scattering_source:
         parts.append("single_scattering")
     return "" if not parts else "_" + "_".join(parts)
+
+
+def _planet_radius_for_eclipse_depth(
+    *,
+    path_geometry,
+    eclipse_radius_mode: str,
+) -> float:
+    if path_geometry is None:
+        return DEFAULT_PLANET_RADIUS_M
+    if eclipse_radius_mode == "reference":
+        return float(path_geometry.reference_radius_m)
+    if eclipse_radius_mode == "top":
+        return float(path_geometry.top_radius_m)
+    if eclipse_radius_mode == "bottom":
+        return float(path_geometry.bottom_radius_m)
+    raise ValueError("unsupported eclipse radius mode")
 
 
 def _geometry_summary(geometry) -> dict[str, object]:
@@ -389,6 +449,23 @@ def _geometry_summary(geometry) -> dict[str, object]:
         "stellar_mu_min": float(np.min(finite_stellar_mu)) if finite_stellar_mu.size else None,
         "stellar_mu_max": float(np.max(finite_stellar_mu)) if finite_stellar_mu.size else None,
         "metadata": dict(geometry.metadata),
+    }
+
+
+def _path_geometry_summary(path_geometry) -> dict[str, object] | None:
+    if path_geometry is None:
+        return None
+    return {
+        "path_model": path_geometry.metadata.get("path_model", "hydrostatic_spherical_shell"),
+        "reference_radius_m": path_geometry.reference_radius_m,
+        "reference_pressure_pa": path_geometry.reference_pressure_pa,
+        "top_radius_m": path_geometry.top_radius_m,
+        "bottom_radius_m": path_geometry.bottom_radius_m,
+        "atmosphere_thickness_m": path_geometry.top_radius_m - path_geometry.bottom_radius_m,
+        "scale_height_min_m": float(np.min(path_geometry.scale_height_m)),
+        "scale_height_median_m": float(np.median(path_geometry.scale_height_m)),
+        "scale_height_max_m": float(np.max(path_geometry.scale_height_m)),
+        "metadata": dict(path_geometry.metadata),
     }
 
 

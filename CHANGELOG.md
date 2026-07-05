@@ -64,6 +64,10 @@
   single-scattering source treatment.
 - Added a v0.3 RT benchmark audit with default, phase-geometry, and
   single-scattering benchmark results.
+- Added hydrostatic radius/path geometry anchored at a reference pressure,
+  optional spherical shell path factors in the emission solver, and a benchmark
+  note showing that the HAT-P-32b comparison still matches best with the
+  plane-parallel path default.
 
 ## v0.2.0 - Core Domain Foundation
 

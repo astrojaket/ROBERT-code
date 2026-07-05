@@ -10,6 +10,8 @@ ROBERT now has the first RT-facing reference building blocks:
   integration,
 - explicit disc geometry objects for normal-emission, uniform thermal-disc, and
   Lobatto phase quadrature calculations,
+- hydrostatic radius/path geometry anchored at a configurable reference radius
+  and pressure,
 - a first-order direct-beam single-scattering source treatment for Rayleigh-like
   or isotropic scattering phase functions.
 
@@ -48,6 +50,13 @@ N_layer = delta_pressure / (mean_molecular_weight * atomic_mass * gravity)
 where pressure is converted to Pa, mean molecular weight is in amu, and
 composition is interpreted as volume mixing ratio.
 
+`hydrostatic_path_geometry` can additionally compute layer-edge radii,
+layer-center radii, and spherical shell path-length factors from the same
+atmosphere, gravity, reference radius, and reference pressure. The current
+HAT-P-32b benchmark still matches best with the default plane-parallel secant
+path, but the spherical path object is now available for controlled geometry
+tests and future cloud, surface, transmission, or phase-curve work.
+
 `solve_clear_sky_emission` consumes a `GasOpticalDepth` object and returns
 `ClearSkyEmissionResult`, with:
 
@@ -57,6 +66,11 @@ composition is interpreted as volume mixing ratio.
 - layer thermal-emission contribution diagnostics,
 - total optical depth used by the solver,
 - optional point-spectrum diagnostics and disc-averaged geometry.
+
+By default, `solve_clear_sky_emission` uses a plane-parallel secant path through
+each layer. Passing `path_geometry=hydrostatic_path_geometry(...)` switches to
+spherical shell path-length factors and records the reference pressure/radius,
+top radius, and bottom radius in solver metadata.
 
 The solver can also consume additional layer optical depths, such as H2-H2/H2-He
 CIA and H2/He Rayleigh scattering extinction. Its metadata records whether
