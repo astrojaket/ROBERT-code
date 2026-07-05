@@ -17,7 +17,8 @@ ROBERT now has the first RT-facing reference building blocks:
 - cloud/aerosol optical-property containers carrying extinction optical depth,
   single-scattering albedo, and asymmetry factor,
 - a conservative two-stream multiple-scattering reference backend behind the
-  thermal-emission solver interface.
+  thermal-emission solver interface,
+- a Numba-backed thermal integration backend for thermal-only RT benchmarks.
 
 These are not a full mature RT path yet. They are the explicit bridge between
 atmosphere, chemistry, opacity, and later cloud, aerosol, and
@@ -95,6 +96,12 @@ conservative multiple-scattering reference closure. The returned
 `total_optical_depth` is then the effective optical depth used by the solver,
 while `extinction_optical_depth` remains the physical extinction optical depth
 for tau plots and code-to-code comparisons.
+
+Passing `thermal_integration_backend="auto"` uses the Numba thermal-integration
+kernel when available and falls back to the NumPy reference path otherwise.
+Use `thermal_integration_backend="numpy"` to force the readable reference
+backend. Direct-beam single-scattering source runs currently remain on the
+NumPy path.
 
 ## Geometry and Source Function
 
@@ -184,6 +191,21 @@ python examples/plot_single_scattering_reference.py
 
 writes a phase-dependent reflected-light sanity plot and a dayside scattering
 contribution profile.
+
+The cloud-scattering benchmark bridge:
+
+```bash
+python examples/benchmark_cloud_scattering_picaso_virga.py
+```
+
+loads `ROBERT_CLOUD_PROPERTY_FILE` when set, accepting either dense `.npz`
+arrays or long-table `.csv` files with PICASO/Virga-style aliases such as
+`tau_ext`, `omega0`, and `g`. If no file is provided, it generates a synthetic
+cloud property product, runs extinction-only and two-stream RT, writes plots and
+a JSON report, and times the cloud loading plus NumPy and Numba thermal RT
+paths. In the current synthetic 64-layer, 900-wavelength, 4-g smoke benchmark,
+cloud loading is about 1 ms and Numba reduces extinction-only RT from about
+15.7 ms to about 6.8 ms on this laptop.
 
 ## Scattering Boundary
 

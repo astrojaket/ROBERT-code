@@ -6,6 +6,11 @@ from .emission import (
     solve_clear_sky_emission,
 )
 from .clouds import CloudOpticalProperties, grey_cloud_deck, power_law_haze
+from .cloud_io import (
+    load_cloud_optical_properties_csv,
+    load_cloud_optical_properties_npz,
+    write_cloud_optical_properties_npz,
+)
 from .extinction import (
     CiaTable,
     LayerOpticalDepth,
@@ -34,6 +39,11 @@ from .scattering import (
     isotropic_phase_function,
     rayleigh_phase_function,
 )
+from .thermal_integration import (
+    ThermalEmissionIntegrationResult,
+    integrate_thermal_emission,
+    thermal_integration_backend_name,
+)
 from .two_stream import (
     TwoStreamScatteringDiagnostics,
     two_stream_effective_optical_depth,
@@ -51,6 +61,7 @@ __all__ = [
     "LayerOpticalDepth",
     "CiaTable",
     "SingleScatteringSource",
+    "ThermalEmissionIntegrationResult",
     "TwoStreamScatteringDiagnostics",
     "assemble_gas_optical_depth",
     "cia_optical_depth",
@@ -59,6 +70,9 @@ __all__ = [
     "geometry_from_emission_angles",
     "hydrostatic_path_geometry",
     "isotropic_phase_function",
+    "integrate_thermal_emission",
+    "load_cloud_optical_properties_csv",
+    "load_cloud_optical_properties_npz",
     "lobatto_phase_geometry",
     "normal_emission_geometry",
     "grey_cloud_deck",
@@ -70,6 +84,8 @@ __all__ = [
     "rayleigh_scattering_optical_depth",
     "read_cia_table",
     "solve_clear_sky_emission",
+    "thermal_integration_backend_name",
     "two_stream_effective_optical_depth",
     "two_stream_scattering_diagnostics",
+    "write_cloud_optical_properties_npz",
 ]

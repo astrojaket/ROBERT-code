@@ -23,6 +23,7 @@ python examples/minimal_forward_model.py
 python examples/plot_blackbody_reference.py
 python examples/plot_synthetic_tau_weighting.py
 python examples/plot_cloud_scattering_reference.py
+python examples/benchmark_cloud_scattering_picaso_virga.py
 ```
 
 For an already-created environment, refresh the editable install with:
@@ -81,11 +82,15 @@ Set `HAT_P_32B_KTA_DIR` to override the default Dropbox k-table directory.
   contribution diagnostics.
 - Cloud/aerosol optical-property containers with extinction optical depth,
   single-scattering albedo, asymmetry factor, and absorption/scattering splits.
+- PICASO/Virga-style cloud optical-property interchange readers for dense
+  `.npz` arrays and long-table `.csv` files.
 - First-order direct-beam single-scattering source diagnostics for phase-aware
   geometries.
 - A first conservative two-stream multiple-scattering reference backend behind
   the RT interface, intended for benchmarking and replacement by fuller
   scattering solvers.
+- A Numba-backed thermal source integration path for thermal-only RT, with a
+  NumPy reference backend retained for tests and debugging.
 - Tests that lock in the intended skeleton behavior.
 
 ## What Comes Later

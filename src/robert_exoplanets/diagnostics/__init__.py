@@ -6,15 +6,18 @@ from .blackbody import (
     blackbody_eclipse_depth_spectrum,
     planck_radiance_wavelength,
 )
+from .cloud_benchmarks import CloudOpticalPropertyComparison, compare_cloud_optical_properties
 from .opacity_benchmarks import OpacityComparisonResult, compare_opacity_arrays
 from .timing import TimingResult, time_callable
 
 __all__ = [
+    "CloudOpticalPropertyComparison",
     "EmissionBenchmark",
     "OpacityComparisonResult",
     "TimingResult",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
+    "compare_cloud_optical_properties",
     "compare_opacity_arrays",
     "load_emission_benchmark_csv",
     "planck_radiance_wavelength",

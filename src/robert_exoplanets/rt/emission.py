@@ -20,6 +20,10 @@ from .geometry import (
 from .optical_depth import GasOpticalDepth
 from .path_geometry import HydrostaticPathGeometry
 from .scattering import SingleScatteringSource
+from .thermal_integration import (
+    integrate_thermal_emission,
+    thermal_integration_backend_name,
+)
 from .two_stream import two_stream_effective_optical_depth
 
 PLANCK_CONSTANT_J_S = 6.62607015e-34
@@ -220,6 +224,7 @@ def solve_clear_sky_emission(
     path_geometry: HydrostaticPathGeometry | None = None,
     scattering_source: SingleScatteringSource | None = None,
     multiple_scattering_backend: str = "none",
+    thermal_integration_backend: str = "auto",
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
@@ -242,6 +247,10 @@ def solve_clear_sky_emission(
         raise RobertValidationError(
             "multiple_scattering_backend cannot yet be combined with scattering_source"
         )
+    requested_thermal_backend = _resolve_thermal_backend_for_solver(
+        thermal_integration_backend,
+        has_scattering_source=scattering_source is not None,
+    )
 
     emission_geometry = _resolve_emission_geometry(
         geometry,
@@ -328,18 +337,46 @@ def solve_clear_sky_emission(
             ]
         )
         bottom_source = _planck_radiance_wavelength(wavelength, deepest_temperature)
+    bottom_visible = np.zeros(mu.size, dtype=bool)
+    if bottom_mode == "blackbody":
+        if path_geometry is None:
+            bottom_visible = np.ones(mu.size, dtype=bool)
+        else:
+            bottom_visible = np.array(path_geometry.bottom_visible(mu), dtype=bool, copy=True)
 
-    for point_index, mu_value in enumerate(mu):
-        slant_tau = tau_ordered * emission_path_factors[point_index, :, None, None]
-        cumulative_before = _exclusive_cumulative(slant_tau)
-        transmission_before = np.exp(-cumulative_before)
-        layer_escape = transmission_before * (-np.expm1(-slant_tau))
-        layer_radiance_by_g = source_ordered[:, :, None] * layer_escape
-        point_layer_contribution_ordered[point_index] = np.sum(
-            layer_radiance_by_g * gas_optical_depth.g_weights[None, None, :],
-            axis=-1,
+    thermal_backend_used = "numpy_direct_scattering"
+    if scattering_source is None:
+        thermal_result = integrate_thermal_emission(
+            tau_ordered,
+            source_ordered,
+            gas_optical_depth.g_weights,
+            emission_path_factors,
+            bottom_source=bottom_source,
+            bottom_visible=bottom_visible,
+            backend=requested_thermal_backend,
         )
-        if scattering_source is not None:
+        point_layer_contribution_ordered = np.array(
+            thermal_result.point_layer_contribution_radiance,
+            dtype=float,
+            copy=True,
+        )
+        point_bottom_contribution = np.array(
+            thermal_result.point_bottom_contribution_radiance,
+            dtype=float,
+            copy=True,
+        )
+        thermal_backend_used = thermal_result.backend
+    else:
+        for point_index, _mu_value in enumerate(mu):
+            slant_tau = tau_ordered * emission_path_factors[point_index, :, None, None]
+            cumulative_before = _exclusive_cumulative(slant_tau)
+            transmission_before = np.exp(-cumulative_before)
+            layer_escape = transmission_before * (-np.expm1(-slant_tau))
+            layer_radiance_by_g = source_ordered[:, :, None] * layer_escape
+            point_layer_contribution_ordered[point_index] = np.sum(
+                layer_radiance_by_g * gas_optical_depth.g_weights[None, None, :],
+                axis=-1,
+            )
             if (
                 scattering_beam is None
                 or scattering_phase is None
@@ -382,9 +419,10 @@ def solve_clear_sky_emission(
                 point_layer_contribution_ordered[point_index] += point_scattering_contribution_ordered[
                     point_index
                 ]
-        if bottom_mode == "blackbody":
-            if path_geometry is None or bool(path_geometry.bottom_visible([mu_value])[0]):
+            if bottom_mode == "blackbody" and bottom_visible[point_index]:
                 total_transmission = np.exp(-np.sum(slant_tau, axis=0))
+                if bottom_source is None:
+                    raise RobertValidationError("bottom source was not initialized")
                 point_bottom_contribution[point_index] = (
                     np.sum(total_transmission * gas_optical_depth.g_weights[None, :], axis=-1)
                     * bottom_source
@@ -426,6 +464,7 @@ def solve_clear_sky_emission(
         else scattering_source.name,
         "multiple_scattering_backend": scattering_backend,
         "multiple_scattering_applied": multiple_scattering_applied,
+        "thermal_integration_backend": thermal_backend_used,
         "total_optical_depth_role": "two_stream_effective_extinction"
         if multiple_scattering_applied == "true"
         else "extinction",
@@ -701,6 +740,19 @@ def _normalize_multiple_scattering_backend(value: str) -> str:
             "multiple_scattering_backend must be 'none' or 'two_stream'"
         )
     return aliases[backend]
+
+
+def _resolve_thermal_backend_for_solver(value: str, *, has_scattering_source: bool) -> str:
+    requested = str(value).strip().lower().replace("-", "_")
+    if not has_scattering_source:
+        return thermal_integration_backend_name(requested)
+    if requested == "numba":
+        raise RobertValidationError(
+            "thermal_integration_backend='numba' cannot yet be combined with scattering_source"
+        )
+    if requested not in {"auto", "numpy"}:
+        thermal_integration_backend_name(requested)
+    return "numpy"
 
 
 def _looks_like_cloud_optical_properties(contribution: object) -> bool:

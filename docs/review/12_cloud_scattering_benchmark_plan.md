@@ -18,9 +18,34 @@ more complicated immediately.
   two-stream effective-extinction closure.
 - `ClearSkyEmissionResult.extinction_optical_depth` preserves physical
   extinction tau when `total_optical_depth` records the solver's effective tau.
+- `load_cloud_optical_properties_npz(...)` and
+  `load_cloud_optical_properties_csv(...)` read dense-array and long-table
+  PICASO/Virga-style cloud optical-property exports.
+- `thermal_integration_backend="auto"` uses the Numba thermal source-integration
+  kernel for thermal-only RT when available.
 
 This is a reference hook. It should not be treated as validated cloud
 scattering until the benchmark ladder below passes.
+
+## Current Timing Smoke Test
+
+`examples/benchmark_cloud_scattering_picaso_virga.py` currently writes a
+synthetic PICASO/Virga-style cloud property file and times cloud loading plus
+thermal RT backends.
+
+On the current laptop, with 64 layers, 900 wavelengths, 4 g ordinates, and a
+four-point disc quadrature:
+
+| Path | Median time |
+| --- | ---: |
+| cloud-property load | 1.04 ms |
+| extinction-only RT, NumPy | 15.70 ms |
+| extinction-only RT, auto/Numba | 6.76 ms |
+| two-stream RT, auto/Numba | 8.90 ms |
+
+The bottleneck in this smoke case is thermal RT integration, not cloud-property
+loading. The first Numba optimization therefore belongs at the thermal
+source-integration layer.
 
 ## Benchmark Ladder
 
