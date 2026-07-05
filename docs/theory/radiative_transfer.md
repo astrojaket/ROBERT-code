@@ -9,7 +9,9 @@ ROBERT now has the first RT-facing reference building blocks:
 - a NumPy clear-sky thermal-emission solver with Planck source-function
   integration,
 - explicit disc geometry objects for normal-emission, uniform thermal-disc, and
-  NemesisPy-style phase quadrature calculations.
+  NemesisPy-style phase quadrature calculations,
+- a first-order direct-beam single-scattering source treatment for Rayleigh-like
+  or isotropic scattering phase functions.
 
 These are not the full mature NEMESIS RT path yet. They are the explicit bridge
 between atmosphere, chemistry, opacity, and later cloud, aerosol, and
@@ -78,9 +80,12 @@ The available helpers are:
 - `nemesis_lobatto_phase_geometry(phase_angle_deg, n_mu)` for a projected-disc
   quadrature following NemesisPy's phase convention.
 
-The current source function is thermal Planck emission only. Rayleigh terms are
-included as extinction when supplied, but the scattering source function is
-explicitly recorded as not included.
+The default source function is thermal Planck emission only. If a
+`SingleScatteringSource` is supplied, the solver adds a first-order direct-beam
+scattering source term for optical-depth contributors whose `kind` contains
+`scattering`. This uses the `DiscGeometry` stellar zenith and azimuth metadata,
+so phase-aware geometries are required. The returned result stores separate
+scattering source-function and contribution diagnostics.
 
 ## Tau and Weighting Plots
 
@@ -123,7 +128,25 @@ CIA table, and the external emission CSV. It compares ROBERT's current
 clear-sky result to the benchmark and writes both a plot and a JSON metric
 report. This is a diagnostic benchmark, not a strict pass/fail validation,
 because the current ROBERT path still omits exact NEMESIS layering/path parity,
-clouds/aerosols, and scattering source functions.
+clouds/aerosols, and multiple-scattering source functions.
+
+To exercise the first single-scattering source term in that benchmark, run:
+
+```bash
+ROBERT_HAT_P_32B_INCLUDE_SCATTERING_SOURCE=1 python examples/benchmark_hat_p_32b_emission_rt.py
+```
+
+The default benchmark leaves this off to preserve the historical thermal
+emission comparison.
+
+The standalone synthetic scattering example:
+
+```bash
+python examples/plot_single_scattering_reference.py
+```
+
+writes a phase-dependent reflected-light sanity plot and a dayside scattering
+contribution profile.
 
 ## Scattering Boundary
 
@@ -133,8 +156,9 @@ Scattering must enter ROBERT in two separate ways:
 - as a source-function treatment when scattering redirects radiation into the
   line of sight.
 
-The current clear-sky solver handles absorption, thermal emission, and optional
-extinction-only Rayleigh terms. Clouds/aerosols and multiple-scattering source
+The current clear-sky solver handles absorption, thermal emission, optional
+extinction-only Rayleigh terms, and optional first-order single scattering of a
+direct stellar beam. Clouds/aerosols, surfaces, and multiple-scattering source
 terms should be added as independent RT components rather than hidden inside
 gas opacity.
 
@@ -147,7 +171,9 @@ NEMESIS and NemesisPy show that the mature correlated-k path needs:
 - reference-tested random-overlap handling for multiple opacity sources,
 - CIA opacity for H2-H2 and H2-He continua with broader HITRAN pair support,
 - Planck/source-function emission integration,
-- Rayleigh and cloud/aerosol scattering source functions,
+- tested single-scattering diagnostics for Rayleigh and cloud/aerosol optical
+  properties,
+- multiple-scattering source functions,
 - contribution-function diagnostics,
 - performance backends only after the reference equations are tested.
 

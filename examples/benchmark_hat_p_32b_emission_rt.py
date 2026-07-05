@@ -21,9 +21,11 @@ from robert_exoplanets import (
     AtmosphereState,
     CompositionMeanMolecularWeight,
     CorrelatedKOpacityProvider,
+    DirectStellarBeam,
     FastChemEquilibriumChemistry,
     PressureGrid,
     SpectralGrid,
+    SingleScatteringSource,
     TabulatedTemperatureProfile,
     assemble_gas_optical_depth,
     cia_optical_depth,
@@ -69,6 +71,7 @@ R_SUN_M = 6.957e8
 R_JUP_M = 7.1492e7
 M_JUP_KG = 1.898e27
 GRAVITATIONAL_CONSTANT = 6.67430e-11
+AU_M = 1.495978707e11
 
 DEFAULT_SPECIES = ("H2O",)
 DEFAULT_FASTCHEM_ACTIVE_SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
@@ -89,6 +92,7 @@ DEFAULT_PLANET_RADIUS_M = 1.98 * R_JUP_M
 DEFAULT_PLANET_MASS_KG = 0.68 * M_JUP_KG
 DEFAULT_STAR_RADIUS_M = 1.32 * R_SUN_M
 DEFAULT_STAR_TEMPERATURE_K = 6001.0
+DEFAULT_SEMI_MAJOR_AXIS_M = 0.034 * AU_M
 DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR = 100.0
 DEFAULT_REFERENCE_RADIUS_PRESSURE_PA = DEFAULT_REFERENCE_RADIUS_PRESSURE_BAR * 101325.0
 DEFAULT_GRAVITY_M_S2 = GRAVITATIONAL_CONSTANT * DEFAULT_PLANET_MASS_KG / DEFAULT_PLANET_RADIUS_M**2
@@ -124,6 +128,7 @@ def main() -> dict[str, object]:
     gas_combination = os.environ.get("ROBERT_HAT_P_32B_GAS_COMBINATION", "random_overlap")
     include_cia = _env_bool("ROBERT_HAT_P_32B_INCLUDE_CIA", True)
     include_rayleigh = _env_bool("ROBERT_HAT_P_32B_INCLUDE_RAYLEIGH", True)
+    include_scattering_source = _env_bool("ROBERT_HAT_P_32B_INCLUDE_SCATTERING_SOURCE", False)
 
     for path, label in (
         (benchmark_csv, "benchmark CSV"),
@@ -137,7 +142,15 @@ def main() -> dict[str, object]:
     kta_paths = _species_paths(kta_dir, species)
     n_mu = int(os.environ.get("ROBERT_HAT_P_32B_RT_NMU", "4"))
     geometry_mode = os.environ.get("ROBERT_HAT_P_32B_RT_GEOMETRY", "legendre_disk").strip().lower()
-    phase_angle_deg = float(os.environ.get("ROBERT_HAT_P_32B_PHASE_DEG", "0.0"))
+    default_phase = "180.0" if include_scattering_source else "0.0"
+    phase_angle_deg = float(os.environ.get("ROBERT_HAT_P_32B_PHASE_DEG", default_phase))
+    if include_scattering_source and geometry_mode in {
+        "legendre",
+        "legendre_disk",
+        "gauss_legendre",
+        "gauss_legendre_disk",
+    }:
+        geometry_mode = "nemesis_lobatto"
     geometry = _disc_geometry_from_env(
         geometry_mode=geometry_mode,
         n_mu=n_mu,
@@ -165,6 +178,7 @@ def main() -> dict[str, object]:
     )
     print(f"CIA: {'on' if include_cia else 'off'} ({cia_file})")
     print(f"Rayleigh: {'on' if include_rayleigh else 'off'}")
+    print(f"Single-scattering source: {'on' if include_scattering_source else 'off'}")
 
     start = perf_counter()
     provider = CorrelatedKOpacityProvider.from_kta_paths(
@@ -229,10 +243,22 @@ def main() -> dict[str, object]:
         additional_optical_depths.append(cia_optical_depth(gas_tau, cia_table))
     if include_rayleigh:
         additional_optical_depths.append(rayleigh_scattering_optical_depth(gas_tau))
+    scattering_source = None
+    if include_scattering_source:
+        scattering_source = SingleScatteringSource(
+            stellar_beam=DirectStellarBeam.blackbody(
+                spectral_grid,
+                star_temperature_k=DEFAULT_STAR_TEMPERATURE_K,
+                star_radius_m=DEFAULT_STAR_RADIUS_M,
+                semi_major_axis_m=DEFAULT_SEMI_MAJOR_AXIS_M,
+            ),
+            phase_function=os.environ.get("ROBERT_HAT_P_32B_SCATTERING_PHASE_FUNCTION", "rayleigh"),
+        )
     result = solve_clear_sky_emission(
         gas_tau,
         geometry=geometry,
         additional_optical_depths=additional_optical_depths,
+        scattering_source=scattering_source,
         planet_radius_m=DEFAULT_PLANET_RADIUS_M,
         star_radius_m=DEFAULT_STAR_RADIUS_M,
         star_temperature_k=DEFAULT_STAR_TEMPERATURE_K,
@@ -245,9 +271,16 @@ def main() -> dict[str, object]:
         model=result.eclipse_depth.values,
         benchmark=benchmark.eclipse_depth,
     )
-    plot_path = _plot_benchmark(benchmark, result, temperature, pressure_grid)
-    geometry_plot_path = _plot_geometry(result)
-    summary_path = OUTPUT_DIR / "hat_p_32b_emission_rt_benchmark_summary.json"
+    output_suffix = "_single_scattering" if include_scattering_source else ""
+    plot_path = _plot_benchmark(
+        benchmark,
+        result,
+        temperature,
+        pressure_grid,
+        output_suffix=output_suffix,
+    )
+    geometry_plot_path = _plot_geometry(result, output_suffix=output_suffix)
+    summary_path = OUTPUT_DIR / f"hat_p_32b_emission_rt_benchmark{output_suffix}_summary.json"
     summary = {
         "benchmark": "HAT-P-32b clear-sky emission RT",
         "status": "diagnostic_not_strict",
@@ -270,18 +303,21 @@ def main() -> dict[str, object]:
         },
         "gas_combination": gas_tau.metadata["gas_combination"],
         "additional_optical_depths": _optical_depth_summary(additional_optical_depths),
+        "single_scattering_source": _scattering_source_summary(scattering_source),
         "n_layers": atmosphere.n_layers,
         "n_wavelength": benchmark.n_points,
         "n_mu": n_mu,
         "geometry": _geometry_summary(result.geometry),
         "planet_radius_m": DEFAULT_PLANET_RADIUS_M,
         "planet_mass_kg": DEFAULT_PLANET_MASS_KG,
+        "semi_major_axis_m": DEFAULT_SEMI_MAJOR_AXIS_M,
         "star_radius_m": DEFAULT_STAR_RADIUS_M,
         "star_temperature_k": DEFAULT_STAR_TEMPERATURE_K,
         "gravity_m_s2": DEFAULT_GRAVITY_M_S2,
         "system_units": {
             "planet_radius": "1.98 R_JUP_E = 1.98 * 7.1492e7 m",
             "planet_mass": "0.68 M_JUP = 0.68 * 1.898e27 kg",
+            "semi_major_axis": "0.034 AU",
             "star_radius": "1.32 R_SUN = 1.32 * 6.957e8 m",
             "gravity": "G * M_plt / R_plt^2",
         },
@@ -292,7 +328,7 @@ def main() -> dict[str, object]:
             "note": "NemesisPy's HAT-P-32b emission path stores Pref but calls calc_hydrostat, not calc_hydrostat_pref_test.",
         },
         "solver": result.metadata,
-        "missing_physics_relative_to_mature_nemesis": list(MISSING_PHYSICS),
+        "missing_physics_relative_to_mature_nemesis": _missing_physics(include_scattering_source),
         "comparison": comparison,
         "outputs": {
             "summary_json": str(summary_path),
@@ -345,6 +381,26 @@ def _geometry_summary(geometry) -> dict[str, object]:
         "stellar_mu_max": float(np.max(finite_stellar_mu)) if finite_stellar_mu.size else None,
         "metadata": dict(geometry.metadata),
     }
+
+
+def _scattering_source_summary(scattering_source) -> dict[str, object] | None:
+    if scattering_source is None:
+        return None
+    return {
+        "name": scattering_source.name,
+        "phase_function": scattering_source.phase_function,
+        "stellar_beam_unit": scattering_source.stellar_beam.unit,
+        "stellar_beam_metadata": dict(scattering_source.stellar_beam.metadata),
+        "metadata": dict(scattering_source.metadata),
+    }
+
+
+def _missing_physics(include_scattering_source: bool) -> list[str]:
+    missing = list(MISSING_PHYSICS)
+    if include_scattering_source:
+        missing = [item for item in missing if item != "scattering source-function treatment"]
+        missing.insert(0, "multiple-scattering and cloud/surface scattering source-function treatment")
+    return missing
 
 
 def _path_from_env(name: str, default: Path) -> Path:
@@ -469,8 +525,10 @@ def _plot_benchmark(
     result,
     temperature: np.ndarray,
     pressure_grid: PressureGrid,
+    *,
+    output_suffix: str = "",
 ) -> Path:
-    output_path = OUTPUT_DIR / "hat_p_32b_clear_sky_emission_rt.png"
+    output_path = OUTPUT_DIR / f"hat_p_32b_clear_sky_emission_rt{output_suffix}.png"
     model_ppm = result.eclipse_depth.values * 1.0e6
     benchmark_ppm = benchmark.eclipse_depth * 1.0e6
     residual_ppm = model_ppm - benchmark_ppm
@@ -478,6 +536,11 @@ def _plot_benchmark(
     mean_contribution = np.mean(contribution, axis=1)
     if np.max(mean_contribution) > 0.0:
         mean_contribution = mean_contribution / np.max(mean_contribution)
+    mean_scattering_contribution = None
+    if result.scattering_layer_contribution_radiance is not None:
+        mean_scattering_contribution = np.mean(result.scattering_layer_contribution_radiance, axis=1)
+        if np.max(mean_scattering_contribution) > 0.0:
+            mean_scattering_contribution = mean_scattering_contribution / np.max(mean_scattering_contribution)
 
     fig = plt.figure(figsize=(11.5, 7.2), constrained_layout=True)
     grid = fig.add_gridspec(2, 2, width_ratios=[2.2, 1.0], height_ratios=[2.0, 1.0])
@@ -552,6 +615,15 @@ def _plot_benchmark(
         linewidth=1.7,
         label="Mean contribution",
     )
+    if mean_scattering_contribution is not None:
+        ax_weight.plot(
+            mean_scattering_contribution,
+            pressure,
+            color="#7b2cbf",
+            linestyle=":",
+            linewidth=1.7,
+            label="Scattering contribution",
+        )
     ax_weight.set_xlim(0.0, 1.05)
     ax_weight.set_xlabel("Normalized Contribution")
     lines = ax_profile.get_lines() + ax_weight.get_lines()
@@ -563,8 +635,8 @@ def _plot_benchmark(
     return output_path
 
 
-def _plot_geometry(result) -> Path:
-    output_path = OUTPUT_DIR / "hat_p_32b_disc_geometry.png"
+def _plot_geometry(result, *, output_suffix: str = "") -> Path:
+    output_path = OUTPUT_DIR / f"hat_p_32b_disc_geometry{output_suffix}.png"
     geometry = result.geometry
     if geometry is None:
         raise RuntimeError("emission result did not include disc geometry")

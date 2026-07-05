@@ -18,6 +18,7 @@ from .geometry import (
     normal_emission_geometry,
 )
 from .optical_depth import GasOpticalDepth
+from .scattering import SingleScatteringSource
 
 PLANCK_CONSTANT_J_S = 6.62607015e-34
 SPEED_OF_LIGHT_M_S = 299_792_458.0
@@ -40,6 +41,9 @@ class ClearSkyEmissionResult:
     point_radiance: ArrayLike | None = None
     point_layer_contribution_radiance: ArrayLike | None = None
     point_bottom_contribution_radiance: ArrayLike | None = None
+    scattering_layer_contribution_radiance: ArrayLike | None = None
+    point_scattering_source_function: ArrayLike | None = None
+    point_scattering_contribution_radiance: ArrayLike | None = None
     total_optical_depth: ArrayLike | None = None
     eclipse_depth: Spectrum | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -123,6 +127,34 @@ class ClearSkyEmissionResult:
             if np.any(point_bottom_contribution < 0.0):
                 raise RobertValidationError("point_bottom_contribution_radiance must be non-negative")
 
+        scattering_layer_contribution = None
+        if self.scattering_layer_contribution_radiance is not None:
+            scattering_layer_contribution = _readonly_array(
+                self.scattering_layer_contribution_radiance,
+                "scattering_layer_contribution_radiance",
+                (n_layers, n_spectral),
+            )
+            if np.any(scattering_layer_contribution < 0.0):
+                raise RobertValidationError("scattering_layer_contribution_radiance must be non-negative")
+        point_scattering_source = None
+        if self.point_scattering_source_function is not None:
+            point_scattering_source = _readonly_array(
+                self.point_scattering_source_function,
+                "point_scattering_source_function",
+                (mu.size, n_layers, n_spectral),
+            )
+            if np.any(point_scattering_source < 0.0):
+                raise RobertValidationError("point_scattering_source_function must be non-negative")
+        point_scattering_contribution = None
+        if self.point_scattering_contribution_radiance is not None:
+            point_scattering_contribution = _readonly_array(
+                self.point_scattering_contribution_radiance,
+                "point_scattering_contribution_radiance",
+                (mu.size, n_layers, n_spectral),
+            )
+            if np.any(point_scattering_contribution < 0.0):
+                raise RobertValidationError("point_scattering_contribution_radiance must be non-negative")
+
         if self.eclipse_depth is not None:
             if self.eclipse_depth.spectral_grid.values.shape != self.radiance.spectral_grid.values.shape:
                 raise RobertValidationError("eclipse depth and radiance grids must have matching shapes")
@@ -143,6 +175,9 @@ class ClearSkyEmissionResult:
         object.__setattr__(self, "point_radiance", point_radiance)
         object.__setattr__(self, "point_layer_contribution_radiance", point_layer_contribution)
         object.__setattr__(self, "point_bottom_contribution_radiance", point_bottom_contribution)
+        object.__setattr__(self, "scattering_layer_contribution_radiance", scattering_layer_contribution)
+        object.__setattr__(self, "point_scattering_source_function", point_scattering_source)
+        object.__setattr__(self, "point_scattering_contribution_radiance", point_scattering_contribution)
         object.__setattr__(self, "total_optical_depth", total_tau)
         object.__setattr__(self, "metadata", dict(self.metadata))
 
@@ -168,6 +203,7 @@ def solve_clear_sky_emission(
     geometry: DiscGeometry | None = None,
     bottom_boundary: str = "blackbody",
     additional_optical_depths: Sequence[object] | None = None,
+    scattering_source: SingleScatteringSource | None = None,
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
@@ -175,9 +211,10 @@ def solve_clear_sky_emission(
     """Solve thermal emission for a clear atmosphere.
 
     The solver integrates Planck layer source functions through gas optical
-    depth plus any additional extinction optical depths. It is a readable NumPy
-    reference implementation and intentionally excludes scattering source
-    terms, even when Rayleigh extinction is supplied.
+    depth plus any additional extinction optical depths. When a
+    ``SingleScatteringSource`` is supplied, scattering optical depths in
+    ``additional_optical_depths`` add a first-order direct-beam scattering
+    source term; otherwise scattering remains extinction-only.
     """
 
     bottom_mode = bottom_boundary.strip().lower()
@@ -202,17 +239,43 @@ def solve_clear_sky_emission(
     order = _top_to_bottom_order(gas_optical_depth)
     source = _layer_planck_source(wavelength, gas_optical_depth.atmosphere.temperature)
     source_ordered = source[order]
-    total_tau, opacity_sources, scattering_treatment = _total_optical_depth(
+    (
+        total_tau,
+        opacity_sources,
+        scattering_treatment,
+        scattering_tau,
+        scattering_sources,
+    ) = _total_optical_depth(
         gas_optical_depth,
         additional_optical_depths,
     )
     tau_ordered = total_tau[order]
+    scattering_tau_ordered = scattering_tau[order]
+    scattering_beam = None
+    scattering_phase = None
+    stellar_mu = None
+    if scattering_source is not None:
+        if not scattering_sources or not np.any(scattering_tau > 0.0):
+            raise RobertValidationError(
+                "scattering_source requires at least one positive scattering optical-depth contribution"
+            )
+        stellar_mu = emission_geometry.stellar_mu
+        if not np.all(np.isfinite(stellar_mu)):
+            raise RobertValidationError("scattering_source requires finite geometry stellar_mu values")
+        scattering_beam = scattering_source.stellar_beam.values_on(output_grid)
+        scattering_phase = scattering_source.phase_function_values(emission_geometry)
+        scattering_treatment = "single_scattering_direct_beam"
 
     point_layer_contribution_ordered = np.zeros(
         (mu.size, gas_optical_depth.atmosphere.n_layers, wavelength.size),
         dtype=float,
     )
     point_bottom_contribution = np.zeros((mu.size, wavelength.size), dtype=float)
+    point_scattering_source_ordered = None
+    point_scattering_contribution_ordered = None
+    if scattering_source is not None:
+        point_scattering_source_ordered = np.zeros_like(point_layer_contribution_ordered)
+        point_scattering_contribution_ordered = np.zeros_like(point_layer_contribution_ordered)
     bottom_source = None
     if bottom_mode == "blackbody":
         deepest_temperature = float(
@@ -232,6 +295,43 @@ def solve_clear_sky_emission(
             layer_radiance_by_g * gas_optical_depth.g_weights[None, None, :],
             axis=-1,
         )
+        if scattering_source is not None:
+            if (
+                scattering_beam is None
+                or scattering_phase is None
+                or stellar_mu is None
+                or point_scattering_source_ordered is None
+                or point_scattering_contribution_ordered is None
+            ):
+                raise RobertValidationError("single-scattering source was not initialized")
+            mu0 = float(stellar_mu[point_index])
+            if mu0 > 0.0:
+                incoming_midpoint_tau = (cumulative_before + 0.5 * tau_ordered) / mu0
+                incoming_transmission = np.exp(-incoming_midpoint_tau)
+                single_scattering_albedo = np.divide(
+                    scattering_tau_ordered,
+                    tau_ordered,
+                    out=np.zeros_like(tau_ordered),
+                    where=tau_ordered > 0.0,
+                )
+                scattering_source_by_g = (
+                    scattering_beam[None, :, None]
+                    * (float(scattering_phase[point_index]) / (4.0 * np.pi))
+                    * single_scattering_albedo
+                    * incoming_transmission
+                )
+                scattering_contribution_by_g = scattering_source_by_g * layer_escape
+                point_scattering_source_ordered[point_index] = np.sum(
+                    scattering_source_by_g * gas_optical_depth.g_weights[None, None, :],
+                    axis=-1,
+                )
+                point_scattering_contribution_ordered[point_index] = np.sum(
+                    scattering_contribution_by_g * gas_optical_depth.g_weights[None, None, :],
+                    axis=-1,
+                )
+                point_layer_contribution_ordered[point_index] += point_scattering_contribution_ordered[
+                    point_index
+                ]
         if bottom_mode == "blackbody":
             total_transmission = np.exp(-np.sum(slant_tau, axis=0))
             point_bottom_contribution[point_index] = (
@@ -241,6 +341,21 @@ def solve_clear_sky_emission(
 
     layer_contribution_ordered = np.tensordot(mu_weights, point_layer_contribution_ordered, axes=(0, 0))
     bottom_contribution = np.tensordot(mu_weights, point_bottom_contribution, axes=(0, 0))
+    scattering_layer_contribution = None
+    point_scattering_source = None
+    point_scattering_contribution = None
+    if point_scattering_contribution_ordered is not None and point_scattering_source_ordered is not None:
+        scattering_layer_contribution_ordered = np.tensordot(
+            mu_weights,
+            point_scattering_contribution_ordered,
+            axes=(0, 0),
+        )
+        scattering_layer_contribution = _restore_layer_order(scattering_layer_contribution_ordered, order)
+        point_scattering_source = _restore_point_layer_order(point_scattering_source_ordered, order)
+        point_scattering_contribution = _restore_point_layer_order(
+            point_scattering_contribution_ordered,
+            order,
+        )
     layer_contribution = _restore_layer_order(layer_contribution_ordered, order)
     point_layer_contribution = _restore_point_layer_order(point_layer_contribution_ordered, order)
     point_radiance = np.sum(point_layer_contribution, axis=1) + point_bottom_contribution
@@ -251,9 +366,13 @@ def solve_clear_sky_emission(
     common_metadata = {
         "rt_solver": "clear_sky_numpy_reference",
         "bottom_boundary": bottom_mode,
-        "source_function": "thermal_planck",
+        "source_function": "thermal_planck"
+        if scattering_source is None
+        else "thermal_planck_plus_single_scattering",
         "scattering_treatment": scattering_treatment,
-        "scattering_source_function": "not_included",
+        "scattering_source_function": "not_included"
+        if scattering_source is None
+        else scattering_source.name,
         "opacity_sources": "+".join(opacity_sources),
         "geometry": emission_geometry.name,
         "geometry_quadrature": emission_geometry.quadrature,
@@ -261,6 +380,9 @@ def solve_clear_sky_emission(
     }
     if emission_geometry.phase_angle_deg is not None:
         common_metadata["phase_angle_deg"] = f"{emission_geometry.phase_angle_deg:.12g}"
+    if scattering_source is not None:
+        common_metadata["scattering_phase_function"] = scattering_source.phase_function
+        common_metadata["scattering_sources"] = "+".join(scattering_sources)
     radiance = Spectrum(
         spectral_grid=output_grid,
         values=radiance_values,
@@ -305,6 +427,9 @@ def solve_clear_sky_emission(
         point_radiance=point_radiance,
         point_layer_contribution_radiance=point_layer_contribution,
         point_bottom_contribution_radiance=point_bottom_contribution,
+        scattering_layer_contribution_radiance=scattering_layer_contribution,
+        point_scattering_source_function=point_scattering_source,
+        point_scattering_contribution_radiance=point_scattering_contribution,
         total_optical_depth=total_tau,
         metadata=common_metadata,
     )
@@ -411,9 +536,11 @@ def _exclusive_cumulative(values: NDArray[np.float64]) -> NDArray[np.float64]:
 def _total_optical_depth(
     gas_optical_depth: GasOpticalDepth,
     additional_optical_depths: Sequence[object] | None,
-) -> tuple[NDArray[np.float64], tuple[str, ...], str]:
+) -> tuple[NDArray[np.float64], tuple[str, ...], str, NDArray[np.float64], tuple[str, ...]]:
     total_tau = np.array(gas_optical_depth.total_tau, dtype=float, copy=True)
+    scattering_tau = np.zeros_like(total_tau)
     sources = ["gas_correlated_k"]
+    scattering_sources = []
     has_scattering_extinction = False
     if additional_optical_depths is not None:
         for contribution in additional_optical_depths:
@@ -424,9 +551,9 @@ def _total_optical_depth(
             tau_values = getattr(contribution, "tau", contribution)
             tau = np.array(tau_values, dtype=float, copy=True)
             if tau.shape == total_tau.shape[:2]:
-                total_tau += tau[:, :, None]
+                tau_for_g = tau[:, :, None]
             elif tau.shape == total_tau.shape:
-                total_tau += tau
+                tau_for_g = tau
             else:
                 raise RobertValidationError(
                     "additional optical depths must have shape layer x wavelength "
@@ -434,15 +561,19 @@ def _total_optical_depth(
                 )
             if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
                 raise RobertValidationError("additional optical depths must be finite and non-negative")
+            total_tau += tau_for_g
             sources.append(name)
             if "scattering" in kind.lower():
                 has_scattering_extinction = True
+                scattering_sources.append(name)
+                scattering_tau += tau_for_g
 
     if not np.all(np.isfinite(total_tau)) or np.any(total_tau < 0.0):
         raise RobertValidationError("total optical depth must be finite and non-negative")
     total_tau.setflags(write=False)
+    scattering_tau.setflags(write=False)
     scattering_treatment = "extinction_only_no_scattering_source" if has_scattering_extinction else "none"
-    return total_tau, tuple(sources), scattering_treatment
+    return total_tau, tuple(sources), scattering_treatment, scattering_tau, tuple(scattering_sources)
 
 
 def _top_to_bottom_order(gas_optical_depth: GasOpticalDepth) -> NDArray[np.int64]:
