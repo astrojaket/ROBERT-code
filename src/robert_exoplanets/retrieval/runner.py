@@ -11,6 +11,9 @@ from robert_exoplanets.instruments import Observation
 
 from .config import RetrievalConfig
 from .model import EmissionModel
+from .optimal_estimation import run_optimal_estimation
+from .problem import RetrievalProblem
+from .samplers import run_ultranest
 
 
 @dataclass(frozen=True)
@@ -60,3 +63,22 @@ def run_stub_retrieval(
         converged=False,
         message="Stub retrieval completed; no physical sampler has been run.",
     )
+
+
+def run_retrieval(
+    problem: RetrievalProblem,
+    *,
+    method: str = "optimal_estimation",
+    output_dir: str | None = None,
+    **kwargs: object,
+):
+    """Run a retrieval problem with the selected inference method."""
+
+    normalized = method.strip().lower().replace("-", "_")
+    if normalized in {"optimal_estimation", "oe"}:
+        return run_optimal_estimation(problem, **kwargs)
+    if normalized in {"ultranest", "nested", "nested_sampling"}:
+        if output_dir is None:
+            raise ValueError("output_dir is required for UltraNest retrievals")
+        return run_ultranest(problem, output_dir=output_dir, **kwargs)
+    raise ValueError(f"unsupported retrieval method: {method}")

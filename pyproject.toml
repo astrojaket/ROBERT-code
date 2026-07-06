@@ -34,6 +34,10 @@ dev = [
 perf = [
   "numba>=0.61"
 ]
+retrieval = [
+  "mpi4py>=4.1",
+  "ultranest>=4.5"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
