@@ -30,10 +30,12 @@ from robert_exoplanets import (
     gauss_legendre_disk_geometry,
     load_cloud_optical_properties_csv,
     load_cloud_optical_properties_npz,
+    load_picaso_cloud_optical_properties,
     solve_clear_sky_emission,
     time_callable,
     write_cloud_optical_properties_npz,
 )
+from robert_exoplanets.opacity import spectral_grid_values_in_unit
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "cloud_scattering_benchmark"
 
@@ -115,7 +117,49 @@ def _load_cloud_file(path: Path) -> CloudOpticalProperties:
         return load_cloud_optical_properties_npz(path, name=path.stem)
     if suffix == ".csv":
         return load_cloud_optical_properties_csv(path, name=path.stem)
-    raise ValueError("ROBERT_CLOUD_PROPERTY_FILE must point to a .npz or .csv file")
+    if suffix == ".cld":
+        return load_picaso_cloud_optical_properties(
+            path,
+            name=path.stem,
+            pressure_path=_optional_env_path("ROBERT_PICASO_PRESSURE_FILE")
+            or _discover_picaso_pressure_path(path),
+            wave_grid_path=_optional_env_path("ROBERT_PICASO_WAVE_GRID_FILE")
+            or _discover_picaso_wave_grid_path(path),
+        )
+    raise ValueError("ROBERT_CLOUD_PROPERTY_FILE must point to a .npz, .csv, or PICASO .cld file")
+
+
+def _optional_env_path(name: str) -> Path | None:
+    configured = os.environ.get(name)
+    if not configured:
+        return None
+    return Path(configured).expanduser()
+
+
+def _discover_picaso_pressure_path(path: Path) -> Path | None:
+    known_pairs = {
+        "jupiterf3": "jupiter.pt",
+        "HJ": "HJ.pt",
+        "t1270g200f1_m0.0_co1.0": "t1270g200f1_m0.0_co1.0.cmp",
+    }
+    candidates = [
+        path.with_name(known_pairs[path.stem]),
+    ] if path.stem in known_pairs else []
+    candidates.extend([path.with_suffix(".pt"), path.with_suffix(".cmp")])
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _discover_picaso_wave_grid_path(path: Path) -> Path | None:
+    candidates = [path.with_name("wave_EGP.dat")]
+    if len(path.parents) >= 2:
+        candidates.append(path.parent.parent / "opacities" / "wave_EGP.dat")
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _timings(
@@ -199,6 +243,7 @@ def _report(
             "single_scattering_albedo_max": float(np.max(cloud.single_scattering_albedo)),
             "asymmetry_factor_min": float(np.min(cloud.asymmetry_factor)),
             "asymmetry_factor_max": float(np.max(cloud.asymmetry_factor)),
+            "metadata": dict(cloud.metadata),
         },
         "cloud_property_comparison": comparison.as_dict(),
         "rt": {
@@ -216,7 +261,13 @@ def _report(
     }
     if external_spectrum is not None:
         wavelength, values = external_spectrum
-        model = np.interp(wavelength, two_stream_auto.radiance.spectral_grid.values, two_stream_auto.radiance.values)
+        model_wavelength = spectral_grid_values_in_unit(two_stream_auto.radiance.spectral_grid, "micron")
+        model_order = np.argsort(model_wavelength)
+        model = np.interp(
+            wavelength,
+            model_wavelength[model_order],
+            two_stream_auto.radiance.values[model_order],
+        )
         residual = model - values
         report["external_spectrum_comparison"] = {
             "n_points": int(wavelength.size),
@@ -236,11 +287,14 @@ def _plot(
     timings: list[dict[str, float | int | str]],
     external_spectrum: tuple[np.ndarray, np.ndarray] | None,
 ) -> None:
-    wavelength = clear.radiance.spectral_grid.values
-    ratio_extinction = extinction.radiance.values / clear.radiance.values
-    ratio_two_stream = two_stream.radiance.values / clear.radiance.values
-    physical_tau = np.sum(extinction.extinction_optical_depth, axis=0)[:, 0]
-    effective_tau = np.sum(two_stream.total_optical_depth, axis=0)[:, 0]
+    wavelength = spectral_grid_values_in_unit(clear.radiance.spectral_grid, "micron")
+    wavelength_order = np.argsort(wavelength)
+    wavelength = wavelength[wavelength_order]
+    clear_radiance = clear.radiance.values[wavelength_order]
+    ratio_extinction = (extinction.radiance.values / clear.radiance.values)[wavelength_order]
+    ratio_two_stream = (two_stream.radiance.values / clear.radiance.values)[wavelength_order]
+    physical_tau = np.sum(extinction.extinction_optical_depth, axis=0)[:, 0][wavelength_order]
+    effective_tau = np.sum(two_stream.total_optical_depth, axis=0)[:, 0][wavelength_order]
 
     fig, axes = plt.subplots(2, 2, figsize=(12.6, 8.4), constrained_layout=True)
     ax_ratio, ax_tau, ax_optical, ax_timing = axes.ravel()
@@ -251,7 +305,7 @@ def _plot(
         external_wavelength, external_values = external_spectrum
         ax_ratio.plot(
             external_wavelength,
-            external_values / np.interp(external_wavelength, wavelength, clear.radiance.values),
+            external_values / np.interp(external_wavelength, wavelength, clear_radiance),
             color="#111111",
             linewidth=1.0,
             alpha=0.7,
@@ -264,8 +318,20 @@ def _plot(
     ax_ratio.grid(alpha=0.25, which="both")
     ax_ratio.legend(frameon=False)
 
-    ax_tau.plot(wavelength, physical_tau, color="#4c78a8", linewidth=1.8, label="Physical extinction tau")
-    ax_tau.plot(wavelength, effective_tau, color="#f58518", linewidth=1.8, label="Two-stream effective tau")
+    ax_tau.plot(
+        wavelength,
+        _positive_for_log(physical_tau),
+        color="#4c78a8",
+        linewidth=1.8,
+        label="Physical extinction tau",
+    )
+    ax_tau.plot(
+        wavelength,
+        _positive_for_log(effective_tau),
+        color="#f58518",
+        linewidth=1.8,
+        label="Two-stream effective tau",
+    )
     ax_tau.set_xscale("log")
     ax_tau.set_yscale("log")
     ax_tau.set_xlabel("Wavelength [micron]")
@@ -274,8 +340,8 @@ def _plot(
     ax_tau.grid(alpha=0.25, which="both")
     ax_tau.legend(frameon=False)
 
-    mean_ssa = np.mean(cloud.single_scattering_albedo, axis=0)
-    mean_g = np.mean(cloud.asymmetry_factor, axis=0)
+    mean_ssa = np.mean(cloud.single_scattering_albedo, axis=0)[wavelength_order]
+    mean_g = np.mean(cloud.asymmetry_factor, axis=0)[wavelength_order]
     ax_optical.plot(wavelength, mean_ssa, color="#54a24b", linewidth=1.8, label="Mean omega0")
     ax_optical.plot(wavelength, mean_g, color="#b279a2", linewidth=1.8, label="Mean g")
     ax_optical.set_xscale("log")
@@ -295,6 +361,10 @@ def _plot(
 
     fig.savefig(output_path, dpi=180)
     plt.close(fig)
+
+
+def _positive_for_log(values: np.ndarray) -> np.ndarray:
+    return np.where(values > 0.0, values, np.nan)
 
 
 def _optional_external_spectrum() -> tuple[np.ndarray, np.ndarray] | None:

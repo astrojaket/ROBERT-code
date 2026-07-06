@@ -199,13 +199,19 @@ python examples/benchmark_cloud_scattering_picaso_virga.py
 ```
 
 loads `ROBERT_CLOUD_PROPERTY_FILE` when set, accepting either dense `.npz`
-arrays or long-table `.csv` files with PICASO/Virga-style aliases such as
-`tau_ext`, `omega0`, and `g`. If no file is provided, it generates a synthetic
-cloud property product, runs extinction-only and two-stream RT, writes plots and
-a JSON report, and times the cloud loading plus NumPy and Numba thermal RT
-paths. In the current synthetic 64-layer, 900-wavelength, 4-g smoke benchmark,
-cloud loading is about 1 ms and Numba reduces extinction-only RT from about
-15.7 ms to about 6.8 ms on this laptop.
+arrays, long-table `.csv` files with PICASO/Virga-style aliases such as
+`tau_ext`, `omega0`, and `g`, or PICASO `.cld` cloud tables. Index-style
+PICASO `.cld` files need physical coordinates from a paired pressure table and
+wave grid; the example auto-discovers the bundled PICASO base-case companions
+when the file lives in a normal PICASO checkout, or they can be set explicitly
+with `ROBERT_PICASO_PRESSURE_FILE` and `ROBERT_PICASO_WAVE_GRID_FILE`.
+
+If no file is provided, the script generates a synthetic cloud property
+product, runs extinction-only and two-stream RT, writes plots and a JSON report,
+and times the cloud loading plus NumPy and Numba thermal RT paths. With the
+public PICASO `jupiterf3.cld` base-case table (60 layers, 196 wavelengths) on
+this laptop, cloud loading is about 21 ms and the Numba two-stream smoke path is
+about 2.7 ms.
 
 ## Scattering Boundary
 

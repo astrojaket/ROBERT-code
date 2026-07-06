@@ -14,6 +14,7 @@ from robert_exoplanets import (
     compare_cloud_optical_properties,
     load_cloud_optical_properties_csv,
     load_cloud_optical_properties_npz,
+    load_picaso_cloud_optical_properties,
     write_cloud_optical_properties_npz,
 )
 from robert_exoplanets.core import RobertDataError, RobertValidationError
@@ -81,6 +82,100 @@ def test_cloud_csv_reader_rejects_missing_cells(tmp_path) -> None:
 
     with pytest.raises(RobertDataError, match="missing pressure/wavelength"):
         load_cloud_optical_properties_csv(path)
+
+
+def test_picaso_cloud_reader_loads_index_table_with_pressure_and_wave_files(tmp_path) -> None:
+    cloud_path = tmp_path / "jupiter_like.cld"
+    cloud_path.write_text(
+        "\n".join(
+            [
+                "lvl wv opd g0 w0 sigma",
+                "1 1 0.1 0.2 0.5 0.0",
+                "1 2 0.2 0.3 0.6 0.0",
+                "2 1 0.3 0.4 0.7 0.0",
+                "2 2 0.4 0.5 0.8 0.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    pressure_path = tmp_path / "jupiter.pt"
+    pressure_path.write_text(
+        "\n".join(
+            [
+                "pressure temperature",
+                "1e-5 900.0",
+                "1e-3 1000.0",
+                "1e-1 1100.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    wave_grid_path = tmp_path / "wave_EGP.dat"
+    wave_grid_path.write_text(
+        "\n".join(
+            [
+                "i micron. wavenumber idum",
+                "1 2.0 5000.0 0.0",
+                "2 1.0 10000.0 0.0",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cloud = load_picaso_cloud_optical_properties(
+        cloud_path,
+        pressure_path=pressure_path,
+        wave_grid_path=wave_grid_path,
+    )
+
+    np.testing.assert_allclose(cloud.pressure_grid.edges, [1.0e-5, 1.0e-3, 1.0e-1])
+    np.testing.assert_allclose(cloud.pressure_grid.centers, [1.0e-4, 1.0e-2])
+    np.testing.assert_allclose(cloud.spectral_grid.values, [1.0, 2.0])
+    np.testing.assert_allclose(cloud.extinction_tau, [[0.2, 0.1], [0.4, 0.3]])
+    np.testing.assert_allclose(cloud.single_scattering_albedo, [[0.6, 0.5], [0.8, 0.7]])
+    np.testing.assert_allclose(cloud.asymmetry_factor, [[0.3, 0.2], [0.5, 0.4]])
+    assert cloud.metadata["source_format"] == "picaso_cld_cloud_optical_properties"
+    assert cloud.metadata["layer_coordinate"] == "index"
+
+
+def test_picaso_cloud_reader_loads_physical_pressure_and_wavenumber_columns(tmp_path) -> None:
+    cloud_path = tmp_path / "virga_like.cld"
+    cloud_path.write_text(
+        "\n".join(
+            [
+                "pressure wavenumber opd w0 g0",
+                "1e-4 5000.0 0.1 0.5 0.2",
+                "1e-4 10000.0 0.2 0.6 0.3",
+                "1e-2 5000.0 0.3 0.7 0.4",
+                "1e-2 10000.0 0.4 0.8 0.5",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cloud = load_picaso_cloud_optical_properties(cloud_path)
+
+    np.testing.assert_allclose(cloud.pressure_grid.centers, [1.0e-4, 1.0e-2])
+    np.testing.assert_allclose(cloud.spectral_grid.values, [1.0, 2.0])
+    np.testing.assert_allclose(cloud.extinction_tau, [[0.2, 0.1], [0.4, 0.3]])
+    assert cloud.metadata["spectral_kind"] == "wavenumber"
+    assert cloud.metadata["layer_coordinate"] == "pressure"
+
+
+def test_picaso_cloud_reader_requires_coordinates_for_index_files(tmp_path) -> None:
+    cloud_path = tmp_path / "index_only.cld"
+    cloud_path.write_text(
+        "\n".join(
+            [
+                "lvl wv opd g0 w0",
+                "1 1 0.1 0.2 0.5",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RobertDataError, match="layer indices"):
+        load_picaso_cloud_optical_properties(cloud_path)
 
 
 def test_cloud_comparison_rejects_grid_mismatch() -> None:

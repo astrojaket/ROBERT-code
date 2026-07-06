@@ -21,6 +21,10 @@ more complicated immediately.
 - `load_cloud_optical_properties_npz(...)` and
   `load_cloud_optical_properties_csv(...)` read dense-array and long-table
   PICASO/Virga-style cloud optical-property exports.
+- `load_picaso_cloud_optical_properties(...)` reads PICASO `.cld` files with
+  `opd`, `w0`, and `g0`, including the public PICASO base-case files that use
+  layer and wavelength-bin indices plus companion pressure and `wave_EGP.dat`
+  coordinate tables.
 - `thermal_integration_backend="auto"` uses the Numba thermal source-integration
   kernel for thermal-only RT when available.
 
@@ -46,6 +50,18 @@ four-point disc quadrature:
 The bottleneck in this smoke case is thermal RT integration, not cloud-property
 loading. The first Numba optimization therefore belongs at the thermal
 source-integration layer.
+
+The public PICASO checkout also provides real base-case cloud tables:
+
+| Table | Shape | Extinction tau range |
+| --- | ---: | ---: |
+| `HJ.cld` | 89 x 196 | 0 to 1238.83 |
+| `jupiterf3.cld` | 60 x 196 | 0 to 33.669 |
+| `t1270g200f1_m0.0_co1.0.cld` | 60 x 196 | 0 to 1.7021 |
+
+Using `jupiterf3.cld` with its paired `jupiter.pt` and `wave_EGP.dat`, the
+benchmark currently loads the cloud file in about 21 ms and runs the Numba
+two-stream smoke path in about 2.7 ms on this laptop.
 
 ## Benchmark Ladder
 

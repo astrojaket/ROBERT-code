@@ -9,6 +9,7 @@ from .clouds import CloudOpticalProperties, grey_cloud_deck, power_law_haze
 from .cloud_io import (
     load_cloud_optical_properties_csv,
     load_cloud_optical_properties_npz,
+    load_picaso_cloud_optical_properties,
     write_cloud_optical_properties_npz,
 )
 from .extinction import (
@@ -73,6 +74,7 @@ __all__ = [
     "integrate_thermal_emission",
     "load_cloud_optical_properties_csv",
     "load_cloud_optical_properties_npz",
+    "load_picaso_cloud_optical_properties",
     "lobatto_phase_geometry",
     "normal_emission_geometry",
     "grey_cloud_deck",
