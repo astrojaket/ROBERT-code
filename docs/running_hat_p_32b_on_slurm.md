@@ -1,5 +1,36 @@
 # Running the HAT-P-32b Retrieval on Slurm
 
+## `addqueue` clusters
+
+On clusters where jobs are submitted through `addqueue` and launched with
+`mpirun`, ROBERT includes a repository-root `submit.sh` matching that workflow.
+The default is the validated 12-process, 40-live-point, 10,000-call test:
+
+```bash
+cd ~/ROBERT-code
+addqueue -q "planet" -c "Robert-run" -n 12 ./submit.sh
+```
+
+The script directly uses
+`/mnt/zfsusers/jaketaylor/anaconda3/envs/robert-exoplanets/bin/python3`, verifies
+the bundled data and Python dependencies, and writes resumable output to
+`retrieval_runs/hat_p_32b_cluster_test`. The process count passed to
+`addqueue -n` must match `ROBERT_NPROCS`; both default to 12. For a different
+run, export settings before calling `addqueue`, for example:
+
+```bash
+export ROBERT_RUN_NAME=hat_p_32b_400live
+export ROBERT_NPROCS=12
+export ROBERT_LIVE_POINTS=400
+export ROBERT_MAX_NCALLS=500000
+export ROBERT_DLOGZ=0.5
+addqueue -q "planet" -c "Robert-run" -n 12 ./submit.sh
+```
+
+Set `ROBERT_PYTHON`, `ROBERT_MPIRUN`, or `ROBERT_REPO_DIR` only if the cluster
+paths differ. Reusing the same run name resumes its UltraNest checkpoint;
+`ROBERT_MAX_NCALLS` is the cumulative call limit.
+
 ## Install
 
 Clone ROBERT and create the pinned Conda environment from the repository root:

@@ -45,6 +45,8 @@
   stable Slurm run directories, concurrent-writer locks, preserved initial and
   per-attempt manifests, live status/throughput records, checkpoint smoke tests,
   and pre-emption-aware automatic requeueing.
+- Added a dependency-checking `addqueue`/`mpirun` submission script matching the
+  target cluster's existing NemesisPy job-launch workflow.
 
 - Added atmospheric state, isothermal temperature, constant chemistry, and
   atmosphere-builder components.
