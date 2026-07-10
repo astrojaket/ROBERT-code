@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import numpy as np
 import pytest
 
@@ -17,6 +18,8 @@ from robert_exoplanets import (
     run_retrieval,
 )
 from robert_exoplanets.core import RobertDataError
+from robert_exoplanets.retrieval.manifest import build_run_manifest
+from robert_exoplanets.retrieval.results import build_retrieval_result
 from robert_exoplanets.retrieval.samplers.ultranest import _result_from_ultranest
 
 
@@ -33,6 +36,7 @@ def test_parameter_set_transforms_unit_cube_and_log_prior() -> None:
     np.testing.assert_allclose(vector, [0.5, 1.0e-2])
     assert parameters.vector_to_mapping(vector) == {"offset": 0.5, "scale": pytest.approx(1.0e-2)}
     assert np.isfinite(parameters.log_prior_from_vector(vector))
+    assert parameters.parameters[1].midpoint == pytest.approx(1.0e-2)
 
 
 def test_load_emission_observation_npz_reads_hat_p_32b_style_keys(tmp_path) -> None:
@@ -86,6 +90,69 @@ def test_retrieval_problem_loglike_and_oe_recover_linear_model(tmp_path) -> None
     assert result.converged
     assert result.best_fit_parameters["baseline"] == pytest.approx(2.0, abs=1.0e-5)
     assert result.best_fit_parameters["slope"] == pytest.approx(0.5, abs=1.0e-4)
+    np.testing.assert_allclose(result.covariance, result.covariance.T, rtol=0.0, atol=0.0)
+
+
+def test_optimal_estimation_honors_observation_mask(tmp_path) -> None:
+    observation = load_emission_observation_npz_from_arrays()
+    observation = type(observation).from_arrays(
+        wavelength=[1.0, 2.0, 3.0],
+        flux=[1.25, 999.0, 1.25],
+        uncertainty=[0.05, 0.05, 0.05],
+        mask=[True, False, True],
+    )
+    parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
+    problem = RetrievalProblem(
+        name="masked-test",
+        observation=observation,
+        parameters=parameters,
+        forward_model=lambda p: Spectrum.from_arrays(
+            observation.wavelength,
+            np.full(observation.n_points, p["baseline"]),
+            unit=observation.flux_unit,
+            observable=observation.observable,
+            wavelength_unit=observation.wavelength_unit,
+        ),
+    )
+
+    result = run_optimal_estimation(problem, max_iterations=6)
+
+    assert result.best_fit_parameters["baseline"] == pytest.approx(1.25, abs=5.0e-4)
+
+
+def test_run_retrieval_writes_manifest_and_unified_result(tmp_path) -> None:
+    observation = load_emission_observation_npz_from_arrays()
+    parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
+    problem = RetrievalProblem(
+        name="serialized-test",
+        observation=observation,
+        parameters=parameters,
+        forward_model=lambda p: Spectrum.from_arrays(
+            observation.wavelength,
+            np.full(observation.n_points, p["baseline"]),
+            unit=observation.flux_unit,
+            observable=observation.observable,
+            wavelength_unit=observation.wavelength_unit,
+        ),
+        opacity_identifiers={"H2O": "sha256:test"},
+    )
+
+    result = run_retrieval(
+        problem,
+        method="optimal_estimation",
+        output_dir=tmp_path,
+        max_iterations=4,
+    )
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    summary = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
+    with np.load(tmp_path / "result_arrays.npz") as arrays:
+        assert arrays["state_vector"].shape == (1,)
+        assert arrays["covariance"].shape == (1, 1)
+    assert result.method == "optimal_estimation"
+    assert manifest["schema_version"] == "1.0"
+    assert manifest["opacity_identifiers"] == {"H2O": "sha256:test"}
+    assert summary["metadata"]["config_hash"] == manifest["config_hash"]
 
 
 def test_run_retrieval_dispatch_rejects_missing_ultranest_output_dir() -> None:
@@ -131,6 +198,7 @@ def test_ultranest_result_adapter_extracts_best_fit() -> None:
         },
         "logz": 10.0,
         "logzerr": 0.1,
+        "ncall": 500,
         "maximum_likelihood": {"point": np.array([1.0]), "logl": 0.0},
     }
 
@@ -140,6 +208,18 @@ def test_ultranest_result_adapter_extracts_best_fit() -> None:
     assert result.log_evidence == pytest.approx(10.0)
     assert result.best_fit_parameters == {"baseline": 1.0}
     assert result.metadata["mpi_nprocs"] == "3"
+    assert result.metadata["ncall"] == "500"
+
+    manifest = build_run_manifest(
+        problem,
+        method="ultranest",
+        settings={"min_num_live_points": 40},
+        random_seed=42,
+    )
+    stable_result = build_retrieval_result(result, manifest=manifest, output_dir=tmp_path_like())
+
+    assert stable_result.metadata["mpi_nprocs"] == "3"
+    assert stable_result.metadata["ncall"] == "500"
 
 
 def load_emission_observation_npz_from_arrays():

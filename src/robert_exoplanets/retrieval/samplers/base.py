@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,8 @@ class NestedSamplerResult:
     log_evidence_error: float | None = None
     best_fit_parameters: Mapping[str, float] = field(default_factory=dict)
     metadata: Mapping[str, str] = field(default_factory=dict)
+    converged: bool = False
+    message: str = "nested sampling did not report convergence"
 
     def __post_init__(self) -> None:
         samples = _readonly_array(self.samples, "samples", 2)
@@ -41,9 +44,9 @@ class NestedSamplerResult:
         object.__setattr__(
             self,
             "best_fit_parameters",
-            {str(key): float(value) for key, value in self.best_fit_parameters.items()},
+            immutable_mapping({str(key): float(value) for key, value in self.best_fit_parameters.items()}),
         )
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
 
 def _readonly_array(values: ArrayLike, name: str, ndim: int) -> NDArray[np.float64]:

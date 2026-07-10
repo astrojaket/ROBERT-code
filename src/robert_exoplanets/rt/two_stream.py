@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class TwoStreamScatteringDiagnostics:
         object.__setattr__(self, "scattering_tau", scattering)
         object.__setattr__(self, "transport_scattering_tau", transport)
         object.__setattr__(self, "effective_tau", effective)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def absorption_tau(self) -> NDArray[np.float64]:

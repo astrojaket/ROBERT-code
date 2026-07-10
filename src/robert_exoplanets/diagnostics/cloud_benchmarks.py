@@ -8,6 +8,7 @@ from typing import Mapping
 import numpy as np
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 from robert_exoplanets.rt import CloudOpticalProperties
 
@@ -40,7 +41,7 @@ class CloudOpticalPropertyComparison:
             if not np.isfinite(value) or value < 0.0:
                 raise RobertValidationError(f"{field_name} must be finite and non-negative")
             object.__setattr__(self, field_name, value)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def as_dict(self) -> dict[str, float | str]:
         """Return a serializable comparison summary."""

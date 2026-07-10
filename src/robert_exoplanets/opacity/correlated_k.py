@@ -12,6 +12,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, RobertCoverageError, RobertValidationError, SpectralGrid
+from robert_exoplanets.core._immutability import immutable_mapping
 
 from .archive import load_robert_npy_directory, load_robert_npz_archive
 from .kta import KtaTable, read_kta
@@ -76,7 +77,7 @@ class CorrelatedKTable:
             wavelength = 10000.0 / wavenumber
             wavelength.setflags(write=False)
 
-        kcoeff = np.asarray(self.kcoeff, dtype=float)
+        kcoeff = np.array(self.kcoeff, dtype=float, copy=True)
         expected_shape = (pressure.size, temperature.size, wavenumber.size, g_samples.size)
         if kcoeff.shape != expected_shape:
             raise RobertValidationError("kcoeff shape must be pressure x temperature x wavelength x g")
@@ -93,7 +94,7 @@ class CorrelatedKTable:
         object.__setattr__(self, "g_samples", g_samples)
         object.__setattr__(self, "g_weights", normalized_g_weights)
         object.__setattr__(self, "kcoeff", kcoeff)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @classmethod
     def from_kta(cls, species: str, table: KtaTable) -> "CorrelatedKTable":
@@ -188,7 +189,7 @@ class PreparedCorrelatedKOpacity:
         object.__setattr__(self, "species", species)
         object.__setattr__(self, "g_samples", g_samples)
         object.__setattr__(self, "g_weights", g_weights)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
 
 @dataclass(frozen=True)
@@ -216,7 +217,7 @@ class EvaluatedCorrelatedKOpacity:
             raise RobertValidationError("evaluated correlated-k unit must not be empty")
         kcoeff.setflags(write=False)
         object.__setattr__(self, "kcoeff", kcoeff)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
 
 @dataclass(frozen=True)
@@ -230,7 +231,7 @@ class CorrelatedKCoverageReport:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "species", tuple(self.species))
-        object.__setattr__(self, "reasons", dict(self.reasons))
+        object.__setattr__(self, "reasons", immutable_mapping(self.reasons))
 
 
 @dataclass(frozen=True)
@@ -250,9 +251,14 @@ class CorrelatedKOpacityProvider:
     def __post_init__(self) -> None:
         if not self.name:
             raise RobertValidationError("correlated-k provider name must not be empty")
-        if self.interpolation not in {"exact", "log_pressure_temperature_log_k"}:
+        if self.interpolation not in {
+            "exact",
+            "log_pressure_temperature_log_k",
+            "log_pressure_temperature_log_k_clip",
+        }:
             raise RobertValidationError(
-                "interpolation must be 'exact' or 'log_pressure_temperature_log_k'"
+                "interpolation must be 'exact', 'log_pressure_temperature_log_k', "
+                "or 'log_pressure_temperature_log_k_clip'"
             )
         tables = {str(species): table for species, table in self.tables.items()}
         if not tables:
@@ -261,7 +267,7 @@ class CorrelatedKOpacityProvider:
             if species != table.species:
                 raise RobertValidationError("correlated-k table mapping key must match table species")
         _validate_common_g_grid(tuple(tables.values()))
-        object.__setattr__(self, "tables", tables)
+        object.__setattr__(self, "tables", immutable_mapping(tables))
 
     @classmethod
     def from_kta_paths(
@@ -280,9 +286,103 @@ class CorrelatedKOpacityProvider:
                 str(species),
                 read_kta(
                     path,
+                    checksum=True,
                     nonfinite_policy=nonfinite_policy,
                     nonfinite_fill_value=nonfinite_fill_value,
                 ),
+            )
+            for species, path in paths.items()
+        }
+        return cls(tables=tables, name=name, interpolation=interpolation)
+
+    @classmethod
+    def from_exomol_kta_directory(
+        cls,
+        directory: str | Path,
+        *,
+        species: Iterable[str] | None = None,
+        filename_pattern: str = "*.kta",
+        name: str = "exomol-correlated-k",
+        interpolation: str = "exact",
+        nonfinite_policy: str = "raise",
+        nonfinite_fill_value: float = 1.0e-300,
+    ) -> "CorrelatedKOpacityProvider":
+        """Discover precomputed ExoMol/exo_k KTA tables in any directory.
+
+        Species names are inferred from the filename token before the first
+        underscore. If multiple files map to one species, callers must choose
+        explicitly with :meth:`from_kta_paths` so resolution/isotopologue
+        selection is never implicit.
+        """
+
+        root = Path(directory).expanduser()
+        if not root.is_dir():
+            raise RobertValidationError(f"ExoMol opacity directory does not exist: {root}")
+        pattern = str(filename_pattern).strip()
+        if not pattern:
+            raise RobertValidationError("filename_pattern must not be empty")
+        discovered: dict[str, Path] = {}
+        for path in sorted(root.glob(pattern)):
+            if not path.is_file() or path.suffix.lower() != ".kta":
+                continue
+            inferred = _species_name_from_opacity_path(path)
+            key = inferred.casefold()
+            if key in discovered:
+                raise RobertValidationError(
+                    f"multiple KTA files discovered for {inferred}; use from_kta_paths for explicit selection"
+                )
+            discovered[key] = path
+        if not discovered:
+            raise RobertValidationError(f"no KTA opacity tables matched {pattern!r} under {root}")
+
+        if species is None:
+            selected_paths = {
+                _species_name_from_opacity_path(path): path for path in discovered.values()
+            }
+        else:
+            requested = tuple(str(item).strip() for item in species)
+            if not requested or any(not item for item in requested):
+                raise RobertValidationError("species must contain non-empty names")
+            if len({item.casefold() for item in requested}) != len(requested):
+                raise RobertValidationError("species must not contain duplicates")
+            missing = tuple(item for item in requested if item.casefold() not in discovered)
+            if missing:
+                raise RobertValidationError(
+                    f"missing ExoMol KTA opacity tables for species: {', '.join(missing)}"
+                )
+            selected_paths = {item: discovered[item.casefold()] for item in requested}
+        return cls.from_kta_paths(
+            selected_paths,
+            name=name,
+            interpolation=interpolation,
+            nonfinite_policy=nonfinite_policy,
+            nonfinite_fill_value=nonfinite_fill_value,
+        )
+
+    @classmethod
+    def from_exok_paths(
+        cls,
+        paths: Mapping[str, str | Path],
+        *,
+        name: str = "exo-k-correlated-k",
+        interpolation: str = "exact",
+        nonfinite_policy: str = "raise",
+        nonfinite_fill_value: float = 1.0e-300,
+        remove_zeros: bool = True,
+        zero_deltalog_min_value: float = 10.0,
+    ) -> "CorrelatedKOpacityProvider":
+        """Load precomputed molecular opacity formats supported by ``exo_k``."""
+
+        from .exok import load_correlated_k_table_with_exok
+
+        tables = {
+            str(species): load_correlated_k_table_with_exok(
+                path,
+                species=str(species),
+                nonfinite_policy=nonfinite_policy,
+                nonfinite_fill_value=nonfinite_fill_value,
+                remove_zeros=remove_zeros,
+                zero_deltalog_min_value=zero_deltalog_min_value,
             )
             for species, path in paths.items()
         }
@@ -310,6 +410,44 @@ class CorrelatedKOpacityProvider:
 
         return tuple(self.tables)
 
+    def bin_to_spectral_grid(
+        self,
+        spectral_grid: SpectralGrid,
+        *,
+        backend: str = "exo_k",
+        num: int = 300,
+        use_rebin: bool = False,
+        remove_zeros: bool = True,
+        zero_deltalog_min_value: float = 10.0,
+    ) -> "CorrelatedKOpacityProvider":
+        """Return a provider binned to requested spectral bins.
+
+        Correlated-k distributions are recompressed within each bin by
+        ``exo_k``; individual g ordinates are never wavelength-interpolated.
+        """
+
+        normalized = backend.strip().lower().replace("-", "_")
+        if normalized not in {"exo_k", "exok"}:
+            raise RobertValidationError("correlated-k spectral binning backend must be 'exo_k'")
+        from .exok import bin_correlated_k_table_with_exok
+
+        tables = {
+            species: bin_correlated_k_table_with_exok(
+                table,
+                spectral_grid,
+                num=num,
+                use_rebin=use_rebin,
+                remove_zeros=remove_zeros,
+                zero_deltalog_min_value=zero_deltalog_min_value,
+            )
+            for species, table in self.tables.items()
+        }
+        return CorrelatedKOpacityProvider(
+            tables=tables,
+            name=f"{self.name}-exo-k-binned",
+            interpolation=self.interpolation,
+        )
+
     def prepare(
         self,
         spectral_grid: SpectralGrid,
@@ -335,7 +473,7 @@ class CorrelatedKOpacityProvider:
                     table.pressure_bar,
                     "pressure",
                 )
-            else:
+            elif self.interpolation == "log_pressure_temperature_log_k":
                 _validate_within_grid(
                     pressure_values_in_unit(pressure_grid.centers, pressure_grid.unit, "bar"),
                     table.pressure_bar,
@@ -360,7 +498,7 @@ class CorrelatedKOpacityProvider:
                 species_tuple,
                 spectral_grid,
                 pressure_grid,
-                reference,
+                tuple(self.tables[item] for item in species_tuple),
             ),
             metadata={"interpolation": self.interpolation},
         )
@@ -385,7 +523,12 @@ class CorrelatedKOpacityProvider:
                 if _prepared_interpolation(prepared) == "exact":
                     _lookup_indices(atmosphere, prepared.spectral_grid, table)
                 else:
-                    _validate_interpolation_coverage(atmosphere, prepared.spectral_grid, table)
+                    _validate_interpolation_coverage(
+                        atmosphere,
+                        prepared.spectral_grid,
+                        table,
+                        clip=_prepared_interpolation(prepared).endswith("_clip"),
+                    )
             except RobertCoverageError as exc:
                 reasons[species_name] = str(exc)
         valid = not reasons
@@ -437,6 +580,7 @@ class CorrelatedKOpacityProvider:
                     atmosphere,
                     prepared.spectral_grid,
                     table,
+                    clip=interpolation.endswith("_clip"),
                 )
 
         return EvaluatedCorrelatedKOpacity(
@@ -470,14 +614,17 @@ def _validate_interpolation_coverage(
     atmosphere: AtmosphereState,
     spectral_grid: SpectralGrid,
     table: CorrelatedKTable,
+    *,
+    clip: bool = False,
 ) -> None:
     pressure = pressure_values_in_unit(
         atmosphere.pressure_grid.centers,
         atmosphere.pressure_grid.unit,
         "bar",
     )
-    _validate_within_grid(pressure, table.pressure_bar, "pressure")
-    _validate_within_grid(atmosphere.temperature, table.temperature_K, "temperature")
+    if not clip:
+        _validate_within_grid(pressure, table.pressure_bar, "pressure")
+        _validate_within_grid(atmosphere.temperature, table.temperature_K, "temperature")
     _exact_spectral_indices(spectral_grid, table)
 
 
@@ -487,8 +634,9 @@ def _interpolate_pressure_temperature_log_k(
     table: CorrelatedKTable,
     *,
     k_floor: float = 1.0e-300,
+    clip: bool = False,
 ) -> NDArray[np.float64]:
-    _validate_interpolation_coverage(atmosphere, spectral_grid, table)
+    _validate_interpolation_coverage(atmosphere, spectral_grid, table, clip=clip)
     pressure = pressure_values_in_unit(
         atmosphere.pressure_grid.centers,
         atmosphere.pressure_grid.unit,
@@ -499,11 +647,13 @@ def _interpolate_pressure_temperature_log_k(
         np.log10(pressure),
         np.log10(table.pressure_bar),
         "pressure",
+        clip=clip,
     )
     temperature_lower, temperature_upper, temperature_weight = _bracket_indices(
         atmosphere.temperature,
         table.temperature_K,
         "temperature",
+        clip=clip,
     )
     log_k = np.log(np.maximum(table.kcoeff, k_floor))
     output = np.empty((atmosphere.n_layers, spectral_index.size, table.g_weights.size), dtype=float)
@@ -573,16 +723,22 @@ def _bracket_indices(
     values: ArrayLike,
     grid: ArrayLike,
     label: str,
+    *,
+    clip: bool = False,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.float64]]:
     requested = np.asarray(values, dtype=float)
     native = np.asarray(grid, dtype=float)
     if native.size == 1:
-        _validate_within_grid(requested, native, label)
+        if not clip:
+            _validate_within_grid(requested, native, label)
         zeros = np.zeros(requested.shape, dtype=np.int64)
         weights = np.zeros(requested.shape, dtype=float)
         return zeros, zeros, weights
-    _validate_within_grid(requested, native, label)
     increasing_grid = native if native[0] < native[-1] else native[::-1]
+    if clip:
+        requested = np.clip(requested, increasing_grid[0], increasing_grid[-1])
+    else:
+        _validate_within_grid(requested, native, label)
     upper = np.searchsorted(increasing_grid, requested, side="left")
     upper = np.clip(upper, 1, increasing_grid.size - 1)
     lower = upper - 1
@@ -627,13 +783,20 @@ def _is_strictly_monotonic_or_single(array: NDArray[np.float64]) -> bool:
     return bool(np.all(diff > 0.0) or np.all(diff < 0.0))
 
 
+def _species_name_from_opacity_path(path: Path) -> str:
+    species = path.stem.split("_", maxsplit=1)[0].strip()
+    if not species:
+        raise RobertValidationError(f"could not infer a species name from opacity file: {path}")
+    return species
+
+
 def _correlated_k_cache_key(
     provider_name: str,
     interpolation: str,
     species: tuple[str, ...],
     spectral_grid: SpectralGrid,
     pressure_grid: PressureGrid,
-    reference: CorrelatedKTable,
+    tables: tuple[CorrelatedKTable, ...],
 ) -> str:
     payload = "|".join(
         (
@@ -644,7 +807,13 @@ def _correlated_k_cache_key(
             np.array2string(spectral_grid.values, precision=16),
             pressure_grid.unit,
             np.array2string(pressure_grid.centers, precision=16),
-            np.array2string(reference.g_weights, precision=16),
+            np.array2string(tables[0].g_weights, precision=16),
+            ",".join(
+                f"{table.species}:{table.metadata.get('checksum_sha256', '')}:"
+                f"{table.metadata.get('spectral_preparation', 'native')}:"
+                f"{table.metadata.get('source_path', '')}"
+                for table in tables
+            ),
         )
     )
     return sha256(payload.encode("utf-8")).hexdigest()[:16]

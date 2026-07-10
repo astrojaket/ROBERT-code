@@ -1,0 +1,24 @@
+{
+  "bundle": "HAT-P-32b FastChem/Madhusudhan-Seager retrieval benchmark",
+  "opacity_preparation": "exo_k bin_down_cp with 300 samples per target bin",
+  "fastchem_runtime": "pyfastchem 3.1.2",
+  "fastchem_source": "https://github.com/NewStrangeWorlds/FastChem",
+  "fastchem_license": "GPL-3.0",
+  "cia_source": "NemesisPy v1.0.1 (packaged under robert_exoplanets/data/cia)",
+  "reference_products": [
+    "quench_study_emission_G395H_spectra_band.npz",
+    "quench_study_emission_corner_data.npz",
+    "quench_study_emission_corner_meta.json",
+    "quench_study_emission_TP_band.npz",
+    "quench_study_emission_TP_VMR_band.npz",
+    "quench_study_emission_summary.txt"
+  ],
+  "opacity_species": [
+    "H2O",
+    "CO2",
+    "CO",
+    "CH4",
+    "NH3",
+    "HCN"
+  ]
+}

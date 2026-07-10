@@ -150,6 +150,34 @@ def test_correlated_k_interpolation_rejects_out_of_range_temperature() -> None:
         provider.evaluate(atmosphere, prepared)
 
 
+def test_correlated_k_clip_policy_matches_nemesispy_boundary_clamping() -> None:
+    table = _interpolation_table("H2O")
+    provider = CorrelatedKOpacityProvider(
+        {"H2O": table},
+        interpolation="log_pressure_temperature_log_k_clip",
+    )
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-7, 1.0e-5]),
+        centers=np.array([1.0e-6]),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array([2000.0], unit="cm^-1", role="opacity")
+    atmosphere = _atmosphere(pressure_grid, temperature=[1800.0])
+    prepared = provider.prepare(spectral_grid, pressure_grid, species=("H2O",))
+
+    evaluated = provider.evaluate(atmosphere, prepared)
+
+    expected = np.exp(
+        _linear_log_k(
+            np.log10(np.min(table.pressure_bar)),
+            np.max(table.temperature_K),
+        )
+    )
+    assert provider.coverage(atmosphere, prepared).valid
+    assert prepared.metadata["interpolation"] == "log_pressure_temperature_log_k_clip"
+    np.testing.assert_allclose(evaluated.kcoeff[0, 0, 0, 0], expected, rtol=1.0e-12)
+
+
 def test_correlated_k_cache_key_includes_interpolation_policy() -> None:
     table = _tiny_table("H2O")
     pressure_grid = _pressure_grid()

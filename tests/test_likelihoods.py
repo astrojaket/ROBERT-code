@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from robert_exoplanets import GaussianLikelihood, Observation, SpectralGrid, Spectrum
+from robert_exoplanets.core import RobertValidationError
 
 
 def _spectrum(values: list[float]) -> Spectrum:
@@ -60,3 +61,20 @@ def test_gaussian_likelihood_applies_offset_to_prediction() -> None:
     )
 
     assert loglike == 0.0
+
+
+def test_gaussian_likelihood_rejects_mismatched_coordinates() -> None:
+    observation = Observation.from_arrays(
+        wavelength=[1.0, 2.0, 3.0],
+        flux=[1.0, 2.0, 3.0],
+        uncertainty=[1.0, 1.0, 1.0],
+    )
+    model = Spectrum(
+        spectral_grid=SpectralGrid.from_array([1.0, 2.1, 3.0]),
+        values=np.array([1.0, 2.0, 3.0]),
+        unit="eclipse_depth",
+        observable="eclipse_depth",
+    )
+
+    with pytest.raises(RobertValidationError, match="observation wavelength grid"):
+        GaussianLikelihood().loglike(model, observation)

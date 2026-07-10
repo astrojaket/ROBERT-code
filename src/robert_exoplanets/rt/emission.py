@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 
 from .geometry import (
@@ -197,7 +198,7 @@ class ClearSkyEmissionResult:
         object.__setattr__(self, "point_scattering_contribution_radiance", point_scattering_contribution)
         object.__setattr__(self, "total_optical_depth", total_tau)
         object.__setattr__(self, "extinction_optical_depth", extinction_tau)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def normalized_layer_contribution(self) -> NDArray[np.float64]:
         """Return layer emission contribution normalized independently by wavelength."""

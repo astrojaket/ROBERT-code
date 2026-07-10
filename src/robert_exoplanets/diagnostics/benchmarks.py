@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from robert_exoplanets.core import RobertDataError, RobertValidationError, SpectralGrid, Spectrum
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 def _readonly_1d(values: list[float], name: str) -> NDArray[np.float64]:
@@ -71,7 +72,7 @@ class EmissionBenchmark:
         object.__setattr__(self, "wavelength_micron", wavelength)
         object.__setattr__(self, "eclipse_depth", eclipse_depth)
         object.__setattr__(self, "references", references)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def n_points(self) -> int:

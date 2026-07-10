@@ -10,6 +10,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from .exceptions import RobertValidationError
 from .grids import SpectralGrid
+from ._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -48,7 +49,7 @@ class Spectrum:
 
         object.__setattr__(self, "values", values)
         object.__setattr__(self, "uncertainty", uncertainty)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @classmethod
     def from_arrays(

@@ -29,6 +29,14 @@ class GaussianLikelihood:
     offset_parameter: str | None = "offset"
     jitter_parameter: str | None = "jitter"
     invalid_model_loglike: float = float("-inf")
+    coordinate_rtol: float = 1.0e-12
+    coordinate_atol: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.coordinate_rtol < 0.0 or not np.isfinite(self.coordinate_rtol):
+            raise RobertValidationError("coordinate_rtol must be finite and non-negative")
+        if self.coordinate_atol < 0.0 or not np.isfinite(self.coordinate_atol):
+            raise RobertValidationError("coordinate_atol must be finite and non-negative")
 
     def loglike(
         self,
@@ -38,11 +46,49 @@ class GaussianLikelihood:
     ) -> float:
         """Evaluate the log likelihood for one observed spectrum."""
 
+        selected_model, selected_data, selected_uncertainty = self.effective_inputs(
+            prediction,
+            observation,
+            parameters,
+        )
+        if not np.all(np.isfinite(selected_model)):
+            return float(self.invalid_model_loglike)
+
+        variance = np.square(selected_uncertainty)
+        residual = selected_data - selected_model
+        loglike = -0.5 * np.sum(np.square(residual) / variance)
+        if self.include_normalization:
+            loglike -= 0.5 * np.sum(np.log(2.0 * np.pi * variance))
+        return float(loglike)
+
+    def effective_inputs(
+        self,
+        prediction: Spectrum | Any,
+        observation: Observation,
+        parameters: Mapping[str, float] | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return masked model, data, and effective uncertainty arrays.
+
+        This is the shared Gaussian data contract used by likelihood and
+        optimal-estimation calculations. Model predictions must already be on
+        the observation spectral grid; resampling belongs in the instrument
+        response.
+        """
+
         spectrum = _prediction_spectrum(prediction)
         parameter_values = {} if parameters is None else parameters
 
         if spectrum.values.shape != observation.flux.shape:
             raise RobertValidationError("prediction and observation shapes must match")
+        if spectrum.spectral_grid.unit != observation.wavelength_unit:
+            raise RobertValidationError("prediction and observation wavelength units must match")
+        if not np.allclose(
+            spectrum.spectral_grid.values,
+            observation.wavelength,
+            rtol=self.coordinate_rtol,
+            atol=self.coordinate_atol,
+        ):
+            raise RobertValidationError("prediction must be evaluated on the observation wavelength grid")
         if spectrum.unit != observation.flux_unit:
             raise RobertValidationError("prediction and observation units must match")
         if spectrum.observable != observation.observable:
@@ -53,7 +99,7 @@ class GaussianLikelihood:
             offset = float(parameter_values[self.offset_parameter])
             if not np.isfinite(offset):
                 raise RobertValidationError("offset parameter must be finite")
-            model_values = model_values + offset
+            model_values += offset
 
         uncertainty = np.array(observation.uncertainty, dtype=float, copy=True)
         if self.jitter_parameter and self.jitter_parameter in parameter_values:
@@ -68,15 +114,9 @@ class GaussianLikelihood:
         if not np.any(valid):
             raise RobertValidationError("likelihood mask excludes all observation points")
 
-        selected_model = model_values[valid]
-        selected_data = observation.flux[valid]
-        selected_uncertainty = uncertainty[valid]
-        if not np.all(np.isfinite(selected_model)):
-            return float(self.invalid_model_loglike)
-
-        variance = np.square(selected_uncertainty)
-        residual = selected_data - selected_model
-        loglike = -0.5 * np.sum(np.square(residual) / variance)
-        if self.include_normalization:
-            loglike -= 0.5 * np.sum(np.log(2.0 * np.pi * variance))
-        return float(loglike)
+        selected_model = np.array(model_values[valid], dtype=float, copy=True)
+        selected_data = np.array(observation.flux[valid], dtype=float, copy=True)
+        selected_uncertainty = np.array(uncertainty[valid], dtype=float, copy=True)
+        for array in (selected_model, selected_data, selected_uncertainty):
+            array.setflags(write=False)
+        return selected_model, selected_data, selected_uncertainty

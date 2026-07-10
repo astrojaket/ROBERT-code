@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertDataError, RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 from .metadata import (
     OpacityDatabase,
@@ -54,19 +55,20 @@ class RobertOpacityArchive:
         for name, values in self.arrays.items():
             if not name:
                 raise RobertValidationError("archive array names must not be empty")
-            array = values if isinstance(values, np.memmap) else np.asarray(values)
+            array = values if isinstance(values, np.memmap) else np.array(values, copy=True)
             if array.size == 0:
                 raise RobertValidationError(f"archive array {name!r} must not be empty")
             if not np.issubdtype(array.dtype, np.number):
                 raise RobertValidationError(f"archive array {name!r} must be numeric")
             if not np.all(np.isfinite(array)):
                 raise RobertValidationError(f"archive array {name!r} must contain only finite values")
+            array.setflags(write=False)
             arrays[str(name)] = array
         if not arrays:
             raise RobertValidationError("opacity archive must contain at least one array")
         object.__setattr__(self, "archive_format", archive_format)
-        object.__setattr__(self, "arrays", arrays)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "arrays", immutable_mapping(arrays))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def to_manifest_mapping(self) -> dict[str, object]:
         """Return a JSON-serializable archive manifest."""
@@ -146,7 +148,9 @@ def load_robert_npy_directory(
     arrays: dict[str, NDArray[np.floating]] = {}
     for name, info in _manifest_arrays(manifest).items():
         filename = str(info["filename"])
-        arrays[name] = np.load(directory / filename, mmap_mode=mmap_mode, allow_pickle=False)
+        array = np.load(directory / filename, mmap_mode=mmap_mode, allow_pickle=False)
+        _validate_loaded_array(name, array, info)
+        arrays[name] = array
     return RobertOpacityArchive(
         database=OpacityDatabase.from_mapping(_manifest_database_mapping(manifest)),
         arrays=arrays,
@@ -193,7 +197,7 @@ def write_robert_npz_archive(
 def inspect_robert_npz_archive(path: str | Path) -> OpacityDatabase:
     """Read only metadata from a ROBERT `.npz` archive."""
 
-    manifest = _read_npz_manifest(path)
+    manifest = _read_npz_manifest(path, allow_legacy_database_manifest=True)
     return OpacityDatabase.from_mapping(_manifest_database_mapping(manifest))
 
 
@@ -204,8 +208,13 @@ def load_robert_npz_archive(path: str | Path) -> RobertOpacityArchive:
     archive_path = Path(path).expanduser()
     arrays: dict[str, NDArray[np.floating]] = {}
     with np.load(archive_path, allow_pickle=False) as archive:
-        for name in _manifest_arrays(manifest):
-            arrays[name] = np.asarray(archive[f"{ARRAY_PREFIX}{name}"])
+        for name, info in _manifest_arrays(manifest).items():
+            key = str(info["key"])
+            if key not in archive:
+                raise RobertDataError(f"ROBERT opacity archive is missing array key {key!r}")
+            array = np.asarray(archive[key])
+            _validate_loaded_array(name, array, info)
+            arrays[name] = array
     return RobertOpacityArchive(
         database=OpacityDatabase.from_mapping(_manifest_database_mapping(manifest)),
         arrays=arrays,
@@ -313,10 +322,19 @@ def _read_directory_manifest(path: str | Path) -> Mapping[str, object]:
     manifest_path = directory / MANIFEST_FILENAME
     if not manifest_path.is_file():
         raise RobertDataError(f"ROBERT opacity archive manifest not found: {manifest_path}")
-    return json.loads(manifest_path.read_text(encoding="utf-8"))
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RobertDataError(f"could not read ROBERT opacity archive manifest: {exc}") from exc
+    _validate_manifest_header(manifest, OpacityStorageFormat.ROBERT_NPY_DIRECTORY)
+    return manifest
 
 
-def _read_npz_manifest(path: str | Path) -> Mapping[str, object]:
+def _read_npz_manifest(
+    path: str | Path,
+    *,
+    allow_legacy_database_manifest: bool = False,
+) -> Mapping[str, object]:
     archive_path = Path(path).expanduser()
     if not archive_path.is_file():
         raise RobertDataError(f"ROBERT opacity archive does not exist: {archive_path}")
@@ -325,7 +343,33 @@ def _read_npz_manifest(path: str | Path) -> Mapping[str, object]:
             raise RobertDataError("ROBERT opacity archive must contain manifest_json")
         raw = archive[NPZ_MANIFEST_KEY]
         manifest_json = str(raw.item() if raw.shape == () else raw.tolist())
-    return json.loads(manifest_json)
+    try:
+        manifest = json.loads(manifest_json)
+    except json.JSONDecodeError as exc:
+        raise RobertDataError(f"invalid ROBERT opacity archive manifest JSON: {exc}") from exc
+    if not allow_legacy_database_manifest or manifest.get("format") == "robert_opacity_archive":
+        _validate_manifest_header(manifest, OpacityStorageFormat.ROBERT_NPZ)
+    elif not isinstance(manifest.get("products"), list):
+        raise RobertDataError("unrecognized ROBERT opacity archive manifest format")
+    return manifest
+
+
+def _validate_manifest_header(
+    manifest: object,
+    expected_format: OpacityStorageFormat,
+) -> None:
+    if not isinstance(manifest, Mapping):
+        raise RobertDataError("ROBERT opacity archive manifest must be a mapping")
+    if manifest.get("format") != "robert_opacity_archive":
+        raise RobertDataError("unrecognized ROBERT opacity archive manifest format")
+    if manifest.get("version") != ROBERT_OPACITY_ARCHIVE_VERSION:
+        raise RobertDataError(
+            f"unsupported ROBERT opacity archive version {manifest.get('version')!r}"
+        )
+    if manifest.get("archive_format") != expected_format.value:
+        raise RobertDataError(
+            "ROBERT opacity archive manifest format does not match its container"
+        )
 
 
 def _manifest_database_mapping(manifest: Mapping[str, object]) -> Mapping[str, object]:
@@ -347,8 +391,46 @@ def _manifest_arrays(manifest: Mapping[str, object]) -> Mapping[str, Mapping[str
     for name, info in arrays.items():
         if not isinstance(info, Mapping):
             raise RobertDataError("ROBERT opacity archive array entries must be mappings")
-        converted[str(name)] = info
+        try:
+            safe_name = _safe_array_name(str(name))
+        except RobertValidationError as exc:
+            raise RobertDataError(f"unsafe archive array name {name!r}") from exc
+        expected_filename = f"{safe_name}.npy"
+        expected_key = f"{ARRAY_PREFIX}{safe_name}"
+        if info.get("filename") != expected_filename or info.get("key") != expected_key:
+            raise RobertDataError(f"archive array {safe_name!r} has an invalid filename or key")
+        shape = info.get("shape")
+        if not isinstance(shape, list) or any(
+            not isinstance(size, int) or isinstance(size, bool) or size < 0 for size in shape
+        ):
+            raise RobertDataError(f"archive array {safe_name!r} has an invalid shape")
+        try:
+            dtype = np.dtype(info.get("dtype"))
+        except (TypeError, ValueError) as exc:
+            raise RobertDataError(f"archive array {safe_name!r} has an invalid dtype") from exc
+        if not np.issubdtype(dtype, np.number):
+            raise RobertDataError(f"archive array {safe_name!r} must have a numeric dtype")
+        converted[safe_name] = info
+    if not converted:
+        raise RobertDataError("ROBERT opacity archive manifest must contain at least one array")
     return converted
+
+
+def _validate_loaded_array(
+    name: str,
+    array: NDArray[np.generic],
+    info: Mapping[str, object],
+) -> None:
+    expected_shape = tuple(int(size) for size in info["shape"])  # type: ignore[index]
+    expected_dtype = np.dtype(info["dtype"])
+    if array.shape != expected_shape:
+        raise RobertDataError(
+            f"archive array {name!r} shape {array.shape} does not match manifest {expected_shape}"
+        )
+    if array.dtype != expected_dtype:
+        raise RobertDataError(
+            f"archive array {name!r} dtype {array.dtype} does not match manifest {expected_dtype}"
+        )
 
 
 def _string_mapping(value: object, name: str) -> dict[str, str]:

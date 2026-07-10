@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 
 from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, RobertCoverageError, RobertValidationError, SpectralGrid
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ class PreparedOpacity:
         if not self.cache_key:
             raise RobertValidationError("prepared opacity cache_key must not be empty")
         object.__setattr__(self, "species", tuple(self.species))
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
 
 @dataclass(frozen=True)

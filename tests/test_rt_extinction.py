@@ -5,6 +5,7 @@ from __future__ import annotations
 import struct
 
 import numpy as np
+import pytest
 
 from robert_exoplanets import (
     AtmosphereState,
@@ -18,7 +19,9 @@ from robert_exoplanets import (
     cia_optical_depth,
     rayleigh_scattering_optical_depth,
     read_cia_table,
+    load_nemesispy_cia_table,
 )
+from robert_exoplanets.core import RobertCoverageError
 
 
 def test_rayleigh_scattering_optical_depth_is_positive_and_larger_at_short_wavelengths() -> None:
@@ -63,6 +66,29 @@ def test_cia_optical_depth_uses_h2_h2_and_h2_he_pairs() -> None:
     assert "H2-He_normal" in cia.metadata["active_pairs"]
 
 
+def test_cia_optical_depth_requires_explicit_extrapolation_policy() -> None:
+    spectral_grid = SpectralGrid.from_array([2.0, 10.0], unit="micron", role="opacity")
+    gas_tau = _gas_tau(spectral_grid)
+    cia_table = CiaTable(
+        wavenumber_cm_inverse=[1000.0, 2000.0],
+        temperature_K=[1000.0, 1100.0],
+        k_cia=np.ones((4, 2, 2)),
+        pair_order=("eq_h2", "eq_he", "H2-H2_normal", "H2-He_normal"),
+    )
+
+    with pytest.raises(RobertCoverageError):
+        cia_optical_depth(gas_tau, cia_table)
+
+    result = cia_optical_depth(
+        gas_tau,
+        cia_table,
+        temperature_extrapolation="clip",
+        spectral_extrapolation="zero",
+    )
+    assert result.metadata["temperature_extrapolation"] == "clip"
+    assert result.metadata["spectral_extrapolation"] == "zero"
+
+
 def test_read_cia_table_reads_fortran_records(tmp_path) -> None:
     path = tmp_path / "tiny_cia.tab"
     temperatures = np.array([500.0, 1000.0], dtype="<f8")
@@ -76,6 +102,18 @@ def test_read_cia_table_reads_fortran_records(tmp_path) -> None:
     np.testing.assert_allclose(table.wavenumber_cm_inverse, [0.0, 25.0, 50.0, 75.0])
     expected = coefficients.reshape(4, 2, 4).transpose(2, 1, 0)
     np.testing.assert_allclose(table.k_cia, expected)
+
+
+def test_vendored_nemesispy_cia_table_has_recorded_provenance() -> None:
+    table = load_nemesispy_cia_table()
+
+    assert table.n_pairs == 9
+    assert table.temperature_K[0] == pytest.approx(200.0)
+    assert table.temperature_K[-1] == pytest.approx(3800.0)
+    assert table.metadata["source_tag"] == "v1.0.1"
+    assert table.metadata["checksum_sha256"] == (
+        "5b519f02f98b205f20628ee5ec7f2829528d0bd356b449c4221ba8b2ef86ea0e"
+    )
 
 
 def _gas_tau(spectral_grid: SpectralGrid):

@@ -22,6 +22,22 @@ Current chemistry types:
   equilibrium-chemistry tables when the external dependency and data files are
   available.
 
+## FastChem Retrieval Chemistry
+
+The FastChem adapter is connected to the parameterized clear-sky retrieval
+model. It accepts `[M/H]` in dex through `metallicity` and a linear elemental
+carbon-to-oxygen ratio through `CtoO`. Every evaluation resets the solver from
+stored solar elemental abundances before applying these parameters, so calls do
+not inherit elemental abundances from the previous sample.
+
+The Conda environment installs `pyfastchem`, and the repository bundles the
+required FastChem inputs under `examples/data/hat_p_32b/fastchem`. Together
+they pass a real smoke test, including repeated calls separated by a different
+metallicity and C/O state. The FastChem path, parameter names, species mapping,
+and elemental-abundance source are recorded in model provenance. FastChem
+remains an optional dependency, each MPI process owns its own solver instance,
+and the bundled upstream files retain their GPL-3.0 license.
+
 ## Free Chemistry
 
 `FreeChemistry` is the first retrieval-facing chemistry model in ROBERT. It is
@@ -72,6 +88,9 @@ that the VMRs sum to one in every layer. This is deliberate. A trace-only
 composition should not silently define the bulk atmosphere. For controlled
 comparison workflows, `normalization="normalize"` can renormalize the supplied
 composition before calculating mean molecular weight.
+
+`normalization="raw_sum"` is available for parity with the existing HAT-P-32b
+FastChem workflow, where a selected set of returned species is used directly.
 
 ## Not Yet Implemented
 

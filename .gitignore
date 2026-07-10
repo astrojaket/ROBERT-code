@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.ipynb_checkpoints/
 .coverage
 htmlcov/
 build/
@@ -32,3 +33,8 @@ retrieval_runs/
 opacity_data/
 opacities/
 input_data/
+
+# The validated, exo_k-binned HAT-P-32b benchmark tables are intentionally
+# versioned; arbitrary user opacity directories remain ignored.
+!examples/data/hat_p_32b/opacities/
+!examples/data/hat_p_32b/opacities/*.robert-opacity.npz

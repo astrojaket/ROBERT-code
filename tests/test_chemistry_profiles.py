@@ -213,6 +213,19 @@ def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     assert np.all(composition["H2"] > 0.0)
     assert np.all(composition["He"] > 0.0)
     assert composition["H2"].flags.writeable is False
+    enriched = chemistry.evaluate(
+        {"metallicity": 1.0, "CtoO": 0.8},
+        grid,
+        np.full(grid.n_layers, 1500.0),
+    )
+    repeated = chemistry.evaluate(
+        {"metallicity": 0.0, "CtoO": 0.55},
+        grid,
+        np.full(grid.n_layers, 1500.0),
+    )
+    assert not np.allclose(enriched["H2O"], composition["H2O"], rtol=1.0e-3)
+    np.testing.assert_allclose(repeated["H2O"], composition["H2O"], rtol=0.0, atol=0.0)
+    assert chemistry.metadata["fastchem_path"] == str(fastchem_path)
 
 
 def test_atmosphere_builder_accepts_free_chemistry_model() -> None:

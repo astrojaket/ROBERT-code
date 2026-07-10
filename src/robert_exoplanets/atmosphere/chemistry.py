@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from robert_exoplanets.core import PressureGrid, RobertConfigError, RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 DEFAULT_MOLECULAR_MASSES: Mapping[str, float] = {
@@ -354,7 +355,18 @@ class FastChemEquilibriumChemistry:
         object.__setattr__(self, "fastchem_path", path)
         object.__setattr__(self, "fastchem_species", tuple(str(item) for item in self.fastchem_species))
         object.__setattr__(self, "labels", labels)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(
+            self,
+            "metadata",
+            immutable_mapping(
+                {
+                    "fastchem_path": str(path),
+                    "metallicity_parameter": self.metallicity_parameter_name,
+                    "carbon_to_oxygen_parameter": self.carbon_to_oxygen_parameter_name,
+                    **dict(self.metadata),
+                }
+            ),
+        )
 
     @property
     def species(self) -> tuple[str, ...]:
@@ -495,7 +507,7 @@ class ConstantChemistry:
             raise RobertValidationError("volume mixing ratios must sum to no more than one")
 
         object.__setattr__(self, "mixing_ratios", ratios)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def species(self) -> tuple[str, ...]:
@@ -614,7 +626,7 @@ class FreeChemistry:
         object.__setattr__(self, "background", background)
         object.__setattr__(self, "fixed_mixing_ratios", fixed)
         object.__setattr__(self, "parameter_names", parameter_names)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def species(self) -> tuple[str, ...]:

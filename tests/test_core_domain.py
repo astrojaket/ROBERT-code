@@ -18,9 +18,27 @@ def test_pressure_grid_logspace_builds_layer_centers() -> None:
     np.testing.assert_allclose(grid.centers, np.sqrt(grid.edges[:-1] * grid.edges[1:]))
 
 
+def test_pressure_grid_from_log_centers_includes_requested_endpoints() -> None:
+    grid = PressureGrid.from_log_centers(100.0, 1.0e-6, n_layers=100, unit="bar")
+
+    assert grid.n_layers == 100
+    assert grid.orientation == "decreasing"
+    assert grid.centers[0] == pytest.approx(100.0)
+    assert grid.centers[-1] == pytest.approx(1.0e-6)
+    np.testing.assert_allclose(np.diff(np.log10(grid.centers)), -8.0 / 99.0)
+
+
 def test_pressure_grid_rejects_non_positive_pressures() -> None:
     with pytest.raises(RobertValidationError, match="positive"):
         PressureGrid(edges=[1.0, 0.0], centers=[0.5])
+
+
+def test_pressure_grid_requires_centres_inside_matching_layers() -> None:
+    with pytest.raises(RobertValidationError, match="strictly inside"):
+        PressureGrid(edges=[1.0, 2.0, 3.0], centers=[1.5, 3.0])
+
+    with pytest.raises(RobertValidationError, match="same orientation"):
+        PressureGrid(edges=[1.0, 2.0, 3.0], centers=[2.5, 1.5])
 
 
 def test_spectral_grid_requires_monotonic_values() -> None:
@@ -49,6 +67,9 @@ def test_planet_requires_gravity_or_mass_and_radius() -> None:
 
     with pytest.raises(RobertValidationError, match="requires gravity"):
         Planet(name="No-gravity")
+
+    with pytest.raises(RobertValidationError, match="finite and positive"):
+        Planet(name="Invalid", radius_m=np.nan, gravity_m_s2=10.0)
 
 
 def test_star_accepts_optional_spectrum() -> None:
