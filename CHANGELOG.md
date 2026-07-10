@@ -47,6 +47,8 @@
   and pre-emption-aware automatic requeueing.
 - Added a dependency-checking `addqueue`/`mpirun` submission script matching the
   target cluster's existing NemesisPy job-launch workflow.
+- Made the `addqueue` launcher detect and reuse scheduler-provided MPI worlds,
+  preventing nested `N × N` process launches and competing retrieval writers.
 
 - Added atmospheric state, isothermal temperature, constant chemistry, and
   atmosphere-builder components.

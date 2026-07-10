@@ -31,6 +31,12 @@ Set `ROBERT_PYTHON`, `ROBERT_MPIRUN`, or `ROBERT_REPO_DIR` only if the cluster
 paths differ. Reusing the same run name resumes its UltraNest checkpoint;
 `ROBERT_MAX_NCALLS` is the cumulative call limit.
 
+Some `addqueue` installations launch `submit.sh` once on every allocated MPI
+rank. ROBERT detects the existing MPI world and runs one Python process per
+rank without starting a nested `mpirun`. If `submit.sh` is instead executed
+once outside MPI, it starts `mpirun -n ROBERT_NPROCS` itself. This prevents an
+`N`-core allocation from accidentally launching `N × N` retrieval processes.
+
 ## Install
 
 Clone ROBERT and create the pinned Conda environment from the repository root:
