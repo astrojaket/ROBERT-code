@@ -41,6 +41,10 @@
 - Added a pinned cross-platform Conda environment, complete package extra,
   fresh-environment validation, and a configurable Slurm/UltraNest batch
   script with MPI launch guidance.
+- Hardened long UltraNest runs for production clusters with resumable defaults,
+  stable Slurm run directories, concurrent-writer locks, preserved initial and
+  per-attempt manifests, live status/throughput records, checkpoint smoke tests,
+  and pre-emption-aware automatic requeueing.
 
 - Added atmospheric state, isothermal temperature, constant chemistry, and
   atmosphere-builder components.

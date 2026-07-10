@@ -107,8 +107,11 @@ def test_inference_configs_validate_and_expose_runner_settings() -> None:
 
     assert nested.method == "ultranest"
     assert nested.kwargs()["min_num_live_points"] == 40
+    assert nested.resume == "resume"
     assert nested.seed == 42
     with pytest.raises(RobertConfigError, match="positive"):
         OptimalEstimationRunConfig(max_iterations=0)
     with pytest.raises(RobertConfigError, match="reserved"):
         UltraNestRunConfig(extra_run_kwargs={"dlogz": 0.1})
+    with pytest.raises(RobertConfigError, match="resume must be one of"):
+        UltraNestRunConfig(resume="sometimes")

@@ -175,6 +175,7 @@ def make_run_config(
     live_points: int = 400,
     max_ncalls: int | None = 100000,
     dlogz: float = 0.5,
+    resume: str = "resume",
     seed: int = 20260710,
     mpi_nprocs: int | None = None,
     pressure_top_bar: float = 1.0e-6,
@@ -209,6 +210,7 @@ def make_run_config(
             min_num_live_points=live_points,
             max_ncalls=max_ncalls,
             dlogz=dlogz,
+            resume=resume,
             seed=seed,
             mpi_nprocs=mpi_nprocs,
         )
