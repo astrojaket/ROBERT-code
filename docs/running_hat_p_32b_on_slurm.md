@@ -36,6 +36,9 @@ rank. ROBERT detects the existing MPI world and runs one Python process per
 rank without starting a nested `mpirun`. If `submit.sh` is instead executed
 once outside MPI, it starts `mpirun -n ROBERT_NPROCS` itself. This prevents an
 `N`-core allocation from accidentally launching `N × N` retrieval processes.
+Both OpenMPI/PMI rank variables and Slurm's `SLURM_NTASKS`/`SLURM_PROCID`
+variables are supported. MPI temporary files use `SLURM_TMPDIR` when supplied,
+then node-local `/dev/shm`, rather than a shared `/tmp` filesystem.
 
 ## Install
 

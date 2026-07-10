@@ -7,10 +7,25 @@ set -uo pipefail
 repo_dir="${ROBERT_REPO_DIR:-$PWD}"
 python_executable="${ROBERT_PYTHON:-/mnt/zfsusers/jaketaylor/anaconda3/envs/robert-exoplanets/bin/python3}"
 mpirun_executable="${ROBERT_MPIRUN:-mpirun}"
-mpi_world_size="${OMPI_COMM_WORLD_SIZE:-${PMI_SIZE:-${PMIX_SIZE:-1}}}"
-mpi_world_rank="${OMPI_COMM_WORLD_RANK:-${PMI_RANK:-${PMIX_RANK:-0}}}"
+mpi_world_size=1
+mpi_world_rank=0
+if [[ "${OMPI_COMM_WORLD_SIZE:-}" =~ ^[0-9]+$ ]] \
+  && (( OMPI_COMM_WORLD_SIZE > 1 )); then
+  mpi_world_size="$OMPI_COMM_WORLD_SIZE"
+  mpi_world_rank="${OMPI_COMM_WORLD_RANK:-0}"
+elif [[ "${PMI_SIZE:-}" =~ ^[0-9]+$ ]] && (( PMI_SIZE > 1 )); then
+  mpi_world_size="$PMI_SIZE"
+  mpi_world_rank="${PMI_RANK:-0}"
+elif [[ "${PMIX_SIZE:-}" =~ ^[0-9]+$ ]] && (( PMIX_SIZE > 1 )); then
+  mpi_world_size="$PMIX_SIZE"
+  mpi_world_rank="${PMIX_RANK:-0}"
+elif [[ -n "${SLURM_PROCID:-}" && "${SLURM_NTASKS:-}" =~ ^[0-9]+$ ]] \
+  && (( SLURM_NTASKS > 1 )); then
+  mpi_world_size="$SLURM_NTASKS"
+  mpi_world_rank="$SLURM_PROCID"
+fi
 scheduler_mpi=0
-if [[ "$mpi_world_size" =~ ^[0-9]+$ ]] && (( mpi_world_size > 1 )); then
+if (( mpi_world_size > 1 )); then
   scheduler_mpi=1
 fi
 if (( scheduler_mpi )); then
@@ -47,7 +62,16 @@ export OMP_NUM_THREADS="${ROBERT_THREADS_PER_PROCESS:-1}"
 export NUMBA_NUM_THREADS="$OMP_NUM_THREADS"
 export NUMBA_CACHE_DIR="${ROBERT_NUMBA_CACHE_DIR:-$HOME/.cache/robert/numba}"
 export MPLCONFIGDIR="${ROBERT_MPLCONFIGDIR:-$HOME/.cache/robert/matplotlib}"
-mkdir -p "$NUMBA_CACHE_DIR" "$MPLCONFIGDIR"
+if [[ -n "${ROBERT_TMPDIR:-}" ]]; then
+  export TMPDIR="$ROBERT_TMPDIR"
+elif [[ -n "${SLURM_TMPDIR:-}" ]]; then
+  export TMPDIR="$SLURM_TMPDIR"
+elif [[ -d /dev/shm && -w /dev/shm ]]; then
+  export TMPDIR="/dev/shm/robert-${SLURM_JOB_ID:-${USER:-job}}"
+else
+  export TMPDIR="/tmp/robert-${SLURM_JOB_ID:-${USER:-job}}"
+fi
+mkdir -p "$NUMBA_CACHE_DIR" "$MPLCONFIGDIR" "$TMPDIR"
 
 if (( is_leader )) && [[ "${ROBERT_VERIFY_DATA:-1}" == "1" ]]; then
   (cd examples/data/hat_p_32b && sha256sum --check checksums.sha256) || exit 2
