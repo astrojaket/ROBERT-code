@@ -45,12 +45,9 @@
   stable Slurm run directories, concurrent-writer locks, preserved initial and
   per-attempt manifests, live status/throughput records, checkpoint smoke tests,
   and pre-emption-aware automatic requeueing.
-- Added a dependency-checking `addqueue`/`mpirun` submission script matching the
-  target cluster's existing NemesisPy job-launch workflow.
-- Made the `addqueue` launcher detect and reuse scheduler-provided MPI worlds,
-  preventing nested `N × N` process launches and competing retrieval writers.
-- Extended cluster-world detection to Slurm `srun` rank variables and moved MPI
-  temporary storage away from shared NFS `/tmp` when local scratch is available.
+- Added a minimal Glamdring `addqueue` launcher following the official cluster
+  contract: one Python invocation per allocated Slurm rank, no nested MPI
+  launcher, and explicit memory and checkpoint-restart guidance.
 
 - Added atmospheric state, isothermal temperature, constant chemistry, and
   atmosphere-builder components.

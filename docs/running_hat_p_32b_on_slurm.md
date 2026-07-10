@@ -2,43 +2,34 @@
 
 ## `addqueue` clusters
 
-On clusters where jobs are submitted through `addqueue` and launched with
-`mpirun`, ROBERT includes a repository-root `submit.sh` matching that workflow.
-The default is the validated 12-process, 40-live-point, 10,000-call test:
+Glamdring's `addqueue -n` starts the requested number of processes itself, so
+ROBERT's repository-root `submit.sh` contains no nested `mpirun`. The default
+is the validated 12-process, 40-live-point, 10,000-call test. Request memory
+explicitly because Glamdring otherwise allocates only 0.1 GB:
 
 ```bash
 cd ~/ROBERT-code
-addqueue -q "planet" -c "Robert-run" -n 12 ./submit.sh
+addqueue -q "planet" -c "ROBERT 40 live / 10k calls" -n 12 -m 32 -r ./submit.sh
 ```
 
 The script directly uses
-`/mnt/zfsusers/jaketaylor/anaconda3/envs/robert-exoplanets/bin/python3`, verifies
-the bundled data and Python dependencies, and writes resumable output to
-`retrieval_runs/hat_p_32b_cluster_test`. The process count passed to
-`addqueue -n` must match `ROBERT_NPROCS`; both default to 12. For a different
-run, export settings before calling `addqueue`, for example:
+`/mnt/zfsusers/jaketaylor/anaconda3/envs/robert-exoplanets/bin/python3` and
+writes resumable output to `retrieval_runs/hat_p_32b_cluster_test`. The `-r`
+option lets Slurm restart a pre-empted job; ROBERT then resumes its UltraNest
+checkpoint. For a different run, export settings before calling `addqueue`:
 
 ```bash
 export ROBERT_RUN_NAME=hat_p_32b_400live
-export ROBERT_NPROCS=12
 export ROBERT_LIVE_POINTS=400
 export ROBERT_MAX_NCALLS=500000
 export ROBERT_DLOGZ=0.5
-addqueue -q "planet" -c "Robert-run" -n 12 ./submit.sh
+addqueue -q "planet" -c "ROBERT production" -n 12 -m 32 -r ./submit.sh
 ```
 
-Set `ROBERT_PYTHON`, `ROBERT_MPIRUN`, or `ROBERT_REPO_DIR` only if the cluster
-paths differ. Reusing the same run name resumes its UltraNest checkpoint;
-`ROBERT_MAX_NCALLS` is the cumulative call limit.
-
-Some `addqueue` installations launch `submit.sh` once on every allocated MPI
-rank. ROBERT detects the existing MPI world and runs one Python process per
-rank without starting a nested `mpirun`. If `submit.sh` is instead executed
-once outside MPI, it starts `mpirun -n ROBERT_NPROCS` itself. This prevents an
-`N`-core allocation from accidentally launching `N × N` retrieval processes.
-Both OpenMPI/PMI rank variables and Slurm's `SLURM_NTASKS`/`SLURM_PROCID`
-variables are supported. MPI temporary files use `SLURM_TMPDIR` when supplied,
-then node-local `/dev/shm`, rather than a shared `/tmp` filesystem.
+Set `ROBERT_PYTHON` only if the environment path differs. Reusing the same run
+name resumes its UltraNest checkpoint; `ROBERT_MAX_NCALLS` is cumulative. Use
+`q`, `q -s JOB_ID`, or `showoutput JOB_ID` to monitor the run, and `scancel
+JOB_ID` to stop it.
 
 ## Install
 
