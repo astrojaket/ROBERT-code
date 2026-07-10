@@ -59,12 +59,18 @@ def main() -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.method == "optimal_estimation":
-        result = run_retrieval(problem, method="optimal_estimation", max_iterations=args.max_iterations)
+        result = run_retrieval(
+            problem,
+            method="optimal_estimation",
+            output_dir=output_dir,
+            max_iterations=args.max_iterations,
+        )
     else:
         result = run_retrieval(
             problem,
             method="ultranest",
             output_dir=output_dir / "ultranest",
+            seed=args.seed,
             min_num_live_points=args.live_points,
             max_ncalls=args.max_ncalls,
             dlogz=args.dlogz,
@@ -134,7 +140,7 @@ def _report(args, observation_path: Path, problem: RetrievalProblem, result, mod
         "method": args.method,
         "observation_npz": str(observation_path),
         "n_points": problem.observation.n_points,
-        "parameters": result.best_fit_parameters,
+        "parameters": dict(result.best_fit_parameters),
         "chi2": chi2,
         "reduced_chi2": chi2 / max(1, problem.observation.n_points - problem.ndim),
         "log_likelihood": _result_log_likelihood(result),
@@ -209,6 +215,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--live-points", type=int, default=80)
     parser.add_argument("--max-ncalls", type=int, default=2000)
     parser.add_argument("--dlogz", type=float, default=0.5)
+    parser.add_argument("--seed", type=int, default=42)
     return parser
 
 

@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 class Prior(Protocol):
@@ -22,6 +23,9 @@ class Prior(Protocol):
 
     def log_probability(self, value: float) -> float:
         """Return the normalized log prior probability density."""
+
+    def gaussian_approximation(self) -> tuple[float, float]:
+        """Return a centre and scale for diagnostic optimal estimation."""
 
 
 @dataclass(frozen=True)
@@ -50,6 +54,11 @@ class UniformPrior:
         if self.lower <= number <= self.upper:
             return float(-np.log(self.upper - self.lower))
         return float("-inf")
+
+    def gaussian_approximation(self) -> tuple[float, float]:
+        """Approximate the bounded prior by a broad Gaussian."""
+
+        return float(0.5 * (self.lower + self.upper)), float(0.5 * (self.upper - self.lower))
 
 
 @dataclass(frozen=True)
@@ -83,6 +92,13 @@ class LogUniformPrior:
             return float(-np.log(number) - np.log(np.log(self.upper / self.lower)))
         return float("-inf")
 
+    def gaussian_approximation(self) -> tuple[float, float]:
+        """Approximate the log prior around its geometric median."""
+
+        center = self.transform(0.5)
+        scale = 0.5 * (self.transform(0.84) - self.transform(0.16))
+        return float(center), float(scale)
+
 
 @dataclass(frozen=True)
 class RetrievalParameter:
@@ -97,13 +113,21 @@ class RetrievalParameter:
     def __post_init__(self) -> None:
         if not self.name:
             raise RobertValidationError("retrieval parameter name must not be empty")
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def midpoint(self) -> float:
-        """Finite midpoint in physical parameter space."""
+        """Prior median obtained from the unit-cube midpoint."""
 
-        return float(0.5 * (self.prior.lower + self.prior.upper))
+        center, _ = self.prior.gaussian_approximation()
+        return center
+
+    @property
+    def approximate_standard_deviation(self) -> float:
+        """Robust Gaussian scale inferred from the central 68% prior interval."""
+
+        _, scale = self.prior.gaussian_approximation()
+        return scale
 
     @property
     def bounds(self) -> tuple[float, float]:

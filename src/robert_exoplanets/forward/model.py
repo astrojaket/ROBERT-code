@@ -9,6 +9,7 @@ import numpy as np
 
 from robert_exoplanets.atmosphere import AtmosphereBuilder, AtmosphereState
 from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.instruments import PreparedObservationResponse
 from robert_exoplanets.opacity import EvaluatedOpacity, FixtureOpacityProvider, PreparedOpacity
 
@@ -69,7 +70,7 @@ class ModelPrediction:
     diagnostics: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "diagnostics", dict(self.diagnostics))
+        object.__setattr__(self, "diagnostics", immutable_mapping(self.diagnostics))
 
 
 @dataclass(frozen=True)

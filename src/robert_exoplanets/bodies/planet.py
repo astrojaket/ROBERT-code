@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Mapping
 
+import numpy as np
+
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.core.exceptions import RobertValidationError
 
 
@@ -31,11 +34,11 @@ class Planet:
             "system_distance_m",
         ):
             value = getattr(self, field_name)
-            if value is not None and value <= 0:
-                raise RobertValidationError(f"{field_name} must be positive when provided")
+            if value is not None and (not np.isfinite(value) or value <= 0):
+                raise RobertValidationError(f"{field_name} must be finite and positive when provided")
         if self.gravity_m_s2 is None and not (self.mass_kg is not None and self.radius_m is not None):
             raise RobertValidationError("planet requires gravity_m_s2 or both mass_kg and radius_m")
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def has_direct_gravity(self) -> bool:

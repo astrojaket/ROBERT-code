@@ -36,3 +36,25 @@ def test_observation_rejects_non_positive_uncertainty() -> None:
             flux=[0.1, 0.2],
             uncertainty=[0.01, 0.0],
         )
+
+
+def test_observation_preserves_explicit_spectral_bins() -> None:
+    observation = Observation.from_arrays(
+        wavelength=[1.0, 2.0],
+        wavelength_bin_edges=[0.5, 1.5, 2.5],
+        flux=[0.1, 0.2],
+        uncertainty=[0.01, 0.01],
+    )
+
+    np.testing.assert_allclose(observation.spectral_grid.bin_edges, [0.5, 1.5, 2.5])
+    assert observation.wavelength_bin_edges.flags.writeable is False
+
+
+def test_observation_rejects_centres_outside_spectral_bins() -> None:
+    with pytest.raises(ValueError, match="strictly inside"):
+        Observation.from_arrays(
+            wavelength=[1.0, 2.0],
+            wavelength_bin_edges=[1.0, 1.5, 2.5],
+            flux=[0.1, 0.2],
+            uncertainty=[0.01, 0.01],
+        )

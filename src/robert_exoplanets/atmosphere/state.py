@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import PressureGrid, RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 def _readonly_layer_array(
@@ -74,9 +75,9 @@ class AtmosphereState:
             raise RobertValidationError("mean_molecular_weight_unit must not be empty")
 
         object.__setattr__(self, "temperature", temperature)
-        object.__setattr__(self, "composition", composition)
+        object.__setattr__(self, "composition", immutable_mapping(composition))
         object.__setattr__(self, "mean_molecular_weight", mean_molecular_weight)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def n_layers(self) -> int:

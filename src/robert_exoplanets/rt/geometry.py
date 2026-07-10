@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -100,7 +101,7 @@ class DiscGeometry:
         object.__setattr__(self, "name", str(self.name))
         object.__setattr__(self, "quadrature", str(self.quadrature))
         object.__setattr__(self, "phase_angle_deg", phase_angle_deg)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def n_points(self) -> int:

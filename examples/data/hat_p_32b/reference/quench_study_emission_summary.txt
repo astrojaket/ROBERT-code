@@ -1,0 +1,36 @@
+# Retrieval summary for quench_study_emission (emission)
+# Generated: 2025-10-10T20:40:02Z
+
+Evidence:
+  logZ: 907.034461  +/- 0.088822
+
+Global statistics (MAP model; for reference):
+  N_total   : 117
+  k_params  : 8
+  chi2      : 134.372610
+  red_chi2  : 1.148484
+  logL_map  : 923.602155
+  AIC       : -1831.204310
+  AICc      : -1829.870977
+  BIC       : -1809.106919
+
+Per-observation statistics (MAP model; for reference):
+  [G395H]
+    N       : 117
+    chi2    : 134.372610
+    red_chi2: 1.148484
+    logL    : 923.602155
+    AIC     : -1831.204310
+    AICc    : -1829.870977
+    BIC     : -1809.106919
+    RMS     : 0.000100665
+
+Parameter posteriors (median ±1σ):
+  metallicity       0.0801018  (-0.232063, +0.222769)
+  CtoO              0.472062  (-0.115038, +0.0764599)
+  P1                -0.20683  (-0.767767, +0.93748)
+  P2                -2.19081  (-2.33706, +2.00997)
+  P3                1.05596  (-0.833169, +0.625628)
+  T0                1533.24  (-22.9946, +23.6994)
+  alpha1            0.210043  (-0.00943248, +0.00803917)
+  alpha2            1.03435  (-0.58661, +0.639828)

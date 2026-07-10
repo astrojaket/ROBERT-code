@@ -16,6 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from robert_exoplanets.core import RobertDataError, RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 from .archive import write_robert_npy_directory, write_robert_npz_archive
 from .metadata import (
@@ -96,7 +97,7 @@ class KtaHeader:
             raise RobertValidationError("data_offset_bytes must be positive")
         if self.file_size_bytes < self.expected_file_size_bytes:
             raise RobertDataError("`.kta` file is smaller than expected from its header")
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def native_shape(self) -> tuple[int, int, int, int]:
@@ -168,7 +169,7 @@ class KtaTable:
             raise RobertValidationError("kcoeff unit must not be empty")
         kcoeff.setflags(write=False)
         object.__setattr__(self, "kcoeff", kcoeff)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
 
 def read_kta_header(

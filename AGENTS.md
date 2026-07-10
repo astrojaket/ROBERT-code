@@ -4,7 +4,7 @@ Guidance for coding agents working in the ROBERT repository.
 
 ## Project Intent
 
-ROBERT is a Python package skeleton for JWST exoplanet emission retrievals. The current repository is intentionally lightweight: it defines the seams of the retrieval workflow, testable core data containers, and a stubbed end-to-end example without implementing full atmospheric physics, radiative transfer, instrument models, or samplers.
+ROBERT is an early-stage Python package for JWST exoplanet emission retrievals. It now includes testable domain containers, correlated-k opacity preparation, a reference radiative-transfer path, likelihood and optimal-estimation infrastructure, and an optional UltraNest adapter. These components support validation retrievals but are not yet a production science model.
 
 The Python distribution name is `robert-exoplanets`; avoid introducing packaging or documentation that assumes the distribution is named `robert`.
 
@@ -23,6 +23,7 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
 - `src/robert_exoplanets/core/`: Core grids, spectra, exceptions, and logging helpers.
 - `src/robert_exoplanets/bodies/`: Planet and star domain objects.
 - `src/robert_exoplanets/instruments/`: Observation and future instrument objects.
+- `src/robert_exoplanets/forward/`: Reusable forward-model orchestration over atmosphere, opacity, RT, and instruments.
 - `src/robert_exoplanets/retrieval/`: Retrieval configuration, model placeholders, and orchestration.
 - `examples/`: Runnable example scripts.
 - `tests/`: Pytest suite.
@@ -30,7 +31,7 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
 ## Useful Commands
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,opacity,retrieval]"
 pytest
 python examples/stub_emission_retrieval.py
 ```
@@ -40,7 +41,7 @@ python examples/stub_emission_retrieval.py
 The following are deliberately out of scope for the initial skeleton:
 
 - JWST pipeline calibration products.
-- Real opacity tables or chemistry.
-- Radiative transfer.
-- Bayesian/nested sampling.
-- Instrument throughput or line spread functions.
+- Calibrated JWST pipeline products and multi-instrument covariance.
+- Production-complete chemistry, clouds, and opacity databases.
+- Science-grade multiple-scattering and instrument throughput/line-spread models.
+- Broad sampler support and fully validated long-run posterior workflows.

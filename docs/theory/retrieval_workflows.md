@@ -16,7 +16,7 @@ future samplers.
 The optional retrieval dependencies are:
 
 ```bash
-python -m pip install -e ".[dev,perf,retrieval]"
+python -m pip install -e ".[dev,perf,opacity,retrieval]"
 ```
 
 On this laptop, UltraNest and mpi4py were installed with:
@@ -35,11 +35,8 @@ Use that explicit path if `mpiexec` is not on `PATH`.
 
 ## Read Observations
 
-The HAT-P-32b observation benchmark is:
-
-```text
-/Users/jaketaylor/Dropbox/PostDoc4/Emission_Example/Retrieval_Results/HAT-P-32b/quench_study_emission_G395H_spectra_band.npz
-```
+The HAT-P-32b observation benchmark is bundled under
+`examples/data/hat_p_32b/reference/`.
 
 ROBERT reads this with:
 
@@ -47,7 +44,7 @@ ROBERT reads this with:
 from robert_exoplanets import load_emission_observation_npz
 
 observation = load_emission_observation_npz(
-    "/Users/jaketaylor/Dropbox/PostDoc4/Emission_Example/Retrieval_Results/HAT-P-32b/quench_study_emission_G395H_spectra_band.npz",
+    "examples/data/hat_p_32b/reference/quench_study_emission_G395H_spectra_band.npz",
     instrument="JWST/NIRSpec G395H",
 )
 ```
@@ -153,8 +150,16 @@ The RT template uses:
 
 ## RT-Linked Retrieval Template
 
-The RT template calls ROBERT's emission RT solver with HAT-P-32b k-tables. It is
-intended for short tests first, then longer UltraNest runs.
+The RT template calls ROBERT's emission RT solver with HAT-P-32b k-tables. The
+observation bin edges are passed to `exo_k`, which bins and recompresses the
+correlated-k distributions before inference. ROBERT does not interpolate
+individual k coefficients in wavelength.
+
+The planet, star, temperature profile, molecular opacity source, binning
+settings, and RT choices live in the ordinary Python configuration file
+`examples/hat_p_32b_config.py`. The retrieval script passes that typed config
+to ROBERT's public `build_clear_sky_emission_model` factory. Copy the config
+file—not the retrieval implementation—when adding another target.
 
 Optimal estimation:
 
@@ -167,8 +172,9 @@ UltraNest with 3 local MPI ranks:
 ```bash
 /opt/homebrew/bin/mpiexec -n 3 python examples/retrieve_hat_p_32b_rt.py \
   --method ultranest \
-  --live-points 60 \
-  --max-ncalls 600
+  --live-points 40 \
+  --max-ncalls 10000 \
+  --dlogz 1.5
 ```
 
 Change the RT priors:
@@ -190,6 +196,20 @@ The first RT template is deliberately small. It uses one active gas (`H2O`), a
 temperature offset, radius scaling, optional Rayleigh extinction, correlated-k
 opacity, random overlap machinery, and the clear-sky emission solver. It is a
 retrieval plumbing test, not yet a final HAT-P-32b science model.
+
+Every call to `run_retrieval` requires an output directory. ROBERT writes
+`manifest.json` before inference starts, followed by a stable `result.json` and
+`result_arrays.npz`. The manifest records priors, likelihood settings, opacity
+checksums, the configuration hash, code/runtime provenance, and the random seed
+for nested sampling.
+
+A recorded single-process HAT-P-32b run with 40 live points, a 10,000-call
+ceiling, `dlogz=1.5`, and seed `20260710` converged before the call limit. It
+reported best-fit log likelihood `-89.3702`, log evidence `-99.8347 ± 0.6391`,
+and configuration hash
+`e3dbb7e05ff765e462255049d518fd2120c635f0cef7d6ceee157c1c2fbde1f4`.
+These settings are a validated example, not a universal convergence guarantee;
+every changed model and prior must be checked independently.
 
 ## Slurm Example
 
@@ -246,11 +266,102 @@ For UltraNest, diagnostic files are also written in the `ultranest/` output
 subdirectory. Corner plots can be generated from those products once we settle
 the long-run output schema.
 
+## Injection-Recovery Validation
+
+ROBERT includes a multi-gas HAT-P-32b-like injection-recovery case:
+
+```bash
+python examples/validate_hat_p_32b_injection_recovery.py \
+  --method optimal_estimation
+```
+
+The case uses H2O, CO2, and NH3 correlated-k tables, explicit synthetic
+wavelength-bin edges, seeded Gaussian noise, and the same exo_k plus emission
+RT path used by retrievals. The output report records injected and recovered
+parameters, absolute tolerances, posterior-standard-deviation errors, reduced
+chi-square bounds, opacity identifiers, the retrieval config hash, and whether
+inference converged. Passing requires all parameter tolerances, the fit-quality
+criterion, and inference convergence simultaneously.
+
+For a sampler validation run:
+
+```bash
+python examples/validate_hat_p_32b_injection_recovery.py \
+  --method ultranest \
+  --live-points 200 \
+  --max-ncalls 20000 \
+  --dlogz 0.5
+```
+
+ROBERT sanitizes non-finite source coefficients using the explicitly configured
+runtime floor, then delegates zero-coefficient replacement to
+`exo_k.Ktable.remove_zeros` before correlated-k recompression. Replacement
+counts and the resulting zero floor are recorded in table metadata.
+
+## Python Retrieval-Run Configuration
+
+`RetrievalRunConfig` binds an observation, prepared model, ordered priors,
+likelihood, output directory and either `OptimalEstimationRunConfig` or
+`UltraNestRunConfig`. `run_configured_retrieval` builds the problem, writes its
+manifest, runs inference and writes stable results.
+
+The FastChem/Madhusudhan-Seager comparison lives in
+`examples/hat_p_32b_fastchem_config.py`. It retrieves `metallicity` (`[M/H]`,
+dex), `CtoO`, and the Madhu parameters `P1`, `P2`, `P3`, `T0`, `alpha1`, and
+`alpha2`.
+
+Inspect the saved reference MAP without running inference:
+
+```bash
+python examples/compare_hat_p_32b_fastchem_retrieval.py
+```
+
+Run a short diagnostic retrieval:
+
+```bash
+python examples/compare_hat_p_32b_fastchem_retrieval.py \
+  --method optimal_estimation --run-retrieval
+```
+
+Run the configured production sampler, preferably under MPI:
+
+```bash
+mpiexec -n 3 python examples/compare_hat_p_32b_fastchem_retrieval.py \
+  --method ultranest --run-retrieval \
+  --live-points 400 --max-ncalls 100000 --dlogz 0.5
+```
+
+Before matching CIA and layering, ROBERT obtained chi-square `145.15` and a
+`25.0 ppm` RMS difference from the saved reference MAP spectrum. ROBERT now
+vendors the NemesisPy v1.0.1 CIA table and uses the same 100 logarithmic
+pressure points from `100` to `1e-6 bar`. It also exposes the
+NemesisPy-compatible pressure/temperature boundary-clipping policy explicitly
+while retaining strict coverage as the default. The reference-MAP comparison
+therefore improves to chi-square `140.82` and `18.79 ppm` RMS; the external run
+reports MAP chi-square `134.37`.
+
+Pressure-grid settings are ordinary Python arguments, making layer-count
+speed/accuracy studies possible without changing RT code:
+
+```python
+config = make_model_config(
+    pressure_top_bar=1.0e-6,
+    pressure_bottom_bar=100.0,
+    n_layers=100,
+)
+```
+
+Generate spectrum/residual, P–T, VMR, and parameter comparison plots with:
+
+```bash
+python examples/plot_hat_p_32b_fastchem_comparison.py \
+  --robert-result-dir examples/outputs/hat_p_32b_fastchem_comparison/optimal_estimation
+```
+
 ## Next Development Steps
 
-1. Add posterior/corner plotting from UltraNest weighted samples.
-2. Add multi-observation likelihood support for multiple JWST modes.
-3. Move the RT template's HAT-P-32b model setup into a reusable package helper.
-4. Add checkpoint manifests with git commit, opacity files, priors, sampler
-   settings, and MPI size.
-5. Add proper covariance/offset/jitter calibration parameter blocks.
+1. Run a fully converged high-live-point UltraNest comparison on HPC.
+2. Benchmark layer-count speed and spectral/retrieval accuracy.
+3. Add multi-observation likelihood support for multiple JWST modes.
+4. Add resumable checkpoint status to the existing run manifest contract.
+5. Add proper covariance and multi-instrument calibration parameter blocks.

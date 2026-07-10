@@ -8,6 +8,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
+from robert_exoplanets.core._immutability import immutable_mapping
+
 from robert_exoplanets.atmosphere import (
     AtmosphereBuilder,
     BackgroundGasMixture,
@@ -43,7 +45,7 @@ class AtmosphereModelSetup:
         if any(not np.isfinite(value) for value in parameters.values()):
             raise RobertConfigError("default_parameters must contain only finite numeric values")
         object.__setattr__(self, "default_parameters", parameters)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def build_atmosphere_builder(self) -> AtmosphereBuilder:
         """Return an `AtmosphereBuilder` for this setup."""

@@ -1,0 +1,51 @@
+{
+  "model_name": "quench_study_emission",
+  "timestamp_utc": "2025-10-10T20:40:17Z",
+  "n_params": 8,
+  "n_samples": 1030,
+  "display_transform": {
+    "type": "log10",
+    "mask": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "labels": [
+    "metallicity",
+    "CtoO",
+    "P1",
+    "P2",
+    "P3",
+    "T0",
+    "alpha1",
+    "alpha2"
+  ],
+  "names": [
+    "metallicity",
+    "CtoO",
+    "P1",
+    "P2",
+    "P3",
+    "T0",
+    "alpha1",
+    "alpha2"
+  ],
+  "scales": [
+    "linear",
+    "linear",
+    "linear",
+    "linear",
+    "linear",
+    "linear",
+    "linear",
+    "linear"
+  ],
+  "map_index": 834,
+  "truth_type": "median"
+}

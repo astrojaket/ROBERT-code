@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError, SpectralGrid
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import spectral_grid_values_in_unit
 
 from .geometry import DiscGeometry
@@ -37,7 +38,7 @@ class DirectStellarBeam:
         if not self.unit:
             raise RobertValidationError("direct stellar beam unit must not be empty")
         object.__setattr__(self, "values", values)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @classmethod
     def blackbody(
@@ -87,7 +88,10 @@ class DirectStellarBeam:
             raise RobertValidationError("direct stellar beam cannot be interpolated from one point")
         if not np.all(np.diff(source_wavelength) > 0.0):
             raise RobertValidationError("direct stellar beam spectral grid must be increasing for interpolation")
-        if target_wavelength[0] < source_wavelength[0] or target_wavelength[-1] > source_wavelength[-1]:
+        if (
+            float(np.min(target_wavelength)) < source_wavelength[0]
+            or float(np.max(target_wavelength)) > source_wavelength[-1]
+        ):
             raise RobertValidationError("direct stellar beam does not cover the requested spectral grid")
         values = np.interp(target_wavelength, source_wavelength, self.values)
         values.setflags(write=False)
@@ -110,7 +114,7 @@ class SingleScatteringSource:
         if not self.name:
             raise RobertValidationError("single-scattering source name must not be empty")
         object.__setattr__(self, "phase_function", phase_function)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def phase_function_values(self, geometry: DiscGeometry) -> NDArray[np.float64]:
         """Return normalized phase-function values for every geometry point."""

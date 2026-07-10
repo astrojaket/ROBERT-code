@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class OpacityComparisonResult:
         object.__setattr__(self, "shape", tuple(int(item) for item in self.shape))
         object.__setattr__(self, "axis_names", tuple(str(item) for item in self.axis_names))
         object.__setattr__(self, "worst_index", tuple(int(item) for item in self.worst_index))
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def to_mapping(self) -> dict[str, object]:
         """Return JSON-serializable benchmark summary."""

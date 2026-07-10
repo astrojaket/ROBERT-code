@@ -16,6 +16,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import PressureGrid, RobertCoverageError, RobertValidationError, SpectralGrid
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 class OpacityMode(str, Enum):
@@ -109,7 +110,7 @@ class SpectralCoverage:
             raise RobertValidationError("spectral coverage resolving_power must be positive")
         object.__setattr__(self, "min_value", min_value)
         object.__setattr__(self, "max_value", max_value)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def contains(self, spectral_grid: SpectralGrid) -> bool:
         """Return whether `spectral_grid` lies inside this interval."""
@@ -182,7 +183,7 @@ class GridCoverage:
         object.__setattr__(self, "pressure_max", pressure_max)
         object.__setattr__(self, "temperature_min", temperature_min)
         object.__setattr__(self, "temperature_max", temperature_max)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def has_pressure(self) -> bool:
@@ -292,7 +293,7 @@ class OpacityDataProduct:
         object.__setattr__(self, "storage_format", storage_format)
         object.__setattr__(self, "cia_pair", cia_pair)
         object.__setattr__(self, "native_shape", native_shape)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def product_id(self) -> str:
@@ -400,7 +401,7 @@ class OpacityCoverageReport:
         object.__setattr__(self, "requested_species", tuple(self.requested_species))
         object.__setattr__(self, "covered_species", tuple(self.covered_species))
         object.__setattr__(self, "missing_species", tuple(self.missing_species))
-        object.__setattr__(self, "reasons", dict(self.reasons))
+        object.__setattr__(self, "reasons", immutable_mapping(self.reasons))
         object.__setattr__(self, "product_ids", tuple(self.product_ids))
 
 
@@ -419,7 +420,7 @@ class OpacityDatabase:
         if not self.name:
             raise RobertValidationError("opacity database name must not be empty")
         object.__setattr__(self, "products", tuple(self.products))
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def species(self) -> tuple[str, ...]:

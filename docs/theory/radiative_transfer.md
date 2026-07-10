@@ -25,6 +25,83 @@ atmosphere, chemistry, opacity, and later cloud, aerosol, and
 scattering-source-function implementations. The current two-stream closure is a
 benchmark hook, not the final cloud-scattering science solver.
 
+## Reusable Retrieval Forward Model
+
+`ClearSkyEmissionForwardModel` is the package-level orchestration layer for the
+validated clear-sky retrieval path. It consumes typed `Planet`, `Star`,
+`PressureGrid`, `SpectralGrid`, `CorrelatedKOpacityProvider`, and
+`ClearSkyEmissionModelConfig` objects. It owns:
+
+- validation and caching of prepared opacity outside likelihood calls,
+- constant-with-altitude log10 VMR parameter mapping for arbitrary trace gases,
+- explicit H2/He background fill and mean molecular weight,
+- optional uniform temperature offset and radius scale parameters,
+- gas optical-depth assembly, Rayleigh selection, geometry, and emission RT,
+- required-parameter declaration, opacity identifiers, and manifest metadata.
+
+Direct construction remains available for tests and specialist workflows, but
+normal user code should use the typed Python factory configuration. This keeps
+the entire target definition in a familiar importable `.py` file while the
+factory performs one-time opacity loading, pressure-grid construction,
+temperature evaluation, `exo_k` binning, and model preparation:
+
+```python
+from pathlib import Path
+
+from robert_exoplanets import (
+    ClearSkyEmissionFactoryConfig,
+    ClearSkyEmissionModelConfig,
+    ExoKOpacitySource,
+    ExoKTableBinning,
+    TabulatedTemperatureProfile,
+    build_clear_sky_emission_model,
+)
+
+config = ClearSkyEmissionFactoryConfig(
+    planet=planet,
+    star=star,
+    temperature_profile=TabulatedTemperatureProfile.from_csv("target_pt.csv"),
+    opacity_source=ExoKOpacitySource(
+        species=("H2O", "CO2", "NH3"),
+        directory=Path("opacity"),
+        filename_pattern="*_R1000.kta",
+    ),
+    opacity_binning=ExoKTableBinning(num=300),
+    model=ClearSkyEmissionModelConfig(
+        opacity_species=("H2O", "CO2", "NH3"),
+        log_vmr_parameters={
+            "H2O": "log_h2o",
+            "CO2": "log_co2",
+            "NH3": "log_nh3",
+        },
+        gas_combination="random_overlap",
+    ),
+)
+
+model = build_clear_sky_emission_model(
+    config,
+    spectral_grid=observation.spectral_grid,
+)
+```
+
+`ExoKOpacitySource(paths={...})` accepts explicitly selected KTA or HDF5 tables
+supported by `exo_k`; directory discovery is the convenient KTA path. Set an
+explicit `pressure_grid` when it should differ from the opacity table centers,
+and set `opacity_binning=None` only for a provider already prepared on the
+observation grid.
+
+The factory is intentionally Python-first. YAML or TOML can be added later as
+an input adapter without changing this validated typed boundary. The model does
+not discover files or resample opacity during evaluation. Manifest metadata
+includes the Python configuration interface, opacity source and binning
+choices, temperature parameterization, physical constants, parameter mappings,
+prepared opacity identity, and hashes of the pressure, spectral, and base
+temperature grids.
+
+The validated complete target example is
+`examples/hat_p_32b_config.py`; copy it as the starting point for another
+planet rather than copying the retrieval implementation.
+
 ## Current Scope
 
 `assemble_gas_optical_depth` consumes:
@@ -82,6 +159,12 @@ The solver can also consume additional layer optical depths, such as H2-H2/H2-He
 CIA and H2/He Rayleigh scattering extinction. Its metadata records whether
 scattering is absent or treated as extinction-only, so later scattering-capable
 solvers can be distinguished from this reference path.
+
+`load_nemesispy_cia_table()` loads the vendored NemesisPy v1.0.1
+`exocia_hitran12_200-3800K.tab` reference asset. ROBERT records its upstream
+commit, SHA-256 checksum, BSD-3-Clause license, hydrogen spin-state choice, and
+interpolation policies in retrieval provenance. Parameterized emission models
+can attach this table once at construction and evaluate CIA for each atmosphere.
 
 Cloud/aerosol opacity can enter in two equivalent ways:
 

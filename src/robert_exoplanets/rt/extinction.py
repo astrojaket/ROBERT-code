@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from importlib.resources import as_file, files
 from pathlib import Path
 import struct
 from typing import Mapping
@@ -10,7 +11,13 @@ from typing import Mapping
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from robert_exoplanets.core import PressureGrid, RobertValidationError, SpectralGrid
+from robert_exoplanets.core import (
+    PressureGrid,
+    RobertCoverageError,
+    RobertValidationError,
+    SpectralGrid,
+)
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 
 from .optical_depth import GasOpticalDepth
@@ -58,7 +65,7 @@ class LayerOpticalDepth:
         if np.any(tau < 0.0):
             raise RobertValidationError("layer optical depth must be non-negative")
         object.__setattr__(self, "tau", tau)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def cumulative_tau_from_top(self) -> NDArray[np.float64]:
         """Return cumulative optical depth from the top of the atmosphere."""
@@ -103,7 +110,7 @@ class CiaTable:
         object.__setattr__(self, "temperature_K", temperature)
         object.__setattr__(self, "k_cia", k_cia)
         object.__setattr__(self, "pair_order", tuple(self.pair_order))
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def n_pairs(self) -> int:
@@ -153,11 +160,34 @@ def read_cia_table(
     raise RobertValidationError("could not read CIA table")
 
 
+def load_nemesispy_cia_table() -> CiaTable:
+    """Load ROBERT's vendored NemesisPy v1.0.1 CIA reference table."""
+
+    resource = files("robert_exoplanets").joinpath(
+        "data/cia/exocia_hitran12_200-3800K.tab"
+    )
+    with as_file(resource) as path:
+        table = read_cia_table(path)
+    return replace(
+        table,
+        metadata={
+            **dict(table.metadata),
+            "source_project": "NEMESISPY",
+            "source_tag": "v1.0.1",
+            "source_commit": "a883805fcd402eab341308f39715670b0ae74cb8",
+            "checksum_sha256": "5b519f02f98b205f20628ee5ec7f2829528d0bd356b449c4221ba8b2ef86ea0e",
+            "license": "BSD-3-Clause",
+        },
+    )
+
+
 def cia_optical_depth(
     gas_optical_depth: GasOpticalDepth,
     cia_table: CiaTable,
     *,
     normal_hydrogen: bool = True,
+    temperature_extrapolation: str = "raise",
+    spectral_extrapolation: str = "raise",
     name: str = "H2-H2/H2-He CIA",
 ) -> LayerOpticalDepth:
     """Compute CIA optical depth using a uniform-layer path estimate.
@@ -167,6 +197,11 @@ def cia_optical_depth(
     density at the layer pressure and temperature. The approximation is
     recorded in metadata.
     """
+
+    if temperature_extrapolation not in {"raise", "clip"}:
+        raise RobertValidationError("temperature_extrapolation must be 'raise' or 'clip'")
+    if spectral_extrapolation not in {"raise", "zero"}:
+        raise RobertValidationError("spectral_extrapolation must be 'raise' or 'zero'")
 
     atmosphere = gas_optical_depth.atmosphere
     wavenumber = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "cm^-1")
@@ -210,6 +245,8 @@ def cia_optical_depth(
             cia_table,
             temperature[layer_index],
             wavenumber,
+            temperature_extrapolation=temperature_extrapolation,
+            spectral_extrapolation=spectral_extrapolation,
         )
         layer_coeff = np.zeros_like(wavenumber)
         for pair_index, mixing_factor in pair_terms:
@@ -238,6 +275,8 @@ def cia_optical_depth(
             "source_path": str(cia_table.metadata.get("source_path", "")),
             "path_model": "uniform_layer_ideal_gas_from_hydrostatic_column",
             "hydrogen_spin_state": "normal" if normal_hydrogen else "equilibrium",
+            "temperature_extrapolation": temperature_extrapolation,
+            "spectral_extrapolation": spectral_extrapolation,
             "active_pairs": ",".join(sorted(set(active_pairs))),
         },
     )
@@ -376,10 +415,18 @@ def _interpolate_cia_coefficients(
     table: CiaTable,
     temperature_k: float,
     wavenumber_cm_inverse: NDArray[np.float64],
+    *,
+    temperature_extrapolation: str,
+    spectral_extrapolation: str,
 ) -> NDArray[np.float64]:
     temperature = float(temperature_k)
     if not np.isfinite(temperature) or temperature <= 0.0:
         raise RobertValidationError("CIA interpolation temperature must be finite and positive")
+    if temperature < table.temperature_K[0] or temperature > table.temperature_K[-1]:
+        if temperature_extrapolation == "raise":
+            raise RobertCoverageError(
+                "atmosphere temperature is outside the CIA table temperature grid"
+            )
     if temperature <= table.temperature_K[0]:
         native = table.k_cia[:, 0, :]
     elif temperature >= table.temperature_K[-1]:
@@ -392,6 +439,13 @@ def _interpolate_cia_coefficients(
         )
         native = (1.0 - fraction) * table.k_cia[:, lower, :] + fraction * table.k_cia[:, upper, :]
 
+    requested_min = float(np.min(wavenumber_cm_inverse))
+    requested_max = float(np.max(wavenumber_cm_inverse))
+    if (
+        requested_min < float(table.wavenumber_cm_inverse[0])
+        or requested_max > float(table.wavenumber_cm_inverse[-1])
+    ) and spectral_extrapolation == "raise":
+        raise RobertCoverageError("requested spectrum is outside the CIA table wavenumber grid")
     coefficients = np.vstack(
         [
             np.interp(

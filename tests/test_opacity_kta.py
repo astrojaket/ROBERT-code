@@ -7,8 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core import RobertValidationError, SpectralGrid
 from robert_exoplanets.opacity import (
+    CorrelatedKOpacityProvider,
     OpacityDataSource,
     OpacityStorageFormat,
     convert_kta_to_robert_archive,
@@ -123,10 +124,109 @@ def test_convert_kta_to_robert_archive_preserves_floor_policy_metadata(tmp_path:
     np.testing.assert_allclose(loaded.arrays["kcoeff"], expected)
 
 
+def test_exok_bins_correlated_k_distributions_to_observation_bins(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NUMBA_CACHE_DIR", str(tmp_path / "numba-cache"))
+    pytest.importorskip("exo_k")
+    path, _expected = _write_synthetic_kta(tmp_path / "H2O_exok_test.kta")
+    provider = CorrelatedKOpacityProvider.from_kta_paths({"H2O": path})
+    wavenumber_centres = np.array([3500.0, 2500.0, 1500.0])
+    wavenumber_edges = np.array([4000.0, 3000.0, 2000.0, 1000.0])
+    target = SpectralGrid(
+        values=10000.0 / wavenumber_centres,
+        bin_edges=10000.0 / wavenumber_edges,
+        unit="micron",
+        role="observed",
+    )
+
+    binned = provider.bin_to_spectral_grid(target, num=50)
+    table = binned.tables["H2O"]
+
+    assert table.kcoeff.shape == (2, 3, 3, 2)
+    np.testing.assert_allclose(table.wavenumber_cm_inverse, wavenumber_centres)
+    assert table.metadata["spectral_preparation"] == "exo_k_bin_down"
+
+
+def test_exok_replaces_zero_coefficients_before_correlated_k_binning(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NUMBA_CACHE_DIR", str(tmp_path / "numba-cache"))
+    pytest.importorskip("exo_k")
+    path, _expected = _write_synthetic_kta(
+        tmp_path / "CO_exok_zero_test.kta",
+        zero_index=(0, 0, 1, 0),
+    )
+    provider = CorrelatedKOpacityProvider.from_kta_paths({"CO": path})
+    target = SpectralGrid(
+        values=10000.0 / np.array([3500.0, 2500.0, 1500.0]),
+        bin_edges=10000.0 / np.array([4000.0, 3000.0, 2000.0, 1000.0]),
+        unit="micron",
+        role="observed",
+    )
+
+    table = provider.bin_to_spectral_grid(target).tables["CO"]
+
+    assert np.all(np.isfinite(table.kcoeff))
+    assert np.all(table.kcoeff > 0.0)
+    assert table.metadata["exo_k_remove_zeros"] == "true"
+    assert table.metadata["exo_k_zeros_replaced"] == "1"
+    assert float(table.metadata["exo_k_zero_floor"]) > 0.0
+
+
+def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(tmp_path: Path) -> None:
+    _write_synthetic_kta(tmp_path / "TiO_custom_resolution.kta")
+    _write_synthetic_kta(tmp_path / "VO_custom_resolution.kta")
+
+    provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+        tmp_path,
+        species=("TiO", "VO"),
+    )
+
+    assert provider.species == ("TiO", "VO")
+    assert provider.tables["TiO"].metadata["source_path"].endswith("TiO_custom_resolution.kta")
+
+
+def test_provider_requires_explicit_selection_for_duplicate_species_files(tmp_path: Path) -> None:
+    _write_synthetic_kta(tmp_path / "H2O_R100.kta")
+    _write_synthetic_kta(tmp_path / "H2O_R1000.kta")
+
+    with pytest.raises(RobertValidationError, match="explicit selection"):
+        CorrelatedKOpacityProvider.from_exomol_kta_directory(tmp_path)
+
+
+def test_provider_loads_and_bins_exomol_hdf5_through_exok(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NUMBA_CACHE_DIR", str(tmp_path / "numba-cache"))
+    exok = pytest.importorskip("exo_k")
+    kta_path, _expected = _write_synthetic_kta(tmp_path / "TiO_source.kta")
+    hdf5_path = tmp_path / "TiO_exomol.h5"
+    native = exok.Ktable(filename=str(kta_path), mol="TiO", remove_zeros=False)
+    native.write_hdf5(filename=str(hdf5_path), exomol_units=True)
+
+    provider = CorrelatedKOpacityProvider.from_exok_paths({"TiO": hdf5_path})
+    target = SpectralGrid(
+        values=10000.0 / np.array([3500.0, 2500.0, 1500.0]),
+        bin_edges=10000.0 / np.array([4000.0, 3000.0, 2000.0, 1000.0]),
+        unit="micron",
+        role="observed",
+    )
+    binned = provider.bin_to_spectral_grid(target)
+
+    assert provider.tables["TiO"].metadata["source_format"] == "exo_k:h5"
+    assert binned.tables["TiO"].kcoeff.shape == (2, 3, 3, 2)
+    assert np.all(np.isfinite(binned.tables["TiO"].kcoeff))
+
+
 def _write_synthetic_kta(
     path: Path,
     *,
     nonfinite_index: tuple[int, int, int, int] | None = None,
+    zero_index: tuple[int, int, int, int] | None = None,
 ) -> tuple[Path, np.ndarray]:
     pressure = np.array([1.0e-5, 1.0], dtype=np.float32)
     temperature = np.array([500.0, 1000.0, 1500.0], dtype=np.float32)
@@ -144,6 +244,8 @@ def _write_synthetic_kta(
     )
     if nonfinite_index is not None:
         kcoeff[nonfinite_index] = np.nan
+    if zero_index is not None:
+        kcoeff[zero_index] = 0.0
 
     n_pressure, n_temperature, n_wavelength, n_g = kcoeff.shape
     irec0 = 11 + 2 * n_g + 2 + n_pressure + n_temperature + n_wavelength

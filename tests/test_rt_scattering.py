@@ -44,6 +44,14 @@ def test_direct_stellar_beam_blackbody_uses_finite_solid_angle() -> None:
     assert float(beam.metadata["stellar_solid_angle_sr"]) > 0.0
 
 
+def test_direct_stellar_beam_accepts_covered_descending_targets() -> None:
+    source = SpectralGrid.from_array([1.0, 2.0, 3.0], unit="micron")
+    target = SpectralGrid.from_array([2.5, 1.5], unit="micron")
+    beam = DirectStellarBeam(source, [10.0, 20.0, 30.0])
+
+    np.testing.assert_allclose(beam.values_on(target), [25.0, 15.0])
+
+
 def test_single_scattering_source_matches_one_layer_reference_solution() -> None:
     spectral_grid = SpectralGrid.from_array([1.0], unit="micron", role="opacity")
     gas_tau = _gas_tau(spectral_grid)

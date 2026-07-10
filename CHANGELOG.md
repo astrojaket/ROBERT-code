@@ -2,6 +2,46 @@
 
 ## v0.3.0 - Minimal Forward Model Foundation
 
+- Added sampler-independent retrieval problems, typed priors, coordinate-aware
+  Gaussian likelihood evaluation, optimal estimation, and an optional
+  UltraNest adapter.
+- Added accuracy-preserving correlated-k spectral binning through `exo_k` using
+  explicit observation bin edges; individual k coefficients are not
+  wavelength-interpolated.
+- Delegated zero-coefficient replacement to `exo_k.Ktable.remove_zeros` before
+  binning, with replacement provenance, and added path-independent discovery
+  of arbitrary molecular ExoMol/exo_k KTA products.
+- Added pre-inference run manifests and stable JSON/NPZ retrieval results with
+  configuration hashes, opacity identifiers, runtime provenance, and seeds.
+- Hardened immutable data containers, pressure/spectral grid invariants,
+  opacity archive manifest integrity, and explicit CIA extrapolation policy.
+- Added deterministic injection-recovery validation contracts and a multi-gas
+  HAT-P-32b-like H2O/CO2/NH3 RT case with explicit synthetic bins, seeded
+  noise, convergence gating, recovery tolerances, and versioned reports.
+- Promoted the validated retrieval physics into a reusable typed
+  `ClearSkyEmissionForwardModel`; HAT-P-32b scripts now only assemble target
+  inputs, opacity, priors, and outputs around the public package model.
+- Added a Python-first `ClearSkyEmissionFactoryConfig`, typed ExoMol/exo_k
+  opacity-source and binning configuration, opacity-derived pressure grids,
+  factory provenance, and a standalone HAT-P-32b target configuration.
+- Added Python-first complete retrieval-run configuration for optimal
+  estimation and UltraNest, runtime temperature/chemistry emission models, a
+  retrieval-tested FastChem adapter, and an eight-parameter HAT-P-32b
+  FastChem/Madhusudhan-Seager comparison configuration.
+- Added invalid-physics backtracking to diagnostic optimal estimation so trial
+  P–T states outside opacity coverage do not crash a configured retrieval.
+- Vendored the NemesisPy v1.0.1 CIA reference table with BSD-3-Clause license,
+  commit and checksum provenance; integrated CIA into parameterized retrievals.
+- Added endpoint-inclusive configurable pressure grids, explicit
+  NemesisPy-compatible opacity-boundary clipping, MPI-safe result writing, a
+  finite UltraNest invalid-model floor, and four comparison plot products.
+- Bundled the complete HAT-P-32b reference case for clone-local execution:
+  saved NemesisPy products, six exo_k-binned opacity archives, FastChem input
+  data and license, checksums, and reproducible generation provenance.
+- Added a pinned cross-platform Conda environment, complete package extra,
+  fresh-environment validation, and a configurable Slurm/UltraNest batch
+  script with MPI launch guidance.
+
 - Added atmospheric state, isothermal temperature, constant chemistry, and
   atmosphere-builder components.
 - Added a zero-opacity fixture provider for pipeline wiring only.

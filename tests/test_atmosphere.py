@@ -86,7 +86,7 @@ def test_tabulated_temperature_profile_rejects_out_of_range_grid() -> None:
 def test_tabulated_temperature_profile_can_clip_out_of_range_grid() -> None:
     grid = PressureGrid(
         edges=[0.25, 0.75, 2.0, 20.0, 30.0],
-        centers=[0.5, 1.0, 10.0, 20.0],
+        centers=[0.5, 1.0, 10.0, 25.0],
     )
     profile = TabulatedTemperatureProfile(
         pressure=np.array([1.0, 10.0]),

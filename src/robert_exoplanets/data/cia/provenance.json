@@ -1,0 +1,11 @@
+{
+  "asset": "exocia_hitran12_200-3800K.tab",
+  "source_project": "NEMESISPY",
+  "source_repository": "https://github.com/Jingxuan97/nemesispy",
+  "source_tag": "v1.0.1",
+  "source_commit": "a883805fcd402eab341308f39715670b0ae74cb8",
+  "source_path": "nemesispy/data/cia/exocia_hitran12_200-3800K.tab",
+  "sha256": "5b519f02f98b205f20628ee5ec7f2829528d0bd356b449c4221ba8b2ef86ea0e",
+  "license": "BSD-3-Clause",
+  "retrieved_utc": "2026-07-10"
+}

@@ -10,6 +10,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit
 
 BOLTZMANN_CONSTANT_J_K = 1.380649e-23
@@ -65,7 +66,7 @@ class HydrostaticPathGeometry:
         object.__setattr__(self, "scale_height_m", scale_height)
         object.__setattr__(self, "edge_radius_m", edge_radius)
         object.__setattr__(self, "center_radius_m", center_radius)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def top_radius_m(self) -> float:

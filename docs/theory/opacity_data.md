@@ -42,6 +42,16 @@ The current opacity implementation is metadata and coverage scaffolding. It can:
 - evaluate correlated-k coefficients with optional log-pressure, linear
   temperature, log-k interpolation while keeping spectral points on the native
   opacity grid,
+- optionally clamp pressure and temperature to the nearest native boundary with
+  the explicit `log_pressure_temperature_log_k_clip` comparison policy,
+- bin KTA-backed correlated-k distributions onto explicit observation bins
+  with `exo_k.Ktable.bin_down_cp`, preserving correlated-k recompression rather
+  than wavelength-interpolating individual coefficients,
+- discover arbitrary molecular KTA products in an ExoMol/exo_k directory with
+  `CorrelatedKOpacityProvider.from_exomol_kta_directory`, while requiring an
+  explicit path when multiple resolutions or isotopologues map to one species,
+- load other precomputed correlated-k formats supported by exo_k, including
+  ExoMol HDF5 products, with `CorrelatedKOpacityProvider.from_exok_paths`,
 - run a local HAT-P-32b opacity benchmark that checks exact evaluator slices
   against native `.kta` values, records non-finite k-coefficient locations, and
   plots wavelength and pressure-temperature opacity diagnostics with the same
@@ -52,8 +62,26 @@ The current opacity implementation is metadata and coverage scaffolding. It can:
 - read a ROBERT `.npz` archive manifest without loading large arrays,
 - validate whether an atmosphere request is covered by known metadata.
 
-It does not yet interpolate or rebin k-tables onto arbitrary off-grid spectral
-grids, evaluate CIA coefficients, or perform radiative transfer.
+It does not invent an independent wavelength interpolator for correlated-k
+tables. Off-grid preparation requires explicit bin edges and the optional
+`exo_k` dependency. CIA evaluation and radiative transfer are implemented as
+separate RT-layer components with explicit coverage policies.
+
+Strict pressure/temperature coverage remains the default. The clipping policy
+exists to reproduce NemesisPy's documented implementation behavior at table
+boundaries and is included in prepared-opacity cache identity and provenance.
+
+Incomplete precomputed molecular tables may contain NaN/Inf values or exact
+zeros where absorption was unavailable. ROBERT applies the caller-selected
+non-finite policy first. During spectral preparation it then uses
+`exo_k.Ktable.remove_zeros` before `bin_down_cp`, allowing exo_k to choose its
+standard small positive zero replacement. Both replacement counts and floor
+values are retained in provenance metadata.
+
+The loaders read precomputed ExoMol/ExoMolOP correlated-k products for any
+molecule; they are not raw ExoMol line-list calculators. Raw `.states`/`.trans`
+line lists must first be converted to cross sections or k-tables by a dedicated
+line-opacity tool or supported exo_k workflow.
 
 ## Native ROBERT Archive Candidates
 
@@ -107,7 +135,7 @@ The next opacity increments should be:
 - ROBERT native archive conversion from validated external opacity inputs,
 - prepared-opacity cache keys that include checksums, coverage, quadrature, and
   source-table identity,
-- validated spectral-grid resampling/rebinning policy for correlated-k tables,
+- broader validation of `exo_k` binning settings against trusted spectra,
 - opacity benchmark reports that compare absorption or k-coefficients as a
   function of wavelength, pressure, and temperature,
 - NumPy reference kernels for optical-depth assembly before any compiled

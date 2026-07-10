@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -96,6 +97,50 @@ def test_robert_npz_archive_round_trips_compact_exchange_file(tmp_path: Path) ->
     loaded = load_robert_npz_archive(archive_path)
     np.testing.assert_allclose(loaded.arrays["opacity"], arrays["opacity"])
     assert loaded.metadata["purpose"] == "exchange"
+
+
+def test_robert_directory_rejects_unsafe_manifest_filename(tmp_path: Path) -> None:
+    archive_path = tmp_path / "archive"
+    write_robert_npy_directory(
+        archive_path,
+        database=_tiny_database(),
+        arrays={"opacity": np.ones((2, 2))},
+    )
+    manifest_path = archive_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["arrays"]["opacity"]["filename"] = "../outside.npy"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(RobertDataError, match="invalid filename"):
+        load_robert_npy_directory(archive_path)
+
+
+def test_robert_directory_rejects_array_shape_not_matching_manifest(tmp_path: Path) -> None:
+    archive_path = tmp_path / "archive"
+    write_robert_npy_directory(
+        archive_path,
+        database=_tiny_database(),
+        arrays={"opacity": np.ones((2, 2))},
+    )
+    np.save(archive_path / "opacity.npy", np.ones((4,)), allow_pickle=False)
+
+    with pytest.raises(RobertDataError, match="does not match manifest"):
+        load_robert_npy_directory(archive_path)
+
+
+def test_loaded_archive_arrays_and_mappings_are_immutable(tmp_path: Path) -> None:
+    archive_path = tmp_path / "archive"
+    write_robert_npy_directory(
+        archive_path,
+        database=_tiny_database(),
+        arrays={"opacity": np.ones((2, 2))},
+    )
+
+    loaded = load_robert_npy_directory(archive_path)
+
+    assert loaded.arrays["opacity"].flags.writeable is False
+    with pytest.raises(TypeError):
+        loaded.arrays["other"] = np.ones(1)
 
 
 def _tiny_database() -> OpacityDatabase:

@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import PressureGrid, RobertValidationError, SpectralGrid
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 
 from .extinction import LayerOpticalDepth
@@ -61,7 +62,7 @@ class CloudOpticalProperties:
         object.__setattr__(self, "extinction_tau", extinction_tau)
         object.__setattr__(self, "single_scattering_albedo", single_scattering_albedo)
         object.__setattr__(self, "asymmetry_factor", asymmetry_factor)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def absorption_tau(self) -> NDArray[np.float64]:

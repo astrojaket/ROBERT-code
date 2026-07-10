@@ -16,6 +16,7 @@ from .extinction import (
     CiaTable,
     LayerOpticalDepth,
     cia_optical_depth,
+    load_nemesispy_cia_table,
     rayleigh_scattering_optical_depth,
     read_cia_table,
 )
@@ -75,6 +76,7 @@ __all__ = [
     "load_cloud_optical_properties_csv",
     "load_cloud_optical_properties_npz",
     "load_picaso_cloud_optical_properties",
+    "load_nemesispy_cia_table",
     "lobatto_phase_geometry",
     "normal_emission_geometry",
     "grey_cloud_deck",

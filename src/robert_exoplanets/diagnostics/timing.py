@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core._immutability import immutable_mapping
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,7 @@ class TimingResult:
         durations.setflags(write=False)
         object.__setattr__(self, "durations_s", durations)
         object.__setattr__(self, "warmups", warmups)
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def repeats(self) -> int:

@@ -9,137 +9,64 @@ import tempfile
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib"))
+os.environ.setdefault("NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "robert-numba-cache"))
 
 import matplotlib
 
-matplotlib.use("Agg")
+if __name__ == "__main__":
+    matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from robert_exoplanets import (
-    AtmosphereState,
-    CorrelatedKOpacityProvider,
-    PressureGrid,
+    ClearSkyEmissionForwardModel,
     RetrievalParameter,
     RetrievalParameterSet,
     RetrievalProblem,
-    SpectralGrid,
-    TabulatedTemperatureProfile,
     UniformPrior,
-    assemble_gas_optical_depth,
-    gauss_legendre_disk_geometry,
+    build_clear_sky_emission_model,
     load_emission_observation_npz,
-    rayleigh_scattering_optical_depth,
     run_retrieval,
-    solve_clear_sky_emission,
 )
 
-DEFAULT_OBSERVATION_NPZ = (
-    Path.home()
-    / "Dropbox"
-    / "PostDoc4"
-    / "Emission_Example"
-    / "Retrieval_Results"
-    / "HAT-P-32b"
-    / "quench_study_emission_G395H_spectra_band.npz"
-)
-DEFAULT_PT_CSV = (
-    Path.home()
-    / "Dropbox"
-    / "PostDoc4"
-    / "Emission_Example"
-    / "PTprofiles-Teq_1800-LogMet_0.0-LogDrag_0-Mstar_0.8-Rp_1.3-logG_1.8-TiOVO_false-daysideavg-w_mu_area.csv"
-)
-DEFAULT_KTA_DIR = Path.home() / "Dropbox" / "PostDoc4" / "Emission_Example" / "HAT-P-32b" / "kta_temp"
+if __package__:
+    from .hat_p_32b_config import (
+        DEFAULT_KTA_DIR,
+        DEFAULT_OBSERVATION_NPZ,
+        DEFAULT_PT_CSV,
+        make_hat_p_32b_model_config,
+    )
+else:
+    from hat_p_32b_config import (
+        DEFAULT_KTA_DIR,
+        DEFAULT_OBSERVATION_NPZ,
+        DEFAULT_PT_CSV,
+        make_hat_p_32b_model_config,
+    )
+
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "hat_p_32b_rt_retrieval"
 
-R_SUN_M = 6.957e8
-R_JUP_M = 7.1492e7
-M_JUP_KG = 1.898e27
-GRAVITATIONAL_CONSTANT = 6.67430e-11
-DEFAULT_PLANET_RADIUS_M = 1.98 * R_JUP_M
-DEFAULT_PLANET_MASS_KG = 0.68 * M_JUP_KG
-DEFAULT_STAR_RADIUS_M = 1.32 * R_SUN_M
-DEFAULT_STAR_TEMPERATURE_K = 6001.0
-DEFAULT_GRAVITY_M_S2 = GRAVITATIONAL_CONSTANT * DEFAULT_PLANET_MASS_KG / DEFAULT_PLANET_RADIUS_M**2
-RUNTIME_NONFINITE_FILL_VALUE = 1.0e-300
 
+def build_hat_p_32b_forward_model(
+    observation,
+    *,
+    pt_csv: Path,
+    kta_dir: Path,
+    include_rayleigh: bool = True,
+    exok_num: int = 300,
+    opacity_species: tuple[str, ...] = ("H2O",),
+) -> ClearSkyEmissionForwardModel:
+    """Assemble HAT-P-32b inputs around ROBERT's public emission model."""
 
-class HatP32bRtForwardModel:
-    """Callable RT forward model for early retrieval tests."""
-
-    def __init__(self, observation, *, pt_csv: Path, kta_dir: Path, include_rayleigh: bool = True) -> None:
-        self.observation = observation
-        self.include_rayleigh = include_rayleigh
-        self.provider = CorrelatedKOpacityProvider.from_kta_paths(
-            {"H2O": kta_dir / "H2O_emission_R1000.kta"},
-            interpolation="log_pressure_temperature_log_k",
-            nonfinite_policy="floor",
-            nonfinite_fill_value=RUNTIME_NONFINITE_FILL_VALUE,
-        )
-        table = self.provider.tables["H2O"]
-        self.pressure_grid = _pressure_grid_from_centers(table.pressure_bar)
-        self.spectral_grid = SpectralGrid.from_array(
-            table.wavelength_micron,
-            unit="micron",
-            role="opacity",
-            name="HAT-P-32b native k-table grid",
-        )
-        profile = TabulatedTemperatureProfile.from_csv(pt_csv, name="HAT-P-32b retrieval PT")
-        self.base_temperature = profile.evaluate({}, self.pressure_grid)
-        self.prepared_opacity = self.provider.prepare(self.spectral_grid, self.pressure_grid, species=("H2O",))
-        self.geometry = gauss_legendre_disk_geometry(4)
-
-    def __call__(self, parameters: dict[str, float]):
-        h2o = float(np.power(10.0, parameters["log_h2o"]))
-        background = max(1.0 - h2o, 1.0e-12)
-        composition = {
-            "H2O": np.full(self.pressure_grid.n_layers, h2o),
-            "H2": np.full(self.pressure_grid.n_layers, 0.84 * background),
-            "He": np.full(self.pressure_grid.n_layers, 0.16 * background),
-        }
-        atmosphere = AtmosphereState(
-            pressure_grid=self.pressure_grid,
-            temperature=self.base_temperature + float(parameters["temperature_offset"]),
-            composition=composition,
-            mean_molecular_weight=np.full(self.pressure_grid.n_layers, 2.3),
-        )
-        evaluated = self.provider.evaluate(atmosphere, self.prepared_opacity)
-        gas_tau = assemble_gas_optical_depth(
-            atmosphere,
-            evaluated,
-            gravity_m_s2=DEFAULT_GRAVITY_M_S2,
-            gas_combination="random_overlap",
-        )
-        additional_optical_depths = []
-        if self.include_rayleigh:
-            additional_optical_depths.append(rayleigh_scattering_optical_depth(gas_tau))
-        result = solve_clear_sky_emission(
-            gas_tau,
-            geometry=self.geometry,
-            additional_optical_depths=additional_optical_depths,
-            planet_radius_m=DEFAULT_PLANET_RADIUS_M * float(parameters["radius_scale"]),
-            star_radius_m=DEFAULT_STAR_RADIUS_M,
-            star_temperature_k=DEFAULT_STAR_TEMPERATURE_K,
-            thermal_integration_backend="auto",
-        )
-        if result.eclipse_depth is None:
-            raise RuntimeError("RT result did not include eclipse depth")
-        native_wavelength = np.array(result.eclipse_depth.spectral_grid.values, dtype=float, copy=True)
-        order = np.argsort(native_wavelength)
-        observed_values = np.interp(
-            self.observation.wavelength,
-            native_wavelength[order],
-            result.eclipse_depth.values[order],
-        )
-        return result.eclipse_depth.__class__.from_arrays(
-            self.observation.wavelength,
-            observed_values,
-            unit=result.eclipse_depth.unit,
-            observable=result.eclipse_depth.observable,
-            wavelength_unit=self.observation.wavelength_unit,
-        )
+    config = make_hat_p_32b_model_config(
+        pt_csv=pt_csv,
+        kta_dir=kta_dir,
+        opacity_species=opacity_species,
+        include_rayleigh=include_rayleigh,
+        exok_num=exok_num,
+    )
+    return build_clear_sky_emission_model(config, spectral_grid=observation.spectral_grid)
 
 
 def main() -> dict[str, object]:
@@ -149,11 +76,12 @@ def main() -> dict[str, object]:
         return {}
 
     observation = load_emission_observation_npz(Path(args.observation_npz), instrument="JWST/NIRSpec G395H")
-    forward_model = HatP32bRtForwardModel(
+    forward_model = build_hat_p_32b_forward_model(
         observation,
         pt_csv=Path(args.pt_csv).expanduser(),
         kta_dir=Path(args.kta_dir).expanduser(),
         include_rayleigh=not args.no_rayleigh,
+        exok_num=args.exok_num,
     )
     parameters = RetrievalParameterSet(
         (
@@ -167,17 +95,24 @@ def main() -> dict[str, object]:
         observation=observation,
         parameters=parameters,
         forward_model=forward_model,
-        metadata={"rt": "clear_sky_emission", "opacity": "H2O_correlated_k"},
+        metadata=dict(forward_model.manifest_metadata),
+        opacity_identifiers=forward_model.opacity_identifiers,
     )
     output_dir = Path(args.output_dir).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
     if args.method == "optimal_estimation":
-        result = run_retrieval(problem, method="optimal_estimation", max_iterations=args.max_iterations)
+        result = run_retrieval(
+            problem,
+            method="optimal_estimation",
+            output_dir=output_dir,
+            max_iterations=args.max_iterations,
+        )
     else:
         result = run_retrieval(
             problem,
             method="ultranest",
             output_dir=output_dir / "ultranest",
+            seed=args.seed,
             min_num_live_points=args.live_points,
             max_ncalls=args.max_ncalls,
             dlogz=args.dlogz,
@@ -202,7 +137,7 @@ def _report(problem: RetrievalProblem, result, model, *, mpi_size: int) -> dict[
     chi2 = float(np.sum(np.square(residual / problem.observation.uncertainty)))
     return {
         "problem": problem.name,
-        "parameters": result.best_fit_parameters,
+        "parameters": dict(result.best_fit_parameters),
         "chi2": chi2,
         "reduced_chi2": chi2 / max(1, problem.observation.n_points - problem.ndim),
         "log_likelihood": _result_log_likelihood(result),
@@ -240,16 +175,6 @@ def _plot(path: Path, observation, model) -> None:
     plt.close(fig)
 
 
-def _pressure_grid_from_centers(centers: np.ndarray) -> PressureGrid:
-    values = np.array(centers, dtype=float, copy=True)
-    log_centers = np.log(values)
-    inner_edges = 0.5 * (log_centers[:-1] + log_centers[1:])
-    first_edge = log_centers[0] - (inner_edges[0] - log_centers[0])
-    last_edge = log_centers[-1] + (log_centers[-1] - inner_edges[-1])
-    edges = np.exp(np.concatenate(([first_edge], inner_edges, [last_edge])))
-    return PressureGrid(edges=edges, centers=values, unit="bar", name="HAT-P-32b k-table pressure")
-
-
 def _mpi_rank_size() -> tuple[int, int]:
     if not any(name in os.environ for name in ("OMPI_COMM_WORLD_SIZE", "PMI_SIZE", "PMIX_RANK", "SLURM_NTASKS")):
         return 0, 1
@@ -272,9 +197,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--temperature-offset-prior", nargs=2, type=float, default=(-400.0, 400.0))
     parser.add_argument("--radius-scale-prior", nargs=2, type=float, default=(0.8, 1.2))
     parser.add_argument("--max-iterations", type=int, default=4)
-    parser.add_argument("--live-points", type=int, default=60)
-    parser.add_argument("--max-ncalls", type=int, default=600)
-    parser.add_argument("--dlogz", type=float, default=1.0)
+    parser.add_argument("--live-points", type=int, default=40)
+    parser.add_argument("--max-ncalls", type=int, default=10000)
+    parser.add_argument("--dlogz", type=float, default=1.5)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--exok-num", type=int, default=300)
     parser.add_argument("--no-rayleigh", action="store_true")
     return parser
 

@@ -7,14 +7,49 @@ on:
       - main
 
 jobs:
+  quality:
+    name: Quality and package build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install development package
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test with coverage floor
+        run: |
+          coverage run -m pytest
+          coverage report
+
+      - name: Build distributions
+        run: python -m build
+
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version:
-          - "3.12"
+        include:
+          - python-version: "3.10"
+            run-examples: false
+          - python-version: "3.11"
+            run-examples: false
+          - python-version: "3.12"
+            run-examples: false
+          - python-version: "3.13"
+            run-examples: true
+          - python-version: "3.14"
+            run-examples: false
 
     steps:
       - name: Check out repository
@@ -32,6 +67,7 @@ jobs:
         run: python -m pytest
 
       - name: Run examples
+        if: matrix.run-examples
         run: |
           python examples/stub_emission_retrieval.py
           python examples/minimal_forward_model.py
@@ -41,3 +77,23 @@ jobs:
           python examples/build_atmosphere_from_config.py
           ROBERT_BENCH_REPEAT=3 ROBERT_BENCH_WARMUP=1 python examples/benchmark_atmosphere_build.py
           ROBERT_OPACITY_IO_REPEAT=3 ROBERT_OPACITY_IO_WARMUP=1 python examples/benchmark_opacity_archive_io.py
+
+  opacity-integration:
+    name: exo_k correlated-k integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install opacity dependencies
+        run: python -m pip install -e ".[dev,opacity]"
+
+      - name: Test exo_k binning bridge
+        env:
+          NUMBA_CACHE_DIR: /tmp/robert-numba-cache
+        run: python -m pytest tests/test_opacity_kta.py -k exok

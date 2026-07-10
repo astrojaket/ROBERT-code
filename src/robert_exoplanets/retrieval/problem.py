@@ -3,18 +3,27 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping
+from typing import Callable, Mapping, Protocol
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertError, RobertValidationError, Spectrum
+from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.instruments import Observation
 from robert_exoplanets.likelihoods import GaussianLikelihood
 
 from .priors import RetrievalParameterSet
 
-ForwardEvaluator = Callable[[Mapping[str, float]], Spectrum | Any]
+
+class ObservedSpectrumPrediction(Protocol):
+    """Structural contract for forward outputs carrying an observed spectrum."""
+
+    observed_spectrum: Spectrum
+
+
+ForwardPrediction = Spectrum | ObservedSpectrumPrediction
+ForwardEvaluator = Callable[[Mapping[str, float]], ForwardPrediction]
 
 
 @dataclass(frozen=True)
@@ -28,11 +37,13 @@ class RetrievalProblem:
     likelihood: GaussianLikelihood = field(default_factory=GaussianLikelihood)
     invalid_loglike: float = float("-inf")
     metadata: Mapping[str, str] = field(default_factory=dict)
+    opacity_identifiers: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.name:
             raise RobertValidationError("retrieval problem name must not be empty")
-        object.__setattr__(self, "metadata", dict(self.metadata))
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+        object.__setattr__(self, "opacity_identifiers", immutable_mapping(self.opacity_identifiers))
 
     @property
     def parameter_names(self) -> tuple[str, ...]:
@@ -56,7 +67,7 @@ class RetrievalProblem:
 
         return self.parameters.vector_to_mapping(vector)
 
-    def predict(self, parameters: Mapping[str, float] | ArrayLike) -> Spectrum | Any:
+    def predict(self, parameters: Mapping[str, float] | ArrayLike) -> ForwardPrediction:
         """Evaluate the forward model for a mapping or vector."""
 
         if isinstance(parameters, Mapping):
@@ -83,6 +94,25 @@ class RetrievalProblem:
         values = np.array(spectrum.values, dtype=float, copy=True)
         values.setflags(write=False)
         return values
+
+    def gaussian_inputs_from_vector(
+        self,
+        vector: ArrayLike,
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+        """Return masked Gaussian model, data, and uncertainty for a vector."""
+
+        parameter_values = self.parameter_mapping(vector)
+        prediction = self.predict(parameter_values)
+        model, data, uncertainty = self.likelihood.effective_inputs(
+            prediction,
+            self.observation,
+            parameter_values,
+        )
+        return (
+            np.asarray(model, dtype=float),
+            np.asarray(data, dtype=float),
+            np.asarray(uncertainty, dtype=float),
+        )
 
     def log_likelihood_from_vector(self, vector: ArrayLike) -> float:
         """Evaluate the log likelihood for a retrieval vector."""

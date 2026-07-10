@@ -1,0 +1,227 @@
+"""Tests for typed Python forward-model configuration and construction."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from robert_exoplanets import (
+    ClearSkyEmissionFactoryConfig,
+    ClearSkyEmissionModelConfig,
+    CorrelatedKOpacityProvider,
+    CorrelatedKTable,
+    ExoKOpacitySource,
+    ExoKTableBinning,
+    FreeChemistry,
+    IsothermalTemperatureProfile,
+    Planet,
+    ParameterizedClearSkyEmissionFactoryConfig,
+    ParameterizedClearSkyEmissionModelConfig,
+    SpectralGrid,
+    Star,
+    build_clear_sky_emission_model,
+    build_parameterized_clear_sky_emission_model,
+    pressure_grid_from_opacity,
+)
+from robert_exoplanets.core import RobertConfigError, RobertValidationError
+
+
+def _spectral_grid(*, include_edges: bool = True) -> SpectralGrid:
+    return SpectralGrid(
+        values=np.array([2.0, 4.0]),
+        bin_edges=np.array([1.5, 3.0, 5.0]) if include_edges else None,
+        unit="micron",
+        role="observed",
+    )
+
+
+def _provider() -> CorrelatedKOpacityProvider:
+    grid = _spectral_grid()
+    return CorrelatedKOpacityProvider(
+        tables={
+            "H2O": CorrelatedKTable(
+                species="H2O",
+                pressure_bar=np.array([0.3, 3.0]),
+                temperature_K=np.array([500.0, 1500.0]),
+                wavenumber_cm_inverse=10000.0 / grid.values,
+                g_samples=np.array([0.5]),
+                g_weights=np.array([1.0]),
+                kcoeff=np.full((2, 2, 2, 1), 1.0e-24),
+            )
+        },
+        interpolation="log_pressure_temperature_log_k",
+    )
+
+
+def _factory_config() -> ClearSkyEmissionFactoryConfig:
+    return ClearSkyEmissionFactoryConfig(
+        planet=Planet(name="Configured b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(
+            name="Configured star",
+            radius_m=7.0e8,
+            effective_temperature_k=5500.0,
+        ),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="temperature"),
+        temperature_parameters={"temperature": 1000.0},
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ClearSkyEmissionModelConfig(
+            opacity_species=("H2O",),
+            log_vmr_parameters={"H2O": "log_h2o"},
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+        ),
+    )
+
+
+def test_factory_builds_evaluable_model_from_python_objects() -> None:
+    model = build_clear_sky_emission_model(_factory_config(), spectral_grid=_spectral_grid())
+
+    spectrum = model(
+        {
+            "log_h2o": -3.0,
+            "temperature_offset": 0.0,
+            "radius_scale": 1.0,
+        }
+    )
+
+    np.testing.assert_allclose(model.pressure_grid.centers, [0.3, 3.0])
+    np.testing.assert_allclose(model.base_temperature_K, [1000.0, 1000.0])
+    assert model.pressure_grid.metadata["species"] == "H2O"
+    assert model.manifest_metadata["factory_configuration_interface"] == "typed_python"
+    assert model.manifest_metadata["factory_temperature_parameters"] == "temperature:1000"
+    assert model.manifest_metadata["factory_pressure_grid_source"] == "opacity_centers"
+    assert model.manifest_metadata["factory_exo_k_binning"] == "disabled"
+    assert np.all(np.isfinite(spectrum.values))
+    assert spectrum.observable == "eclipse_depth"
+
+
+def test_pressure_grid_factory_supports_descending_opacity_centers() -> None:
+    provider = _provider()
+    table = provider.tables["H2O"]
+    descending = CorrelatedKOpacityProvider(
+        tables={
+            "H2O": CorrelatedKTable(
+                species="H2O",
+                pressure_bar=table.pressure_bar[::-1],
+                temperature_K=table.temperature_K,
+                wavenumber_cm_inverse=table.wavenumber_cm_inverse,
+                g_samples=table.g_samples,
+                g_weights=table.g_weights,
+                kcoeff=table.kcoeff[::-1],
+            )
+        },
+        interpolation=provider.interpolation,
+    )
+
+    grid = pressure_grid_from_opacity(descending)
+
+    assert grid.orientation == "decreasing"
+    np.testing.assert_allclose(grid.centers, [3.0, 0.3])
+
+
+def test_factory_config_validates_temperature_and_opacity_species() -> None:
+    base = _factory_config()
+    with pytest.raises(RobertConfigError, match="temperature parameters are missing"):
+        ClearSkyEmissionFactoryConfig(
+            planet=base.planet,
+            star=base.star,
+            temperature_profile=base.temperature_profile,
+            opacity_source=base.opacity_source,
+            opacity_binning=None,
+            model=base.model,
+        )
+
+    with pytest.raises(RobertConfigError, match="missing model species"):
+        ClearSkyEmissionFactoryConfig(
+            planet=base.planet,
+            star=base.star,
+            temperature_profile=base.temperature_profile,
+            temperature_parameters=base.temperature_parameters,
+            opacity_source=base.opacity_source,
+            opacity_binning=None,
+            model=ClearSkyEmissionModelConfig(
+                opacity_species=("CO",),
+                log_vmr_parameters={"CO": "log_co"},
+            ),
+        )
+
+
+def test_exok_source_requires_one_source_and_matching_paths() -> None:
+    with pytest.raises(RobertConfigError, match="exactly one"):
+        ExoKOpacitySource(species=("H2O",))
+    with pytest.raises(RobertConfigError, match="keys must match"):
+        ExoKOpacitySource(
+            species=("H2O", "CO"),
+            paths={"H2O": Path("water.h5")},
+        )
+
+    source = ExoKOpacitySource(
+        species=("H2O",),
+        paths={"H2O": Path("water.h5")},
+    )
+    assert source.paths == {"H2O": Path("water.h5")}
+    with pytest.raises(TypeError):
+        source.paths["CO"] = Path("co.h5")  # type: ignore[index]
+
+
+def test_exok_binning_requires_observation_bin_edges() -> None:
+    with pytest.raises(RobertConfigError, match="bin edges"):
+        ExoKTableBinning().apply(_provider(), _spectral_grid(include_edges=False))
+    with pytest.raises(RobertConfigError, match="positive integer"):
+        ExoKTableBinning(num=0)
+
+
+def test_pressure_grid_inference_requires_two_points() -> None:
+    grid = _spectral_grid()
+    provider = CorrelatedKOpacityProvider(
+        tables={
+            "H2O": CorrelatedKTable(
+                species="H2O",
+                pressure_bar=np.array([1.0]),
+                temperature_K=np.array([1000.0]),
+                wavenumber_cm_inverse=10000.0 / grid.values,
+                g_samples=np.array([0.5]),
+                g_weights=np.array([1.0]),
+                kcoeff=np.full((1, 1, 2, 1), 1.0e-24),
+            )
+        }
+    )
+
+    with pytest.raises(RobertValidationError, match="at least two"):
+        pressure_grid_from_opacity(provider)
+
+
+def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() -> None:
+    config = ParameterizedClearSkyEmissionFactoryConfig(
+        planet=Planet(name="Parameterized b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Parameterized", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedClearSkyEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+        ),
+    )
+    model = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+
+    cool = model({"T_iso": 900.0, "log_h2o": -3.0})
+    hot = model({"T_iso": 1200.0, "log_h2o": -3.0})
+
+    assert model.required_parameters == ("T_iso", "log_h2o")
+    assert model.manifest_metadata["factory_parameterization"] == (
+        "runtime_temperature_and_chemistry"
+    )
+    assert np.all(hot.values > cool.values)
