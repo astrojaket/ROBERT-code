@@ -19,6 +19,7 @@ from .run_config import (
     run_configured_retrieval,
 )
 from .samplers import NestedSamplerResult, run_ultranest
+from .status import load_retrieval_status
 
 __all__ = [
     "EmissionModel",
@@ -40,6 +41,7 @@ __all__ = [
     "UltraNestRunConfig",
     "build_retrieval_problem",
     "load_emission_observation_npz",
+    "load_retrieval_status",
     "run_optimal_estimation",
     "run_retrieval",
     "run_configured_retrieval",

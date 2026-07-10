@@ -33,15 +33,28 @@ The second command should report a reference-MAP ROBERT chi-square near
 Within an allocated node, test MPI before starting a large retrieval:
 
 ```bash
-mpiexec -n 4 python examples/compare_hat_p_32b_fastchem_retrieval.py \
+mpiexec -n 3 python examples/compare_hat_p_32b_fastchem_retrieval.py \
   --method ultranest --run-retrieval \
   --live-points 40 --max-ncalls 500 --dlogz 1.5 \
-  --mpi-nprocs 4 \
+  --resume overwrite \
+  --mpi-nprocs 3 \
   --output-dir retrieval_runs/hat_p_32b_smoke
 ```
 
 This deliberately bounded run is only an infrastructure test and is not
 expected to converge.
+
+For the first actual Slurm submission, use the previously validated 40-live
+point, 10,000-call setup on three cores and give it a new run name:
+
+```bash
+sbatch --ntasks=3 --mem=16G --time=02:00:00 \
+  --export=ALL,ROBERT_RUN_NAME=hat_p_32b_smoke_01,ROBERT_LIVE_POINTS=40,ROBERT_MAX_NCALLS=10000,ROBERT_DLOGZ=1.5 \
+  slurm/hat_p_32b_ultranest.sbatch
+```
+
+This writes to `retrieval_runs/hat_p_32b_smoke_01`. Use a different run name
+if that directory already contains a previous smoke test.
 
 ## Submit the production job
 
@@ -53,11 +66,12 @@ sbatch slurm/hat_p_32b_ultranest.sbatch
 ```
 
 Defaults are 32 MPI tasks, 400 live points, 500,000 likelihood calls, 100
-layers, and `dlogz=0.5`. Override them without editing the script:
+layers, `dlogz=0.5`, and resumable output under
+`retrieval_runs/hat_p_32b_production`. Override them without editing the script:
 
 ```bash
 ROBERT_MAX_NCALLS=1000000 ROBERT_LIVE_POINTS=600 \
-ROBERT_OUTPUT_DIR="$PWD/retrieval_runs/hat_p_32b_long" \
+ROBERT_RUN_NAME=hat_p_32b_long \
 sbatch slurm/hat_p_32b_ultranest.sbatch
 ```
 
@@ -72,6 +86,35 @@ Do not interpret the evidence or posterior unless `result.json` reports
 `"converged": true`. UltraNest can exceed `--max-ncalls` slightly while
 finishing an in-flight parallel batch.
 
+## Resume and monitor a run
+
+UltraNest's `--max-ncalls` is a cumulative limit for the run directory, not an
+additional allowance for each Slurm submission. To extend a run that stopped at
+500,000 calls, submit the same output directory with a higher limit:
+
+```bash
+ROBERT_MAX_NCALLS=1000000 ROBERT_RUN_NAME=hat_p_32b_production \
+sbatch slurm/hat_p_32b_ultranest.sbatch
+```
+
+The script asks Slurm for a three-minute pre-emption warning and automatically
+requeues the job. UltraNest periodically flushes its HDF5 point store, so a
+hard node loss can discard the last unflushed batch but not the whole run.
+Every submission records a separate attempt manifest and event journal while
+preserving the original scientific manifest.
+
+Inspect progress from the login node at any time:
+
+```bash
+robert-retrieval-status retrieval_runs/hat_p_32b_production
+robert-retrieval-status retrieval_runs/hat_p_32b_production --json
+```
+
+Never submit two jobs to the same output directory simultaneously. ROBERT uses
+an operating-system lock to reject the second job before it can write to the
+UltraNest checkpoint. Use `ROBERT_RESUME=overwrite` only when intentionally
+starting that directory again from scratch; normally leave it as `resume`.
+
 ## Manual command
 
 The equivalent command for a custom allocation is:
@@ -80,6 +123,7 @@ The equivalent command for a custom allocation is:
 mpiexec -n 32 python examples/compare_hat_p_32b_fastchem_retrieval.py \
   --method ultranest --run-retrieval \
   --live-points 400 --max-ncalls 500000 --dlogz 0.5 \
+  --resume resume \
   --mpi-nprocs 32 \
   --pressure-top-bar 1e-6 --pressure-bottom-bar 100 --layers 100 \
   --output-dir retrieval_runs/hat_p_32b_production

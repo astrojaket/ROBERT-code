@@ -28,6 +28,9 @@ dependencies = [
   "numpy>=1.24"
 ]
 
+[project.scripts]
+robert-retrieval-status = "robert_exoplanets.retrieval.status:main"
+
 [project.optional-dependencies]
 dev = [
   "build>=1.2",

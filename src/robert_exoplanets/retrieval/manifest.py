@@ -164,6 +164,37 @@ def write_run_manifest(manifest: RunManifest, output_dir: str | Path) -> Path:
     return path
 
 
+def read_run_manifest(path_or_directory: str | Path) -> RunManifest:
+    """Read and validate a previously written run manifest."""
+
+    path = Path(path_or_directory).expanduser()
+    if path.is_dir():
+        path = path / RUN_MANIFEST_FILENAME
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return RunManifest(
+            problem_name=value["problem_name"],
+            method=value["method"],
+            created_at_utc=value["created_at_utc"],
+            config_hash=value["config_hash"],
+            parameter_names=tuple(value["parameter_names"]),
+            parameter_priors=tuple(value["parameter_priors"]),
+            likelihood=value["likelihood"],
+            problem_metadata=value["problem_metadata"],
+            opacity_identifiers=value["opacity_identifiers"],
+            settings=value["settings"],
+            random_seed=value.get("random_seed"),
+            robert_version=value.get("robert_version", __version__),
+            python_version=value.get("python_version", "unknown"),
+            platform=value.get("platform", "unknown"),
+            git_commit=value.get("git_commit"),
+            git_dirty=value.get("git_dirty"),
+            schema_version=value.get("schema_version", RUN_MANIFEST_SCHEMA_VERSION),
+        )
+    except (OSError, KeyError, TypeError, json.JSONDecodeError, RobertValidationError) as exc:
+        raise RobertDataError(f"failed to read retrieval run manifest: {path}") from exc
+
+
 def _json_mapping(values: Mapping[str, object]) -> dict[str, object]:
     return {str(key): _json_value(value) for key, value in values.items()}
 
@@ -218,5 +249,6 @@ __all__ = [
     "RUN_MANIFEST_SCHEMA_VERSION",
     "RunManifest",
     "build_run_manifest",
+    "read_run_manifest",
     "write_run_manifest",
 ]

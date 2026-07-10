@@ -37,6 +37,7 @@ def main() -> dict[str, object]:
         live_points=args.live_points,
         max_ncalls=args.max_ncalls,
         dlogz=args.dlogz,
+        resume=args.resume,
         seed=args.seed,
         mpi_nprocs=args.mpi_nprocs or mpi_size,
         pressure_top_bar=args.pressure_top_bar,
@@ -120,6 +121,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--live-points", type=int, default=400)
     parser.add_argument("--max-ncalls", type=int, default=100000)
     parser.add_argument("--dlogz", type=float, default=0.5)
+    parser.add_argument(
+        "--resume",
+        choices=("resume", "resume-similar", "overwrite", "subfolder"),
+        default="resume",
+    )
     parser.add_argument("--seed", type=int, default=20260710)
     parser.add_argument("--mpi-nprocs", type=int)
     parser.add_argument("--pressure-top-bar", type=float, default=1.0e-6)

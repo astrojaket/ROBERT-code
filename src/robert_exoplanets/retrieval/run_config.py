@@ -72,7 +72,7 @@ class UltraNestRunConfig:
     min_num_live_points: int = 400
     max_ncalls: int | None = None
     dlogz: float = 0.5
-    resume: str = "overwrite"
+    resume: str = "resume"
     show_status: bool = True
     mpi_nprocs: int | None = None
     seed: int | None = None
@@ -89,8 +89,12 @@ class UltraNestRunConfig:
         dlogz = float(self.dlogz)
         if not np.isfinite(dlogz) or dlogz <= 0.0:
             raise RobertConfigError("dlogz must be finite and positive")
-        if not str(self.resume).strip():
-            raise RobertConfigError("resume must not be empty")
+        resume = str(self.resume).strip().lower()
+        allowed_resume_modes = {"resume", "resume-similar", "overwrite", "subfolder"}
+        if resume not in allowed_resume_modes:
+            raise RobertConfigError(
+                "resume must be one of: " + ", ".join(sorted(allowed_resume_modes))
+            )
         mpi_nprocs = None if self.mpi_nprocs is None else int(self.mpi_nprocs)
         if mpi_nprocs is not None and mpi_nprocs < 1:
             raise RobertConfigError("mpi_nprocs must be positive when provided")
@@ -119,6 +123,7 @@ class UltraNestRunConfig:
         object.__setattr__(self, "min_num_live_points", live_points)
         object.__setattr__(self, "max_ncalls", max_ncalls)
         object.__setattr__(self, "dlogz", dlogz)
+        object.__setattr__(self, "resume", resume)
         object.__setattr__(self, "mpi_nprocs", mpi_nprocs)
         object.__setattr__(self, "seed", seed)
         object.__setattr__(self, "invalid_loglike_floor", invalid_floor)
