@@ -4,7 +4,10 @@ This directory contains the working MNRAS manuscript for ROBERT. Scientific
 claims should describe released or reproducible behaviour in the repository;
 planned work belongs in explicitly labelled roadmap text.
 
-Overleaf project: <https://www.overleaf.com/project/6a52bcdc49adad6c1f9f2b86>
+Authoritative manuscript repository:
+<https://github.com/astrojaket/ROBERT-paper>
+
+Overleaf project: <https://www.overleaf.com/project/6a52bebeb63a11a7e01c4ada>
 
 ## Build
 
