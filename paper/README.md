@@ -4,6 +4,8 @@ This directory contains the working MNRAS manuscript for ROBERT. Scientific
 claims should describe released or reproducible behaviour in the repository;
 planned work belongs in explicitly labelled roadmap text.
 
+Overleaf project: <https://www.overleaf.com/project/6a52bcdc49adad6c1f9f2b86>
+
 ## Build
 
 The manuscript uses the official MNRAS class and BibTeX style. Overleaf's
@@ -40,4 +42,3 @@ from version-controlled scripts wherever possible.
   retrieval and robustness suite has run.
 - Replace author, affiliation, software-version, repository DOI, and data
   availability placeholders before circulating the manuscript externally.
-
