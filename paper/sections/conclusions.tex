@@ -1,0 +1,30 @@
+\section{Conclusions}
+\label{sec:conclusions}
+
+We have presented \ROBERT{}, a pre-release Python framework for testable and
+reproducible exoplanet atmospheric retrievals. Its principal contribution is a
+set of explicit boundaries between observations, atmospheric state, opacity,
+radiative transfer, instrument response, likelihoods, and inference. The
+current implementation includes correlated-$k$ gas opacity and random overlap,
+thermal emission and transmission, clear and scattering-cloud calculations,
+one- and two-region daysides, multiple observation data sets, optimal
+estimation, and UltraNest.
+
+Controlled comparisons with PICASO already test the SH4 multiple-scattering
+path at high numerical precision, while petitRADTRANS comparisons and the
+WASP-69b data workflow broaden validation to molecular opacity, transmission,
+and real multi-instrument observations. \roberttodo{Update this sentence after
+all tagged benchmark artefacts and WASP-69b retrievals are complete.}
+
+The WASP-80b analysis is designed as both a scientific reanalysis and a test of
+the complete reproducibility chain. \roberttodo{Insert the main WASP-80b
+findings and state clearly where they agree or disagree with published
+constraints.}
+
+Near-term development will focus on science-grade cloud microphysics,
+high-stream scattering references, broader opacity validation, richer
+disequilibrium chemistry, and robust long-run posterior workflows. Longer-term
+interfaces permit reflected light, phase curves, multidimensional atmospheres,
+line-by-line opacity, additional samplers, and multi-instrument covariance,
+without requiring those capabilities to be claimed by the present release.
+
