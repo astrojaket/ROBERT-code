@@ -1,0 +1,83 @@
+\documentclass[fleqn,usenatbib]{mnras}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\newcommand{\ROBERT}{\textsc{Robert}}
+\newcommand{\roberttodo}[1]{\textcolor{magenta}{[TODO: #1]}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title[ROBERT]{ROBERT: a reproducible retrieval framework for JWST exoplanet emission spectra}
+
+\author[J. Taylor et al.]{
+Jake Taylor$^{1}$\thanks{E-mail: \roberttodo{corresponding-author email}}
+and \roberttodo{co-authors}\\
+$^{1}$\roberttodo{affiliation}
+}
+
+\date{Accepted XXX. Received YYY; in original form ZZZ}
+\pubyear{2026}
+
+\begin{document}
+\label{firstpage}
+\pagerange{\pageref{firstpage}--\pageref{lastpage}}
+\maketitle
+
+\begin{abstract}
+Atmospheric retrievals translate exoplanet spectra into constraints on thermal
+structure, composition, clouds, and planetary properties, but scientific
+interpretation can depend on choices made across opacity preparation,
+radiative transfer, inference, and data handling. We present \ROBERT{}, an
+open, typed Python framework developed for reproducible retrievals of JWST
+exoplanet emission spectra. \ROBERT{} separates atmospheric state construction,
+correlated-$k$ opacity preparation, radiative transfer, instrument response,
+likelihood evaluation, and inference behind explicit interfaces, and records
+the resulting configuration and data provenance. The current implementation
+supports clear and cloudy thermal emission, transmission, multiple one-dimensional
+regions, multiple data sets, optimal estimation, and nested sampling with
+UltraNest. We validate individual numerical components and compare thermal
+radiative transfer with PICASO and molecular emission and transmission with
+petitRADTRANS. We further exercise the end-to-end data model using the
+panchromatic JWST emission spectrum of WASP-69b. \roberttodo{Replace this final
+sentence with the quantitative WASP-80b results, including retrieved metallicity,
+C/O, molecular detections, and model evidences.} This work establishes a
+testable route from retrieval-code development to a reproducible scientific
+analysis while retaining clear boundaries between validated capability and
+future physics.
+\end{abstract}
+
+\begin{keywords}
+planets and satellites: atmospheres -- planets and satellites: gaseous planets
+-- methods: numerical -- radiative transfer -- software: development
+\end{keywords}
+
+\input{sections/introduction}
+\input{sections/methods}
+\input{sections/results}
+\input{sections/conclusions}
+\input{sections/reproducibility}
+
+\section*{Acknowledgements}
+\roberttodo{Funding, computing facilities, and contributors.} The development
+and writing workflow used OpenAI Codex. The authors reviewed and take
+responsibility for all code, analyses, citations, and text produced with AI
+assistance.
+
+\section*{Data Availability}
+The WASP-69b spectrum used for validation is distributed with source provenance
+in the \ROBERT{} repository and originates from the machine-readable tables of
+\citet{Schlawin2024}. \roberttodo{Add the WASP-80b data products, MAST programme
+identifier, exact reduction version, retrieval posterior archive, and Zenodo
+DOI.} Source code and analysis scripts will be archived at a versioned DOI on
+acceptance; the development repository is \roberttodo{insert public GitHub URL}.
+
+\bibliographystyle{mnras}
+\bibliography{references}
+
+\label{lastpage}
+\end{document}
+

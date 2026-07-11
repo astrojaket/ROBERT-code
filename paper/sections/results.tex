@@ -1,0 +1,64 @@
+\section{WASP-80b reanalysis}
+\label{sec:results}
+
+This section defines the analysis that will provide the principal science
+result of the paper. It intentionally contains no inferred values before the
+retrieval and robustness suite is complete.
+
+\subsection{Data and model hierarchy}
+
+We will reanalyse the published NIRCam/F322W2, NIRCam/F444W, and MIRI/LRS
+$2.4$--$12\,\mu$m dayside emission spectrum of WASP-80b
+\citep{Bell2023,WASP80Panchromatic2025}. The reduction, wavelength bins,
+uncertainties, covariance assumptions, and any inter-instrument offsets will be
+recorded as separate observation data sets rather than concatenated into an
+anonymous spectrum. \roberttodo{Acquire the exact machine-readable spectrum,
+record its DOI/MAST identifiers and checksums, and determine whether the
+published covariance is available.}
+
+The planned hierarchy is:
+\begin{enumerate}
+ \item a clear one-region free-chemistry model;
+ \item a clear one-region equilibrium-chemistry model parameterized by
+ metallicity and C/O;
+ \item grey and microphysical cloud extensions;
+ \item diluted and two-region dayside models; and
+ \item targeted disequilibrium or quench-pressure extensions if justified by
+ posterior predictive residuals.
+\end{enumerate}
+Each comparison will hold opacity, spectral response, priors on shared
+parameters, and convergence criteria fixed where scientifically possible.
+
+\subsection{Prespecified reported quantities}
+
+The primary quantities are metallicity, C/O, thermal structure, CH$_4$ and
+H$_2$O abundance constraints, cloud optical properties, and the evidence of
+each model relative to the clear one-region baseline. We will report credible
+intervals, prior-to-posterior contraction, posterior correlations, contribution
+functions, and posterior predictive spectra. Molecular evidence will be tested
+with nested model comparisons or abundance-posterior diagnostics declared
+before inspecting the final result; a Gaussian ``sigma'' equivalent will not
+be quoted without stating its definition.
+
+\subsection{Robustness tests}
+
+Robustness tests will include NIRCam-only and MIRI-only retrievals, alternative
+temperature parameterizations, opacity-table resolution and bounds checks,
+cloud-model sensitivity, removal of instrument offsets, repeated nested-sampling
+runs, and injection--recovery at representative posterior points. The
+published WASP-80b posterior products will be passed through the same plotting
+and comparison code where their parameterization permits.
+
+\subsection{Results completion gate}
+
+Before this section is converted from a plan into results, all final runs must
+have: (i) a versioned configuration and manifest; (ii) converged evidence and
+posterior diagnostics; (iii) reproducible figures and tables; (iv) an archived
+machine-readable posterior; and (v) an internal check that the text distinguishes
+data-supported conclusions from model-dependent interpretation.
+
+\roberttodo{Replace this paragraph with the quantitative results and add: data
+figure; best-fitting/posterior-predictive spectra; abundance and thermal-profile
+figure; corner or information-content summary; evidence table; and direct
+comparison with \citet{WASP80Panchromatic2025}.}
+
