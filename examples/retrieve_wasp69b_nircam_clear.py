@@ -1,10 +1,9 @@
-"""NIRCam-only clear one-region retrieval for WASP-69b.
+"""NIRCam-only clear one-region retrieval for a configured target.
 
-This is a ROBERT validation analogue, not an exact reproduction of the paper's
-full 2--12 micron CHIMERA/EGP-grid retrieval. Following ROBERT's default
-multi-instrument retrieval workflow, opacity is recompressed into each mode's
-published observation bins with exo_k before inference. Native-resolution
-spectra are reserved for plotting and diagnostics.
+WASP-69b is the default configuration. Following ROBERT's default
+multi-instrument workflow, opacity is recompressed into each mode's published
+observation bins with exo_k before inference. Native-resolution spectra are
+reserved for plotting and diagnostics.
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 import hashlib
+from importlib import import_module
 import json
 import os
 from pathlib import Path
@@ -45,23 +45,37 @@ from robert_exoplanets import (
     ParameterizedClearSkyEmissionFactoryConfig,
     ParameterizedClearSkyEmissionModelConfig,
     ParmentierGuillot2014TemperatureProfile,
-    Planet,
     PressureGrid,
     RetrievalParameter,
     RetrievalParameterSet,
-    Star,
     UniformPrior,
     build_multi_dataset_emission_model,
-    load_schlawin2024_wasp69b,
     run_ultranest,
 )
 
+
+def _target_configuration():
+    module_name = os.environ.get("ROBERT_TARGET_CONFIG", "examples.wasp69b_target")
+    try:
+        return import_module(module_name)
+    except ModuleNotFoundError:
+        if "." not in module_name:
+            raise
+        return import_module(module_name.rsplit(".", 1)[-1])
+
+
+TARGET = _target_configuration()
+PLANET = TARGET.PLANET
+STAR = TARGET.STAR
+PLANET_GRAVITY_M_S2 = TARGET.PLANET_GRAVITY_M_S2
+TARGET_SLUG = TARGET.TARGET_SLUG
+
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "wasp69b_schlawin2024"
+DATA = TARGET.DATA_DIRECTORY
 PRT_DATA = ROOT / "opacity_data" / "petitRADTRANS" / "input_data"
 FASTCHEM = ROOT / "examples" / "data" / "hat_p_32b" / "fastchem"
-CACHE = ROOT / "opacity_data" / "wasp69b_nircam_observation_bins"
-OUTPUT = Path(__file__).resolve().parent / "outputs" / "wasp69b_nircam_clear"
+CACHE = TARGET.CACHE_DIRECTORY
+OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_nircam_clear"
 SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
 PATTERNS = {
     "H2O": "*POKAZATEL*.ktable.petitRADTRANS.h5",
@@ -71,17 +85,14 @@ PATTERNS = {
     "NH3": "*CoYuTe*.ktable.petitRADTRANS.h5",
     "HCN": "*Harris*.ktable.petitRADTRANS.h5",
 }
-RJUP_M = 7.1492e7
-MJUP_KG = 1.89813e27
-RSUN_M = 6.957e8
 CALLS_PER_ATTEMPT = 5000
 
 
 def nircam_observations() -> ObservationCollection:
-    full = load_schlawin2024_wasp69b(DATA, miri_offset_parameter=None)
+    full = TARGET.load_observations(miri_offset_parameter=None)
     return ObservationCollection(
         datasets=tuple(dataset for dataset in full.datasets if dataset.name != "lrs"),
-        name="WASP-69b NIRCam-only Schlawin et al. 2024",
+        name=f"{PLANET.name} NIRCam-only published spectrum",
         metadata={**dict(full.metadata), "selection": "NIRCam only"},
     )
 
@@ -179,27 +190,16 @@ def parameters() -> RetrievalParameterSet:
 
 
 def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalProblem:
-    gravity = 6.67430e-11 * (0.26 * MJUP_KG) / (1.06 * RJUP_M) ** 2
     pressure = PressureGrid.from_log_centers(
         100.0,
         1.0e-6,
         n_layers=80,
         unit="bar",
-        name="WASP-69b emission pressure grid",
+        name=f"{PLANET.name} emission pressure grid",
     )
     cia = _cia_tables()
-    planet = Planet(
-        name="WASP-69b",
-        radius_m=1.06 * RJUP_M,
-        mass_kg=0.26 * MJUP_KG,
-    )
-    star = Star(
-        name="WASP-69",
-        radius_m=0.813 * RSUN_M,
-        effective_temperature_k=4750.0,
-    )
     temperature_profile = ParmentierGuillot2014TemperatureProfile(
-        gravity=gravity,
+        gravity=PLANET_GRAVITY_M_S2,
         internal_temperature=100.0,
     )
     chemistry_model = FastChemEquilibriumChemistry(
@@ -215,7 +215,7 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
         gas_combination="random_overlap",
         thermal_integration_backend="auto",
         metadata={
-            "target": "WASP-69b",
+            "target": PLANET.name,
             "dataset_selection": ",".join(observations.names),
             "dayside_geometry": "one_region_clear",
             "paper_analogue": "not_exact_EGP_grid_reproduction",
@@ -245,12 +245,12 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
             )
         provider = CorrelatedKOpacityProvider(
             tables,
-            name=f"WASP-69b-NIRCam-{dataset.name}-ExoMol-pRT-R1000-binned",
+            name=f"{PLANET.name}-NIRCam-{dataset.name}-ExoMol-pRT-R1000-binned",
             interpolation="log_pressure_temperature_log_k_clip",
         )
         configs[dataset.name] = ParameterizedClearSkyEmissionFactoryConfig(
-            planet=planet,
-            star=star,
+            planet=PLANET,
+            star=STAR,
             temperature_profile=temperature_profile,
             chemistry_model=chemistry_model,
             mean_molecular_weight_model=mean_molecular_weight_model,
@@ -274,15 +274,15 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
             }
         )
     return MultiDatasetRetrievalProblem(
-        name="wasp69b-nircam-clear-one-region",
+        name=f"{TARGET_SLUG}-nircam-clear-one-region",
         observations=observations,
         parameters=parameters(),
         forward_model=forward_model,
         likelihood=MultiDatasetGaussianLikelihood(include_normalization=True),
         invalid_loglike=-1.0e100,
         metadata={
-            "comparison": "Schlawin_et_al_2024_clear_one_region",
-            "difference": "NIRCam-only and PG14 analytic TP instead of full-band EGP RCE grid",
+            "comparison": f"{PLANET.name}_published_eclipse_spectrum",
+            "difference": "NIRCam-only equilibrium chemistry with PG14 analytic TP",
         },
         opacity_identifiers=opacity_ids,
     )
@@ -357,9 +357,8 @@ def _write_products(
             "log_evidence": -588,
         },
         "comparison_warning": (
-            "Paper values use 2-12 micron CHIMERA plus interpolated EGP RCE profiles; "
-            "this ROBERT run uses its recorded dataset selection and a PG14 analytic "
-            "TP profile, so evidence values are not directly comparable."
+            "Literature evidence values are not directly comparable unless the data, "
+            "priors, chemistry, temperature profile, opacity, and likelihood match."
         ),
     }
     (output / "summary.json").write_text(
@@ -415,13 +414,13 @@ def _plot(observations, envelopes, best_spectra, summary, path: Path) -> None:
         residual = (obs.flux - best_spectra[name].values) / obs.uncertainty
         residual_axis.plot(obs.wavelength, residual, ".", color=color, markersize=3)
     axis.set_ylabel("Eclipse depth (ppm)")
-    axis.set_title("WASP-69b: ROBERT clear one-region retrieval")
+    axis.set_title(f"{PLANET.name}: ROBERT clear one-region retrieval")
     axis.text(
         0.02,
         0.97,
         "Shading: posterior 68% (1-sigma) spectrum envelope\n"
         f"ROBERT reduced chi-square = {summary['reduced_chi_squared']:.2f}\n"
-        "Paper full 2-12 micron clear model: reduced chi-square = 14.5",
+        "Literature comparisons require matched model assumptions.",
         transform=axis.transAxes,
         va="top",
         fontsize=9,

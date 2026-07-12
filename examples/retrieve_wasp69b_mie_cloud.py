@@ -1,4 +1,4 @@
-"""Full-band WASP-69b one-region Mie-cloud retrieval.
+"""Full-band one-region Mie-cloud retrieval for a configured target.
 
 Two optical-constant modes share the same cloud mass/particle physics:
 
@@ -13,15 +13,20 @@ its prior sensitivity are understood.
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
 import tempfile
 import time
+from typing import Mapping
 
-os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib"))
-os.environ.setdefault("NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "robert-numba-cache"))
+os.environ.setdefault(
+    "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib")
+)
+os.environ.setdefault(
+    "NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "robert-numba-cache")
+)
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
 
@@ -39,26 +44,24 @@ from robert_exoplanets import (
     ParameterizedClearSkyEmissionModelConfig,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     ParmentierGuillot2014TemperatureProfile,
-    Planet,
     PressureGrid,
     RefractiveIndexCloudConfig,
     RetrievalParameter,
     RetrievalParameterSet,
-    Star,
     UniformPrior,
     build_parameterized_clear_sky_emission_model,
-    load_schlawin2024_wasp69b,
     run_ultranest,
 )
+from robert_exoplanets.core import Spectrum
 
 from retrieve_wasp69b_nircam_clear import (
-    DATA,
     FASTCHEM,
-    MJUP_KG,
-    RJUP_M,
-    RSUN_M,
+    PLANET,
+    PLANET_GRAVITY_M_S2,
     SPECIES,
-    NamedRegionalModels,
+    STAR,
+    TARGET,
+    TARGET_SLUG,
     _cia_tables,
     _load_table,
     prepare_opacity_cache,
@@ -66,19 +69,31 @@ from retrieve_wasp69b_nircam_clear import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "data" / "optical_constants" / "exo_skryer"
-OUTPUT = Path(__file__).resolve().parent / "outputs" / "wasp69b_mie_cloud"
+OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_mie_cloud"
 DIRECT_NK_NODES_MICRON = (2.4, 4.0, 5.5, 7.0, 9.0, 12.0)
+
+
+@dataclass(frozen=True)
+class NamedRegionalModels:
+    """Evaluate named cloud models while retaining dataset identity."""
+
+    models: Mapping[str, object]
+
+    def __call__(self, values: Mapping[str, float]) -> Mapping[str, Spectrum]:
+        return {name: model(values) for name, model in self.models.items()}
 
 
 def observations():
     """Return all four named NIRCam/MIRI datasets with a MIRI offset."""
 
-    return load_schlawin2024_wasp69b(DATA, miri_offset_parameter="miri_offset")
+    return TARGET.load_observations(miri_offset_parameter="miri_offset")
 
 
 def retrieval_parameters(cloud_mode: str) -> RetrievalParameterSet:
     parameters = [
-        RetrievalParameter("metallicity", UniformPrior(0.0, 2.0), label="[M/H]", unit="dex"),
+        RetrievalParameter(
+            "metallicity", UniformPrior(0.0, 2.0), label="[M/H]", unit="dex"
+        ),
         RetrievalParameter("CtoO", UniformPrior(0.05, 1.5), label="C/O"),
         RetrievalParameter("kappa_IR", LogUniformPrior(1.0e-5, 1.0), unit="m2 kg-1"),
         RetrievalParameter("gamma1", LogUniformPrior(1.0e-2, 100.0)),
@@ -119,13 +134,12 @@ def build_problem(
     particle_density_kg_m3: float,
 ) -> MultiDatasetRetrievalProblem:
     selected_observations = observations()
-    gravity = 6.67430e-11 * (0.26 * MJUP_KG) / (1.06 * RJUP_M) ** 2
     pressure = PressureGrid.from_log_centers(
         100.0,
         1.0e-6,
         n_layers=80,
         unit="bar",
-        name="WASP-69b emission pressure grid",
+        name=f"{PLANET.name} emission pressure grid",
     )
     fixed_index = None
     nodes: tuple[float, ...] = DIRECT_NK_NODES_MICRON
@@ -153,8 +167,10 @@ def build_problem(
         multiple_scattering_backend="sh4",
         fixed_refractive_index=fixed_index,
         metadata={
-            "target": "WASP-69b",
-            "material_selection": material if fixed_index is not None else "retrieved_n_k",
+            "target": PLANET.name,
+            "material_selection": material
+            if fixed_index is not None
+            else "retrieved_n_k",
         },
     )
     cia = _cia_tables()
@@ -166,9 +182,15 @@ def build_problem(
         canonical_weights = tables["H2O"].g_weights
         for species, table in tuple(tables.items()):
             if not np.allclose(table.g_samples, canonical_g, rtol=0.0, atol=1.0e-8):
-                raise ValueError(f"{species} uses a genuinely different correlated-k g grid")
-            if not np.allclose(table.g_weights, canonical_weights, rtol=0.0, atol=1.0e-8):
-                raise ValueError(f"{species} uses genuinely different correlated-k weights")
+                raise ValueError(
+                    f"{species} uses a genuinely different correlated-k g grid"
+                )
+            if not np.allclose(
+                table.g_weights, canonical_weights, rtol=0.0, atol=1.0e-8
+            ):
+                raise ValueError(
+                    f"{species} uses genuinely different correlated-k weights"
+                )
             tables[species] = replace(
                 table,
                 g_samples=canonical_g,
@@ -176,18 +198,14 @@ def build_problem(
             )
         provider = CorrelatedKOpacityProvider(
             tables,
-            name=f"WASP-69b-{dataset.name}-ExoMol-pRT-observation-binned",
+            name=f"{PLANET.name}-{dataset.name}-ExoMol-pRT-observation-binned",
             interpolation="log_pressure_temperature_log_k_clip",
         )
         factory = ParameterizedClearSkyEmissionFactoryConfig(
-            planet=Planet(name="WASP-69b", radius_m=1.06 * RJUP_M, mass_kg=0.26 * MJUP_KG),
-            star=Star(
-                name="WASP-69",
-                radius_m=0.813 * RSUN_M,
-                effective_temperature_k=4750.0,
-            ),
+            planet=PLANET,
+            star=STAR,
             temperature_profile=ParmentierGuillot2014TemperatureProfile(
-                gravity=gravity,
+                gravity=PLANET_GRAVITY_M_S2,
                 internal_temperature=100.0,
             ),
             chemistry_model=FastChemEquilibriumChemistry(
@@ -207,7 +225,7 @@ def build_problem(
                 gas_combination="random_overlap",
                 thermal_integration_backend="auto",
                 metadata={
-                    "target": "WASP-69b",
+                    "target": PLANET.name,
                     "dataset_selection": "NIRCam_plus_MIRI",
                     "dayside_geometry": "one_region_mie_cloud",
                 },
@@ -230,17 +248,20 @@ def build_problem(
         )
         models[dataset.name] = model
         opacity_ids.update(
-            {f"{dataset.name}:{key}": value for key, value in model.opacity_identifiers.items()}
+            {
+                f"{dataset.name}:{key}": value
+                for key, value in model.opacity_identifiers.items()
+            }
         )
     return MultiDatasetRetrievalProblem(
-        name=f"wasp69b-fullband-one-region-mie-{cloud_mode}",
+        name=f"{TARGET_SLUG}-fullband-one-region-mie-{cloud_mode}",
         observations=selected_observations,
         parameters=retrieval_parameters(cloud_mode),
         forward_model=NamedRegionalModels(models),
         likelihood=MultiDatasetGaussianLikelihood(include_normalization=True),
         invalid_loglike=-1.0e100,
         metadata={
-            "comparison": "Schlawin_et_al_2024_full_band_cloud",
+            "comparison": f"{PLANET.name}_published_eclipse_spectrum_cloud",
             "cloud_mode": cloud_mode,
             "material": material if cloud_mode == "catalog" else "retrieved_n_k",
             "geometry": "one_region",
@@ -252,7 +273,9 @@ def build_problem(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cloud-mode", choices=("catalog", "direct-nk"), default="catalog")
+    parser.add_argument(
+        "--cloud-mode", choices=("catalog", "direct-nk"), default="catalog"
+    )
     parser.add_argument("--material", default="MgSiO3")
     parser.add_argument("--particle-density-kg-m3", type=float, default=3200.0)
     parser.add_argument("--prepare-only", action="store_true")

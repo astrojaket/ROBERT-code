@@ -75,8 +75,10 @@ from .instruments import (
 from .io import (
     AtmosphereModelSetup,
     SCHLAWIN2024_SP_SHA256,
+    WISER2025_SHA256,
     build_atmosphere_setup,
     load_schlawin2024_wasp69b,
+    load_wiser2025_wasp80b,
 )
 from .likelihoods import GaussianLikelihood, MultiDatasetGaussianLikelihood
 from .opacity import (
@@ -316,6 +318,7 @@ __all__ = [
     "RetrievalRunConfig",
     "RunManifest",
     "SCHLAWIN2024_SP_SHA256",
+    "WISER2025_SHA256",
     "SingleScatteringSource",
     "SplineTemperatureProfile",
     "SpectralGrid",
@@ -373,6 +376,7 @@ __all__ = [
     "load_cloud_optical_properties_npz",
     "load_nemesispy_cia_table",
     "load_schlawin2024_wasp69b",
+    "load_wiser2025_wasp80b",
     "load_emission_observation_npz",
     "load_retrieval_status",
     "load_picaso_cloud_optical_properties",
