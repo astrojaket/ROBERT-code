@@ -1,11 +1,13 @@
-"""Time two multi-instrument forward-model workflows for WASP-69b.
+"""Time three multi-instrument forward-model workflows for WASP-69b.
 
 The compared likelihood calls are:
 
 1. one emission calculation on the native R~1000 opacity grid, followed by
    top-hat integration onto every observation grid; and
 2. one emission calculation per instrument mode using opacity pre-compressed
-   into that mode's published wavelength bins.
+   into that mode's published wavelength bins; and
+3. the same mode-specific opacity and RT calculations with one atmosphere and
+   chemistry state shared across all modes.
 
 The per-mode path is ROBERT's default for retrieval. The native path is a
 plotting and diagnostic option. Setup (HDF5/cache loading and model
@@ -39,13 +41,14 @@ from robert_exoplanets import (
     CorrelatedKOpacityProvider,
     CorrelatedKTable,
     FastChemEquilibriumChemistry,
-    MultiDatasetForwardModel,
+    NativeSpectrumMultiDatasetForwardModel,
     MultiDatasetGaussianLikelihood,
     ParameterizedClearSkyEmissionFactoryConfig,
     ParameterizedClearSkyEmissionModelConfig,
     ParmentierGuillot2014TemperatureProfile,
     Planet,
     PressureGrid,
+    MultiDatasetEmissionForwardModel,
     Star,
     build_parameterized_clear_sky_emission_model,
     load_schlawin2024_wasp69b,
@@ -69,7 +72,9 @@ RSUN_M = 6.957e8
 
 
 @dataclass(frozen=True)
-class NamedModels:
+class IndependentModeModelsForBenchmark:
+    """Comparison-only wrapper that deliberately rebuilds each atmosphere."""
+
     models: Mapping[str, Callable[[Mapping[str, float]], Spectrum]]
 
     def __call__(self, parameters: Mapping[str, float]) -> Mapping[str, Spectrum]:
@@ -220,13 +225,14 @@ def run(
     native_model = build_parameterized_clear_sky_emission_model(
         _config(native_provider, pressure, cia), spectral_grid=native_grid
     )
-    one_native = MultiDatasetForwardModel(
+    one_native = NativeSpectrumMultiDatasetForwardModel(
         native_model=native_model, observations=observations
     )
     native_setup_seconds = perf_counter() - setup_start
 
     setup_start = perf_counter()
     mode_models = {}
+    shared_atmosphere_builder = None
     for dataset in observations.datasets:
         tables = _canonicalize_g(
             {species: _load_table(dataset.name, species) for species in SPECIES}
@@ -236,11 +242,17 @@ def run(
             name=f"WASP-69b-{dataset.name}-observation-bins",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        mode_models[dataset.name] = build_parameterized_clear_sky_emission_model(
+        model = build_parameterized_clear_sky_emission_model(
             _config(provider, pressure, cia),
             spectral_grid=dataset.observation.spectral_grid,
         )
-    per_mode = NamedModels(mode_models)
+        if shared_atmosphere_builder is None:
+            shared_atmosphere_builder = model.atmosphere_builder
+        else:
+            model = replace(model, atmosphere_builder=shared_atmosphere_builder)
+        mode_models[dataset.name] = model
+    per_mode = IndependentModeModelsForBenchmark(mode_models)
+    shared_per_mode = MultiDatasetEmissionForwardModel(mode_models)
     per_mode_setup_seconds = perf_counter() - setup_start
 
     def native_loglike() -> float:
@@ -249,20 +261,69 @@ def run(
     def per_mode_loglike() -> float:
         return likelihood.loglike(per_mode(parameters), observations, parameters)
 
+    def shared_per_mode_loglike() -> float:
+        return likelihood.loglike(shared_per_mode(parameters), observations, parameters)
+
     for _ in range(warmups):
         native_loglike()
         per_mode_loglike()
+        shared_per_mode_loglike()
     profiler = None if profile is None else cProfile.Profile()
     if profiler is not None:
         profiler.enable()
     native_times, native_ll = _time(native_loglike, repeats)
     mode_times, mode_ll = _time(per_mode_loglike, repeats)
+    shared_mode_times, shared_mode_ll = _time(shared_per_mode_loglike, repeats)
+    independent_spectra = per_mode(parameters)
+    shared_spectra = shared_per_mode(parameters)
+    reference_spectra = {
+        name: replace(
+            model,
+            config=replace(model.config, compute_diagnostics=True),
+        )(parameters)
+        for name, model in mode_models.items()
+    }
+    per_mode_max_abs_difference = {
+        name: float(
+            np.max(
+                np.abs(
+                    independent_spectra[name].values
+                    - shared_spectra[name].values
+                )
+            )
+        )
+        for name in independent_spectra
+    }
+    fused_reference_max_abs_difference = {
+        name: float(
+            np.max(
+                np.abs(
+                    shared_spectra[name].values
+                    - reference_spectra[name].values
+                )
+            )
+        )
+        for name in shared_spectra
+    }
+    fused_reference_max_relative_difference = {
+        name: float(
+            np.max(
+                np.abs(
+                    shared_spectra[name].values
+                    - reference_spectra[name].values
+                )
+                / np.maximum(np.abs(reference_spectra[name].values), 1.0e-300)
+            )
+        )
+        for name in shared_spectra
+    }
     if profiler is not None:
         profiler.disable()
         profile.parent.mkdir(parents=True, exist_ok=True)
         profiler.dump_stats(profile)
     native_median = float(np.median(native_times))
     mode_median = float(np.median(mode_times))
+    shared_mode_median = float(np.median(shared_mode_times))
     return {
         "target": "WASP-69b",
         "modes": list(observations.names),
@@ -284,7 +345,40 @@ def run(
             "median_seconds": mode_median,
             "log_likelihood": mode_ll,
         },
+        "bin_opacity_then_shared_atmosphere_per_mode": {
+            "setup_seconds": per_mode_setup_seconds,
+            "call_seconds": shared_mode_times,
+            "median_seconds": shared_mode_median,
+            "log_likelihood": shared_mode_ll,
+            "likelihood_exactly_equal_to_independent": shared_mode_ll == mode_ll,
+            "spectra_exactly_equal_to_independent": all(
+                np.array_equal(
+                    independent_spectra[name].values,
+                    shared_spectra[name].values,
+                )
+                for name in independent_spectra
+            ),
+            "per_mode_max_abs_difference": per_mode_max_abs_difference,
+            "fused_matches_species_resolved_reference": all(
+                np.allclose(
+                    shared_spectra[name].values,
+                    reference_spectra[name].values,
+                    rtol=2.0e-13,
+                    atol=0.0,
+                )
+                for name in shared_spectra
+            ),
+            "fused_reference_max_abs_difference": (
+                fused_reference_max_abs_difference
+            ),
+            "fused_reference_max_relative_difference": (
+                fused_reference_max_relative_difference
+            ),
+        },
         "median_speed_ratio_native_over_per_mode": native_median / mode_median,
+        "median_speedup_shared_over_independent_per_mode": (
+            mode_median / shared_mode_median
+        ),
         "note": "Log likelihoods need not match: correlated-k recompression before RT is not equivalent to integrating a native-grid spectrum after RT.",
     }
 

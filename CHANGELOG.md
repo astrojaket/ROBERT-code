@@ -2,6 +2,12 @@
 
 ## v0.3.0 - Minimal Forward Model Foundation
 
+- Added a diagnostics-free fused correlated-k assembly path that scales
+  k-coefficients and performs random overlap in one Numba kernel without
+  materializing the species optical-depth cube; the species-resolved path
+  remains the scientific reference.
+- Classified ExoMol opacity sampling as a functional beta backend while
+  retaining correlated-k as the validated retrieval default.
 - Added sampler-independent retrieval problems, typed priors, coordinate-aware
   Gaussian likelihood evaluation, optimal estimation, and an optional
   UltraNest adapter.
@@ -177,6 +183,21 @@
   Representative six-molecule WASP-69b calls are 3.1--5.3x faster without
   changing their likelihoods; a deterministic random-overlap scaling benchmark
   and warmed `cProfile` support were added.
+- Added an exact shared-atmosphere multi-dataset emission path that evaluates
+  temperature, chemistry, mean molecular weight, and atmospheric state once
+  while retaining mode-specific correlated-k opacity and RT. WASP-69b spectra
+  and likelihoods remain bit-for-bit identical, with warmed three-mode calls
+  about 12% faster and four-mode calls about 21% faster.
+- Made shared-atmosphere orchestration the default public multi-instrument
+  factory flow. The native-spectrum-then-bin diagnostic now has an explicit
+  `NativeSpectrumMultiDatasetForwardModel` name, while the deliberately
+  repeated-atmosphere path exists only inside the performance benchmark.
+- Removed the unused v0.1 `Observation.validate()` compatibility no-op;
+  observations already validate all invariants during construction.
+- Added explicit WASP-69b `--dlogz` and provenance-rich `--fast-stop`
+  controls for exploratory checkpoint finalization without changing scientific
+  defaults, plus a complete clear-model plotting and published-comparison
+  workflow that reports posterior effective sample size.
 
 ## v0.2.0 - Core Domain Foundation
 

@@ -10,6 +10,7 @@ from robert_exoplanets import (
     Observation,
     SpectralGrid,
     Spectrum,
+    StratifiedSamplingObservationResponse,
     TopHatObservationResponse,
 )
 from robert_exoplanets.core import RobertCoverageError
@@ -71,3 +72,28 @@ def test_top_hat_response_integrates_piecewise_linear_spectrum() -> None:
 
     np.testing.assert_allclose(observed.values, [2.5, 6.5])
     assert observed.metadata["bin_integration"] == "piecewise_linear_top_hat"
+
+
+def test_stratified_sampling_selects_fixed_points_and_averages_bins() -> None:
+    observation = Observation.from_arrays(
+        [1.5, 2.5],
+        [0.0, 0.0],
+        [1.0, 1.0],
+        wavelength_bin_edges=[1.0, 2.0, 3.0],
+    )
+    source_grid = SpectralGrid.from_array(np.linspace(1.0, 3.0, 41))
+    prepared = StratifiedSamplingObservationResponse(samples_per_bin=2).prepare(
+        observation, source_grid
+    )
+    sampled = Spectrum(
+        spectral_grid=prepared.spectral_grid,
+        values=prepared.spectral_grid.values**2,
+        unit="eclipse_depth",
+        observable="eclipse_depth",
+    )
+
+    observed = prepared.observe(sampled)
+
+    np.testing.assert_allclose(prepared.spectral_grid.values, [1.25, 1.75, 2.25, 2.75])
+    np.testing.assert_allclose(observed.values, [2.3125, 6.3125])
+    assert observed.metadata["samples_per_bin"] == "2"

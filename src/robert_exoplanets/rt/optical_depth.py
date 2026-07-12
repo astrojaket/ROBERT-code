@@ -10,29 +10,40 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, RobertValidationError, SpectralGrid
-from robert_exoplanets.opacity import EvaluatedCorrelatedKOpacity, pressure_values_in_unit
+from robert_exoplanets.opacity import (
+    EvaluatedOpacity,
+    OpacitySamplingProvider,
+    PreparedOpacitySampling,
+    pressure_values_in_unit,
+)
 
-from .random_overlap import random_overlap_species_tau
+from .random_overlap import (
+    fused_random_overlap_backend_name,
+    fused_random_overlap_kcoeff,
+    random_overlap_species_tau,
+)
 
 ATOMIC_MASS_KG = 1.66053906660e-27
 
 
 @dataclass(frozen=True)
 class GasOpticalDepth:
-    """Gas optical depth on layer, spectral, and correlated-k quadrature axes.
+    """Gas optical depth on layer, spectral, and opacity quadrature/sample axes.
 
-    The native `total_tau` array has shape `(layer, wavelength, g)` and
-    `species_tau` has shape `(species, layer, wavelength, g)`.
+    The native `total_tau` array has shape `(layer, wavelength, g_or_sample)`
+    and `species_tau` has shape
+    `(species, layer, wavelength, g_or_sample)`. Opacity sampling uses a
+    singleton compatibility axis because each wavelength is a physical sample.
     """
 
     atmosphere: AtmosphereState
-    opacity: EvaluatedCorrelatedKOpacity
+    opacity: EvaluatedOpacity
     species: tuple[str, ...]
     gravity_m_s2: ArrayLike
     layer_pressure_thickness_pa: ArrayLike
     layer_column_density_molecules_m2: ArrayLike
     species_column_density_molecules_m2: ArrayLike
-    species_tau: ArrayLike
+    species_tau: ArrayLike | None
     total_tau: ArrayLike
     unit: str = "dimensionless"
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -63,11 +74,13 @@ class GasOpticalDepth:
             "species_column_density_molecules_m2",
             (n_species, n_layers),
         )
-        species_tau = _readonly_array(
-            self.species_tau,
-            "species_tau",
-            (n_species, n_layers, n_spectral, n_g),
-        )
+        species_tau = None
+        if self.species_tau is not None:
+            species_tau = _readonly_array(
+                self.species_tau,
+                "species_tau",
+                (n_species, n_layers, n_spectral, n_g),
+            )
         total_tau = _readonly_array(
             self.total_tau,
             "total_tau",
@@ -88,13 +101,13 @@ class GasOpticalDepth:
             raise RobertValidationError("layer column densities must be positive")
         if np.any(species_column < 0.0):
             raise RobertValidationError("species column densities must be non-negative")
-        if np.any(species_tau < 0.0) or np.any(total_tau < 0.0):
+        if (species_tau is not None and np.any(species_tau < 0.0)) or np.any(total_tau < 0.0):
             raise RobertValidationError("gas optical depths must be non-negative")
         metadata = dict(self.metadata)
         gas_combination = metadata.get("gas_combination", "sum_by_g")
         if gas_combination not in {"sum_by_g", "random_overlap"}:
             raise RobertValidationError("gas_combination must be 'sum_by_g' or 'random_overlap'")
-        if gas_combination == "sum_by_g" and not np.allclose(
+        if species_tau is not None and gas_combination == "sum_by_g" and not np.allclose(
             np.sum(species_tau, axis=0),
             total_tau,
             rtol=1.0e-12,
@@ -198,10 +211,11 @@ class GasOpticalDepth:
 
 def assemble_gas_optical_depth(
     atmosphere: AtmosphereState,
-    opacity: EvaluatedCorrelatedKOpacity,
+    opacity: EvaluatedOpacity,
     *,
     gravity_m_s2: float | ArrayLike,
     gas_combination: str = "sum_by_g",
+    retain_species_tau: bool = True,
 ) -> GasOpticalDepth:
     """Assemble gas optical depth from evaluated correlated-k coefficients.
 
@@ -228,14 +242,46 @@ def assemble_gas_optical_depth(
     vmr = np.stack([atmosphere.composition[item] for item in species], axis=0)
     species_column_density = vmr * layer_column_density[None, :]
     kcoeff_m2_per_molecule = _kcoeff_m2_per_molecule(opacity.kcoeff, opacity.unit)
-    species_tau = kcoeff_m2_per_molecule * species_column_density[:, :, None, None]
-    combination = _gas_combination_mode(gas_combination)
-    if combination == "sum_by_g":
-        total_tau = np.sum(species_tau, axis=0)
+    requested_combination = _gas_combination_mode(gas_combination)
+    opacity_mode = str(opacity.prepared.metadata.get("opacity_mode", "correlated_k"))
+    combination = (
+        "sum_by_g" if opacity_mode == "opacity_sampling" else requested_combination
+    )
+    if retain_species_tau:
+        kcoeff_m2_per_molecule = _kcoeff_m2_per_molecule(
+            opacity.kcoeff, opacity.unit
+        )
+        species_tau = (
+            kcoeff_m2_per_molecule
+            * species_column_density[:, :, None, None]
+        )
+        if combination == "sum_by_g":
+            total_tau = np.sum(species_tau, axis=0)
+        else:
+            total_tau = random_overlap_species_tau(
+                species_tau, opacity.prepared.g_weights
+            )
     else:
-        total_tau = random_overlap_species_tau(species_tau, opacity.prepared.g_weights)
+        species_tau = None
+        unit_scale = _opacity_unit_scale_m2(opacity.unit)
+        if combination == "random_overlap":
+            total_tau = fused_random_overlap_kcoeff(
+                opacity.kcoeff,
+                species_column_density,
+                opacity.prepared.g_weights,
+                unit_scale_m2=unit_scale,
+            )
+        else:
+            total_tau = np.einsum(
+                "slwg,sl->lwg",
+                opacity.kcoeff,
+                species_column_density * unit_scale,
+                optimize=True,
+            )
 
-    if not np.all(np.isfinite(species_tau)) or not np.all(np.isfinite(total_tau)):
+    if (
+        species_tau is not None and not np.all(np.isfinite(species_tau))
+    ) or not np.all(np.isfinite(total_tau)):
         raise RobertValidationError("assembled gas optical depth must be finite")
 
     return GasOpticalDepth(
@@ -249,10 +295,76 @@ def assemble_gas_optical_depth(
         species_tau=species_tau,
         total_tau=total_tau,
         metadata={
-            "opacity_mode": "correlated_k",
+            "opacity_mode": opacity_mode,
             "opacity_unit": opacity.unit,
             "column_model": "hydrostatic_plane_parallel",
             "gas_combination": combination,
+            "requested_gas_combination": requested_combination,
+            "species_tau_diagnostics": (
+                "enabled" if species_tau is not None else "disabled"
+            ),
+            "assembly_backend": (
+                "species_resolved_reference"
+                if species_tau is not None
+                else fused_random_overlap_backend_name()
+                if combination == "random_overlap"
+                else "fused_direct_sum"
+            ),
+        },
+    )
+
+
+def assemble_opacity_sampling_gas_optical_depth(
+    atmosphere: AtmosphereState,
+    provider: OpacitySamplingProvider,
+    prepared: PreparedOpacitySampling,
+    *,
+    gravity_m_s2: float | ArrayLike,
+) -> GasOpticalDepth:
+    """Fuse sampled-opacity interpolation, VMR mixing, and tau assembly."""
+
+    _validate_pressure_grid_match(atmosphere.pressure_grid, prepared.pressure_grid)
+    _validate_composition_convention(atmosphere.composition_convention)
+    _validate_mean_molecular_weight_unit(atmosphere.mean_molecular_weight_unit)
+    missing = tuple(name for name in prepared.species if name not in atmosphere.composition)
+    if missing:
+        raise RobertValidationError(
+            f"atmosphere is missing opacity species: {', '.join(missing)}"
+        )
+    gravity = _gravity_profile(gravity_m_s2, atmosphere.n_layers)
+    layer_delta_p_pa = _pressure_layer_thickness_pa(atmosphere.pressure_grid)
+    particle_mass_kg = atmosphere.mean_molecular_weight * ATOMIC_MASS_KG
+    layer_column_density = layer_delta_p_pa / (particle_mass_kg * gravity)
+    vmr = np.stack(
+        [atmosphere.composition[name] for name in prepared.species], axis=0
+    )
+    species_column_density = vmr * layer_column_density[None, :]
+    mixture = provider.evaluate_mixture(atmosphere, prepared)
+    cross_section_m2 = _kcoeff_m2_per_molecule(
+        mixture.cross_section, mixture.unit
+    )
+    total_tau = cross_section_m2 * layer_column_density[:, None]
+    total_tau = total_tau[:, :, None]
+    if not np.all(np.isfinite(total_tau)):
+        raise RobertValidationError("assembled opacity-sampling optical depth must be finite")
+    return GasOpticalDepth(
+        atmosphere=atmosphere,
+        opacity=mixture,
+        species=prepared.species,
+        gravity_m_s2=gravity,
+        layer_pressure_thickness_pa=layer_delta_p_pa,
+        layer_column_density_molecules_m2=layer_column_density,
+        species_column_density_molecules_m2=species_column_density,
+        species_tau=None,
+        total_tau=total_tau,
+        metadata={
+            "opacity_mode": "opacity_sampling",
+            "maturity": "beta",
+            "opacity_unit": mixture.unit,
+            "column_model": "hydrostatic_plane_parallel",
+            "gas_combination": "sum_by_g",
+            "requested_gas_combination": "fused_direct_sum",
+            "species_tau_diagnostics": "disabled",
         },
     )
 
@@ -322,6 +434,27 @@ def _kcoeff_m2_per_molecule(
         raise RobertValidationError(f"unsupported opacity unit for gas optical depth: {unit}")
     kcoeff.setflags(write=False)
     return kcoeff
+
+
+def _opacity_unit_scale_m2(unit: str) -> float:
+    normalized = unit.strip().lower().replace(" ", "")
+    if normalized in {
+        "cm^2/molecule",
+        "cm2/molecule",
+        "cm^2molecule^-1",
+        "cm2molecule-1",
+    }:
+        return 1.0e-4
+    if normalized in {
+        "m^2/molecule",
+        "m2/molecule",
+        "m^2molecule^-1",
+        "m2molecule-1",
+    }:
+        return 1.0
+    raise RobertValidationError(
+        f"unsupported opacity unit for gas optical depth: {unit}"
+    )
 
 
 def _gas_combination_mode(value: str) -> str:

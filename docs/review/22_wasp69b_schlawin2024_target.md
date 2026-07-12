@@ -71,11 +71,20 @@ two-region disk when the complementary component has negligible flux.
 `ObservationCollection` and `ObservationDataset` preserve instrument identity,
 binning, masks, and nuisance-parameter names. The default retrieval workflow
 uses `exo_k` to recompress opacity into each instrument mode's published bins,
-then evaluates one mode-specific forward model per dataset. This preserves the
-correlated-k operation on opacity distributions before radiative transfer.
+builds one atmospheric state per physical region, then evaluates mode-specific
+opacity and RT for an arbitrary number of datasets. This preserves the
+correlated-k operation on opacity distributions before radiative transfer
+without repeating temperature, chemistry, or mean-molecular-weight work.
 
-`MultiDatasetForwardModel` is retained for plotting and diagnostics. It
-evaluates one shared native-resolution physical spectrum and integrates that
+`MultiDatasetEmissionForwardModel` is the retrieval-facing default, constructed
+by `build_multi_dataset_emission_model`. Every mode configuration must share
+the same explicit atmospheric objects; differing opacity providers and
+spectral grids remain mode-specific. Independent complete-model calls are kept
+only inside the timing benchmark as a comparison baseline.
+
+`NativeSpectrumMultiDatasetForwardModel` is a separately named plotting and
+diagnostic path. It evaluates one shared native-resolution physical spectrum
+and integrates that
 spectrum over each published top-hat wavelength bin; it does not substitute
 centre interpolation. It must not be described as `exo_k` binning because
 `exo_k` does not operate on an already evaluated flux spectrum.

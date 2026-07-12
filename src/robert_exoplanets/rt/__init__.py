@@ -4,6 +4,7 @@ from .emission import (
     ClearSkyEmissionResult,
     disk_average_quadrature,
     solve_clear_sky_emission,
+    solve_clear_sky_emission_spectrum,
 )
 from .clouds import (
     CloudOpticalProperties,
@@ -38,7 +39,11 @@ from .extinction import (
     rayleigh_scattering_optical_depth,
     read_cia_table,
 )
-from .optical_depth import GasOpticalDepth, assemble_gas_optical_depth
+from .optical_depth import (
+    GasOpticalDepth,
+    assemble_gas_optical_depth,
+    assemble_opacity_sampling_gas_optical_depth,
+)
 from .path_geometry import HydrostaticPathGeometry, hydrostatic_path_geometry
 from .geometry import (
     DiscGeometry,
@@ -61,7 +66,9 @@ from .scattering import (
 )
 from .thermal_integration import (
     ThermalEmissionIntegrationResult,
+    ThermalEmissionSpectrumIntegrationResult,
     integrate_thermal_emission,
+    integrate_thermal_emission_spectrum,
     thermal_integration_backend_name,
 )
 from .two_stream import (
@@ -89,10 +96,12 @@ __all__ = [
     "CiaTable",
     "SingleScatteringSource",
     "ThermalEmissionIntegrationResult",
+    "ThermalEmissionSpectrumIntegrationResult",
     "ThermalTwoStreamResult",
     "ThermalSH4Result",
     "TwoStreamScatteringDiagnostics",
     "assemble_gas_optical_depth",
+    "assemble_opacity_sampling_gas_optical_depth",
     "cia_optical_depth",
     "disk_average_quadrature",
     "gauss_legendre_disk_geometry",
@@ -100,6 +109,7 @@ __all__ = [
     "hydrostatic_path_geometry",
     "isotropic_phase_function",
     "integrate_thermal_emission",
+    "integrate_thermal_emission_spectrum",
     "load_cloud_optical_properties_csv",
     "load_cloud_optical_properties_npz",
     "load_picaso_cloud_optical_properties",
@@ -124,6 +134,7 @@ __all__ = [
     "read_cia_table",
     "refractive_index_from_parameters",
     "solve_clear_sky_emission",
+    "solve_clear_sky_emission_spectrum",
     "solve_absorption_transmission",
     "solve_thermal_two_stream",
     "solve_thermal_sh4",

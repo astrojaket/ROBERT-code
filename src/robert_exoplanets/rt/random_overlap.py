@@ -81,6 +81,74 @@ def random_overlap_species_tau(
     return combined
 
 
+def fused_random_overlap_kcoeff(
+    kcoeff: ArrayLike,
+    species_column_density_molecules_m2: ArrayLike,
+    g_weights: ArrayLike,
+    *,
+    unit_scale_m2: float,
+    cutoff: float = 1.0e-12,
+) -> NDArray[np.float64]:
+    """Scale molecular k-coefficients and combine them without a species-tau cube.
+
+    This retrieval-oriented kernel is numerically equivalent to constructing
+    ``species_tau = kcoeff * column_density * unit_scale_m2`` and passing that
+    array to :func:`random_overlap_species_tau`. The explicit species-resolved
+    route remains the diagnostic and NumPy reference implementation.
+    """
+
+    coefficients = np.asarray(kcoeff, dtype=float)
+    columns = np.asarray(species_column_density_molecules_m2, dtype=float)
+    weights = _normalized_g_weights(g_weights)
+    if coefficients.ndim != 4:
+        raise RobertValidationError(
+            "kcoeff must have shape species x layer x wavelength x g"
+        )
+    if columns.shape != coefficients.shape[:2]:
+        raise RobertValidationError(
+            "species column density must have shape species x layer"
+        )
+    if coefficients.shape[-1] != weights.size:
+        raise RobertValidationError("g_weights must match the kcoeff g axis")
+    if not np.all(np.isfinite(coefficients)) or np.any(coefficients < 0.0):
+        raise RobertValidationError("kcoeff must be finite and non-negative")
+    if not np.all(np.isfinite(columns)) or np.any(columns < 0.0):
+        raise RobertValidationError(
+            "species column density must be finite and non-negative"
+        )
+    scale = float(unit_scale_m2)
+    if not np.isfinite(scale) or scale <= 0.0:
+        raise RobertValidationError("unit_scale_m2 must be finite and positive")
+    if cutoff < 0.0 or not np.isfinite(cutoff):
+        raise RobertValidationError(
+            "random-overlap cutoff must be finite and non-negative"
+        )
+    if _NUMBA_AVAILABLE:
+        combined = _numba_fused_random_overlap_kcoeff_kernel(
+            coefficients,
+            columns,
+            weights,
+            scale,
+            float(cutoff),
+        )
+    else:  # Preserve the base-install reference behavior without the perf extra.
+        species_tau = coefficients * columns[:, :, None, None] * scale
+        combined = random_overlap_species_tau(
+            species_tau,
+            weights,
+            cutoff=cutoff,
+            backend="numpy",
+        )
+    combined.setflags(write=False)
+    return combined
+
+
+def fused_random_overlap_backend_name() -> str:
+    """Return the active diagnostics-free random-overlap assembly backend."""
+
+    return "fused_numba_random_overlap" if _NUMBA_AVAILABLE else "numpy_reference_fallback"
+
+
 def random_overlap_tau_vectors(
     tau_by_species_g: ArrayLike,
     g_weights: ArrayLike,
@@ -289,6 +357,132 @@ def _numba_random_overlap_species_tau(
 
 
 if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_fused_random_overlap_kcoeff_kernel(
+        kcoeff,
+        species_columns,
+        weights,
+        unit_scale,
+        cutoff,
+    ):
+        n_species, n_layers, n_spectral, n_g = kcoeff.shape
+        output = np.zeros((n_layers, n_spectral, n_g), dtype=np.float64)
+        random_weights = np.empty(n_g * n_g, dtype=np.float64)
+        for i_g in range(n_g):
+            for j_g in range(n_g):
+                random_weights[i_g * n_g + j_g] = weights[i_g] * weights[j_g]
+
+        n_points = n_layers * n_spectral
+        if n_species == 1:
+            for point_index in prange(n_points):
+                layer_index = point_index // n_spectral
+                spectral_index = point_index - layer_index * n_spectral
+                species_scale = species_columns[0, layer_index] * unit_scale
+                for g_index in range(n_g):
+                    output[layer_index, spectral_index, g_index] = (
+                        kcoeff[0, layer_index, spectral_index, g_index]
+                        * species_scale
+                    )
+            return output
+        for point_index in prange(n_points):
+            layer_index = point_index // n_spectral
+            spectral_index = point_index - layer_index * n_spectral
+            first_active = -1
+            for species_index in range(n_species):
+                species_scale = (
+                    species_columns[species_index, layer_index] * unit_scale
+                )
+                max_tau = 0.0
+                for g_index in range(n_g):
+                    value = (
+                        kcoeff[
+                            species_index,
+                            layer_index,
+                            spectral_index,
+                            g_index,
+                        ]
+                        * species_scale
+                    )
+                    if value > max_tau:
+                        max_tau = value
+                if max_tau >= cutoff:
+                    first_active = species_index
+                    break
+
+            if first_active < 0:
+                continue
+
+            combined = np.empty(n_g, dtype=np.float64)
+            right_tau = np.empty(n_g, dtype=np.float64)
+            next_combined = np.empty(n_g, dtype=np.float64)
+            random_values = np.empty(n_g * n_g, dtype=np.float64)
+            heap_values = np.empty(n_g, dtype=np.float64)
+            heap_rows = np.empty(n_g, dtype=np.int64)
+            heap_columns = np.empty(n_g, dtype=np.int64)
+            first_scale = species_columns[first_active, layer_index] * unit_scale
+            for g_index in range(n_g):
+                combined[g_index] = (
+                    kcoeff[
+                        first_active,
+                        layer_index,
+                        spectral_index,
+                        g_index,
+                    ]
+                    * first_scale
+                )
+
+            for species_index in range(first_active + 1, n_species):
+                species_scale = (
+                    species_columns[species_index, layer_index] * unit_scale
+                )
+                max_tau = 0.0
+                for g_index in range(n_g):
+                    value = (
+                        kcoeff[
+                            species_index,
+                            layer_index,
+                            spectral_index,
+                            g_index,
+                        ]
+                        * species_scale
+                    )
+                    right_tau[g_index] = value
+                    if value > max_tau:
+                        max_tau = value
+                if max_tau < cutoff:
+                    continue
+
+                right_is_sorted = True
+                for g_index in range(1, n_g):
+                    if right_tau[g_index] < right_tau[g_index - 1]:
+                        right_is_sorted = False
+                        break
+                if right_is_sorted:
+                    _numba_combine_sorted_distributions_into(
+                        combined,
+                        right_tau,
+                        weights,
+                        heap_values,
+                        heap_rows,
+                        heap_columns,
+                        next_combined,
+                    )
+                else:
+                    _numba_combine_two_distributions_into(
+                        combined,
+                        right_tau,
+                        weights,
+                        random_weights,
+                        random_values,
+                        next_combined,
+                    )
+                for g_index in range(n_g):
+                    combined[g_index] = next_combined[g_index]
+
+            for g_index in range(n_g):
+                output[layer_index, spectral_index, g_index] = combined[g_index]
+        return output
 
     @njit(parallel=True)
     def _numba_random_overlap_species_tau_kernel(tau, weights, cutoff):
@@ -508,6 +702,11 @@ if _NUMBA_AVAILABLE:
             rebinned[g_index] /= weights[g_index]
 
 else:
+
+    def _numba_fused_random_overlap_kcoeff_kernel(*args):
+        raise RobertValidationError(
+            "fused random-overlap k-coefficient assembly requires numba"
+        )
 
     def _numba_random_overlap_species_tau_kernel(tau, weights, cutoff):
         raise RobertValidationError(

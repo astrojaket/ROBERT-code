@@ -114,3 +114,54 @@ memory for speed.
 Transmission integration and general gas optical-depth assembly are not
 current priorities: their measured contribution is small enough that more
 complex code would not materially shorten retrievals.
+
+## Diagnostics-free fused correlated-k follow-up
+
+The retrieval path now scales molecular k-coefficients by species column
+density and performs random overlap in one Numba kernel. It does not allocate
+or retain the full `(species, layer, wavelength, g)` optical-depth cube.
+Requests with `compute_diagnostics=True` still use the species-resolved path,
+which remains the scientific reference. Base installations without Numba fall
+back to that NumPy reference calculation.
+
+On the four-mode WASP-69b benchmark, the fused spectra agree with the reference
+spectra to a maximum relative difference of `1.92e-15`; both likelihoods are
+unchanged. With one Numba thread, the shared-atmosphere median was 322 ms,
+compared with approximately 334 ms before fusion. A clean eight-thread run was
+190 ms. The fusion therefore removes unnecessary memory traffic safely, but
+the modest one-thread gain confirms that random-overlap recompression arithmetic
+remains the main cost.
+
+The benchmark now performs this fused-versus-reference spectral comparison on
+every run and records per-mode absolute and relative differences in its JSON
+output.
+
+## Shared-atmosphere multi-dataset follow-up
+
+The first WASP-69b retrieval wrapper shared parameter values but constructed a
+complete atmosphere independently for every instrument mode. ROBERT now
+exposes `ParameterizedClearSkyEmissionForwardModel.evaluate_atmosphere` and a
+typed `MultiDatasetEmissionForwardModel`. The latter validates that
+all mode models use the exact same `AtmosphereBuilder`, evaluates temperature,
+FastChem equilibrium chemistry, mean molecular weight, and the atmospheric
+state once, then retains each mode's independently prepared correlated-k
+opacity and RT calculation.
+
+This is deliberately distinct from computing one native-resolution spectrum
+and binning flux afterward. The new path preserves mode-specific correlated-k
+recompression before RT, so its scientific calculation is identical to the
+previous per-mode retrieval path.
+
+Measured on the four published WASP-69b datasets (280 total bins), seven
+warmed repeats changed the median likelihood-call time from 0.478 s to 0.380 s,
+a 1.26x speedup and 20.6% time reduction. For the three independent native
+instrument modes used by the retrieval (274 bins), twelve warmed repeats
+changed the median from 0.369 s to 0.325 s, a 1.13x speedup and 11.9% time
+reduction. Five parameter vectors spanning the prior produced bit-for-bit
+identical spectra and likelihoods.
+
+The smaller-than-hoped speedup is itself useful profile evidence. After state
+sharing, random-overlap correlated-k mixing accounts for about 60% of the
+warmed forward path. Atmosphere and chemistry duplication was real, but is no
+longer the dominant bottleneck; further laptop-scale gains must focus on the
+spectral opacity/RT kernels and on reducing sampler call count.

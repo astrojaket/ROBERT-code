@@ -5,7 +5,9 @@ from .collection import ObservationCollection, ObservationDataset
 from .response import (
     LinearObservationResponse,
     PreparedObservationResponse,
+    PreparedStratifiedSamplingObservationResponse,
     PreparedTopHatObservationResponse,
+    StratifiedSamplingObservationResponse,
     TopHatObservationResponse,
 )
 
@@ -15,7 +17,9 @@ __all__ = [
     "ObservationCollection",
     "ObservationDataset",
     "PreparedObservationResponse",
+    "PreparedStratifiedSamplingObservationResponse",
     "PreparedTopHatObservationResponse",
+    "StratifiedSamplingObservationResponse",
     "TopHatObservationResponse",
     "infer_wavelength_bin_edges",
 ]

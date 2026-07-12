@@ -24,13 +24,16 @@ from robert_exoplanets import (
     RefractiveIndexCloudConfig,
     RefractiveIndexSpectrum,
     GreyScatteringCloudConfig,
+    MultiDatasetEmissionForwardModel,
     SpectralGrid,
     Star,
     build_clear_sky_emission_model,
+    build_multi_dataset_emission_model,
     build_parameterized_clear_sky_emission_model,
     pressure_grid_from_opacity,
 )
 from robert_exoplanets.core import RobertConfigError, RobertValidationError
+from robert_exoplanets.atmosphere import AtmosphereBuilder
 
 
 def _spectral_grid(*, include_edges: bool = True) -> SpectralGrid:
@@ -82,7 +85,9 @@ def _factory_config() -> ClearSkyEmissionFactoryConfig:
 
 
 def test_factory_builds_evaluable_model_from_python_objects() -> None:
-    model = build_clear_sky_emission_model(_factory_config(), spectral_grid=_spectral_grid())
+    model = build_clear_sky_emission_model(
+        _factory_config(), spectral_grid=_spectral_grid()
+    )
 
     spectrum = model(
         {
@@ -96,7 +101,9 @@ def test_factory_builds_evaluable_model_from_python_objects() -> None:
     np.testing.assert_allclose(model.base_temperature_K, [1000.0, 1000.0])
     assert model.pressure_grid.metadata["species"] == "H2O"
     assert model.manifest_metadata["factory_configuration_interface"] == "typed_python"
-    assert model.manifest_metadata["factory_temperature_parameters"] == "temperature:1000"
+    assert (
+        model.manifest_metadata["factory_temperature_parameters"] == "temperature:1000"
+    )
     assert model.manifest_metadata["factory_pressure_grid_source"] == "opacity_centers"
     assert model.manifest_metadata["factory_exo_k_binning"] == "disabled"
     assert np.all(np.isfinite(spectrum.values))
@@ -232,6 +239,98 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
     assert np.all(hot.values > cool.values)
 
 
+def test_shared_atmosphere_multi_dataset_model_matches_independent_models(
+    monkeypatch,
+) -> None:
+    config = ParameterizedClearSkyEmissionFactoryConfig(
+        planet=Planet(name="Shared b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Shared", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedClearSkyEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+        ),
+    )
+    first = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+    independent_second = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+    parameters = {"T_iso": 1000.0, "log_h2o": -3.0}
+    independent = {
+        "first": first(parameters),
+        "second": independent_second(parameters),
+    }
+    build_calls = 0
+    original_build = AtmosphereBuilder.build
+
+    def counted_build(builder, values=None):
+        nonlocal build_calls
+        build_calls += 1
+        return original_build(builder, values)
+
+    monkeypatch.setattr(AtmosphereBuilder, "build", counted_build)
+    shared = build_multi_dataset_emission_model(
+        {"first": config, "second": config},
+        spectral_grids={
+            "first": _spectral_grid(),
+            "second": _spectral_grid(),
+        },
+    )
+
+    prediction = shared(parameters)
+
+    assert build_calls == 1
+    np.testing.assert_array_equal(
+        prediction["first"].values, independent["first"].values
+    )
+    np.testing.assert_array_equal(
+        prediction["second"].values, independent["second"].values
+    )
+
+
+def test_shared_atmosphere_multi_dataset_model_rejects_distinct_builders() -> None:
+    config = ParameterizedClearSkyEmissionFactoryConfig(
+        planet=Planet(name="Shared b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Shared", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedClearSkyEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+        ),
+    )
+    first = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+    second = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+
+    with pytest.raises(RobertValidationError, match="same AtmosphereBuilder"):
+        MultiDatasetEmissionForwardModel({"first": first, "second": second})
+
+
 def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> None:
     config = ParameterizedClearSkyEmissionFactoryConfig(
         planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
@@ -278,7 +377,9 @@ def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> No
     assert np.all(np.isfinite(spectrum.values))
 
 
-def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles() -> None:
+def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles() -> (
+    None
+):
     config = ParameterizedClearSkyEmissionFactoryConfig(
         planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Generic star", radius_m=7.0e8, effective_temperature_k=5500.0),
@@ -312,7 +413,10 @@ def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles(
         cloud=RefractiveIndexCloudConfig(
             refractive_index_wavelength_micron=(1.5, 5.0),
             real_index_parameter_names=("cloud_n_short", "cloud_n_long"),
-            log10_imaginary_index_parameter_names=("cloud_logk_short", "cloud_logk_long"),
+            log10_imaginary_index_parameter_names=(
+                "cloud_logk_short",
+                "cloud_logk_long",
+            ),
             log10_condensate_mass_fraction_parameter="log_cloud_mass_fraction",
             log10_effective_radius_micron_parameter="log_cloud_radius",
             particle_density_kg_m3=3000.0,

@@ -1,5 +1,7 @@
 """Opacity metadata, inspectors, and fixture interfaces."""
 
+from typing import Union
+
 from .archive import (
     RobertOpacityArchive,
     inspect_robert_npy_directory,
@@ -43,12 +45,31 @@ from .metadata import (
     pressure_values_in_unit,
     spectral_grid_values_in_unit,
 )
+from .opacity_sampling import (
+    EvaluatedOpacitySampling,
+    EvaluatedOpacitySamplingMixture,
+    OpacitySamplingCoverageReport,
+    OpacitySamplingProvider,
+    OpacitySamplingTable,
+    PreparedOpacitySampling,
+)
+
+OpacityProvider = Union[CorrelatedKOpacityProvider, OpacitySamplingProvider]
+PreparedOpacity = Union[PreparedCorrelatedKOpacity, PreparedOpacitySampling]
+EvaluatedOpacity = Union[
+    EvaluatedCorrelatedKOpacity,
+    EvaluatedOpacitySampling,
+    EvaluatedOpacitySamplingMixture,
+]
 
 __all__ = [
     "CorrelatedKCoverageReport",
     "CorrelatedKOpacityProvider",
     "CorrelatedKTable",
     "EvaluatedCorrelatedKOpacity",
+    "EvaluatedOpacity",
+    "EvaluatedOpacitySampling",
+    "EvaluatedOpacitySamplingMixture",
     "GridCoverage",
     "KtaHeader",
     "KtaTable",
@@ -57,8 +78,14 @@ __all__ = [
     "OpacityDataProduct",
     "OpacityDataSource",
     "OpacityMode",
+    "OpacityProvider",
+    "OpacitySamplingCoverageReport",
+    "OpacitySamplingProvider",
+    "OpacitySamplingTable",
     "OpacityStorageFormat",
     "PreparedCorrelatedKOpacity",
+    "PreparedOpacity",
+    "PreparedOpacitySampling",
     "RobertOpacityArchive",
     "SpectralCoverage",
     "convert_kta_to_robert_archive",

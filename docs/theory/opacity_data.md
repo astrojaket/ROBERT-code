@@ -42,6 +42,13 @@ The current opacity implementation is metadata and coverage scaffolding. It can:
 - evaluate correlated-k coefficients with optional log-pressure, linear
   temperature, log-k interpolation while keeping spectral points on the native
   opacity grid,
+- load ExoMolOP/TauREx pressure-temperature cross-section HDF5 grids with
+  `OpacitySamplingProvider.from_exomol_paths`, retain an explicit shared subset
+  of physical wavelength samples, and interpolate log cross section in
+  log-pressure and temperature,
+- prepare either correlated-k or opacity-sampling providers behind the same
+  forward-model contract; sampled species optical depths are summed directly
+  and never passed through random overlap,
 - optionally clamp pressure and temperature to the nearest native boundary with
   the explicit `log_pressure_temperature_log_k_clip` comparison policy,
 - bin KTA-backed correlated-k distributions onto explicit observation bins
@@ -70,6 +77,48 @@ separate RT-layer components with explicit coverage policies.
 Strict pressure/temperature coverage remains the default. The clipping policy
 exists to reproduce NemesisPy's documented implementation behavior at table
 boundaries and is included in prepared-opacity cache identity and provenance.
+
+## Selecting opacity sampling
+
+Opacity sampling is currently a **beta** backend: it works and is covered by
+numerical parity tests, but its sampling strategy is not yet validated broadly
+enough for production retrievals. Correlated-k remains the default.
+
+Downloaded cross sections stay outside Git under `opacity_data/`. A provider
+and an explicit sampling grid can be constructed with:
+
+```python
+from pathlib import Path
+
+from robert_exoplanets import OpacitySamplingProvider
+
+species = ("H2O", "CO", "CO2", "CH4", "NH3", "HCN")
+root = Path("opacity_data/exomol_xsec")
+provider = OpacitySamplingProvider.from_exomol_paths(
+    {name: root / f"{name}.h5" for name in species}
+)
+spectral_grid = provider.native_spectral_grid(
+    sampling=3,
+    wavelength_bounds_micron=(1.0, 12.0),
+)
+```
+
+Pass this provider and grid to the same emission factory used for correlated-k.
+`ExoMolOpacitySamplingSource` is the equivalent typed factory source. Exo-k
+binning is ignored for this provider because its grid is already an explicit
+selection of physical samples. The default strict interpolation policy raises
+outside the ExoMol pressure or temperature grid; append `_clip` to the provider
+interpolation policy only for a documented comparison requiring boundary
+clamping.
+
+For observed spectra, `StratifiedSamplingObservationResponse` can select a
+fixed number of native opacity samples inside every observation bin and then
+average the resulting spectrum back onto those bins. This is deterministic and
+keeps the model grid tied to the data, but it is an opt-in convergence tool—not
+a validated replacement for correlated-k. On the WASP-69b native bins, sparse
+sampling was faster only at errors larger than the observational uncertainty;
+the sampling density needed to approach the full-grid result removed the speed
+advantage. See `docs/review/30_wasp69b_fast_rt_and_sampling.md`.
 
 Incomplete precomputed molecular tables may contain NaN/Inf values or exact
 zeros where absorption was unavailable. ROBERT applies the caller-selected
@@ -120,11 +169,16 @@ metadata, archive format, and RT-facing prepared opacity state.
 
 ## Design Direction
 
-Correlated-k is the first target because it is the practical retrieval mode used
-by the HAT-P-32b benchmark workflow. The public metadata layer already has
-separate modes for opacity sampling and line-by-line so POSEIDON-style
-opacity-sampling and high-resolution HITRAN/HITEMP/ExoMol line-by-line support
-can be added without changing the RT-facing contract.
+Correlated-k remains the validated default for retrieval workflows. ExoMolOP
+cross-section opacity sampling is now an alternative provider using the same
+RT-facing contract. The sampling stride is an explicit accuracy/performance
+choice: on the current six-species benchmark, retaining every third R=15,000
+point (effective R about 5,000) is close to correlated-k accuracy at R=100 and
+remains faster, while every fifteenth point is much faster but materially less
+accurate. The WASP-69b native-bin benchmark demonstrates that this conclusion
+does not automatically transfer to a different bin layout. The benchmark must
+be repeated for each target wavelength range and data resolution before
+changing a retrieval default.
 
 The next opacity increments should be:
 

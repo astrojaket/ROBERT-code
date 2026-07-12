@@ -19,6 +19,7 @@ from robert_exoplanets import (
     geometry_from_emission_angles,
     planck_radiance_wavelength,
     solve_clear_sky_emission,
+    solve_clear_sky_emission_spectrum,
 )
 from robert_exoplanets.core import RobertValidationError
 
@@ -45,6 +46,27 @@ def test_isothermal_clear_sky_with_blackbody_bottom_recovers_planck_radiance() -
         result.radiance.values,
     )
     assert result.metadata["scattering_treatment"] == "none"
+
+
+def test_spectrum_only_solver_matches_diagnostic_solver() -> None:
+    gas_tau = _gas_tau(
+        temperature=[900.0, 1300.0],
+        kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
+    )
+    geometry = gauss_legendre_disk_geometry(4)
+    diagnostic = solve_clear_sky_emission(
+        gas_tau,
+        geometry=geometry,
+        bottom_boundary="blackbody",
+    )
+    spectrum = solve_clear_sky_emission_spectrum(
+        gas_tau,
+        geometry=geometry,
+        bottom_boundary="blackbody",
+    )
+
+    np.testing.assert_allclose(spectrum.values, diagnostic.radiance.values, rtol=1.0e-12)
+    assert spectrum.metadata["diagnostics"] == "disabled"
 
 
 def test_single_layer_without_bottom_matches_absorbing_slab_solution() -> None:
