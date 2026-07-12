@@ -1,4 +1,4 @@
-"""Run the optimized WASP-69b clear-emission retrieval on native modes.
+"""Run the optimized clear-emission retrieval on configured native modes.
 
 This fresh run excludes the derived NIRCam overlap-average product and uses
 F322W2, F444W, and MIRI/LRS as independent likelihood terms. It deliberately
@@ -29,7 +29,6 @@ import numpy as np
 
 from robert_exoplanets import (
     ObservationCollection,
-    load_schlawin2024_wasp69b,
     run_ultranest,
 )
 
@@ -38,7 +37,7 @@ import retrieve_wasp69b_nircam_clear as workflow
 OUTPUT = (
     Path(__file__).resolve().parent
     / "outputs"
-    / "wasp69b_clear_native_modes_optimized_priors_v2"
+    / f"{workflow.TARGET_SLUG}_clear_native_modes_optimized_priors_v2"
 )
 RETAINED_MODES = ("f322w2", "f444w", "lrs")
 LIVE_POINTS = 50
@@ -51,15 +50,12 @@ SEED = 20260712
 def native_mode_observations() -> ObservationCollection:
     """Return only independent published instrument modes."""
 
-    published = load_schlawin2024_wasp69b(
-        workflow.DATA,
-        miri_offset_parameter=None,
-    )
+    published = workflow.TARGET.load_observations(miri_offset_parameter=None)
     observations = ObservationCollection(
         datasets=tuple(
             dataset for dataset in published.datasets if dataset.name in RETAINED_MODES
         ),
-        name="WASP-69b native instrument modes (no overlap-average product)",
+        name=f"{workflow.PLANET.name} native instrument modes",
         metadata={
             **dict(published.metadata),
             "selection": "F322W2, F444W, and LRS; overlap average excluded",
@@ -79,13 +75,10 @@ def build_native_mode_problem(observations: ObservationCollection):
     problem = workflow.build_problem(observations)
     return replace(
         problem,
-        name="wasp69b-clear-native-modes-optimized-priors-v2",
+        name=f"{workflow.TARGET_SLUG}-clear-native-modes-optimized-priors-v2",
         metadata={
             **dict(problem.metadata),
-            "difference": (
-                "native F322W2/F444W/LRS modes and PG14 analytic TP instead of "
-                "the full-band EGP RCE grid"
-            ),
+            "difference": ("native F322W2/F444W/LRS modes with PG14 analytic TP"),
             "dataset_selection": "F322W2,F444W,LRS",
             "overlap_average": "excluded",
             "dataset_manipulation": "none",

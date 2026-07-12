@@ -46,14 +46,17 @@ from robert_exoplanets import (
     ParameterizedClearSkyEmissionFactoryConfig,
     ParameterizedClearSkyEmissionModelConfig,
     ParmentierGuillot2014TemperatureProfile,
-    Planet,
     PressureGrid,
     MultiDatasetEmissionForwardModel,
-    Star,
     build_parameterized_clear_sky_emission_model,
     load_schlawin2024_wasp69b,
 )
 from robert_exoplanets.core import SpectralGrid, Spectrum
+
+try:
+    from examples.wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
+except ModuleNotFoundError:  # Direct execution from the examples directory.
+    from wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
 
 from retrieve_wasp69b_nircam_clear import (
     CACHE,
@@ -65,11 +68,6 @@ from retrieve_wasp69b_nircam_clear import (
     _cia_tables,
     _load_table,
 )
-
-RJUP_M = 7.1492e7
-MJUP_KG = 1.89813e27
-RSUN_M = 6.957e8
-
 
 @dataclass(frozen=True)
 class IndependentModeModelsForBenchmark:
@@ -133,14 +131,11 @@ def _canonicalize_g(
 def _config(
     provider: CorrelatedKOpacityProvider, pressure: PressureGrid, cia
 ) -> ParameterizedClearSkyEmissionFactoryConfig:
-    gravity = 6.67430e-11 * (0.26 * MJUP_KG) / (1.06 * RJUP_M) ** 2
     return ParameterizedClearSkyEmissionFactoryConfig(
-        planet=Planet(name="WASP-69b", radius_m=1.06 * RJUP_M, mass_kg=0.26 * MJUP_KG),
-        star=Star(
-            name="WASP-69", radius_m=0.813 * RSUN_M, effective_temperature_k=4750.0
-        ),
+        planet=PLANET,
+        star=STAR,
         temperature_profile=ParmentierGuillot2014TemperatureProfile(
-            gravity=gravity, internal_temperature=100.0
+            gravity=PLANET_GRAVITY_M_S2, internal_temperature=100.0
         ),
         chemistry_model=FastChemEquilibriumChemistry(
             fastchem_path=FASTCHEM, metadata={"element_abundances": "asplund_2009"}
