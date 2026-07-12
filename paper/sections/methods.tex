@@ -65,6 +65,66 @@ an ordinate grid or be combined by random overlap with resorting and
 rebinning. Collision-induced absorption and Rayleigh extinction are separate
 contributors, allowing their provenance and approximations to be inspected.
 
+For random overlap, two discrete opacity distributions with optical depths
+$\{\tau_a\}$ and $\{\tau_b\}$ and quadrature weights $\{w_a\}$ and $\{w_b\}$
+form the product distribution
+\begin{equation}
+ \tau_{ab}=\tau_a+\tau_b, \qquad w_{ab}=w_aw_b.
+ \label{eq:random-overlap}
+\end{equation}
+The $n_g^2$ product points are ranked and conservatively rebinned to the
+original $n_g$ intervals; the procedure is applied successively to all active
+absorbers. The reference implementation explicitly sorts the product
+distribution. In the accelerated implementation, nondecreasing input
+distributions---the normal correlated-$k$ case---are recognized and the
+$n_g$ already sorted rows of outer sums are combined with an $n_g$-element
+heap. Rebinning is performed in the same streaming pass with reusable work
+arrays. This avoids a general sort of every $n_g^2$ temporary at every layer
+and wavelength. Unsorted inputs retain the general sorting path, and a gas is
+skipped only when its maximum optical depth is below the declared transparent
+gas threshold. The NumPy implementation remains the scientific reference;
+the optional compiled backend is required to reproduce it to floating-point
+precision.
+
+\subsection{Profile-guided computational optimization}
+\label{sec:performance-methods}
+
+Optimization used warmed forward-model profiles of an 80-layer, six-molecule
+WASP-69b calculation with 16 $g$ ordinates, evaluated on both a 1591-point
+native opacity grid and 280-point observation grids. Changes were accepted
+only if they preserved the layer, wavelength, angular, and correlated-$k$
+resolution, equations, convergence thresholds, and double-precision
+arithmetic. Consequently, the changes described here alter implementation
+cost rather than retrieval physics.
+
+Random overlap was the dominant initial cost and was optimized as described
+above. Two additional repeated operations were removed from likelihood calls.
+First, prepared opacity objects retain validated spectral lookup indices, and
+providers may cache $\log k$ for immutable coefficient tables instead of
+recomputing logarithms during every pressure--temperature interpolation. The
+cache is explicit and optional because it exchanges memory for speed; cached
+and uncached calculations are tested for exact equality. Second, four fixed
+four-term source contractions in the SH4 solver were written as explicit sums,
+avoiding thousands of dispatches to a general tensor-contraction routine while
+leaving the spherical-harmonics equations unchanged. Spherical transmission
+was not rewritten because profiling showed that its contribution was already
+small.
+
+The random-overlap benchmark spans one, three, and six species at 280 and 1591
+wavelengths, records throughput and memory, and compares a deterministic
+subset with the NumPy reference on every run. On the development system
+(macOS arm64, Python 3.12.13, NumPy 2.2.6, and Numba 0.61.2), the largest
+observed random-overlap difference was $3.13\times10^{-13}$ in optical depth.
+The complete 279-test suite passes after these changes. In the representative
+WASP-69b workloads, the native-grid-then-bin path decreased from 6.35 to
+1.21\,s per warmed evaluation (a factor of 5.3), while preparing opacities per
+instrument mode decreased from 1.34 to 0.43\,s (a factor of 3.1). The
+corresponding log-likelihoods were unchanged exactly within the recorded
+double-precision calculation. Cached log-coefficients used approximately
+106\,MiB for the four observation-grid providers and 599\,MiB for the full
+native-grid provider, so production configurations should select the cache
+policy with available memory in mind.
+
 \subsection{Thermal emission and transmission}
 
 For a non-scattering, plane-parallel ray with direction cosine $\mu$, the
@@ -168,4 +228,3 @@ profiles, cloud contrast, metallicity, C/O, maximum likelihood, and evidence
 relative to the published analysis. \roberttodo{Run and report the staged
 retrieval suite; the current repository contains the data model and target
 workflow but not final publication-grade posteriors.}
-
