@@ -14,6 +14,7 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     integrate_thermal_emission,
+    integrate_thermal_emission_spectrum,
     solve_clear_sky_emission,
     thermal_integration_backend_name,
 )
@@ -86,6 +87,46 @@ def test_thermal_integration_auto_matches_numpy_reference() -> None:
         rtol=1.0e-12,
     )
     assert accelerated.backend in {"numpy", "numba"}
+
+
+def test_spectrum_only_integration_matches_summed_diagnostics() -> None:
+    tau = np.array(
+        [
+            [[0.1, 0.2], [0.3, 0.4]],
+            [[0.5, 0.6], [0.7, 0.8]],
+        ]
+    )
+    source = np.array([[2.0, 3.0], [4.0, 5.0]])
+    weights = np.array([0.4, 0.6])
+    paths = np.array([[1.0, 1.0], [2.0, 1.5]])
+    point_weights = np.array([0.3, 0.7])
+    bottom = np.array([7.0, 8.0])
+    diagnostics = integrate_thermal_emission(
+        tau,
+        source,
+        weights,
+        paths,
+        bottom_source=bottom,
+        backend="numpy",
+    )
+    expected = np.tensordot(
+        point_weights,
+        np.sum(diagnostics.point_layer_contribution_radiance, axis=1)
+        + diagnostics.point_bottom_contribution_radiance,
+        axes=(0, 0),
+    )
+
+    spectrum_only = integrate_thermal_emission_spectrum(
+        tau,
+        source,
+        weights,
+        paths,
+        point_weights,
+        bottom_source=bottom,
+        backend="auto",
+    )
+
+    np.testing.assert_allclose(spectrum_only.radiance, expected, rtol=1.0e-12)
 
 
 def test_linear_source_matches_exact_rutten_formal_integral() -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from robert_exoplanets import (
-    MultiDatasetForwardModel,
+    NativeSpectrumMultiDatasetForwardModel,
     MultiDatasetGaussianLikelihood,
     MultiDatasetRetrievalProblem,
     LinearObservationResponse,
@@ -32,7 +32,9 @@ def _observation(wavelength, flux, instrument):
 def test_multi_dataset_forward_model_retains_dataset_identity() -> None:
     collection = ObservationCollection(
         (
-            ObservationDataset("nircam", _observation([2.0, 3.0], [1.0, 2.0], "NIRCam")),
+            ObservationDataset(
+                "nircam", _observation([2.0, 3.0], [1.0, 2.0], "NIRCam")
+            ),
             ObservationDataset("miri", _observation([5.0, 8.0], [3.0, 4.0], "MIRI")),
         )
     )
@@ -42,7 +44,7 @@ def test_multi_dataset_forward_model_retains_dataset_identity() -> None:
         unit="eclipse_depth",
         observable="eclipse_depth",
     )
-    model = MultiDatasetForwardModel(
+    model = NativeSpectrumMultiDatasetForwardModel(
         lambda parameters: native,
         collection,
         response=LinearObservationResponse(),

@@ -101,6 +101,9 @@ non-converged sampler runs cannot pass validation.
   directories and compact `.npz` exchange files, with an I/O benchmark example.
 - A native-grid correlated-k opacity evaluator for exact benchmark cases and
   optional log-pressure, temperature, log-k interpolation.
+- A functional beta ExoMol cross-section opacity-sampling backend for
+  convergence experiments; correlated-k remains the validated retrieval
+  default.
 - Accuracy-preserving spectral-bin preparation through `exo_k`, which
   re-sorts and recompresses each correlated-k distribution onto observation
   bin edges instead of interpolating individual g ordinates.
@@ -158,6 +161,9 @@ non-converged sampler runs cannot pass validation.
 - A Numba-backed thermal source integration path for thermal-only RT, with a
   NumPy reference backend retained for tests and debugging.
 - A coordinate-checked Gaussian likelihood with masks, offsets, and jitter.
+- Shared-atmosphere multi-dataset emission as the default multi-instrument
+  retrieval flow: one temperature/chemistry state per physical region fans out
+  to arbitrary mode-specific correlated-k opacity and RT calculations.
 - Typed retrieval parameters and priors, diagnostic optimal estimation, and an
   optional UltraNest adapter behind one `RetrievalProblem` interface.
 - Versioned run manifests written before inference, including configuration

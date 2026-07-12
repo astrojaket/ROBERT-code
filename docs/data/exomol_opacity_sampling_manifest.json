@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "downloaded_utc": "2026-07-12",
+  "source": "ExoMolOP",
+  "format": "TauREx HDF5 cross sections",
+  "resolving_power": 15000,
+  "wavelength_micron": [0.3, 50.0],
+  "shape": [22, 27, 76744],
+  "axis_order": ["pressure_bar", "temperature_K", "wavenumber_cm-1"],
+  "unit": "cm^2/molecule",
+  "files": {
+    "H2O": {"line_list": "1H2-16O__POKAZATEL", "sha256": "ba9d455db93809661aee79e7d322fde19da0236af1c1a9bb68f5b24735efb7fb", "bytes": 365310072},
+    "CO": {"line_list": "12C-16O__Li2015", "sha256": "4f66cfca115eeb76fd8580bdf10f616db038d928b4af9d18ddc0c584a7116596", "bytes": 365310264},
+    "CO2": {"line_list": "12C-16O2__UCL-4000", "sha256": "de25847fada9879ee11dc9bfd031b57e8747bbef108d05c242b62c2cfe82b314", "bytes": 365310264, "metadata_note": "upstream DOI dataset contains the literal placeholder 'qqq'; use the line-list publication DOI 10.1093/mnras/staa1874"},
+    "CH4": {"line_list": "12C-1H4__YT34to10", "sha256": "87fe3971038a3b1975a341cf2ef8632d76ec612b093f812479833072c738d11d", "bytes": 365310264},
+    "NH3": {"line_list": "14N-1H3__CoYuTe", "sha256": "e5069a45aabffad377e26cb8025ae051ed64c3109ab31d41cff9081461bba8e7", "bytes": 365310264},
+    "HCN": {"line_list": "1H-12C-14N__Harris", "sha256": "9d0a50c7a08a788d52c8947787bdd6be59acd9a00960ee59d3f15fba979fb3df", "bytes": 365310264}
+  }
+}

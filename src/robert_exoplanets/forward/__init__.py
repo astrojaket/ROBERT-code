@@ -14,8 +14,10 @@ from .factory import (
     ClearSkyEmissionFactoryConfig,
     ExoKOpacitySource,
     ExoKTableBinning,
+    ExoMolOpacitySamplingSource,
     ParameterizedClearSkyEmissionFactoryConfig,
     build_clear_sky_emission_model,
+    build_multi_dataset_emission_model,
     build_parameterized_clear_sky_emission_model,
     pressure_grid_from_opacity,
 )
@@ -25,7 +27,11 @@ from .inhomogeneous import (
     TwoRegionEmissionModel,
     build_disk_emission_model,
 )
-from .multi_dataset import MultiDatasetForwardModel, MultiDatasetPrediction
+from .multi_dataset import (
+    MultiDatasetEmissionForwardModel,
+    NativeSpectrumMultiDatasetForwardModel,
+    NativeSpectrumMultiDatasetPrediction,
+)
 
 __all__ = [
     "ClearSkyEmissionFactoryConfig",
@@ -35,9 +41,11 @@ __all__ = [
     "ClearSkyEmissionModelConfig",
     "ExoKOpacitySource",
     "ExoKTableBinning",
+    "ExoMolOpacitySamplingSource",
     "GreyScatteringCloudConfig",
-    "MultiDatasetForwardModel",
-    "MultiDatasetPrediction",
+    "MultiDatasetEmissionForwardModel",
+    "NativeSpectrumMultiDatasetForwardModel",
+    "NativeSpectrumMultiDatasetPrediction",
     "ParameterizedClearSkyEmissionFactoryConfig",
     "ParameterizedClearSkyEmissionForwardModel",
     "ParameterizedGreyCloudEmissionForwardModel",
@@ -46,6 +54,7 @@ __all__ = [
     "TwoRegionEmissionModel",
     "ParameterizedClearSkyEmissionModelConfig",
     "build_clear_sky_emission_model",
+    "build_multi_dataset_emission_model",
     "build_disk_emission_model",
     "build_parameterized_clear_sky_emission_model",
     "pressure_grid_from_opacity",

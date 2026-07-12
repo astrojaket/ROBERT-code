@@ -144,19 +144,79 @@ def test_assemble_gas_optical_depth_can_use_random_overlap_combination() -> None
     assert gas_tau.metadata["gas_combination"] == "random_overlap"
 
 
+def test_fused_gas_optical_depth_matches_species_resolved_random_overlap() -> None:
+    pytest.importorskip("numba")
+    rng = np.random.default_rng(1947)
+    pressure_grid = PressureGrid(
+        edges=np.geomspace(1.0e-5, 1.0, 5),
+        centers=np.sqrt(
+            np.geomspace(1.0e-5, 1.0, 5)[:-1]
+            * np.geomspace(1.0e-5, 1.0, 5)[1:]
+        ),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array(
+        np.linspace(1000.0, 1400.0, 7), unit="cm^-1", role="opacity"
+    )
+    species = ("H2O", "CO", "CO2")
+    atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=np.linspace(800.0, 1200.0, 4),
+        composition={
+            name: np.exp(rng.uniform(-12.0, -4.0, size=4)) for name in species
+        },
+        mean_molecular_weight=np.linspace(2.2, 2.4, 4),
+    )
+    kcoeff = np.sort(
+        np.exp(rng.uniform(-65.0, -45.0, size=(3, 4, 7, 16))),
+        axis=-1,
+    )
+    opacity = _evaluated_opacity(
+        pressure_grid,
+        spectral_grid,
+        species,
+        kcoeff,
+    )
+
+    reference = assemble_gas_optical_depth(
+        atmosphere,
+        opacity,
+        gravity_m_s2=9.5,
+        gas_combination="random_overlap",
+    )
+    fused = assemble_gas_optical_depth(
+        atmosphere,
+        opacity,
+        gravity_m_s2=9.5,
+        gas_combination="random_overlap",
+        retain_species_tau=False,
+    )
+
+    np.testing.assert_allclose(
+        fused.total_tau,
+        reference.total_tau,
+        rtol=2.0e-12,
+        atol=2.0e-12,
+    )
+    assert fused.species_tau is None
+    assert fused.metadata["assembly_backend"] == "fused_numba_random_overlap"
+    assert fused.metadata["species_tau_diagnostics"] == "disabled"
+
+
 def _evaluated_opacity(
     pressure_grid: PressureGrid,
     spectral_grid: SpectralGrid,
     species: tuple[str, ...],
     kcoeff: np.ndarray,
 ) -> EvaluatedCorrelatedKOpacity:
+    n_g = kcoeff.shape[-1]
     prepared = PreparedCorrelatedKOpacity(
         provider_name="test-correlated-k",
         spectral_grid=spectral_grid,
         pressure_grid=pressure_grid,
         species=species,
-        g_samples=np.array([0.25, 0.75]),
-        g_weights=np.array([0.5, 0.5]),
+        g_samples=(np.arange(n_g, dtype=float) + 0.5) / n_g,
+        g_weights=np.full(n_g, 1.0 / n_g),
         cache_key="test-random-overlap-cache-key",
     )
     return EvaluatedCorrelatedKOpacity(

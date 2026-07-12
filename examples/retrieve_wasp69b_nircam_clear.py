@@ -10,13 +10,12 @@ spectra are reserved for plotting and diagnostics.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, replace
+from dataclasses import replace
 import hashlib
 import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Mapping
 
 os.environ.setdefault(
     "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib")
@@ -52,11 +51,10 @@ from robert_exoplanets import (
     RetrievalParameterSet,
     Star,
     UniformPrior,
-    build_parameterized_clear_sky_emission_model,
+    build_multi_dataset_emission_model,
     load_schlawin2024_wasp69b,
     run_ultranest,
 )
-from robert_exoplanets.core import Spectrum
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data" / "wasp69b_schlawin2024"
@@ -180,14 +178,6 @@ def parameters() -> RetrievalParameterSet:
     )
 
 
-@dataclass(frozen=True)
-class NamedRegionalModels:
-    models: Mapping[str, object]
-
-    def __call__(self, values: Mapping[str, float]) -> Mapping[str, Spectrum]:
-        return {name: model(values) for name, model in self.models.items()}
-
-
 def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalProblem:
     gravity = 6.67430e-11 * (0.26 * MJUP_KG) / (1.06 * RJUP_M) ** 2
     pressure = PressureGrid.from_log_centers(
@@ -198,8 +188,41 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
         name="WASP-69b emission pressure grid",
     )
     cia = _cia_tables()
-    models = {}
-    opacity_ids = {}
+    planet = Planet(
+        name="WASP-69b",
+        radius_m=1.06 * RJUP_M,
+        mass_kg=0.26 * MJUP_KG,
+    )
+    star = Star(
+        name="WASP-69",
+        radius_m=0.813 * RSUN_M,
+        effective_temperature_k=4750.0,
+    )
+    temperature_profile = ParmentierGuillot2014TemperatureProfile(
+        gravity=gravity,
+        internal_temperature=100.0,
+    )
+    chemistry_model = FastChemEquilibriumChemistry(
+        fastchem_path=FASTCHEM,
+        metadata={"element_abundances": "asplund_2009"},
+    )
+    mean_molecular_weight_model = CompositionMeanMolecularWeight(
+        normalization="raw_sum"
+    )
+    model_config = ParameterizedClearSkyEmissionModelConfig(
+        opacity_species=SPECIES,
+        include_rayleigh=True,
+        gas_combination="random_overlap",
+        thermal_integration_backend="auto",
+        metadata={
+            "target": "WASP-69b",
+            "dataset_selection": ",".join(observations.names),
+            "dayside_geometry": "one_region_clear",
+            "paper_analogue": "not_exact_EGP_grid_reproduction",
+        },
+    )
+    configs = {}
+    spectral_grids = {}
     for dataset in observations.datasets:
         tables = {species: _load_table(dataset.name, species) for species in SPECIES}
         canonical_g = tables["H2O"].g_samples
@@ -225,53 +248,28 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
             name=f"WASP-69b-NIRCam-{dataset.name}-ExoMol-pRT-R1000-binned",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        config = ParameterizedClearSkyEmissionFactoryConfig(
-            planet=Planet(
-                name="WASP-69b",
-                radius_m=1.06 * RJUP_M,
-                mass_kg=0.26 * MJUP_KG,
-            ),
-            star=Star(
-                name="WASP-69",
-                radius_m=0.813 * RSUN_M,
-                effective_temperature_k=4750.0,
-            ),
-            temperature_profile=ParmentierGuillot2014TemperatureProfile(
-                gravity=gravity,
-                internal_temperature=100.0,
-            ),
-            chemistry_model=FastChemEquilibriumChemistry(
-                fastchem_path=FASTCHEM,
-                metadata={"element_abundances": "asplund_2009"},
-            ),
-            mean_molecular_weight_model=CompositionMeanMolecularWeight(
-                normalization="raw_sum"
-            ),
+        configs[dataset.name] = ParameterizedClearSkyEmissionFactoryConfig(
+            planet=planet,
+            star=star,
+            temperature_profile=temperature_profile,
+            chemistry_model=chemistry_model,
+            mean_molecular_weight_model=mean_molecular_weight_model,
             pressure_grid=pressure,
             cia_table=cia,
             opacity_source=provider,
             opacity_binning=None,
-            model=ParameterizedClearSkyEmissionModelConfig(
-                opacity_species=SPECIES,
-                include_rayleigh=True,
-                gas_combination="random_overlap",
-                thermal_integration_backend="auto",
-                metadata={
-                    "target": "WASP-69b",
-                    "dataset_selection": "NIRCam_only",
-                    "dayside_geometry": "one_region_clear",
-                    "paper_analogue": "not_exact_EGP_grid_reproduction",
-                },
-            ),
+            model=model_config,
         )
-        model = build_parameterized_clear_sky_emission_model(
-            config,
-            spectral_grid=dataset.observation.spectral_grid,
-        )
-        models[dataset.name] = model
+        spectral_grids[dataset.name] = dataset.observation.spectral_grid
+    forward_model = build_multi_dataset_emission_model(
+        configs,
+        spectral_grids=spectral_grids,
+    )
+    opacity_ids = {}
+    for dataset_name, model in forward_model.models.items():
         opacity_ids.update(
             {
-                f"{dataset.name}:{key}": value
+                f"{dataset_name}:{key}": value
                 for key, value in model.opacity_identifiers.items()
             }
         )
@@ -279,7 +277,7 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
         name="wasp69b-nircam-clear-one-region",
         observations=observations,
         parameters=parameters(),
-        forward_model=NamedRegionalModels(models),
+        forward_model=forward_model,
         likelihood=MultiDatasetGaussianLikelihood(include_normalization=True),
         invalid_loglike=-1.0e100,
         metadata={
@@ -360,7 +358,8 @@ def _write_products(
         },
         "comparison_warning": (
             "Paper values use 2-12 micron CHIMERA plus interpolated EGP RCE profiles; "
-            "this run uses NIRCam only and a PG14 analytic TP profile."
+            "this ROBERT run uses its recorded dataset selection and a PG14 analytic "
+            "TP profile, so evidence values are not directly comparable."
         ),
     }
     (output / "summary.json").write_text(
@@ -385,7 +384,12 @@ def _write_products(
 
 
 def _plot(observations, envelopes, best_spectra, summary, path: Path) -> None:
-    colors = {"f322w2": "#20639b", "avg": "#7a5195", "f444w": "#ef5675"}
+    colors = {
+        "f322w2": "#20639b",
+        "avg": "#7a5195",
+        "f444w": "#ef5675",
+        "lrs": "#2ca25f",
+    }
     fig, (axis, residual_axis) = plt.subplots(
         2, 1, figsize=(10, 7), sharex=True, gridspec_kw={"height_ratios": [3, 1]}
     )
@@ -411,12 +415,12 @@ def _plot(observations, envelopes, best_spectra, summary, path: Path) -> None:
         residual = (obs.flux - best_spectra[name].values) / obs.uncertainty
         residual_axis.plot(obs.wavelength, residual, ".", color=color, markersize=3)
     axis.set_ylabel("Eclipse depth (ppm)")
-    axis.set_title("WASP-69b NIRCam: ROBERT clear one-region retrieval")
+    axis.set_title("WASP-69b: ROBERT clear one-region retrieval")
     axis.text(
         0.02,
         0.97,
         "Shading: posterior 68% (1-sigma) spectrum envelope\n"
-        f"NIRCam-only reduced chi-square = {summary['reduced_chi_squared']:.2f}\n"
+        f"ROBERT reduced chi-square = {summary['reduced_chi_squared']:.2f}\n"
         "Paper full 2-12 micron clear model: reduced chi-square = 14.5",
         transform=axis.transAxes,
         va="top",

@@ -24,6 +24,7 @@ from .scattering import SingleScatteringSource
 from .sh4 import solve_thermal_sh4
 from .thermal_integration import (
     integrate_thermal_emission,
+    integrate_thermal_emission_spectrum,
     thermal_integration_backend_name,
 )
 from .toon import solve_thermal_two_stream
@@ -625,6 +626,144 @@ def solve_clear_sky_emission(
     )
 
 
+def solve_clear_sky_emission_spectrum(
+    gas_optical_depth: GasOpticalDepth,
+    *,
+    geometry: DiscGeometry | None = None,
+    bottom_boundary: str = "blackbody",
+    additional_optical_depths: Sequence[object] | None = None,
+    path_geometry: HydrostaticPathGeometry | None = None,
+    thermal_integration_backend: str = "auto",
+    planet_radius_m: float | None = None,
+    star_radius_m: float | None = None,
+    star_temperature_k: float | None = None,
+) -> Spectrum:
+    """Return only thermal radiance or eclipse depth for retrieval calls.
+
+    This absorption/extinction path intentionally omits layer, disc-point, and
+    contribution-function arrays. Use :func:`solve_clear_sky_emission` when
+    diagnostics or scattering source reconstruction are required.
+    """
+
+    bottom_mode = bottom_boundary.strip().lower()
+    if bottom_mode not in {"blackbody", "none"}:
+        raise RobertValidationError("bottom_boundary must be 'blackbody' or 'none'")
+    emission_geometry = geometry or normal_emission_geometry()
+    mu = emission_geometry.emission_angle_cosines
+    mu_weights = emission_geometry.emission_angle_weights
+    if path_geometry is not None:
+        _validate_path_geometry_match(gas_optical_depth, path_geometry)
+    wavelength = spectral_grid_values_in_unit(
+        gas_optical_depth.spectral_grid, "micron"
+    )
+    output_grid = SpectralGrid.from_array(
+        wavelength,
+        unit="micron",
+        role="rt_native",
+        name=gas_optical_depth.spectral_grid.name,
+    )
+    order = _top_to_bottom_order(gas_optical_depth)
+    source = _layer_planck_source(
+        wavelength, gas_optical_depth.atmosphere.temperature
+    )
+    source_ordered = source[order]
+    level_source_ordered = None
+    temperature_edges = gas_optical_depth.atmosphere.temperature_edges
+    if temperature_edges is not None:
+        ordered_edges = np.asarray(temperature_edges, dtype=float)
+        if order[0] != 0:
+            ordered_edges = ordered_edges[::-1]
+        level_source_ordered = _layer_planck_source(wavelength, ordered_edges)
+    total_tau, opacity_sources = _total_extinction_only(
+        gas_optical_depth, additional_optical_depths
+    )
+    path_factors = _emission_path_factors(
+        mu,
+        gas_optical_depth.atmosphere.n_layers,
+        order=order,
+        path_geometry=path_geometry,
+    )
+    bottom_source = None
+    if bottom_mode == "blackbody":
+        if temperature_edges is None:
+            deepest_temperature = float(
+                gas_optical_depth.atmosphere.temperature[
+                    int(np.argmax(gas_optical_depth.pressure_grid.centers))
+                ]
+            )
+        else:
+            deepest_temperature = float(
+                temperature_edges[
+                    int(np.argmax(gas_optical_depth.pressure_grid.edges))
+                ]
+            )
+        bottom_source = _planck_radiance_wavelength(
+            wavelength, deepest_temperature
+        )
+    if bottom_mode == "blackbody":
+        bottom_visible = (
+            np.ones(mu.size, dtype=bool)
+            if path_geometry is None
+            else np.asarray(path_geometry.bottom_visible(mu), dtype=bool)
+        )
+    else:
+        bottom_visible = np.zeros(mu.size, dtype=bool)
+    integrated = integrate_thermal_emission_spectrum(
+        total_tau[order],
+        source_ordered,
+        gas_optical_depth.g_weights,
+        path_factors,
+        mu_weights,
+        level_source_ordered=level_source_ordered,
+        bottom_source=bottom_source,
+        bottom_visible=bottom_visible,
+        backend=thermal_integration_backend,
+    )
+    radiance_values = np.asarray(integrated.radiance)
+    metadata = {
+        "rt_solver": "clear_sky_spectrum_only",
+        "diagnostics": "disabled",
+        "bottom_boundary": bottom_mode,
+        "source_function": "thermal_planck",
+        "thermal_integration_backend": integrated.backend,
+        "opacity_sources": "+".join(opacity_sources),
+        "geometry": emission_geometry.name,
+        "geometry_n_points": str(emission_geometry.n_points),
+        "path_geometry": "plane_parallel_secant"
+        if path_geometry is None
+        else str(path_geometry.metadata.get("path_model", "hydrostatic_spherical_shell")),
+    }
+    if star_temperature_k is None and planet_radius_m is None and star_radius_m is None:
+        return Spectrum(
+            spectral_grid=output_grid,
+            values=radiance_values,
+            unit="W m^-3 sr^-1",
+            observable="spectral_radiance",
+            metadata=metadata,
+        )
+    if star_temperature_k is None or planet_radius_m is None or star_radius_m is None:
+        raise RobertValidationError(
+            "star_temperature_k, planet_radius_m, and star_radius_m are all required for eclipse depth"
+        )
+    stellar_radiance = _planck_radiance_wavelength(
+        wavelength, float(star_temperature_k)
+    )
+    planet_radius = _positive_float(planet_radius_m, "planet_radius_m")
+    star_radius = _positive_float(star_radius_m, "star_radius_m")
+    depth = (radiance_values / stellar_radiance) * (planet_radius / star_radius) ** 2
+    if not np.all(np.isfinite(depth)) or np.any(depth < 0.0):
+        raise RobertValidationError(
+            "spectrum-only eclipse-depth calculation produced invalid values"
+        )
+    return Spectrum(
+        spectral_grid=output_grid,
+        values=depth,
+        unit="eclipse_depth",
+        observable="eclipse_depth",
+        metadata={**metadata, "stellar_model": "blackbody"},
+    )
+
+
 def disk_average_quadrature(n_mu: int = 4) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Return quadrature for disk-averaged thermal emission.
 
@@ -830,6 +969,38 @@ def _total_optical_depth(
         phase_moments,
         tuple(scattering_sources),
     )
+
+
+def _total_extinction_only(
+    gas_optical_depth: GasOpticalDepth,
+    additional_optical_depths: Sequence[object] | None,
+) -> tuple[NDArray[np.float64], tuple[str, ...]]:
+    total_tau = np.array(gas_optical_depth.total_tau, dtype=float, copy=True)
+    sources = [str(gas_optical_depth.metadata.get("opacity_mode", "gas"))]
+    if additional_optical_depths is not None:
+        for contribution in additional_optical_depths:
+            if contribution is None:
+                continue
+            _validate_contribution_grid_match(gas_optical_depth, contribution)
+            name = str(getattr(contribution, "name", "additional_extinction"))
+            if _looks_like_cloud_optical_properties(contribution):
+                values = getattr(contribution, "extinction_tau")
+                label = "cloud extinction_tau"
+            else:
+                values = getattr(contribution, "tau", contribution)
+                label = "additional optical depths"
+            total_tau += _layer_spectral_tau_for_g(
+                values,
+                total_tau.shape,
+                label,
+            )
+            sources.append(name)
+    if not np.all(np.isfinite(total_tau)) or np.any(total_tau < 0.0):
+        raise RobertValidationError(
+            "total extinction optical depth must be finite and non-negative"
+        )
+    total_tau.setflags(write=False)
+    return total_tau, tuple(sources)
 
 
 def _contribution_phase_moments_for_g(

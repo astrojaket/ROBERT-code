@@ -142,12 +142,6 @@ class Observation:
             metadata={"source": "observation"},
         )
 
-    def validate(self) -> None:
-        """Preserve the v0.1 validation method as a no-op for compatibility."""
-
-        return None
-
-
 def infer_wavelength_bin_edges(wavelength: ArrayLike) -> NDArray[np.float64]:
     """Infer contiguous bin edges halfway between monotonic bin centres."""
 

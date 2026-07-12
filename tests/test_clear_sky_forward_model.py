@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -97,6 +99,31 @@ def test_clear_sky_emission_model_evaluates_multi_gas_eclipse_depth() -> None:
     assert len(model.manifest_metadata["pressure_grid_sha256"]) == 64
     assert len(model.manifest_metadata["spectral_grid_sha256"]) == 64
     assert model.manifest_metadata["log_vmr_parameters"] == "H2O:log_h2o,CO:log_co"
+
+
+def test_diagnostics_free_fused_model_matches_diagnostic_reference() -> None:
+    pytest.importorskip("numba")
+    fused = _model()
+    reference = replace(
+        fused,
+        config=replace(fused.config, compute_diagnostics=True),
+    )
+    parameters = {
+        "log_h2o": -3.0,
+        "log_co": -4.0,
+        "temperature_offset": 20.0,
+        "radius_scale": 1.02,
+    }
+
+    fused_spectrum = fused(parameters)
+    reference_spectrum = reference(parameters)
+
+    np.testing.assert_allclose(
+        fused_spectrum.values,
+        reference_spectrum.values,
+        rtol=2.0e-13,
+        atol=0.0,
+    )
 
 
 def test_clear_sky_emission_model_rejects_missing_or_invalid_parameters() -> None:
