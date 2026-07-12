@@ -18,7 +18,12 @@ from robert_exoplanets import (
     IsothermalTemperatureProfile,
     Planet,
     ParameterizedClearSkyEmissionFactoryConfig,
+    ParameterizedGreyCloudEmissionForwardModel,
+    ParameterizedRefractiveIndexCloudEmissionForwardModel,
     ParameterizedClearSkyEmissionModelConfig,
+    RefractiveIndexCloudConfig,
+    RefractiveIndexSpectrum,
+    GreyScatteringCloudConfig,
     SpectralGrid,
     Star,
     build_clear_sky_emission_model,
@@ -225,3 +230,136 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
         "runtime_temperature_and_chemistry"
     )
     assert np.all(hot.values > cool.values)
+
+
+def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> None:
+    config = ParameterizedClearSkyEmissionFactoryConfig(
+        planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Generic star", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedClearSkyEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+        ),
+    )
+    clear = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+    cloudy = ParameterizedGreyCloudEmissionForwardModel(
+        planet=clear.planet,
+        star=clear.star,
+        spectral_grid=clear.spectral_grid,
+        atmosphere_builder=clear.atmosphere_builder,
+        opacity_provider=clear.opacity_provider,
+        config=clear.config,
+        cia_table=clear.cia_table,
+        geometry=clear.geometry,
+        cloud=GreyScatteringCloudConfig(
+            log10_mass_extinction_parameter="log_kappa_cloud",
+            multiple_scattering_backend="sh4",
+        ),
+    )
+
+    spectrum = cloudy({"T_iso": 1000.0, "log_h2o": -3.0, "log_kappa_cloud": -2.0})
+
+    assert cloudy.required_parameters == ("T_iso", "log_h2o", "log_kappa_cloud")
+    assert cloudy.manifest_metadata["cloud_multiple_scattering_backend"] == "sh4"
+    assert cloudy.manifest_metadata["planet_name"] == "Generic b"
+    assert spectrum.observable == "eclipse_depth"
+    assert np.all(np.isfinite(spectrum.values))
+
+
+def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles() -> None:
+    config = ParameterizedClearSkyEmissionFactoryConfig(
+        planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Generic star", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedClearSkyEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+        ),
+    )
+    clear = build_parameterized_clear_sky_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+    cloudy = ParameterizedRefractiveIndexCloudEmissionForwardModel(
+        planet=clear.planet,
+        star=clear.star,
+        spectral_grid=clear.spectral_grid,
+        atmosphere_builder=clear.atmosphere_builder,
+        opacity_provider=clear.opacity_provider,
+        config=clear.config,
+        cia_table=clear.cia_table,
+        geometry=clear.geometry,
+        cloud=RefractiveIndexCloudConfig(
+            refractive_index_wavelength_micron=(1.5, 5.0),
+            real_index_parameter_names=("cloud_n_short", "cloud_n_long"),
+            log10_imaginary_index_parameter_names=("cloud_logk_short", "cloud_logk_long"),
+            log10_condensate_mass_fraction_parameter="log_cloud_mass_fraction",
+            log10_effective_radius_micron_parameter="log_cloud_radius",
+            particle_density_kg_m3=3000.0,
+            geometric_stddev=1.0,
+            quadrature_points=1,
+        ),
+    )
+    parameters = {
+        "T_iso": 1000.0,
+        "log_h2o": -3.0,
+        "cloud_n_short": 1.5,
+        "cloud_n_long": 1.6,
+        "cloud_logk_short": -3.0,
+        "cloud_logk_long": -2.0,
+        "log_cloud_mass_fraction": -6.0,
+        "log_cloud_radius": -1.0,
+    }
+
+    spectrum = cloudy(parameters)
+
+    assert cloudy.required_parameters == tuple(parameters)
+    assert cloudy.manifest_metadata["cloud_refractive_index_parameterization"] == (
+        "nodal_n_log10_k"
+    )
+    assert cloudy.manifest_metadata["cloud_phase_function_closure"] == (
+        "exact_mie_legendre_moments_through_l4"
+    )
+    assert spectrum.observable == "eclipse_depth"
+    assert np.all(np.isfinite(spectrum.values))
+
+
+def test_parameterized_mie_cloud_accepts_fixed_catalog_style_refractive_index() -> None:
+    fixed = RefractiveIndexSpectrum(
+        wavelength_micron=(1.0, 6.0),
+        real_index=(1.5, 1.7),
+        imaginary_index=(1.0e-3, 1.0e-2),
+        name="fixed test material",
+    )
+    cloud = RefractiveIndexCloudConfig(
+        refractive_index_wavelength_micron=(),
+        real_index_parameter_names=(),
+        log10_imaginary_index_parameter_names=(),
+        log10_condensate_mass_fraction_parameter="log_q_cloud",
+        log10_effective_radius_micron_parameter="log_r_cloud",
+        particle_density_kg_m3=3000.0,
+        fixed_refractive_index=fixed,
+    )
+
+    assert cloud.required_parameters == ("log_q_cloud", "log_r_cloud")
+    assert cloud.fixed_refractive_index is fixed

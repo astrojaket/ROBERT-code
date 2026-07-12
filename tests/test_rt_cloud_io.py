@@ -32,6 +32,7 @@ def test_cloud_npz_roundtrip_preserves_optical_properties(tmp_path) -> None:
     assert comparison.max_abs_single_scattering_albedo == pytest.approx(0.0)
     assert comparison.max_abs_asymmetry_factor == pytest.approx(0.0)
     assert loaded.metadata["source_format"] == "npz_cloud_optical_properties"
+    np.testing.assert_allclose(loaded.phase_function_moments, cloud.phase_function_moments)
 
 
 def test_cloud_npz_reader_accepts_picaso_virga_aliases(tmp_path) -> None:
@@ -194,11 +195,15 @@ def test_cloud_comparison_rejects_grid_mismatch() -> None:
 def _cloud() -> CloudOpticalProperties:
     pressure_grid = PressureGrid.logspace(1.0e-5, 1.0e-1, 2, unit="bar")
     spectral_grid = SpectralGrid.from_array([1.0, 2.0], unit="micron", role="opacity")
+    asymmetry = np.array([[0.0, 0.1], [0.2, 0.3]])
+    degree = np.arange(5, dtype=float)[:, None, None]
+    moments = (2.0 * degree + 1.0) * asymmetry[None, ...] ** degree
     return CloudOpticalProperties(
         name="roundtrip cloud",
         extinction_tau=np.array([[0.1, 0.2], [0.3, 0.4]]),
         pressure_grid=pressure_grid,
         spectral_grid=spectral_grid,
         single_scattering_albedo=np.array([[0.5, 0.6], [0.7, 0.8]]),
-        asymmetry_factor=np.array([[0.0, 0.1], [0.2, 0.3]]),
+        asymmetry_factor=asymmetry,
+        phase_function_moments=moments,
     )

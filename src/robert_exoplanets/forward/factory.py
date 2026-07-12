@@ -207,7 +207,7 @@ class ParameterizedClearSkyEmissionFactoryConfig:
     chemistry_model: ChemistryModel
     opacity_source: ExoKOpacitySource | CorrelatedKOpacityProvider
     model: ParameterizedClearSkyEmissionModelConfig
-    cia_table: CiaTable | None = None
+    cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     pressure_grid: PressureGrid | None = None
     mean_molecular_weight: float = 2.3
     mean_molecular_weight_model: MeanMolecularWeightModel | None = None

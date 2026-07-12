@@ -58,18 +58,24 @@ def test_numba_random_overlap_backend_matches_numpy_when_available() -> None:
     pytest.importorskip("numba")
     species_tau = np.array(
         [
-            [[
-                [0.1, 0.4, 0.2],
-                [0.3, 0.2, 0.8],
-            ]],
-            [[
-                [0.5, 0.2, 0.1],
-                [0.4, 0.7, 0.6],
-            ]],
-            [[
-                [0.0, 0.1, 0.3],
-                [0.2, 0.1, 0.5],
-            ]],
+            [
+                [
+                    [0.1, 0.4, 0.2],
+                    [0.3, 0.2, 0.8],
+                ]
+            ],
+            [
+                [
+                    [0.5, 0.2, 0.1],
+                    [0.4, 0.7, 0.6],
+                ]
+            ],
+            [
+                [
+                    [0.0, 0.1, 0.3],
+                    [0.2, 0.1, 0.5],
+                ]
+            ],
         ],
         dtype=float,
     )
@@ -78,7 +84,28 @@ def test_numba_random_overlap_backend_matches_numpy_when_available() -> None:
     numpy_combined = random_overlap_species_tau(species_tau, weights, backend="numpy")
     numba_combined = random_overlap_species_tau(species_tau, weights, backend="numba")
 
-    np.testing.assert_allclose(numba_combined, numpy_combined, rtol=1.0e-12, atol=1.0e-12)
+    np.testing.assert_allclose(
+        numba_combined, numpy_combined, rtol=1.0e-12, atol=1.0e-12
+    )
+
+
+def test_numba_random_overlap_sorted_fast_path_matches_numpy() -> None:
+    pytest.importorskip("numba")
+    rng = np.random.default_rng(1928)
+    species_tau = np.sort(
+        np.exp(rng.uniform(-20.0, 5.0, size=(5, 3, 7, 16))),
+        axis=-1,
+    )
+    weights = np.arange(1.0, 17.0)
+    weights /= np.sum(weights)
+
+    numpy_combined = random_overlap_species_tau(species_tau, weights, backend="numpy")
+    numba_combined = random_overlap_species_tau(species_tau, weights, backend="numba")
+
+    np.testing.assert_allclose(
+        numba_combined, numpy_combined, rtol=2.0e-12, atol=2.0e-12
+    )
+    assert np.all(np.diff(numba_combined, axis=-1) >= 0.0)
 
 
 def test_assemble_gas_optical_depth_can_use_random_overlap_combination() -> None:

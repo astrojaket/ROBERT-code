@@ -30,6 +30,20 @@
   FastChem/Madhusudhan-Seager comparison configuration.
 - Added invalid-physics backtracking to diagnostic optimal estimation so trial
   P–T states outside opacity coverage do not crash a configured retrieval.
+- Added a thermal P3/SH4 multiple-scattering backend following Rooney, Batalha
+  & Marley, including explicit HG phase moments, optional delta-M scaling,
+  stable banded multilayer boundary solves, source-function angular
+  reconstruction, PICASO parity benchmarks, and retrieval-scale speed plots.
+- Added an RT backend selection guide covering transmission, emission,
+  reflected light, scattering order, and simple versus microphysical clouds.
+- Added a controlled six-molecule ExoMolOP/exo_k emission comparison that sends
+  an identical 20-g optical-depth cube to ROBERT and PICASO, with sub-0.06%
+  maximum disk-integrated RT differences and molecular contribution plots.
+- Added exact linear-in-optical-depth clear thermal source integration to both
+  NumPy and Numba backends, reducing the molecular comparison RMS residual.
+- Added absorption-dominated spherical transmission with exact shell chords,
+  correlated-k impact-area integration, analytic limits, and a realistic
+  FastChem molecular+CIA HAT-P-32b convergence benchmark.
 - Vendored the NemesisPy v1.0.1 CIA reference table with BSD-3-Clause license,
   commit and checksum provenance; integrated CIA into parameterized retrievals.
 - Added endpoint-inclusive configurable pressure grids, explicit
@@ -48,6 +62,48 @@
 - Added a minimal Glamdring `addqueue` launcher following the official cluster
   contract: one Python invocation per allocated Slurm rank, no nested MPI
   launcher, and explicit memory and checkpoint-restart guidance.
+- Added cloud-type-agnostic refractive-index retrievals and homogeneous-sphere
+  Mie physics: tabulated/CSV/Exo-Skryer optical-constant readers, lognormal
+  particle-size averaging, mass extinction and scattering, condensate mass
+  fraction profiles, direct nodal `n`/`log10(k)` emission parameters, and exact
+  scalar Legendre phase moments through degree four for SH4/delta-M transport.
+- Added a commit-pinned, AGPL-separated snapshot of Exo Skryer's optical-
+  constant catalogue with 44 selectable physical/reference materials,
+  preserved source headers, checksums, duplicate-splice handling, and licence
+  provenance.
+- Added analytic one- and two-layer thermal cloud-scattering validation cases,
+  plus pressure-resolved cloud-extinction and contribution maps in the
+  PICASO/Virga-style benchmark output.
+- Added a subprocess-isolated PICASO Toon reference runner and controlled
+  grey-cloud RT comparison, then replaced the effective-extinction shortcut
+  with a coupled, stably scaled hemispheric-mean thermal source-function solve.
+  Controlled disk-integrated scattering cases agree with PICASO within 0.72%.
+- Added explicit pressure-edge temperatures for linear-in-optical-depth Planck
+  sources, Rutten formal-solution and Taylor et al. (2021) analytic-limit tests,
+  physical extinction diagnostics, and a batched block-tridiagonal solver that
+  reduces the 900-wavelength/four-g benchmark from 4.4 s to about 0.24 s.
+- Added reproducible stable petitRADTRANS 3.3.3 benchmarks over 0.3--12 micron,
+  including exact pRT correlated-k quadrature, explicit mass-to-volume mixing
+  ratio conversion, six molecular absorbers, H2-H2/H2-He CIA, and H2/He
+  Rayleigh extinction. Corrected gas-mixture Rayleigh physics to add the
+  number-weighted molecular cross-sections rather than mixed refractivities.
+  The six-molecule thermal-emission RT isolation agrees with pRT3 to 0.140%
+  RMS, with contribution functions reproducing the same photospheric structure.
+- Added native petitRADTRANS HDF5 CIA loading for H2-H2 and H2-He with explicit
+  provenance and selectable log-coefficient temperature interpolation. A fully
+  independent six-line-species plus CIA HDF emission run agrees with stable
+  pRT3 to 0.108% RMS on matched 80-cell/81-node grids and shows regular
+  pressure-grid convergence through 160 cells.
+- Added the published 280-point WASP-69b JWST NIRCam+MIRI eclipse spectrum with
+  checksummed VizieR provenance; exact two-region areal emission mixing;
+  single-region dayside dilution; flux-conserving top-hat observation-bin
+  integration; and named multi-dataset forward, likelihood, nuisance-offset,
+  and retrieval contracts for the Schlawin et al. (2024) benchmark.
+- Added a planet-independent disk-emission selector that composes ROBERT's
+  existing regional forward models as one-region, diluted one-region, or
+  two-region configurations, plus a parameterized gray-scattering regional
+  model whose layer optical depths follow the hydrostatic mass column and use
+  the validated SH4 multiple-scattering backend by default.
 
 - Added atmospheric state, isothermal temperature, constant chemistry, and
   atmosphere-builder components.
@@ -115,6 +171,12 @@
   optional spherical shell path factors in the emission solver, and a benchmark
   note showing that the HAT-P-32b comparison still matches best with the
   plane-parallel path default.
+- Accelerated repeated forward-model calls by caching immutable log-k tables
+  and prepared spectral indices, using a streaming heap merge for sorted
+  correlated-k random overlap, and simplifying fixed SH4 source contractions.
+  Representative six-molecule WASP-69b calls are 3.1--5.3x faster without
+  changing their likelihoods; a deterministic random-overlap scaling benchmark
+  and warmed `cProfile` support were added.
 
 ## v0.2.0 - Core Domain Foundation
 

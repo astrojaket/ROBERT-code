@@ -69,6 +69,7 @@ def integrate_thermal_emission(
     g_weights: ArrayLike,
     emission_path_factors: ArrayLike,
     *,
+    level_source_ordered: ArrayLike | None = None,
     bottom_source: ArrayLike | None = None,
     bottom_visible: ArrayLike | None = None,
     backend: str = "auto",
@@ -80,6 +81,15 @@ def integrate_thermal_emission(
 
     tau = _readonly_3d(tau_ordered, "tau_ordered")
     source = _readonly_array(source_ordered, "source_ordered", tau.shape[:2])
+    level_source = None
+    if level_source_ordered is not None:
+        level_source = _readonly_array(
+            level_source_ordered,
+            "level_source_ordered",
+            (tau.shape[0] + 1, tau.shape[1]),
+        )
+        if np.any(level_source < 0.0):
+            raise RobertValidationError("level_source_ordered must be non-negative")
     weights = _readonly_1d(g_weights, "g_weights")
     if weights.shape != (tau.shape[2],):
         raise RobertValidationError("g_weights must match the tau g axis")
@@ -122,6 +132,7 @@ def integrate_thermal_emission(
         point_layer, point_bottom = _numba_integrate_thermal_emission(
             tau,
             source,
+            level_source,
             normalized_weights,
             path_factors,
             bottom,
@@ -131,6 +142,7 @@ def integrate_thermal_emission(
         point_layer, point_bottom = _numpy_integrate_thermal_emission(
             tau,
             source,
+            level_source,
             normalized_weights,
             path_factors,
             bottom,
@@ -147,6 +159,7 @@ def integrate_thermal_emission(
 def _numpy_integrate_thermal_emission(
     tau: NDArray[np.float64],
     source: NDArray[np.float64],
+    level_source: NDArray[np.float64] | None,
     weights: NDArray[np.float64],
     path_factors: NDArray[np.float64],
     bottom_source: NDArray[np.float64],
@@ -160,8 +173,17 @@ def _numpy_integrate_thermal_emission(
         slant_tau = tau * path_factors[point_index, :, None, None]
         cumulative_before = _exclusive_cumulative(slant_tau)
         transmission_before = np.exp(-cumulative_before)
-        layer_escape = transmission_before * (-np.expm1(-slant_tau))
-        layer_radiance_by_g = source[:, :, None] * layer_escape
+        escape = -np.expm1(-slant_tau)
+        if level_source is None:
+            emitted = source[:, :, None] * escape
+        else:
+            linear_weight = _linear_source_bottom_weight(slant_tau, escape)
+            emitted = (
+                level_source[:-1, :, None] * escape
+                + (level_source[1:, :, None] - level_source[:-1, :, None])
+                * linear_weight
+            )
+        layer_radiance_by_g = transmission_before * emitted
         point_layer[point_index] = np.sum(layer_radiance_by_g * weights[None, None, :], axis=-1)
         if bottom_visible[point_index]:
             total_transmission = np.exp(-np.sum(slant_tau, axis=0))
@@ -178,9 +200,26 @@ def _exclusive_cumulative(values: NDArray[np.float64]) -> NDArray[np.float64]:
     return output
 
 
+def _linear_source_bottom_weight(
+    slant_tau: NDArray[np.float64],
+    escape: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return the exact bottom-source weight for a linear layer source."""
+
+    small = np.abs(slant_tau) < 1.0e-5
+    weight = np.empty_like(slant_tau)
+    value = slant_tau[small]
+    weight[small] = value / 2.0 - value**2 / 3.0 + value**3 / 8.0 - value**4 / 30.0
+    weight[~small] = (
+        escape[~small] - slant_tau[~small] * np.exp(-slant_tau[~small])
+    ) / slant_tau[~small]
+    return weight
+
+
 def _numba_integrate_thermal_emission(
     tau: NDArray[np.float64],
     source: NDArray[np.float64],
+    level_source: NDArray[np.float64] | None,
     weights: NDArray[np.float64],
     path_factors: NDArray[np.float64],
     bottom_source: NDArray[np.float64],
@@ -190,9 +229,17 @@ def _numba_integrate_thermal_emission(
         raise RobertValidationError(
             "thermal_integration_backend='numba' requires the optional numba package"
         )
+    use_linear_source = level_source is not None
+    numba_level_source = (
+        np.zeros((tau.shape[0] + 1, tau.shape[1]), dtype=float)
+        if level_source is None
+        else level_source
+    )
     return _numba_integrate_thermal_emission_kernel(
         tau,
         source,
+        numba_level_source,
+        use_linear_source,
         weights,
         path_factors,
         bottom_source,
@@ -206,6 +253,8 @@ if _NUMBA_AVAILABLE:
     def _numba_integrate_thermal_emission_kernel(
         tau,
         source,
+        level_source,
+        use_linear_source,
         weights,
         path_factors,
         bottom_source,
@@ -228,9 +277,31 @@ if _NUMBA_AVAILABLE:
                             layer_index,
                         ]
                         transmission_before = np.exp(-cumulative_tau)
-                        layer_escape = transmission_before * (-np.expm1(-slant_tau))
+                        escape = -np.expm1(-slant_tau)
+                        if use_linear_source:
+                            if np.abs(slant_tau) < 1.0e-5:
+                                linear_weight = (
+                                    slant_tau / 2.0
+                                    - slant_tau**2 / 3.0
+                                    + slant_tau**3 / 8.0
+                                    - slant_tau**4 / 30.0
+                                )
+                            else:
+                                linear_weight = (
+                                    escape - slant_tau * np.exp(-slant_tau)
+                                ) / slant_tau
+                            emitted = (
+                                level_source[layer_index, spectral_index] * escape
+                                + (
+                                    level_source[layer_index + 1, spectral_index]
+                                    - level_source[layer_index, spectral_index]
+                                )
+                                * linear_weight
+                            )
+                        else:
+                            emitted = source[layer_index, spectral_index] * escape
                         point_layer[point_index, layer_index, spectral_index] += (
-                            source[layer_index, spectral_index] * layer_escape * weight
+                            transmission_before * emitted * weight
                         )
                         cumulative_tau += slant_tau
                     if bottom_visible[point_index]:
@@ -244,6 +315,8 @@ else:
     def _numba_integrate_thermal_emission_kernel(
         tau,
         source,
+        level_source,
+        use_linear_source,
         weights,
         path_factors,
         bottom_source,

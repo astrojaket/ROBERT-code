@@ -16,7 +16,6 @@ from .correlated_k import (
     EvaluatedCorrelatedKOpacity,
     PreparedCorrelatedKOpacity,
 )
-from .fixture import CoverageReport, EvaluatedOpacity, FixtureOpacityProvider, PreparedOpacity
 from .inspectors import (
     file_sha256,
     inspect_exomol_directory,
@@ -46,13 +45,10 @@ from .metadata import (
 )
 
 __all__ = [
-    "CoverageReport",
     "CorrelatedKCoverageReport",
     "CorrelatedKOpacityProvider",
     "CorrelatedKTable",
-    "EvaluatedOpacity",
     "EvaluatedCorrelatedKOpacity",
-    "FixtureOpacityProvider",
     "GridCoverage",
     "KtaHeader",
     "KtaTable",
@@ -62,7 +58,6 @@ __all__ = [
     "OpacityDataSource",
     "OpacityMode",
     "OpacityStorageFormat",
-    "PreparedOpacity",
     "PreparedCorrelatedKOpacity",
     "RobertOpacityArchive",
     "SpectralCoverage",

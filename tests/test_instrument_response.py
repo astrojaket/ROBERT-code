@@ -5,7 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from robert_exoplanets import LinearObservationResponse, Observation, SpectralGrid, Spectrum
+from robert_exoplanets import (
+    LinearObservationResponse,
+    Observation,
+    SpectralGrid,
+    Spectrum,
+    TopHatObservationResponse,
+)
 from robert_exoplanets.core import RobertCoverageError
 
 
@@ -45,3 +51,23 @@ def test_linear_observation_response_rejects_uncovered_wavelengths() -> None:
 
     with pytest.raises(RobertCoverageError, match="outside native spectrum"):
         response.observe(native)
+
+
+def test_top_hat_response_integrates_piecewise_linear_spectrum() -> None:
+    native = Spectrum(
+        spectral_grid=SpectralGrid.from_array([1.0, 2.0, 3.0], unit="micron"),
+        values=np.array([1.0, 4.0, 9.0]),
+        unit="eclipse_depth",
+        observable="eclipse_depth",
+    )
+    observation = Observation.from_arrays(
+        [1.5, 2.5],
+        [0.0, 0.0],
+        [1.0, 1.0],
+        wavelength_bin_edges=[1.0, 2.0, 3.0],
+    )
+
+    observed = TopHatObservationResponse().prepare(observation).observe(native)
+
+    np.testing.assert_allclose(observed.values, [2.5, 6.5])
+    assert observed.metadata["bin_integration"] == "piecewise_linear_top_hat"

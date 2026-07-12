@@ -196,6 +196,23 @@ benchmark can be run with:
 python examples/benchmark_atmosphere_build.py
 ```
 
+The correlated-k random-overlap scaling benchmark exercises the principal
+multi-molecule opacity-mixing kernel independently of data loading and RT:
+
+```bash
+python examples/benchmark_random_overlap.py
+```
+
+It reports molecule/grid scaling, input memory, throughput, and agreement with
+the NumPy reference backend. The WASP-69b benchmark measures warmed full-model
+calls and can also write a `cProfile` capture without including setup, warmup,
+or Numba compilation:
+
+```bash
+python examples/benchmark_wasp69b_multi_instrument.py \
+  --profile wasp69b-forward-model.prof
+```
+
 Environment variables `ROBERT_BENCH_REPEAT` and `ROBERT_BENCH_WARMUP` control
 the number of measured and warmup calls.
 

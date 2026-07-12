@@ -46,7 +46,9 @@ def random_overlap_species_tau(
     if tau.shape[-1] != weights.size:
         raise RobertValidationError("g_weights must match the species_tau g axis")
     if cutoff < 0.0 or not np.isfinite(cutoff):
-        raise RobertValidationError("random-overlap cutoff must be finite and non-negative")
+        raise RobertValidationError(
+            "random-overlap cutoff must be finite and non-negative"
+        )
 
     n_species, n_layers, n_spectral, n_g = tau.shape
     if n_species == 1:
@@ -65,12 +67,14 @@ def random_overlap_species_tau(
     combined = np.zeros((n_layers, n_spectral, n_g), dtype=float)
     for layer_index in range(n_layers):
         for spectral_index in range(n_spectral):
-            combined[layer_index, spectral_index] = _random_overlap_tau_vectors_unchecked(
-                tau[:, layer_index, spectral_index, :],
-                weights,
-                random_weights,
-                target_edges,
-                cutoff=cutoff,
+            combined[layer_index, spectral_index] = (
+                _random_overlap_tau_vectors_unchecked(
+                    tau[:, layer_index, spectral_index, :],
+                    weights,
+                    random_weights,
+                    target_edges,
+                    cutoff=cutoff,
+                )
             )
 
     combined.setflags(write=False)
@@ -91,7 +95,9 @@ def random_overlap_tau_vectors(
     if tau.shape[-1] != weights.size:
         raise RobertValidationError("g_weights must match the tau g axis")
     if cutoff < 0.0 or not np.isfinite(cutoff):
-        raise RobertValidationError("random-overlap cutoff must be finite and non-negative")
+        raise RobertValidationError(
+            "random-overlap cutoff must be finite and non-negative"
+        )
 
     if tau.shape[0] == 1:
         output = np.array(tau[0], dtype=float, copy=True)
@@ -161,7 +167,9 @@ def rank_rebin_distribution(
         raise RobertValidationError("values and weights must have the same shape")
 
     target_edges = np.concatenate(([0.0], np.cumsum(target)))
-    rebinned = _rank_rebin_distribution_unchecked(value_array, source_weights, target, target_edges)
+    rebinned = _rank_rebin_distribution_unchecked(
+        value_array, source_weights, target, target_edges
+    )
     rebinned.setflags(write=False)
     return rebinned
 
@@ -193,8 +201,12 @@ def _rank_rebin_distribution_unchecked(
     sorted_weights = source_weights[order]
     source_edges = np.concatenate(([0.0], np.cumsum(sorted_weights)))
     source_edges[-1] = 1.0
-    cumulative_integral = np.concatenate(([0.0], np.cumsum(sorted_values * sorted_weights)))
-    integral_at_target_edges = np.interp(target_edges, source_edges, cumulative_integral)
+    cumulative_integral = np.concatenate(
+        ([0.0], np.cumsum(sorted_values * sorted_weights))
+    )
+    integral_at_target_edges = np.interp(
+        target_edges, source_edges, cumulative_integral
+    )
     rebinned = np.diff(integral_at_target_edges) / target_weights
     return np.array(rebinned, dtype=float, copy=True)
 
@@ -202,7 +214,9 @@ def _rank_rebin_distribution_unchecked(
 def _readonly_species_tau(values: ArrayLike) -> NDArray[np.float64]:
     tau = np.array(values, dtype=float, copy=True)
     if tau.ndim != 4:
-        raise RobertValidationError("species_tau must have shape species x layer x wavelength x g")
+        raise RobertValidationError(
+            "species_tau must have shape species x layer x wavelength x g"
+        )
     if tau.shape[0] < 1 or tau.shape[1] < 1 or tau.shape[2] < 1 or tau.shape[3] < 1:
         raise RobertValidationError("species_tau axes must be non-empty")
     if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
@@ -253,9 +267,13 @@ def _random_overlap_backend(value: str) -> str:
         return "numpy"
     if normalized == "numba":
         if not _NUMBA_AVAILABLE:
-            raise RobertValidationError("random-overlap backend 'numba' requires the optional numba package")
+            raise RobertValidationError(
+                "random-overlap backend 'numba' requires the optional numba package"
+            )
         return "numba"
-    raise RobertValidationError("random-overlap backend must be 'auto', 'numpy', or 'numba'")
+    raise RobertValidationError(
+        "random-overlap backend must be 'auto', 'numpy', or 'numba'"
+    )
 
 
 def _numba_random_overlap_species_tau(
@@ -264,7 +282,9 @@ def _numba_random_overlap_species_tau(
     cutoff: float,
 ) -> NDArray[np.float64]:
     if not _NUMBA_AVAILABLE:
-        raise RobertValidationError("random-overlap backend 'numba' requires the optional numba package")
+        raise RobertValidationError(
+            "random-overlap backend 'numba' requires the optional numba package"
+        )
     return _numba_random_overlap_species_tau_kernel(tau, weights, cutoff)
 
 
@@ -298,8 +318,15 @@ if _NUMBA_AVAILABLE:
                 continue
 
             combined = np.empty(n_g, dtype=np.float64)
+            next_combined = np.empty(n_g, dtype=np.float64)
+            random_values = np.empty(n_g * n_g, dtype=np.float64)
+            heap_values = np.empty(n_g, dtype=np.float64)
+            heap_rows = np.empty(n_g, dtype=np.int64)
+            heap_columns = np.empty(n_g, dtype=np.int64)
             for g_index in range(n_g):
-                combined[g_index] = tau[first_active, layer_index, spectral_index, g_index]
+                combined[g_index] = tau[
+                    first_active, layer_index, spectral_index, g_index
+                ]
 
             for species_index in range(first_active + 1, n_species):
                 max_tau = 0.0
@@ -310,49 +337,179 @@ if _NUMBA_AVAILABLE:
                 if max_tau < cutoff:
                     continue
 
-                next_tau = np.empty(n_g, dtype=np.float64)
+                right_tau = tau[species_index, layer_index, spectral_index]
+                right_is_sorted = True
+                for g_index in range(1, n_g):
+                    if right_tau[g_index] < right_tau[g_index - 1]:
+                        right_is_sorted = False
+                        break
+                if right_is_sorted:
+                    _numba_combine_sorted_distributions_into(
+                        combined,
+                        right_tau,
+                        weights,
+                        heap_values,
+                        heap_rows,
+                        heap_columns,
+                        next_combined,
+                    )
+                else:
+                    _numba_combine_two_distributions_into(
+                        combined,
+                        right_tau,
+                        weights,
+                        random_weights,
+                        random_values,
+                        next_combined,
+                    )
                 for g_index in range(n_g):
-                    next_tau[g_index] = tau[species_index, layer_index, spectral_index, g_index]
-                combined = _numba_combine_two_distributions(
-                    combined,
-                    next_tau,
-                    weights,
-                    random_weights,
-                )
+                    combined[g_index] = next_combined[g_index]
 
             for g_index in range(n_g):
                 output[layer_index, spectral_index, g_index] = combined[g_index]
         return output
 
+    @njit
+    def _numba_combine_sorted_distributions_into(
+        left_tau,
+        right_tau,
+        weights,
+        heap_values,
+        heap_rows,
+        heap_columns,
+        rebinned,
+    ):
+        n_g = weights.size
+        for row_index in range(n_g):
+            heap_values[row_index] = left_tau[row_index] + right_tau[0]
+            heap_rows[row_index] = row_index
+            heap_columns[row_index] = 0
+            rebinned[row_index] = 0.0
+
+        heap_size = n_g
+        for start_index in range(n_g // 2 - 1, -1, -1):
+            _numba_sift_down(
+                heap_values,
+                heap_rows,
+                heap_columns,
+                heap_size,
+                start_index,
+            )
+
+        target_index = 0
+        target_left = 0.0
+        target_right = weights[0]
+        source_left = 0.0
+        for _ in range(n_g * n_g):
+            value = heap_values[0]
+            row_index = heap_rows[0]
+            column_index = heap_columns[0]
+            source_right = source_left + weights[row_index] * weights[column_index]
+            while target_index < n_g:
+                overlap = min(source_right, target_right) - max(
+                    source_left, target_left
+                )
+                if overlap > 0.0:
+                    rebinned[target_index] += value * overlap
+                if source_right >= target_right and target_index < n_g - 1:
+                    target_left = target_right
+                    target_index += 1
+                    target_right = target_left + weights[target_index]
+                    continue
+                break
+            source_left = source_right
+
+            next_column = column_index + 1
+            if next_column < n_g:
+                heap_values[0] = left_tau[row_index] + right_tau[next_column]
+                heap_rows[0] = row_index
+                heap_columns[0] = next_column
+            else:
+                heap_size -= 1
+                if heap_size == 0:
+                    break
+                heap_values[0] = heap_values[heap_size]
+                heap_rows[0] = heap_rows[heap_size]
+                heap_columns[0] = heap_columns[heap_size]
+            _numba_sift_down(heap_values, heap_rows, heap_columns, heap_size, 0)
+
+        for g_index in range(n_g):
+            rebinned[g_index] /= weights[g_index]
+
+    @njit(inline="always")
+    def _numba_sift_down(heap_values, heap_rows, heap_columns, heap_size, start_index):
+        parent = start_index
+        while True:
+            left_child = 2 * parent + 1
+            if left_child >= heap_size:
+                return
+            right_child = left_child + 1
+            smallest = left_child
+            if (
+                right_child < heap_size
+                and heap_values[right_child] < heap_values[left_child]
+            ):
+                smallest = right_child
+            if heap_values[parent] <= heap_values[smallest]:
+                return
+            heap_values[parent], heap_values[smallest] = (
+                heap_values[smallest],
+                heap_values[parent],
+            )
+            heap_rows[parent], heap_rows[smallest] = (
+                heap_rows[smallest],
+                heap_rows[parent],
+            )
+            heap_columns[parent], heap_columns[smallest] = (
+                heap_columns[smallest],
+                heap_columns[parent],
+            )
+            parent = smallest
 
     @njit
-    def _numba_combine_two_distributions(left_tau, right_tau, weights, random_weights):
+    def _numba_combine_two_distributions_into(
+        left_tau,
+        right_tau,
+        weights,
+        random_weights,
+        random_values,
+        rebinned,
+    ):
         n_g = weights.size
         n_random = n_g * n_g
-        random_values = np.empty(n_random, dtype=np.float64)
         for i_g in range(n_g):
             for j_g in range(n_g):
                 random_values[i_g * n_g + j_g] = left_tau[i_g] + right_tau[j_g]
 
         order = np.argsort(random_values)
-        rebinned = np.empty(n_g, dtype=np.float64)
+        for g_index in range(n_g):
+            rebinned[g_index] = 0.0
+        target_index = 0
         target_left = 0.0
-        for target_index in range(n_g):
-            target_right = target_left + weights[target_index]
-            source_left = 0.0
-            integral = 0.0
-            for random_index in range(n_random):
-                ordered_index = order[random_index]
-                source_right = source_left + random_weights[ordered_index]
-                overlap = min(source_right, target_right) - max(source_left, target_left)
+        target_right = weights[0]
+        source_left = 0.0
+        for random_index in range(n_random):
+            ordered_index = order[random_index]
+            source_right = source_left + random_weights[ordered_index]
+            while target_index < n_g:
+                overlap = min(source_right, target_right) - max(
+                    source_left, target_left
+                )
                 if overlap > 0.0:
-                    integral += random_values[ordered_index] * overlap
-                source_left = source_right
-            rebinned[target_index] = integral / weights[target_index]
-            target_left = target_right
-        return rebinned
+                    rebinned[target_index] += random_values[ordered_index] * overlap
+                if source_right >= target_right and target_index < n_g - 1:
+                    target_left = target_right
+                    target_index += 1
+                    target_right = target_left + weights[target_index]
+                    continue
+                break
+            source_left = source_right
+        for g_index in range(n_g):
+            rebinned[g_index] /= weights[g_index]
 
 else:
 
     def _numba_random_overlap_species_tau_kernel(tau, weights, cutoff):
-        raise RobertValidationError("random-overlap backend 'numba' requires the optional numba package")
+        raise RobertValidationError(
+            "random-overlap backend 'numba' requires the optional numba package"
+        )

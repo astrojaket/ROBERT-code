@@ -1,22 +1,15 @@
-"""Retrieval orchestration and legacy stub workflow."""
+"""Retrieval orchestration."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
 from typing import IO
 
-import numpy as np
-from numpy.typing import NDArray
-
 from robert_exoplanets.core import RobertConfigError, RobertDataError
-from robert_exoplanets.instruments import Observation
 
-from .config import RetrievalConfig
-from .model import EmissionModel
 from .manifest import (
     RUN_MANIFEST_FILENAME,
     RunManifest,
@@ -28,56 +21,6 @@ from .optimal_estimation import run_optimal_estimation
 from .problem import RetrievalProblem
 from .results import RetrievalResult, build_retrieval_result, write_retrieval_result
 from .samplers import run_ultranest
-
-
-@dataclass(frozen=True)
-class StubRetrievalResult:
-    """Result object returned by the stub retrieval runner."""
-
-    config: RetrievalConfig
-    model_name: str
-    best_fit_parameters: dict[str, float]
-    model_flux: NDArray[np.float64]
-    log_likelihood: float
-    converged: bool
-    message: str
-
-
-def run_stub_retrieval(
-    observation: Observation,
-    config: RetrievalConfig,
-    model: EmissionModel | None = None,
-) -> StubRetrievalResult:
-    """Run a deterministic placeholder retrieval.
-
-    This function wires together the intended end-to-end retrieval flow while
-    avoiding real physics and sampling. It computes a weighted mean baseline and
-    evaluates the placeholder emission model at that baseline.
-    """
-
-    observation.validate()
-    active_model = model or EmissionModel()
-
-    weights = 1.0 / np.square(observation.uncertainty)
-    baseline = float(np.average(observation.flux, weights=weights))
-    best_fit_parameters = {
-        "baseline": baseline,
-        "slope": 0.0,
-    }
-    model_flux = active_model.evaluate(observation.wavelength, best_fit_parameters)
-    residual = observation.flux - model_flux
-    log_likelihood = float(-0.5 * np.sum(np.square(residual / observation.uncertainty)))
-
-    return StubRetrievalResult(
-        config=config,
-        model_name=active_model.name,
-        best_fit_parameters=best_fit_parameters,
-        model_flux=model_flux,
-        log_likelihood=log_likelihood,
-        converged=False,
-        message="Stub retrieval completed; no physical sampler has been run.",
-    )
-
 
 def run_retrieval(
     problem: RetrievalProblem,
@@ -289,4 +232,4 @@ def _mpi_context():
     return int(communicator.Get_rank()), communicator
 
 
-__all__ = ["RetrievalResult", "StubRetrievalResult", "run_retrieval", "run_stub_retrieval"]
+__all__ = ["RetrievalResult", "run_retrieval"]

@@ -48,6 +48,7 @@ class LayerOpticalDepth:
     pressure_grid: PressureGrid
     kind: str = "extinction"
     unit: str = "dimensionless"
+    phase_function_moments: ArrayLike | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -64,7 +65,14 @@ class LayerOpticalDepth:
         )
         if np.any(tau < 0.0):
             raise RobertValidationError("layer optical depth must be non-negative")
+        phase_moments = None
+        if self.phase_function_moments is not None:
+            phase_moments = _readonly_phase_function_moments(
+                self.phase_function_moments,
+                (self.pressure_grid.n_layers, self.spectral_grid.size),
+            )
         object.__setattr__(self, "tau", tau)
+        object.__setattr__(self, "phase_function_moments", phase_moments)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     def cumulative_tau_from_top(self) -> NDArray[np.float64]:
@@ -117,6 +125,82 @@ class CiaTable:
         """Number of CIA pairs stored in the table."""
 
         return len(self.pair_order)
+
+    @classmethod
+    def from_petitradtrans_hdf(
+        cls,
+        path: str | Path,
+        *,
+        collision_pair: str,
+    ) -> "CiaTable":
+        """Load one H2-H2 or H2-He petitRADTRANS CIA HDF5 table.
+
+        The pRT ``alpha`` values are absorption coefficients at unit amagat
+        density product. They are placed in both equilibrium/normal hydrogen
+        slots because these pRT tables do not encode a separate spin isomer.
+        """
+
+        try:
+            import h5py
+        except ImportError as exc:  # pragma: no cover - dependency error path
+            raise RobertValidationError(
+                "loading petitRADTRANS HDF5 CIA requires h5py"
+            ) from exc
+
+        normalized_pair = collision_pair.strip().upper().replace("_", "-")
+        pair_indices = {"H2-H2": (0, 2), "H2-HE": (1, 3)}
+        if normalized_pair not in pair_indices:
+            raise RobertValidationError("collision_pair must be 'H2-H2' or 'H2-He'")
+        source = Path(path).expanduser()
+        required = ("t", "wavenumbers", "alpha", "mol_name", "mol_mass")
+        try:
+            with h5py.File(source, "r") as handle:
+                missing = tuple(name for name in required if name not in handle)
+                if missing:
+                    raise RobertValidationError(
+                        "petitRADTRANS CIA file is missing datasets: " + ", ".join(missing)
+                    )
+                temperature = np.asarray(handle["t"], dtype=float)
+                wavenumber = np.asarray(handle["wavenumbers"], dtype=float)
+                alpha = np.asarray(handle["alpha"], dtype=float)
+                declared_unit = str(handle["alpha"].attrs.get("units", "")).strip()
+                molecules = "+".join(_decode_hdf_strings(handle["mol_name"]))
+                molar_masses = ",".join(
+                    f"{value:.17g}" for value in np.asarray(handle["mol_mass"], dtype=float)
+                )
+                doi = _decode_hdf_first(handle.get("DOI"))
+        except OSError as exc:
+            raise RobertValidationError(
+                f"could not read petitRADTRANS CIA file: {source}"
+            ) from exc
+        if declared_unit != "cm^-1":
+            raise RobertValidationError(
+                "petitRADTRANS CIA alpha dataset must declare units of cm^-1"
+            )
+        if alpha.shape != (temperature.size, wavenumber.size):
+            raise RobertValidationError(
+                "petitRADTRANS CIA alpha must have temperature x wavenumber shape"
+            )
+        k_cia = np.zeros((len(DEFAULT_CIA_PAIR_ORDER), temperature.size, wavenumber.size), dtype=float)
+        for index in pair_indices[normalized_pair]:
+            k_cia[index] = alpha
+        return cls(
+            wavenumber_cm_inverse=wavenumber,
+            temperature_K=temperature,
+            k_cia=k_cia,
+            pair_order=DEFAULT_CIA_PAIR_ORDER,
+            unit="cm^-1 amagat^-2",
+            metadata={
+                "source_format": "petitradtrans_cia_hdf5",
+                "source_path": str(source.resolve()),
+                "source_alpha_unit": declared_unit,
+                "collision_pair": collision_pair,
+                "molecules": molecules,
+                "molar_masses_amu": molar_masses,
+                "doi": doi,
+                "hydrogen_spin_state": "not_separated_in_source",
+            },
+        )
 
 
 def read_cia_table(
@@ -188,6 +272,7 @@ def cia_optical_depth(
     normal_hydrogen: bool = True,
     temperature_extrapolation: str = "raise",
     spectral_extrapolation: str = "raise",
+    coefficient_interpolation: str = "linear",
     name: str = "H2-H2/H2-He CIA",
 ) -> LayerOpticalDepth:
     """Compute CIA optical depth using a uniform-layer path estimate.
@@ -202,6 +287,8 @@ def cia_optical_depth(
         raise RobertValidationError("temperature_extrapolation must be 'raise' or 'clip'")
     if spectral_extrapolation not in {"raise", "zero"}:
         raise RobertValidationError("spectral_extrapolation must be 'raise' or 'zero'")
+    if coefficient_interpolation not in {"linear", "log"}:
+        raise RobertValidationError("coefficient_interpolation must be 'linear' or 'log'")
 
     atmosphere = gas_optical_depth.atmosphere
     wavenumber = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "cm^-1")
@@ -247,6 +334,7 @@ def cia_optical_depth(
             wavenumber,
             temperature_extrapolation=temperature_extrapolation,
             spectral_extrapolation=spectral_extrapolation,
+            coefficient_interpolation=coefficient_interpolation,
         )
         layer_coeff = np.zeros_like(wavenumber)
         for pair_index, mixing_factor in pair_terms:
@@ -277,6 +365,7 @@ def cia_optical_depth(
             "hydrogen_spin_state": "normal" if normal_hydrogen else "equilibrium",
             "temperature_extrapolation": temperature_extrapolation,
             "spectral_extrapolation": spectral_extrapolation,
+            "coefficient_interpolation": coefficient_interpolation,
             "active_pairs": ",".join(sorted(set(active_pairs))),
         },
     )
@@ -285,35 +374,37 @@ def cia_optical_depth(
 def rayleigh_scattering_optical_depth(
     gas_optical_depth: GasOpticalDepth,
     *,
-    default_h2_fraction_of_h2_he: float = 0.864,
+    default_h2_fraction_of_h2_he: float | None = None,
     name: str = "H2/He Rayleigh scattering",
 ) -> LayerOpticalDepth:
     """Compute H2/He Rayleigh scattering extinction optical depth.
 
-    The calculation applies an H2/He refractivity model to the H2+He column
-    when those species are present in the atmosphere.
+    The calculation applies separate H2 and He refractivity models and adds
+    their number-weighted molecular cross-sections.  Cross-sections, rather
+    than refractivities, are additive for an ideal gas mixture. An atmosphere
+    without explicit H2 and He raises unless the caller deliberately supplies
+    a fallback H2 fraction for an assumed H2/He background.
     """
 
-    default_fraction = float(default_h2_fraction_of_h2_he)
-    if not np.isfinite(default_fraction) or not 0.0 <= default_fraction <= 1.0:
-        raise RobertValidationError("default_h2_fraction_of_h2_he must be in [0, 1]")
+    default_fraction = None
+    if default_h2_fraction_of_h2_he is not None:
+        default_fraction = float(default_h2_fraction_of_h2_he)
+        if not np.isfinite(default_fraction) or not 0.0 <= default_fraction <= 1.0:
+            raise RobertValidationError("default_h2_fraction_of_h2_he must be in [0, 1]")
 
     atmosphere = gas_optical_depth.atmosphere
     wavelength_micron = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
     h2 = _composition_profile(atmosphere.composition, "H2", atmosphere.n_layers)
     he = _composition_profile(atmosphere.composition, "He", atmosphere.n_layers)
     h2_he_fraction = h2 + he
-    if np.any(h2_he_fraction > 0.0):
-        h2_fraction = np.divide(
-            h2,
-            h2_he_fraction,
-            out=np.full_like(h2, default_fraction),
-            where=h2_he_fraction > 0.0,
-        )
-        rayleigh_column = gas_optical_depth.layer_column_density_molecules_m2 * h2_he_fraction
-    else:
-        h2_fraction = np.full(atmosphere.n_layers, default_fraction, dtype=float)
-        rayleigh_column = gas_optical_depth.layer_column_density_molecules_m2
+    if not np.any(h2_he_fraction > 0.0):
+        if default_fraction is None:
+            raise RobertValidationError(
+                "Rayleigh scattering requires explicit H2/He composition or an explicit "
+                "default_h2_fraction_of_h2_he"
+            )
+        h2 = np.full(atmosphere.n_layers, default_fraction, dtype=float)
+        he = 1.0 - h2
 
     lambda_m = wavelength_micron * 1.0e-6
     inverse_micron = 1.0 / wavelength_micron
@@ -326,18 +417,17 @@ def rayleigh_scattering_optical_depth(
     n0 = 1.01325e5 / (BOLTZMANN_CONSTANT_J_K * 273.15)
     faniso = 1.0
 
-    mixed_refractivity = (
-        h2_fraction[:, None] * refractivity_h2[None, :]
-        + (1.0 - h2_fraction[:, None]) * refractivity_he[None, :]
-    )
-    cross_section_m2 = (
+    common_factor = (
         32.0
         * np.pi**3
-        * mixed_refractivity**2
         * faniso
         / (3.0 * (n0 * lambda_m[None, :] ** 2) ** 2)
     )
-    tau = cross_section_m2 * rayleigh_column[:, None]
+    cross_section_h2_m2 = common_factor * refractivity_h2[None, :] ** 2
+    cross_section_he_m2 = common_factor * refractivity_he[None, :] ** 2
+    tau = gas_optical_depth.layer_column_density_molecules_m2[:, None] * (
+        h2[:, None] * cross_section_h2_m2 + he[:, None] * cross_section_he_m2
+    )
     if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
         raise RobertValidationError("Rayleigh optical-depth calculation produced invalid values")
 
@@ -347,9 +437,16 @@ def rayleigh_scattering_optical_depth(
         spectral_grid=gas_optical_depth.spectral_grid,
         pressure_grid=gas_optical_depth.pressure_grid,
         kind="scattering_extinction",
+        phase_function_moments=np.repeat(
+            np.array([1.0, 0.0, 0.5, 0.0, 0.0])[:, None],
+            gas_optical_depth.spectral_grid.size,
+            axis=1,
+        ),
         metadata={
             "source": "H2/He refractivity model",
-            "column_model": "H2/He fraction of hydrostatic layer column",
+            "column_model": "species VMR times hydrostatic layer column",
+            "mixture_rule": "number-weighted sum of molecular cross-sections",
+            "composition_fallback": "none" if default_fraction is None else "explicit_H2/He",
             "scattering_source_function": "not_included",
         },
     )
@@ -418,6 +515,7 @@ def _interpolate_cia_coefficients(
     *,
     temperature_extrapolation: str,
     spectral_extrapolation: str,
+    coefficient_interpolation: str,
 ) -> NDArray[np.float64]:
     temperature = float(temperature_k)
     if not np.isfinite(temperature) or temperature <= 0.0:
@@ -437,7 +535,17 @@ def _interpolate_cia_coefficients(
         fraction = (temperature - table.temperature_K[lower]) / (
             table.temperature_K[upper] - table.temperature_K[lower]
         )
-        native = (1.0 - fraction) * table.k_cia[:, lower, :] + fraction * table.k_cia[:, upper, :]
+        lower_values = table.k_cia[:, lower, :]
+        upper_values = table.k_cia[:, upper, :]
+        if coefficient_interpolation == "linear":
+            native = (1.0 - fraction) * lower_values + fraction * upper_values
+        else:
+            both_positive = (lower_values > 0.0) & (upper_values > 0.0)
+            native = (1.0 - fraction) * lower_values + fraction * upper_values
+            native[both_positive] = np.exp(
+                (1.0 - fraction) * np.log(lower_values[both_positive])
+                + fraction * np.log(upper_values[both_positive])
+            )
 
     requested_min = float(np.min(wavenumber_cm_inverse))
     requested_max = float(np.max(wavenumber_cm_inverse))
@@ -480,6 +588,24 @@ def _composition_profile(
     return profile
 
 
+def _decode_hdf_strings(dataset: object) -> tuple[str, ...]:
+    values = np.asarray(dataset)
+    decoded = []
+    for value in values.reshape(-1):
+        if isinstance(value, bytes):
+            decoded.append(value.decode("utf-8"))
+        else:
+            decoded.append(str(value))
+    return tuple(decoded)
+
+
+def _decode_hdf_first(dataset: object | None) -> str:
+    if dataset is None:
+        return ""
+    values = _decode_hdf_strings(dataset)
+    return "" if not values else values[0]
+
+
 def _top_to_bottom_order(pressure_grid: PressureGrid) -> NDArray[np.int64]:
     pressure = pressure_values_in_unit(pressure_grid.centers, pressure_grid.unit, "pa")
     return np.argsort(pressure).astype(np.int64)
@@ -515,5 +641,28 @@ def _readonly_array(
         raise RobertValidationError(f"{name} has incorrect shape")
     if not np.all(np.isfinite(array)):
         raise RobertValidationError(f"{name} must contain only finite values")
+    array.setflags(write=False)
+    return array
+
+
+def _readonly_phase_function_moments(
+    values: ArrayLike,
+    shape: tuple[int, int],
+) -> NDArray[np.float64]:
+    array = np.array(values, dtype=float, copy=True)
+    if array.shape == (5, shape[1]):
+        array = np.repeat(array[:, None, :], shape[0], axis=1)
+    elif array.shape != (5, shape[0], shape[1]):
+        raise RobertValidationError(
+            "phase_function_moments must have shape (5, spectral) or "
+            "(5, layer, spectral)"
+        )
+    if not np.all(np.isfinite(array)):
+        raise RobertValidationError("phase_function_moments must contain only finite values")
+    limits = (2.0 * np.arange(5) + 1.0)[:, None, None]
+    if np.any(np.abs(array) > limits * (1.0 + 1.0e-10)):
+        raise RobertValidationError("phase_function_moments exceed physical bounds")
+    if not np.allclose(array[0], 1.0, rtol=0.0, atol=1.0e-12):
+        raise RobertValidationError("phase_function_moments[0] must equal one")
     array.setflags(write=False)
     return array

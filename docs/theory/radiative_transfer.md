@@ -15,15 +15,20 @@ ROBERT now has the first RT-facing reference building blocks:
 - a first-order direct-beam single-scattering source treatment for Rayleigh-like
   or isotropic scattering phase functions,
 - cloud/aerosol optical-property containers carrying extinction optical depth,
-  single-scattering albedo, and asymmetry factor,
-- a conservative two-stream multiple-scattering reference backend behind the
-  thermal-emission solver interface,
+  single-scattering albedo, asymmetry factor, and optional phase moments,
+- a coupled hemispheric-mean thermal two-stream source-function backend behind
+  the thermal-emission solver interface,
+- a four-term spherical-harmonics (P3/SH4) thermal multiple-scattering backend
+  with explicit physical or HG phase moments and optional delta-M scaling,
 - a Numba-backed thermal integration backend for thermal-only RT benchmarks.
 
 These are not a full mature RT path yet. They are the explicit bridge between
 atmosphere, chemistry, opacity, and later cloud, aerosol, and
-scattering-source-function implementations. The current two-stream closure is a
-benchmark hook, not the final cloud-scattering science solver.
+scattering-source-function implementations. The two-stream backend is the fast
+approximation. SH4 is the higher-fidelity retrieval backend, but a high-stream
+reference remains necessary to establish its science domain. See [Choosing a
+Radiative-Transfer Backend](rt_backend_selection.md) for emission,
+transmission, reflected-light, and cloud-complexity recommendations.
 
 ## Reusable Retrieval Forward Model
 
@@ -169,16 +174,87 @@ can attach this table once at construction and evaluate CIA for each atmosphere.
 Cloud/aerosol opacity can enter in two equivalent ways:
 
 - pass a `CloudOpticalProperties` object containing layer-by-wavelength
-  extinction optical depth, single-scattering albedo, and asymmetry factor;
+  extinction optical depth, single-scattering albedo, asymmetry factor, and
+  optionally phase moments through degree four;
 - pass split `LayerOpticalDepth` objects from
   `CloudOpticalProperties.as_layer_optical_depths()` for explicit absorption
   and scattering diagnostics.
 
-Passing `multiple_scattering_backend="two_stream"` activates the first
-conservative multiple-scattering reference closure. The returned
-`total_optical_depth` is then the effective optical depth used by the solver,
-while `extinction_optical_depth` remains the physical extinction optical depth
-for tau plots and code-to-code comparisons.
+Passing `multiple_scattering_backend="two_stream"` activates the coupled
+hemispheric-mean Toon thermal source-function solver. It solves upward and
+downward diffuse flux moments as a banded boundary-value problem, reconstructs
+outgoing intensities from the scattering source function, and retains physical
+extinction optical depth in both `total_optical_depth` and
+`extinction_optical_depth`. No effective-extinction substitution is used.
+
+Passing `multiple_scattering_backend="sh4"` activates the Rooney, Batalha &
+Marley P3 solution. Four intensity moments are coupled across every layer with
+two incoming half-range boundary constraints at the top and bottom. ROBERT uses
+stable layer-anchored eigenmodes, a banded multilayer solve, linear Planck
+sources, and source-function angular reconstruction. The high-level backend
+scattering-optical-depth weights supplied cloud and Rayleigh phase moments.
+Homogeneous-sphere Mie clouds supply exact scalar moments through degree four;
+degree four defines the delta-M forward fraction and degrees zero through three
+enter SH4. A Henyey–Greenstein closure remains the explicit fallback for cloud
+properties that provide only `g`.
+
+In the controlled 160-layer PICASO comparison, matched ROBERT and PICASO SH4
+point radiances agree within `3.23e-6` relative error for both isotropic and
+`omega=0.9, g=0.6` forward-scattering cases. On a 64-layer, 900-wavelength,
+four-g-ordinate, six-angle benchmark, median wall times were 0.304 s for Toon
+and 0.798 s for SH4 on the validation laptop: SH4 was 2.62 times slower. The
+repeatable benchmark is `examples/benchmark_sh4_rt.py`.
+
+The next controlled comparison uses real molecular correlated-k structure from
+the bundled HAT-P-32b ExoMolOP/exo_k archives. ROBERT assembles H2O, CO, CO2,
+CH4, NH3, and HCN by random overlap and passes the identical 20-g optical-depth
+cube to PICASO. Across 117 spectral bins, the maximum disk-integrated residual
+is 0.0507% and the RMS disk residual is 0.0151%. The realistic FastChem+CIA
+HAT-P-32b case agrees to 0.00361% maximum disk difference. See
+`examples/compare_molecular_emission_picaso.py` and
+`docs/review/15_molecular_emission_picaso_comparison.md`.
+
+When an atmosphere supplies temperatures at pressure edges, clear thermal
+emission uses the exact formal integral for a Planck source linear in optical
+depth within each layer. Both NumPy and Numba integrations implement the same
+stable small-optical-depth limit. Atmospheres without edge temperatures retain
+the explicitly recorded constant layer-centre source fallback.
+
+`solve_absorption_transmission` provides the first transmission path. It treats
+each hydrostatic layer as a constant-property spherical shell, computes exact
+full-chord lengths, integrates correlated-k transmission over g, and then
+integrates occulting area over impact parameter. The result includes effective
+radius and annulus-area diagnostics. Its present scope is direct-beam
+absorption/extinction: scattered light returned to the beam, refraction,
+finite-star effects, and limb darkening remain future validation work. The
+realistic HAT-P-32b benchmark and quadrature convergence are documented in
+`docs/review/16_emission_transmission_validation.md`.
+
+The sign convention and formal solution follow Rutten (2003): optical depth
+increases downward, `mu dI/dtau = I - S`, and the top boundary has no incident
+thermal radiation. Thermal profiles are evaluated explicitly at pressure
+edges because the Planck source is represented as linear in optical depth
+within each layer. The implementation is tested against the absorbing formal
+solution and the semi-infinite isothermal scattering suppression derived in
+Appendix A of Taylor et al. (2021).
+
+This remains an angular two-stream approximation. Strongly anisotropic
+angle-resolved intensities require validation against SH4 or a high-stream
+discrete-ordinates/matrix-operator calculation before science use.
+
+Primary theory and validation sources:
+
+- [Rutten (2003), *Radiative Transfer in Stellar Atmospheres*](https://robrutten.nl/rrweb/rjr-edu/coursenotes/rutten_rtsa_notes_2003.pdf),
+  for the transfer equation, optical-depth convention, angular moments,
+  scattering source function, formal solution, and Eddington limits;
+- [Taylor et al. (2021), *How does thermal scattering shape the infrared spectra of cloudy exoplanets?*](https://doi.org/10.1093/mnras/stab1854),
+  especially Appendix A for the isothermal/linear-Planck scattering limits and
+  the science requirements inherited from the NEMESIS matrix-operator study;
+- [Toon et al. (1989)](https://doi.org/10.1029/JD094iD13p16287), for the fast
+  inhomogeneous two-stream source-function method used for PICASO parity.
+- [Rooney, Batalha & Marley (2024)](https://doi.org/10.3847/1538-4357/ad05c5),
+  for the four-term spherical-harmonics thermal solution and its high-stream
+  validation.
 
 Passing `thermal_integration_backend="auto"` uses the Numba thermal-integration
 kernel when available and falls back to the NumPy reference path otherwise.
@@ -281,6 +357,17 @@ The cloud-scattering benchmark bridge:
 python examples/benchmark_cloud_scattering_picaso_virga.py
 ```
 
+The Taylor et al. (2021) Figures 1–2 thermal-scattering reproduction is run with:
+
+```bash
+python examples/benchmark_taylor2021_figures_1_2.py
+```
+
+It overlays ROBERT against the archived NEMESIS Figure 1 forward spectra and
+recreates Figure 2 using the archived TP profiles. ROBERT uses the existing
+petitRADTRANS HDF5 H2O/CO and CIA tables; see
+`docs/review/24_taylor2021_cloud_figures_1_2.md` for provenance and scope.
+
 loads `ROBERT_CLOUD_PROPERTY_FILE` when set, accepting either dense `.npz`
 arrays, long-table `.csv` files with PICASO/Virga-style aliases such as
 `tau_ext`, `omega0`, and `g`, or PICASO `.cld` cloud tables. Index-style
@@ -292,9 +379,9 @@ with `ROBERT_PICASO_PRESSURE_FILE` and `ROBERT_PICASO_WAVE_GRID_FILE`.
 If no file is provided, the script generates a synthetic cloud property
 product, runs extinction-only and two-stream RT, writes plots and a JSON report,
 and times the cloud loading plus NumPy and Numba thermal RT paths. With the
-public PICASO `jupiterf3.cld` base-case table (60 layers, 196 wavelengths) on
-this laptop, cloud loading is about 21 ms and the Numba two-stream smoke path is
-about 2.7 ms.
+synthetic 64-layer, 900-wavelength, four-g benchmark on this laptop, the batched
+NumPy two-stream solve takes about 0.24 s. This is suitable for validation but
+still requires a compiled kernel before long nested-sampling retrievals.
 
 ## Scattering Boundary
 
@@ -312,7 +399,7 @@ gas opacity.
 
 The first cloud/aerosol object follows the same separation: it stores optical
 properties, but the RT backend decides whether scattering is extinction-only,
-single-scattering direct beam, two-stream reference, or a future fuller
+single-scattering direct beam, fast two-stream approximation, or a fuller
 multiple-scattering solver.
 
 ## Cloud-Scattering Benchmark Ladder

@@ -8,7 +8,6 @@ from .exceptions import (
     RobertValidationError,
 )
 from .grids import PressureGrid, SpectralGrid
-from .logging import get_logger
 from .spectrum import Spectrum
 
 __all__ = [
@@ -20,5 +19,4 @@ __all__ = [
     "RobertValidationError",
     "SpectralGrid",
     "Spectrum",
-    "get_logger",
 ]
