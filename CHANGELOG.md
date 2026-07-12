@@ -2,6 +2,9 @@
 
 ## v0.3.0 - Minimal Forward Model Foundation
 
+- Added an independent optional float64 JAX/XLA implementation of conservative
+  random-overlap recompression with explicit CPU/GPU device selection and no
+  silent precision or platform fallback.
 - Added a diagnostics-free fused correlated-k assembly path that scales
   k-coefficients and performs random overlap in one Numba kernel without
   materializing the species optical-depth cube; the species-resolved path

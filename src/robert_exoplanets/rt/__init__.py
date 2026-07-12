@@ -58,6 +58,10 @@ from .random_overlap import (
     random_overlap_tau_vectors,
     rank_rebin_distribution,
 )
+from .jax_random_overlap import (
+    jax_random_overlap_device_info,
+    jax_random_overlap_species_tau,
+)
 from .scattering import (
     DirectStellarBeam,
     SingleScatteringSource,
@@ -126,6 +130,8 @@ __all__ = [
     "grey_cloud_deck",
     "grey_cloud_from_mass_extinction",
     "power_law_haze",
+    "jax_random_overlap_device_info",
+    "jax_random_overlap_species_tau",
     "random_overlap_species_tau",
     "random_overlap_tau_vectors",
     "rank_rebin_distribution",

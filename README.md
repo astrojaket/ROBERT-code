@@ -116,6 +116,9 @@ non-converged sampler runs cannot pass validation.
 - Gas optical-depth assembly from evaluated correlated-k opacity, including
   random-overlap multi-gas mixing, CIA/Rayleigh optical-depth contributors, and
   plot-ready cumulative tau and transmission-weighting diagnostics.
+- An independent optional float64 JAX/XLA conservative-RORR backend for
+  explicit Apple-Silicon/Linux CPU experiments and Linux CUDA benchmarks;
+  NumPy and Numba remain the reference and default CPU paths.
 - Hydrostatic radius/path geometry anchored at a reference pressure, available
   as an optional spherical-shell path model for RT experiments.
 - A NumPy clear-sky thermal-emission reference solver with Planck source
