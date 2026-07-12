@@ -56,6 +56,11 @@ def load_cloud_optical_properties_npz(
         tau = np.array(archive[tau_key], dtype=float, copy=True)
         ssa = _optional_array_from_archive(archive, keys, _SSA_ALIASES, default=0.0)
         asymmetry = _optional_array_from_archive(archive, keys, _ASYMMETRY_ALIASES, default=0.0)
+        phase_moments = (
+            None
+            if "phase_function_moments" not in keys
+            else np.array(archive["phase_function_moments"], dtype=float, copy=True)
+        )
         pressure_edges = _optional_pressure_edges_from_archive(archive, keys)
 
     resolved_pressure_unit = _unit_from_pressure_key(pressure_key, pressure_unit)
@@ -80,6 +85,7 @@ def load_cloud_optical_properties_npz(
         pressure_grid=pressure_grid,
         single_scattering_albedo=ssa,
         asymmetry_factor=asymmetry,
+        phase_function_moments=phase_moments,
         metadata={
             "source_format": "npz_cloud_optical_properties",
             "source_path": str(file_path),
@@ -330,17 +336,17 @@ def write_cloud_optical_properties_npz(
     )
     pressure_key = f"pressure_{_normalized_pressure_unit_for_key(pressure_unit)}"
     edge_key = f"pressure_edges_{_normalized_pressure_unit_for_key(pressure_unit)}"
-    np.savez(
-        file_path,
-        **{
+    arrays = {
             pressure_key: pressure,
             edge_key: pressure_edges,
             "wavelength_micron": cloud.spectral_grid.values,
             "extinction_tau": cloud.extinction_tau,
             "single_scattering_albedo": cloud.single_scattering_albedo,
             "asymmetry_factor": cloud.asymmetry_factor,
-        },
-    )
+        }
+    if cloud.phase_function_moments is not None:
+        arrays["phase_function_moments"] = cloud.phase_function_moments
+    np.savez(file_path, **arrays)
     return file_path
 
 

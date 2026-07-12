@@ -13,14 +13,23 @@ from robert_exoplanets.atmosphere import AtmosphereBuilder, AtmosphereState
 from robert_exoplanets.bodies import Planet, Star
 from robert_exoplanets.core import PressureGrid, RobertValidationError, SpectralGrid, Spectrum
 from robert_exoplanets.core._immutability import immutable_mapping
-from robert_exoplanets.opacity import CorrelatedKOpacityProvider, PreparedCorrelatedKOpacity
+from robert_exoplanets.opacity import (
+    CorrelatedKOpacityProvider,
+    PreparedCorrelatedKOpacity,
+    pressure_values_in_unit,
+)
 from robert_exoplanets.rt import (
     CiaTable,
     DiscGeometry,
+    RefractiveIndexSpectrum,
     assemble_gas_optical_depth,
     cia_optical_depth,
     gauss_legendre_disk_geometry,
+    grey_cloud_from_mass_extinction,
+    lognormal_mie_optics,
+    mie_cloud_from_mass_fraction,
     rayleigh_scattering_optical_depth,
+    refractive_index_from_parameters,
     solve_clear_sky_emission,
     thermal_integration_backend_name,
 )
@@ -369,7 +378,7 @@ class ParameterizedClearSkyEmissionForwardModel:
     atmosphere_builder: AtmosphereBuilder
     opacity_provider: CorrelatedKOpacityProvider
     config: ParameterizedClearSkyEmissionModelConfig
-    cia_table: CiaTable | None = None
+    cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     geometry: DiscGeometry | None = None
     prepared_opacity: PreparedCorrelatedKOpacity = field(init=False, repr=False)
     gravity_m_s2: float = field(init=False)
@@ -412,6 +421,16 @@ class ParameterizedClearSkyEmissionForwardModel:
     @property
     def pressure_grid(self) -> PressureGrid:
         return self.atmosphere_builder.pressure_grid
+
+    @property
+    def cia_tables(self) -> tuple[CiaTable, ...]:
+        """Return every configured CIA source as an additive tuple."""
+
+        if self.cia_table is None:
+            return ()
+        if isinstance(self.cia_table, CiaTable):
+            return (self.cia_table,)
+        return tuple(self.cia_table)
 
     @property
     def required_parameters(self) -> tuple[str, ...]:
@@ -457,12 +476,12 @@ class ParameterizedClearSkyEmissionForwardModel:
                 "required_parameters": ",".join(self.required_parameters),
                 "gas_combination": self.config.gas_combination,
                 "include_rayleigh": str(bool(self.config.include_rayleigh)).lower(),
-                "include_cia": str(self.cia_table is not None).lower(),
-                "cia_source": (
-                    "" if self.cia_table is None else str(self.cia_table.metadata.get("source_project", ""))
+                "include_cia": str(bool(self.cia_tables)).lower(),
+                "cia_source": ",".join(
+                    str(table.metadata.get("source_project", "")) for table in self.cia_tables
                 ),
-                "cia_checksum_sha256": (
-                    "" if self.cia_table is None else str(self.cia_table.metadata.get("checksum_sha256", ""))
+                "cia_checksum_sha256": ",".join(
+                    str(table.metadata.get("checksum_sha256", "")) for table in self.cia_tables
                 ),
                 "cia_normal_hydrogen": str(bool(self.config.cia_normal_hydrogen)).lower(),
                 "thermal_integration_backend": self.config.thermal_integration_backend,
@@ -506,11 +525,11 @@ class ParameterizedClearSkyEmissionForwardModel:
             gas_combination=self.config.gas_combination,
         )
         additional_optical_depths = []
-        if self.cia_table is not None:
+        for table in self.cia_tables:
             additional_optical_depths.append(
                 cia_optical_depth(
                     gas_optical_depth,
-                    self.cia_table,
+                    table,
                     normal_hydrogen=self.config.cia_normal_hydrogen,
                     temperature_extrapolation=self.config.cia_temperature_extrapolation,
                     spectral_extrapolation=self.config.cia_spectral_extrapolation,
@@ -539,6 +558,432 @@ class ParameterizedClearSkyEmissionForwardModel:
         return result.eclipse_depth
 
 
+@dataclass(frozen=True)
+class GreyScatteringCloudConfig:
+    """Region-specific uniform gray cloud-opacity retrieval parameter."""
+
+    log10_mass_extinction_parameter: str
+    single_scattering_albedo: float = 1.0
+    asymmetry_factor: float = 0.0
+    multiple_scattering_backend: str = "sh4"
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        parameter = str(self.log10_mass_extinction_parameter).strip()
+        if not parameter:
+            raise RobertValidationError("log10_mass_extinction_parameter must not be empty")
+        omega = float(self.single_scattering_albedo)
+        asymmetry = float(self.asymmetry_factor)
+        if not np.isfinite(omega) or not 0.0 <= omega <= 1.0:
+            raise RobertValidationError("single_scattering_albedo must lie in [0, 1]")
+        if not np.isfinite(asymmetry) or not -1.0 <= asymmetry <= 1.0:
+            raise RobertValidationError("asymmetry_factor must lie in [-1, 1]")
+        backend = self.multiple_scattering_backend.strip().lower()
+        if backend not in {"two_stream", "toon_hemispheric_mean", "sh4", "p3"}:
+            raise RobertValidationError("gray scattering cloud requires a multiple-scattering backend")
+        object.__setattr__(self, "log10_mass_extinction_parameter", parameter)
+        object.__setattr__(self, "single_scattering_albedo", omega)
+        object.__setattr__(self, "asymmetry_factor", asymmetry)
+        object.__setattr__(self, "multiple_scattering_backend", backend)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+
+@dataclass(frozen=True)
+class ParameterizedGreyCloudEmissionForwardModel(ParameterizedClearSkyEmissionForwardModel):
+    """Parameterized emission column with a uniform gray scattering opacity."""
+
+    cloud: GreyScatteringCloudConfig = field(
+        default_factory=lambda: GreyScatteringCloudConfig("log_cloud_mass_extinction")
+    )
+
+    @property
+    def required_parameters(self) -> tuple[str, ...]:
+        return (
+            *super().required_parameters,
+            self.cloud.log10_mass_extinction_parameter,
+        )
+
+    @property
+    def manifest_metadata(self) -> Mapping[str, str]:
+        return immutable_mapping(
+            {
+                **dict(super().manifest_metadata),
+                "forward_model": "parameterized_grey_cloud_emission",
+                "cloud_model": "uniform_mass_extinction",
+                "cloud_log10_mass_extinction_parameter": (
+                    self.cloud.log10_mass_extinction_parameter
+                ),
+                "cloud_mass_extinction_unit": "cm2/g_bulk_atmosphere",
+                "cloud_single_scattering_albedo": (
+                    f"{self.cloud.single_scattering_albedo:.17g}"
+                ),
+                "cloud_asymmetry_factor": f"{self.cloud.asymmetry_factor:.17g}",
+                "cloud_multiple_scattering_backend": self.cloud.multiple_scattering_backend,
+                **dict(self.cloud.metadata),
+            }
+        )
+
+    def __call__(self, parameters: Mapping[str, float]) -> Spectrum:
+        missing = tuple(name for name in self.required_parameters if name not in parameters)
+        if missing:
+            raise RobertValidationError(
+                "parameterized cloudy emission parameters are missing: " + ", ".join(missing)
+            )
+        parameter_values = {name: float(parameters[name]) for name in self.required_parameters}
+        if not all(np.isfinite(value) for value in parameter_values.values()):
+            raise RobertValidationError("parameterized cloudy emission parameters must be finite")
+        atmosphere = self.atmosphere_builder.build(parameter_values)
+        evaluated_opacity = self.opacity_provider.evaluate(atmosphere, self.prepared_opacity)
+        gas_optical_depth = assemble_gas_optical_depth(
+            atmosphere,
+            evaluated_opacity,
+            gravity_m_s2=self.gravity_m_s2,
+            gas_combination=self.config.gas_combination,
+        )
+        additional_optical_depths = []
+        for table in self.cia_tables:
+            additional_optical_depths.append(
+                cia_optical_depth(
+                    gas_optical_depth,
+                    table,
+                    normal_hydrogen=self.config.cia_normal_hydrogen,
+                    temperature_extrapolation=self.config.cia_temperature_extrapolation,
+                    spectral_extrapolation=self.config.cia_spectral_extrapolation,
+                )
+            )
+        if self.config.include_rayleigh:
+            additional_optical_depths.append(rayleigh_scattering_optical_depth(gas_optical_depth))
+        cloud_opacity = float(
+            np.power(10.0, parameter_values[self.cloud.log10_mass_extinction_parameter])
+        )
+        if not np.isfinite(cloud_opacity):
+            raise RobertValidationError("gray cloud mass extinction overflowed")
+        additional_optical_depths.append(
+            grey_cloud_from_mass_extinction(
+                gas_optical_depth,
+                mass_extinction_cm2_g=cloud_opacity,
+                single_scattering_albedo=self.cloud.single_scattering_albedo,
+                asymmetry_factor=self.cloud.asymmetry_factor,
+            )
+        )
+        radius_scale = (
+            1.0
+            if self.config.radius_scale_parameter is None
+            else parameter_values[self.config.radius_scale_parameter]
+        )
+        if radius_scale <= 0.0:
+            raise RobertValidationError("radius scale must be positive")
+        result = solve_clear_sky_emission(
+            gas_optical_depth,
+            geometry=self.geometry,
+            additional_optical_depths=additional_optical_depths,
+            multiple_scattering_backend=self.cloud.multiple_scattering_backend,
+            planet_radius_m=self.planet.radius_m * radius_scale,
+            star_radius_m=self.star.radius_m,
+            star_temperature_k=self.star.effective_temperature_k,
+            thermal_integration_backend=self.config.thermal_integration_backend,
+        )
+        if result.eclipse_depth is None:
+            raise RobertValidationError("cloudy emission solver did not return eclipse depth")
+        return result.eclipse_depth
+
+
+@dataclass(frozen=True)
+class RefractiveIndexCloudConfig:
+    """Cloud-type-agnostic Mie cloud retrieval parameters.
+
+    The refractive index is represented by nodal real ``n`` and log10
+    imaginary ``k`` parameters. Particle composition is not assumed. Material
+    catalogues are used after retrieval for comparison, or may provide fixed
+    indices through the lower-level Mie API.
+    """
+
+    refractive_index_wavelength_micron: tuple[float, ...]
+    real_index_parameter_names: tuple[str, ...]
+    log10_imaginary_index_parameter_names: tuple[str, ...]
+    log10_condensate_mass_fraction_parameter: str
+    log10_effective_radius_micron_parameter: str
+    particle_density_kg_m3: float
+    geometric_stddev: float = 1.0
+    geometric_stddev_parameter: str | None = None
+    log10_cloud_top_pressure_bar_parameter: str | None = None
+    log10_cloud_base_pressure_bar_parameter: str | None = None
+    quadrature_points: int = 1
+    refractive_index_extrapolation: str = "raise"
+    multiple_scattering_backend: str = "sh4"
+    fixed_refractive_index: RefractiveIndexSpectrum | None = None
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        wavelength = tuple(float(item) for item in self.refractive_index_wavelength_micron)
+        real_names = tuple(str(item).strip() for item in self.real_index_parameter_names)
+        imaginary_names = tuple(
+            str(item).strip() for item in self.log10_imaginary_index_parameter_names
+        )
+        fixed_index = self.fixed_refractive_index
+        if fixed_index is None:
+            if not wavelength or any(not np.isfinite(item) or item <= 0.0 for item in wavelength):
+                raise RobertValidationError(
+                    "refractive-index wavelength nodes must be finite and positive"
+                )
+            if any(
+                right <= left
+                for left, right in zip(wavelength[:-1], wavelength[1:], strict=True)
+            ):
+                raise RobertValidationError(
+                    "refractive-index wavelength nodes must be strictly increasing"
+                )
+            if len(real_names) != len(wavelength) or len(imaginary_names) != len(wavelength):
+                raise RobertValidationError(
+                    "refractive-index parameter names must match wavelength nodes"
+                )
+        elif wavelength or real_names or imaginary_names:
+            raise RobertValidationError(
+                "fixed_refractive_index cannot be combined with retrieved n/k nodes"
+            )
+        scalar_names = (
+            str(self.log10_condensate_mass_fraction_parameter).strip(),
+            str(self.log10_effective_radius_micron_parameter).strip(),
+        )
+        optional_names = tuple(
+            None if item is None else str(item).strip()
+            for item in (
+                self.geometric_stddev_parameter,
+                self.log10_cloud_top_pressure_bar_parameter,
+                self.log10_cloud_base_pressure_bar_parameter,
+            )
+        )
+        all_names = (*real_names, *imaginary_names, *scalar_names, *(item for item in optional_names if item))
+        if any(not item for item in all_names) or len(set(all_names)) != len(all_names):
+            raise RobertValidationError("cloud retrieval parameter names must be non-empty and unique")
+        density = float(self.particle_density_kg_m3)
+        width = float(self.geometric_stddev)
+        if not np.isfinite(density) or density <= 0.0:
+            raise RobertValidationError("particle_density_kg_m3 must be finite and positive")
+        if not np.isfinite(width) or width < 1.0:
+            raise RobertValidationError("geometric_stddev must be finite and at least one")
+        points = int(self.quadrature_points)
+        if points < 1:
+            raise RobertValidationError("quadrature_points must be positive")
+        extrapolation = str(self.refractive_index_extrapolation).strip().lower()
+        if extrapolation not in {"raise", "clip"}:
+            raise RobertValidationError("refractive_index_extrapolation must be 'raise' or 'clip'")
+        backend = str(self.multiple_scattering_backend).strip().lower()
+        if backend not in {"two_stream", "toon_hemispheric_mean", "sh4", "p3"}:
+            raise RobertValidationError("refractive-index cloud requires a multiple-scattering backend")
+        object.__setattr__(self, "refractive_index_wavelength_micron", wavelength)
+        object.__setattr__(self, "real_index_parameter_names", real_names)
+        object.__setattr__(self, "log10_imaginary_index_parameter_names", imaginary_names)
+        object.__setattr__(self, "log10_condensate_mass_fraction_parameter", scalar_names[0])
+        object.__setattr__(self, "log10_effective_radius_micron_parameter", scalar_names[1])
+        object.__setattr__(self, "geometric_stddev_parameter", optional_names[0])
+        object.__setattr__(self, "log10_cloud_top_pressure_bar_parameter", optional_names[1])
+        object.__setattr__(self, "log10_cloud_base_pressure_bar_parameter", optional_names[2])
+        object.__setattr__(self, "particle_density_kg_m3", density)
+        object.__setattr__(self, "geometric_stddev", width)
+        object.__setattr__(self, "quadrature_points", points)
+        object.__setattr__(self, "refractive_index_extrapolation", extrapolation)
+        object.__setattr__(self, "multiple_scattering_backend", backend)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+    @property
+    def required_parameters(self) -> tuple[str, ...]:
+        parameters = [self.log10_condensate_mass_fraction_parameter,
+                      self.log10_effective_radius_micron_parameter]
+        if self.fixed_refractive_index is None:
+            parameters[:0] = [
+                *self.real_index_parameter_names,
+                *self.log10_imaginary_index_parameter_names,
+            ]
+        parameters.extend(
+            item
+            for item in (
+                self.geometric_stddev_parameter,
+                self.log10_cloud_top_pressure_bar_parameter,
+                self.log10_cloud_base_pressure_bar_parameter,
+            )
+            if item is not None
+        )
+        return tuple(parameters)
+
+
+@dataclass(frozen=True)
+class ParameterizedRefractiveIndexCloudEmissionForwardModel(
+    ParameterizedClearSkyEmissionForwardModel
+):
+    """Emission column with directly retrieved complex cloud refractive index."""
+
+    cloud: RefractiveIndexCloudConfig = field(
+        default_factory=lambda: RefractiveIndexCloudConfig(
+            refractive_index_wavelength_micron=(1.0, 10.0),
+            real_index_parameter_names=("cloud_n_0", "cloud_n_1"),
+            log10_imaginary_index_parameter_names=("cloud_logk_0", "cloud_logk_1"),
+            log10_condensate_mass_fraction_parameter="log_cloud_mass_fraction",
+            log10_effective_radius_micron_parameter="log_cloud_radius_micron",
+            particle_density_kg_m3=3000.0,
+        )
+    )
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if len(set(self.required_parameters)) != len(self.required_parameters):
+            raise RobertValidationError("cloud and atmosphere retrieval parameter names must be unique")
+
+    @property
+    def required_parameters(self) -> tuple[str, ...]:
+        return (*super().required_parameters, *self.cloud.required_parameters)
+
+    @property
+    def manifest_metadata(self) -> Mapping[str, str]:
+        return immutable_mapping(
+            {
+                **dict(super().manifest_metadata),
+                "forward_model": "parameterized_refractive_index_cloud_emission",
+                "cloud_model": "lognormal_homogeneous_sphere_mie",
+                "cloud_refractive_index_parameterization": (
+                    "nodal_n_log10_k"
+                    if self.cloud.fixed_refractive_index is None
+                    else "tabulated_n_k"
+                ),
+                "cloud_refractive_index_wavelength_micron": ",".join(
+                    f"{item:.17g}" for item in self.cloud.refractive_index_wavelength_micron
+                ),
+                "cloud_real_index_parameters": ",".join(self.cloud.real_index_parameter_names),
+                "cloud_log10_imaginary_index_parameters": ",".join(
+                    self.cloud.log10_imaginary_index_parameter_names
+                ),
+                "cloud_particle_density_kg_m3": f"{self.cloud.particle_density_kg_m3:.17g}",
+                "cloud_geometric_stddev": f"{self.cloud.geometric_stddev:.17g}",
+                "cloud_quadrature_points": str(self.cloud.quadrature_points),
+                "cloud_multiple_scattering_backend": self.cloud.multiple_scattering_backend,
+                "cloud_phase_function_closure": "exact_mie_legendre_moments_through_l4",
+                "cloud_refractive_index_mode": (
+                    "retrieved_nodal_n_log10_k"
+                    if self.cloud.fixed_refractive_index is None
+                    else "fixed_tabulated_n_k"
+                ),
+                "cloud_refractive_index_name": (
+                    "retrieved refractive index"
+                    if self.cloud.fixed_refractive_index is None
+                    else self.cloud.fixed_refractive_index.name
+                ),
+                **dict(self.cloud.metadata),
+            }
+        )
+
+    def __call__(self, parameters: Mapping[str, float]) -> Spectrum:
+        missing = tuple(name for name in self.required_parameters if name not in parameters)
+        if missing:
+            raise RobertValidationError(
+                "parameterized refractive-index cloud parameters are missing: " + ", ".join(missing)
+            )
+        parameter_values = {name: float(parameters[name]) for name in self.required_parameters}
+        if not all(np.isfinite(value) for value in parameter_values.values()):
+            raise RobertValidationError("parameterized refractive-index cloud parameters must be finite")
+        atmosphere = self.atmosphere_builder.build(parameter_values)
+        evaluated_opacity = self.opacity_provider.evaluate(atmosphere, self.prepared_opacity)
+        gas_optical_depth = assemble_gas_optical_depth(
+            atmosphere,
+            evaluated_opacity,
+            gravity_m_s2=self.gravity_m_s2,
+            gas_combination=self.config.gas_combination,
+        )
+        additional_optical_depths = [
+            cia_optical_depth(
+                gas_optical_depth,
+                table,
+                normal_hydrogen=self.config.cia_normal_hydrogen,
+                temperature_extrapolation=self.config.cia_temperature_extrapolation,
+                spectral_extrapolation=self.config.cia_spectral_extrapolation,
+            )
+            for table in self.cia_tables
+        ]
+        if self.config.include_rayleigh:
+            additional_optical_depths.append(rayleigh_scattering_optical_depth(gas_optical_depth))
+
+        index = self.cloud.fixed_refractive_index
+        if index is None:
+            index = refractive_index_from_parameters(
+                self.cloud.refractive_index_wavelength_micron,
+                parameter_values,
+                real_parameter_names=self.cloud.real_index_parameter_names,
+                log10_imaginary_parameter_names=self.cloud.log10_imaginary_index_parameter_names,
+            )
+        radius = float(
+            np.power(10.0, parameter_values[self.cloud.log10_effective_radius_micron_parameter])
+        )
+        width = (
+            self.cloud.geometric_stddev
+            if self.cloud.geometric_stddev_parameter is None
+            else parameter_values[self.cloud.geometric_stddev_parameter]
+        )
+        particle_optics = lognormal_mie_optics(
+            index,
+            self.spectral_grid,
+            effective_radius_micron=radius,
+            geometric_stddev=width,
+            particle_density_kg_m3=self.cloud.particle_density_kg_m3,
+            quadrature_points=self.cloud.quadrature_points,
+            extrapolation=self.cloud.refractive_index_extrapolation,
+        )
+        mass_fraction_value = float(
+            np.power(10.0, parameter_values[self.cloud.log10_condensate_mass_fraction_parameter])
+        )
+        pressure_bar = pressure_values_in_unit(
+            self.pressure_grid.centers, self.pressure_grid.unit, "bar"
+        )
+        active = np.ones(self.pressure_grid.n_layers, dtype=bool)
+        top_pressure = None
+        base_pressure = None
+        if self.cloud.log10_cloud_top_pressure_bar_parameter is not None:
+            top_pressure = float(
+                np.power(
+                    10.0,
+                    parameter_values[self.cloud.log10_cloud_top_pressure_bar_parameter],
+                )
+            )
+            active &= pressure_bar >= top_pressure
+        if self.cloud.log10_cloud_base_pressure_bar_parameter is not None:
+            base_pressure = float(
+                np.power(
+                    10.0,
+                    parameter_values[self.cloud.log10_cloud_base_pressure_bar_parameter],
+                )
+            )
+            active &= pressure_bar <= base_pressure
+        if top_pressure is not None and base_pressure is not None and top_pressure > base_pressure:
+            raise RobertValidationError("cloud top pressure must not exceed cloud base pressure")
+        mass_fraction = np.where(active, mass_fraction_value, 0.0)
+        additional_optical_depths.append(
+            mie_cloud_from_mass_fraction(
+                gas_optical_depth,
+                particle_optics,
+                condensate_mass_fraction=mass_fraction,
+            )
+        )
+
+        radius_scale = (
+            1.0
+            if self.config.radius_scale_parameter is None
+            else parameter_values[self.config.radius_scale_parameter]
+        )
+        if radius_scale <= 0.0:
+            raise RobertValidationError("radius scale must be positive")
+        result = solve_clear_sky_emission(
+            gas_optical_depth,
+            geometry=self.geometry,
+            additional_optical_depths=additional_optical_depths,
+            multiple_scattering_backend=self.cloud.multiple_scattering_backend,
+            planet_radius_m=self.planet.radius_m * radius_scale,
+            star_radius_m=self.star.radius_m,
+            star_temperature_k=self.star.effective_temperature_k,
+            thermal_integration_backend=self.config.thermal_integration_backend,
+        )
+        if result.eclipse_depth is None:
+            raise RobertValidationError("refractive-index cloud solver did not return eclipse depth")
+        return result.eclipse_depth
+
+
 def _planet_gravity(planet: Planet) -> float:
     if planet.gravity_m_s2 is not None:
         return float(planet.gravity_m_s2)
@@ -562,6 +1007,10 @@ def _array_signature(*arrays: ArrayLike, labels: tuple[str, ...] = ()) -> str:
 __all__ = [
     "ClearSkyEmissionForwardModel",
     "ClearSkyEmissionModelConfig",
+    "GreyScatteringCloudConfig",
     "ParameterizedClearSkyEmissionForwardModel",
+    "ParameterizedGreyCloudEmissionForwardModel",
+    "ParameterizedRefractiveIndexCloudEmissionForwardModel",
     "ParameterizedClearSkyEmissionModelConfig",
+    "RefractiveIndexCloudConfig",
 ]

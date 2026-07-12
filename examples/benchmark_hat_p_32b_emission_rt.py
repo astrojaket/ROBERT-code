@@ -361,7 +361,7 @@ def main() -> dict[str, object]:
             "used_by_current_robert_emission_solver": path_geometry is not None,
             "note": "ROBERT anchors the hydrostatic radius grid at this pressure when hydrostatic spherical path geometry is enabled.",
         },
-        "solver": result.metadata,
+        "solver": dict(result.metadata),
         "remaining_benchmark_physics_gaps": _missing_physics(include_scattering_source),
         "comparison": comparison,
         "outputs": {

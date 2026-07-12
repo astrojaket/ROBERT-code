@@ -21,11 +21,12 @@ from .geometry import (
 from .optical_depth import GasOpticalDepth
 from .path_geometry import HydrostaticPathGeometry
 from .scattering import SingleScatteringSource
+from .sh4 import solve_thermal_sh4
 from .thermal_integration import (
     integrate_thermal_emission,
     thermal_integration_backend_name,
 )
-from .two_stream import two_stream_effective_optical_depth
+from .toon import solve_thermal_two_stream
 
 PLANCK_CONSTANT_J_S = 6.62607015e-34
 SPEED_OF_LIGHT_M_S = 299_792_458.0
@@ -237,7 +238,7 @@ def solve_clear_sky_emission(
     ``SingleScatteringSource`` is supplied, scattering optical depths in
     ``additional_optical_depths`` add a first-order direct-beam scattering
     source term; otherwise scattering remains extinction-only unless
-    ``multiple_scattering_backend="two_stream"`` is requested.
+    ``multiple_scattering_backend="two_stream"`` or ``"sh4"`` is requested.
     """
 
     bottom_mode = bottom_boundary.strip().lower()
@@ -273,12 +274,20 @@ def solve_clear_sky_emission(
     order = _top_to_bottom_order(gas_optical_depth)
     source = _layer_planck_source(wavelength, gas_optical_depth.atmosphere.temperature)
     source_ordered = source[order]
+    level_source_ordered = None
+    temperature_edges = gas_optical_depth.atmosphere.temperature_edges
+    if temperature_edges is not None:
+        ordered_edge_temperature = np.asarray(temperature_edges, dtype=float)
+        if order[0] != 0:
+            ordered_edge_temperature = ordered_edge_temperature[::-1]
+        level_source_ordered = _layer_planck_source(wavelength, ordered_edge_temperature)
     (
         total_tau,
         opacity_sources,
         scattering_treatment,
         scattering_tau,
         transport_scattering_tau,
+        scattering_phase_moments,
         scattering_sources,
     ) = _total_optical_depth(
         gas_optical_depth,
@@ -288,12 +297,15 @@ def solve_clear_sky_emission(
     multiple_scattering_applied = "false"
     if scattering_backend != "none":
         if np.any(scattering_tau > 0.0):
-            solver_total_tau = two_stream_effective_optical_depth(
-                total_tau,
-                scattering_tau,
-                transport_scattering_tau,
+            if path_geometry is not None:
+                raise RobertValidationError(
+                    "thermal two-stream scattering currently requires plane-parallel geometry"
+                )
+            scattering_treatment = (
+                "toon_hemispheric_mean_thermal_two_stream"
+                if scattering_backend == "toon_hemispheric_mean"
+                else "rooney_p3_sh4_mixed_phase_moments_delta_m"
             )
-            scattering_treatment = "two_stream_multiple_scattering_reference"
             multiple_scattering_applied = "true"
         else:
             multiple_scattering_applied = "false_no_scattering"
@@ -332,11 +344,16 @@ def solve_clear_sky_emission(
         point_scattering_contribution_ordered = np.zeros_like(point_layer_contribution_ordered)
     bottom_source = None
     if bottom_mode == "blackbody":
-        deepest_temperature = float(
-            gas_optical_depth.atmosphere.temperature[
-                int(np.argmax(gas_optical_depth.pressure_grid.centers))
-            ]
-        )
+        if temperature_edges is None:
+            deepest_temperature = float(
+                gas_optical_depth.atmosphere.temperature[
+                    int(np.argmax(gas_optical_depth.pressure_grid.centers))
+                ]
+            )
+        else:
+            deepest_temperature = float(
+                temperature_edges[int(np.argmax(gas_optical_depth.pressure_grid.edges))]
+            )
         bottom_source = _planck_radiance_wavelength(wavelength, deepest_temperature)
     bottom_visible = np.zeros(mu.size, dtype=bool)
     if bottom_mode == "blackbody":
@@ -347,26 +364,89 @@ def solve_clear_sky_emission(
 
     thermal_backend_used = "numpy_direct_scattering"
     if scattering_source is None:
-        thermal_result = integrate_thermal_emission(
-            tau_ordered,
-            source_ordered,
-            gas_optical_depth.g_weights,
-            emission_path_factors,
-            bottom_source=bottom_source,
-            bottom_visible=bottom_visible,
-            backend=requested_thermal_backend,
-        )
-        point_layer_contribution_ordered = np.array(
-            thermal_result.point_layer_contribution_radiance,
-            dtype=float,
-            copy=True,
-        )
-        point_bottom_contribution = np.array(
-            thermal_result.point_bottom_contribution_radiance,
-            dtype=float,
-            copy=True,
-        )
-        thermal_backend_used = thermal_result.backend
+        if multiple_scattering_applied == "true":
+            if temperature_edges is None:
+                raise RobertValidationError(
+                    "thermal two-stream scattering requires atmosphere temperature_edges"
+                )
+            level_temperature = np.asarray(temperature_edges, dtype=float)
+            if order[0] != 0:
+                level_temperature = level_temperature[::-1]
+            level_source = _layer_planck_source(wavelength, level_temperature)
+            single_scattering_albedo = np.divide(
+                scattering_tau_ordered,
+                tau_ordered,
+                out=np.zeros_like(tau_ordered),
+                where=tau_ordered > 0.0,
+            )
+            asymmetry_factor = np.divide(
+                scattering_tau_ordered - transport_scattering_tau[order],
+                scattering_tau_ordered,
+                out=np.zeros_like(scattering_tau_ordered),
+                where=scattering_tau_ordered > 0.0,
+            )
+            bottom_planck = (
+                np.zeros(wavelength.size) if bottom_source is None else bottom_source
+            )
+            if scattering_backend == "toon_hemispheric_mean":
+                multiple_scattering = solve_thermal_two_stream(
+                    tau_ordered,
+                    single_scattering_albedo,
+                    asymmetry_factor,
+                    level_source,
+                    mu,
+                    bottom_planck_radiance=bottom_planck,
+                )
+                thermal_backend_used = "numpy_toon_hemispheric_mean"
+            else:
+                multiple_scattering = solve_thermal_sh4(
+                    tau_ordered,
+                    single_scattering_albedo,
+                    asymmetry_factor,
+                    level_source,
+                    mu,
+                    bottom_planck_radiance=bottom_planck,
+                    phase_function_moments=scattering_phase_moments[:4, order],
+                    delta_m_forward_fraction=np.clip(
+                        scattering_phase_moments[4, order] / 9.0,
+                        0.0,
+                        1.0 - 1.0e-12,
+                    ),
+                    delta_m=True,
+                )
+                thermal_backend_used = "scipy_banded_sh4_phase_moments_delta_m"
+            point_layer_contribution_ordered = np.sum(
+                multiple_scattering.point_layer_contribution_radiance
+                * gas_optical_depth.g_weights[None, None, None, :],
+                axis=-1,
+            )
+            point_bottom_contribution = np.sum(
+                multiple_scattering.point_bottom_contribution_radiance
+                * gas_optical_depth.g_weights[None, None, :],
+                axis=-1,
+            )
+        else:
+            thermal_result = integrate_thermal_emission(
+                tau_ordered,
+                source_ordered,
+                gas_optical_depth.g_weights,
+                emission_path_factors,
+                level_source_ordered=level_source_ordered,
+                bottom_source=bottom_source,
+                bottom_visible=bottom_visible,
+                backend=requested_thermal_backend,
+            )
+            point_layer_contribution_ordered = np.array(
+                thermal_result.point_layer_contribution_radiance,
+                dtype=float,
+                copy=True,
+            )
+            point_bottom_contribution = np.array(
+                thermal_result.point_bottom_contribution_radiance,
+                dtype=float,
+                copy=True,
+            )
+            thermal_backend_used = thermal_result.backend
     else:
         for point_index, _mu_value in enumerate(mu):
             slant_tau = tau_ordered * emission_path_factors[point_index, :, None, None]
@@ -466,9 +546,10 @@ def solve_clear_sky_emission(
         "multiple_scattering_backend": scattering_backend,
         "multiple_scattering_applied": multiple_scattering_applied,
         "thermal_integration_backend": thermal_backend_used,
-        "total_optical_depth_role": "two_stream_effective_extinction"
-        if multiple_scattering_applied == "true"
-        else "extinction",
+        "thermal_source_discretization": "linear_in_optical_depth_between_pressure_edges"
+        if level_source_ordered is not None
+        else "constant_at_layer_centers",
+        "total_optical_depth_role": "extinction",
         "opacity_sources": "+".join(opacity_sources),
         "geometry": emission_geometry.name,
         "geometry_quadrature": emission_geometry.quadrature,
@@ -651,11 +732,13 @@ def _total_optical_depth(
     str,
     NDArray[np.float64],
     NDArray[np.float64],
+    NDArray[np.float64],
     tuple[str, ...],
 ]:
     total_tau = np.array(gas_optical_depth.total_tau, dtype=float, copy=True)
     scattering_tau = np.zeros_like(total_tau)
     transport_scattering_tau = np.zeros_like(total_tau)
+    phase_moment_numerator = np.zeros((5,) + total_tau.shape)
     sources = ["gas_correlated_k"]
     scattering_sources = []
     has_scattering_extinction = False
@@ -686,6 +769,11 @@ def _total_optical_depth(
                 if np.any(asymmetry_factor < -1.0) or np.any(asymmetry_factor > 1.0):
                     raise RobertValidationError("cloud asymmetry_factor must be in [-1, 1]")
                 cloud_scattering_tau = extinction_tau * single_scattering_albedo
+                phase_moments = _contribution_phase_moments_for_g(
+                    contribution,
+                    total_tau.shape,
+                    asymmetry_factor=asymmetry_factor,
+                )
                 total_tau += extinction_tau
                 sources.append(name)
                 if np.any(cloud_scattering_tau > 0.0):
@@ -693,6 +781,7 @@ def _total_optical_depth(
                     scattering_sources.append(name)
                     scattering_tau += cloud_scattering_tau
                     transport_scattering_tau += cloud_scattering_tau * (1.0 - asymmetry_factor)
+                    phase_moment_numerator += cloud_scattering_tau[None, ...] * phase_moments
                 continue
 
             _validate_contribution_grid_match(gas_optical_depth, contribution)
@@ -706,16 +795,31 @@ def _total_optical_depth(
             total_tau += tau_for_g
             sources.append(name)
             if "scattering" in kind.lower():
+                phase_moments = _contribution_phase_moments_for_g(
+                    contribution,
+                    total_tau.shape,
+                    asymmetry_factor=None,
+                )
+                contribution_asymmetry = phase_moments[1] / 3.0
                 has_scattering_extinction = True
                 scattering_sources.append(name)
                 scattering_tau += tau_for_g
-                transport_scattering_tau += tau_for_g
+                transport_scattering_tau += tau_for_g * (1.0 - contribution_asymmetry)
+                phase_moment_numerator += tau_for_g[None, ...] * phase_moments
 
     if not np.all(np.isfinite(total_tau)) or np.any(total_tau < 0.0):
         raise RobertValidationError("total optical depth must be finite and non-negative")
     total_tau.setflags(write=False)
     scattering_tau.setflags(write=False)
     transport_scattering_tau.setflags(write=False)
+    phase_moments = np.divide(
+        phase_moment_numerator,
+        scattering_tau[None, ...],
+        out=np.zeros_like(phase_moment_numerator),
+        where=scattering_tau[None, ...] > 0.0,
+    )
+    phase_moments[0, scattering_tau <= 0.0] = 1.0
+    phase_moments.setflags(write=False)
     scattering_treatment = "extinction_only_no_scattering_source" if has_scattering_extinction else "none"
     return (
         total_tau,
@@ -723,8 +827,36 @@ def _total_optical_depth(
         scattering_treatment,
         scattering_tau,
         transport_scattering_tau,
+        phase_moments,
         tuple(scattering_sources),
     )
+
+
+def _contribution_phase_moments_for_g(
+    contribution: object,
+    shape: tuple[int, int, int],
+    *,
+    asymmetry_factor: NDArray[np.float64] | None,
+) -> NDArray[np.float64]:
+    supplied = getattr(contribution, "phase_function_moments", None)
+    if supplied is None:
+        if asymmetry_factor is None:
+            asymmetry_factor = np.zeros(shape)
+        degree = np.arange(5, dtype=float).reshape(5, 1, 1, 1)
+        return (2.0 * degree + 1.0) * asymmetry_factor[None, ...] ** degree
+    moments = np.asarray(supplied, dtype=float)
+    if moments.shape == (5, shape[0], shape[1]):
+        moments = np.repeat(moments[:, :, :, None], shape[2], axis=3)
+    elif moments.shape != (5,) + shape:
+        raise RobertValidationError(
+            "scattering phase_function_moments must have shape "
+            "(5, layer, spectral) or (5, layer, spectral, g)"
+        )
+    if not np.all(np.isfinite(moments)):
+        raise RobertValidationError("scattering phase_function_moments must be finite")
+    if not np.allclose(moments[0], 1.0, rtol=0.0, atol=1.0e-12):
+        raise RobertValidationError("scattering phase_function_moments[0] must equal one")
+    return moments
 
 
 def _normalize_multiple_scattering_backend(value: str) -> str:
@@ -733,12 +865,16 @@ def _normalize_multiple_scattering_backend(value: str) -> str:
         "none": "none",
         "off": "none",
         "false": "none",
-        "two_stream": "two_stream_reference",
-        "two_stream_reference": "two_stream_reference",
+        "two_stream": "toon_hemispheric_mean",
+        "toon": "toon_hemispheric_mean",
+        "toon_hemispheric_mean": "toon_hemispheric_mean",
+        "sh4": "sh4_henyey_greenstein_delta_m",
+        "p3": "sh4_henyey_greenstein_delta_m",
+        "sh4_henyey_greenstein_delta_m": "sh4_henyey_greenstein_delta_m",
     }
     if backend not in aliases:
         raise RobertValidationError(
-            "multiple_scattering_backend must be 'none' or 'two_stream'"
+            "multiple_scattering_backend must be 'none', 'two_stream', or 'sh4'"
         )
     return aliases[backend]
 

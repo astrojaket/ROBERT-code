@@ -88,6 +88,54 @@ def test_thermal_integration_auto_matches_numpy_reference() -> None:
     assert accelerated.backend in {"numpy", "numba"}
 
 
+def test_linear_source_matches_exact_rutten_formal_integral() -> None:
+    tau_value = 0.7
+    mu = 0.43
+    source_top = 2.0
+    source_bottom = 5.0
+    bottom_boundary = 7.0
+    tau = np.array([[[tau_value]]])
+    level_source = np.array([[source_top], [source_bottom]])
+
+    reference = integrate_thermal_emission(
+        tau,
+        np.array([[(source_top + source_bottom) / 2.0]]),
+        np.array([1.0]),
+        np.array([[1.0 / mu]]),
+        level_source_ordered=level_source,
+        bottom_source=np.array([bottom_boundary]),
+        backend="numpy",
+    )
+    accelerated = integrate_thermal_emission(
+        tau,
+        np.array([[999.0]]),
+        np.array([1.0]),
+        np.array([[1.0 / mu]]),
+        level_source_ordered=level_source,
+        bottom_source=np.array([bottom_boundary]),
+        backend="auto",
+    )
+
+    slope = (source_bottom - source_top) / tau_value
+    transmission = np.exp(-tau_value / mu)
+    atmospheric = (
+        source_top * (1.0 - transmission)
+        + slope * (mu - (tau_value + mu) * transmission)
+    )
+    expected = atmospheric + bottom_boundary * transmission
+    np.testing.assert_allclose(
+        np.sum(reference.point_layer_contribution_radiance)
+        + np.sum(reference.point_bottom_contribution_radiance),
+        expected,
+        rtol=2.0e-13,
+    )
+    np.testing.assert_allclose(
+        accelerated.point_layer_contribution_radiance,
+        reference.point_layer_contribution_radiance,
+        rtol=2.0e-13,
+    )
+
+
 def test_emission_solver_numpy_and_auto_thermal_backends_match() -> None:
     gas_tau = _gas_tau(
         temperature=[900.0, 1200.0],

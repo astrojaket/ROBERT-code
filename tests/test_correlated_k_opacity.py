@@ -27,11 +27,36 @@ from robert_exoplanets.opacity import (
 )
 
 
+def test_correlated_k_table_loads_petitradtrans_hdf(tmp_path: Path) -> None:
+    h5py = pytest.importorskip("h5py")
+    path = tmp_path / "water.ktable.petitRADTRANS.h5"
+    with h5py.File(path, "w") as handle:
+        handle.create_dataset("p", data=[1.0e-5, 1.0])
+        handle.create_dataset("t", data=[500.0, 1000.0])
+        handle.create_dataset("bin_centers", data=[1000.0, 2000.0])
+        handle.create_dataset("samples", data=[0.25, 0.75])
+        handle.create_dataset("weights", data=[0.4, 0.6])
+        coefficients = handle.create_dataset("kcoeff", data=np.ones((2, 2, 2, 2)))
+        coefficients.attrs["units"] = "cm^2/molecule"
+        handle.create_dataset("DOI", data=[b"10.0000/example"])
+        handle.create_dataset("method", data=[b"petit_samples"])
+
+    table = CorrelatedKTable.from_petitradtrans_hdf(path, species="H2O")
+
+    assert table.kcoeff.shape == (2, 2, 2, 2)
+    assert table.unit == "cm^2/molecule"
+    assert table.metadata["source_format"] == "petitradtrans_hdf5"
+    assert table.metadata["doi"] == "10.0000/example"
+    np.testing.assert_allclose(table.wavelength_micron, [10.0, 5.0])
+
+
 def test_correlated_k_provider_evaluates_exact_native_grid_points() -> None:
     table = _tiny_table("H2O")
     provider = CorrelatedKOpacityProvider({"H2O": table})
     pressure_grid = _pressure_grid()
-    spectral_grid = SpectralGrid.from_array([1000.0, 3000.0], unit="cm^-1", role="opacity")
+    spectral_grid = SpectralGrid.from_array(
+        [1000.0, 3000.0], unit="cm^-1", role="opacity"
+    )
     atmosphere = _atmosphere(pressure_grid, temperature=[500.0, 1500.0])
     prepared = provider.prepare(spectral_grid, pressure_grid, species=("H2O",))
 
@@ -63,7 +88,9 @@ def test_correlated_k_provider_rejects_off_grid_temperature() -> None:
     table = _tiny_table("H2O")
     provider = CorrelatedKOpacityProvider({"H2O": table})
     pressure_grid = _pressure_grid()
-    spectral_grid = SpectralGrid.from_array([1000.0, 2000.0], unit="cm^-1", role="opacity")
+    spectral_grid = SpectralGrid.from_array(
+        [1000.0, 2000.0], unit="cm^-1", role="opacity"
+    )
     atmosphere = _atmosphere(pressure_grid, temperature=[500.0, 1250.0])
     prepared = provider.prepare(spectral_grid, pressure_grid, species=("H2O",))
 
@@ -79,7 +106,9 @@ def test_correlated_k_provider_rejects_off_grid_spectral_grid() -> None:
     table = _tiny_table("H2O")
     provider = CorrelatedKOpacityProvider({"H2O": table})
     pressure_grid = _pressure_grid()
-    spectral_grid = SpectralGrid.from_array([1100.0, 2000.0], unit="cm^-1", role="opacity")
+    spectral_grid = SpectralGrid.from_array(
+        [1100.0, 2000.0], unit="cm^-1", role="opacity"
+    )
 
     with pytest.raises(RobertCoverageError, match="spectral value 1100"):
         provider.prepare(spectral_grid, pressure_grid, species=("H2O",))
@@ -124,7 +153,37 @@ def test_correlated_k_provider_interpolates_log_pressure_temperature_log_k() -> 
     assert evaluated.kcoeff.shape == (1, 1, 1, 1)
     assert prepared.metadata["interpolation"] == "log_pressure_temperature_log_k"
     assert evaluated.metadata["interpolation"] == "log_pressure_temperature_log_k"
+    np.testing.assert_array_equal(prepared.spectral_indices["H2O"], [0])
     np.testing.assert_allclose(evaluated.kcoeff[0, 0, 0, 0], expected, rtol=1.0e-12)
+
+
+def test_correlated_k_cached_log_coefficients_match_uncached_interpolation() -> None:
+    table = _interpolation_table("H2O")
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-4, 1.0e-2]),
+        centers=np.array([1.0e-3]),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array([2000.0], unit="cm^-1", role="opacity")
+    atmosphere = _atmosphere(pressure_grid, temperature=[1000.0])
+    cached = CorrelatedKOpacityProvider(
+        {"H2O": table},
+        interpolation="log_pressure_temperature_log_k",
+    )
+    uncached = CorrelatedKOpacityProvider(
+        {"H2O": table},
+        interpolation="log_pressure_temperature_log_k",
+        cache_log_kcoeff=False,
+    )
+    cached_prepared = cached.prepare(spectral_grid, pressure_grid, species=("H2O",))
+    uncached_prepared = uncached.prepare(spectral_grid, pressure_grid, species=("H2O",))
+
+    cached_values = cached.evaluate(atmosphere, cached_prepared).kcoeff
+    uncached_values = uncached.evaluate(atmosphere, uncached_prepared).kcoeff
+
+    assert cached_prepared.metadata["log_kcoeff_cache"] == "enabled"
+    assert uncached_prepared.metadata["log_kcoeff_cache"] == "disabled"
+    np.testing.assert_array_equal(cached_values, uncached_values)
 
 
 def test_correlated_k_interpolation_rejects_out_of_range_temperature() -> None:
@@ -181,7 +240,9 @@ def test_correlated_k_clip_policy_matches_nemesispy_boundary_clamping() -> None:
 def test_correlated_k_cache_key_includes_interpolation_policy() -> None:
     table = _tiny_table("H2O")
     pressure_grid = _pressure_grid()
-    spectral_grid = SpectralGrid.from_array([1000.0, 2000.0], unit="cm^-1", role="opacity")
+    spectral_grid = SpectralGrid.from_array(
+        [1000.0, 2000.0], unit="cm^-1", role="opacity"
+    )
 
     exact = CorrelatedKOpacityProvider({"H2O": table}, interpolation="exact").prepare(
         spectral_grid,
@@ -270,7 +331,9 @@ def _interpolation_table(species: str) -> CorrelatedKTable:
     )
 
 
-def _linear_log_k(log10_pressure: np.ndarray | float, temperature: np.ndarray | float) -> np.ndarray | float:
+def _linear_log_k(
+    log10_pressure: np.ndarray | float, temperature: np.ndarray | float
+) -> np.ndarray | float:
     return -72.0 + 0.35 * log10_pressure + 1.0e-3 * temperature
 
 
@@ -282,7 +345,9 @@ def _pressure_grid() -> PressureGrid:
     )
 
 
-def _atmosphere(pressure_grid: PressureGrid, temperature: list[float]) -> AtmosphereState:
+def _atmosphere(
+    pressure_grid: PressureGrid, temperature: list[float]
+) -> AtmosphereState:
     return AtmosphereState(
         pressure_grid=pressure_grid,
         temperature=np.asarray(temperature),

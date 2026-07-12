@@ -30,6 +30,20 @@ def _readonly_layer_array(
     return array
 
 
+def _readonly_level_array(
+    values: ArrayLike,
+    name: str,
+    n_levels: int,
+) -> NDArray[np.float64]:
+    array = np.array(values, dtype=float, copy=True)
+    if array.shape != (n_levels,):
+        raise RobertValidationError(f"{name} must match pressure grid edges")
+    if not np.all(np.isfinite(array)):
+        raise RobertValidationError(f"{name} must contain only finite values")
+    array.setflags(write=False)
+    return array
+
+
 @dataclass(frozen=True)
 class AtmosphereState:
     """Evaluated one-dimensional atmospheric state for one parameter vector."""
@@ -38,6 +52,7 @@ class AtmosphereState:
     temperature: NDArray[np.float64]
     composition: Mapping[str, ArrayLike]
     mean_molecular_weight: ArrayLike
+    temperature_edges: ArrayLike | None = None
     temperature_unit: str = "K"
     composition_convention: str = "volume_mixing_ratio"
     mean_molecular_weight_unit: str = "amu"
@@ -48,6 +63,15 @@ class AtmosphereState:
         temperature = _readonly_layer_array(self.temperature, "temperature", n_layers)
         if np.any(temperature <= 0.0):
             raise RobertValidationError("temperature values must be positive")
+        temperature_edges = None
+        if self.temperature_edges is not None:
+            temperature_edges = _readonly_level_array(
+                self.temperature_edges,
+                "temperature_edges",
+                n_layers + 1,
+            )
+            if np.any(temperature_edges <= 0.0):
+                raise RobertValidationError("temperature edge values must be positive")
 
         composition: dict[str, NDArray[np.float64]] = {}
         for species, values in self.composition.items():
@@ -75,6 +99,7 @@ class AtmosphereState:
             raise RobertValidationError("mean_molecular_weight_unit must not be empty")
 
         object.__setattr__(self, "temperature", temperature)
+        object.__setattr__(self, "temperature_edges", temperature_edges)
         object.__setattr__(self, "composition", immutable_mapping(composition))
         object.__setattr__(self, "mean_molecular_weight", mean_molecular_weight)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))

@@ -77,6 +77,43 @@ def test_single_layer_without_bottom_matches_absorbing_slab_solution() -> None:
     np.testing.assert_allclose(result.bottom_contribution_radiance, 0.0)
 
 
+def test_clear_emission_uses_edge_temperatures_for_exact_linear_source() -> None:
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-5, 1.0e-3]),
+        centers=np.array([1.0e-4]),
+        unit="bar",
+    )
+    atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=np.array([999.0]),
+        temperature_edges=np.array([800.0, 1200.0]),
+        composition={"H2O": np.array([1.0e-3])},
+        mean_molecular_weight=2.3,
+    )
+    spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")
+    opacity = _evaluated_opacity(
+        pressure_grid,
+        spectral_grid,
+        np.array([[[[1.0e-28]]]]),
+        unit="m^2/molecule",
+    )
+    gas_tau = assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=10.0)
+
+    result = solve_clear_sky_emission(gas_tau, bottom_boundary="blackbody")
+
+    tau = float(gas_tau.total_tau[0, 0, 0])
+    top = float(planck_radiance_wavelength([2.0], 800.0)[0])
+    bottom = float(planck_radiance_wavelength([2.0], 1200.0)[0])
+    escape = -np.expm1(-tau)
+    linear_weight = (escape - tau * np.exp(-tau)) / tau
+    expected = top * escape + (bottom - top) * linear_weight + bottom * np.exp(-tau)
+    np.testing.assert_allclose(result.radiance.values, expected, rtol=2.0e-13)
+    assert (
+        result.metadata["thermal_source_discretization"]
+        == "linear_in_optical_depth_between_pressure_edges"
+    )
+
+
 def test_clear_sky_emission_accepts_additional_layer_extinction() -> None:
     pressure_grid = PressureGrid(
         edges=np.array([1.0e-5, 1.0e-3]),

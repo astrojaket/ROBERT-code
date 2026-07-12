@@ -5,12 +5,30 @@ from .emission import (
     disk_average_quadrature,
     solve_clear_sky_emission,
 )
-from .clouds import CloudOpticalProperties, grey_cloud_deck, power_law_haze
+from .clouds import (
+    CloudOpticalProperties,
+    grey_cloud_deck,
+    grey_cloud_from_mass_extinction,
+    power_law_haze,
+)
 from .cloud_io import (
     load_cloud_optical_properties_csv,
     load_cloud_optical_properties_npz,
     load_picaso_cloud_optical_properties,
     write_cloud_optical_properties_npz,
+)
+from .mie import (
+    MieParticleOptics,
+    OpticalConstantsCatalog,
+    RefractiveIndexSpectrum,
+    load_exo_skryer_refractive_index,
+    load_refractive_index_csv,
+    load_refractive_index_table,
+    lognormal_mie_optics,
+    mie_cloud_from_mass_fraction,
+    mie_efficiencies,
+    mie_phase_function_moments,
+    refractive_index_from_parameters,
 )
 from .extinction import (
     CiaTable,
@@ -51,9 +69,13 @@ from .two_stream import (
     two_stream_effective_optical_depth,
     two_stream_scattering_diagnostics,
 )
+from .toon import ThermalTwoStreamResult, solve_thermal_two_stream
+from .sh4 import ThermalSH4Result, henyey_greenstein_moments, solve_thermal_sh4
+from .transmission import AbsorptionTransmissionResult, solve_absorption_transmission
 
 __all__ = [
     "ClearSkyEmissionResult",
+    "AbsorptionTransmissionResult",
     "CloudOpticalProperties",
     "DirectStellarBeam",
     "DiscGeometry",
@@ -61,9 +83,14 @@ __all__ = [
     "GasOpticalDepth",
     "HydrostaticPathGeometry",
     "LayerOpticalDepth",
+    "MieParticleOptics",
+    "OpticalConstantsCatalog",
+    "RefractiveIndexSpectrum",
     "CiaTable",
     "SingleScatteringSource",
     "ThermalEmissionIntegrationResult",
+    "ThermalTwoStreamResult",
+    "ThermalSH4Result",
     "TwoStreamScatteringDiagnostics",
     "assemble_gas_optical_depth",
     "cia_optical_depth",
@@ -77,9 +104,17 @@ __all__ = [
     "load_cloud_optical_properties_npz",
     "load_picaso_cloud_optical_properties",
     "load_nemesispy_cia_table",
+    "load_exo_skryer_refractive_index",
+    "load_refractive_index_csv",
+    "load_refractive_index_table",
     "lobatto_phase_geometry",
     "normal_emission_geometry",
+    "lognormal_mie_optics",
+    "mie_cloud_from_mass_fraction",
+    "mie_efficiencies",
+    "mie_phase_function_moments",
     "grey_cloud_deck",
+    "grey_cloud_from_mass_extinction",
     "power_law_haze",
     "random_overlap_species_tau",
     "random_overlap_tau_vectors",
@@ -87,7 +122,12 @@ __all__ = [
     "rayleigh_phase_function",
     "rayleigh_scattering_optical_depth",
     "read_cia_table",
+    "refractive_index_from_parameters",
     "solve_clear_sky_emission",
+    "solve_absorption_transmission",
+    "solve_thermal_two_stream",
+    "solve_thermal_sh4",
+    "henyey_greenstein_moments",
     "thermal_integration_backend_name",
     "two_stream_effective_optical_depth",
     "two_stream_scattering_diagnostics",

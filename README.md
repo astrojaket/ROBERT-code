@@ -25,8 +25,6 @@ The project architecture is governed by [RFC-0001: ROBERT Architectural Specific
 conda env create --file environment.yml
 conda activate robert-exoplanets
 pytest
-python examples/stub_emission_retrieval.py
-python examples/minimal_forward_model.py
 python examples/plot_blackbody_reference.py
 python examples/plot_synthetic_tau_weighting.py
 python examples/plot_cloud_scattering_reference.py
@@ -91,11 +89,8 @@ non-converged sampler runs cannot pass validation.
 
 - A minimal `robert_exoplanets` Python package.
 - Core grid, spectrum, planet, star, and observation containers.
-- Retrieval configuration containers.
-- A placeholder emission model.
-- A stub retrieval runner that returns deterministic mock results.
-- A minimal non-retrieval forward-model pipeline with explicit placeholder
-  atmosphere, opacity, instrument-response, and likelihood components.
+- Typed, executable retrieval configuration for optimal estimation and
+  UltraNest workflows.
 - Blackbody reference diagnostics for visual sanity checks.
 - Opacity metadata, coverage checks, and lightweight inspectors for ExoMol,
   ExoMolOP/exo_k `.kta`, HITRAN `.par`, HITRAN CIA, and future ROBERT archives.
@@ -138,14 +133,28 @@ non-converged sampler runs cannot pass validation.
   endpoint-inclusive logarithmic pressure grids, explicit NemesisPy-compatible
   opacity-boundary clipping, and reusable ROBERT/NemesisPy comparison plots.
 - Cloud/aerosol optical-property containers with extinction optical depth,
-  single-scattering albedo, asymmetry factor, and absorption/scattering splits.
+  single-scattering albedo, asymmetry factor, phase moments, and
+  absorption/scattering splits.
 - PICASO/Virga-style cloud optical-property interchange readers for dense
   `.npz` arrays and long-table `.csv` files.
+- Cloud-type-agnostic homogeneous-sphere Mie optics from measured or retrieved
+  complex refractive indices, including exact scalar phase moments through
+  degree four, lognormal particle-size averaging, condensate-mass hydrostatic
+  optical depths, and a retrieval-facing nodal `n(lambda)`/`log10(k(lambda))`
+  emission model.
+- A pinned, separately licensed Exo Skryer optical-constant catalogue with 44
+  selectable physical/reference materials and source-checksum provenance.
 - First-order direct-beam single-scattering source diagnostics for phase-aware
   geometries.
-- A first conservative two-stream multiple-scattering reference backend behind
-  the RT interface, intended for benchmarking and replacement by fuller
-  scattering solvers.
+- A coupled hemispheric-mean Toon thermal two-stream source-function backend,
+  validated in controlled disk-integrated grey cases against PICASO while
+  retaining explicit limits for strongly anisotropic angle-resolved use.
+- A four-term spherical-harmonics (P3/SH4) thermal multiple-scattering backend
+  for higher-fidelity cloudy emission, with physical or HG phase moments,
+  delta-M scaling, matched PICASO tests, and retrieval-scale timing benchmarks.
+- Exact linear-in-optical-depth clear thermal source integration and a first
+  absorption-dominated spherical-shell transmission solver with correlated-k
+  impact-parameter integration.
 - A Numba-backed thermal source integration path for thermal-only RT, with a
   NumPy reference backend retained for tests and debugging.
 - A coordinate-checked Gaussian likelihood with masks, offsets, and jitter.
@@ -156,7 +165,7 @@ non-converged sampler runs cannot pass validation.
   plus method-independent JSON/NPZ results.
 - Deterministic injection-recovery validation helpers with explicit parameter
   tolerances, fit-quality bounds, convergence gating, and versioned reports.
-- Tests that lock in the intended skeleton behavior.
+- Unit, integration, regression, and scientific benchmark tests.
 
 ## What Comes Later
 

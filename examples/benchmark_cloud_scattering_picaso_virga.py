@@ -17,6 +17,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm
 
 from robert_exoplanets import (
     AtmosphereState,
@@ -35,7 +36,7 @@ from robert_exoplanets import (
     time_callable,
     write_cloud_optical_properties_npz,
 )
-from robert_exoplanets.opacity import spectral_grid_values_in_unit
+from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "cloud_scattering_benchmark"
 
@@ -296,8 +297,8 @@ def _plot(
     physical_tau = np.sum(extinction.extinction_optical_depth, axis=0)[:, 0][wavelength_order]
     effective_tau = np.sum(two_stream.total_optical_depth, axis=0)[:, 0][wavelength_order]
 
-    fig, axes = plt.subplots(2, 2, figsize=(12.6, 8.4), constrained_layout=True)
-    ax_ratio, ax_tau, ax_optical, ax_timing = axes.ravel()
+    fig, axes = plt.subplots(2, 3, figsize=(17.0, 9.0), constrained_layout=True)
+    ax_ratio, ax_tau, ax_layer_tau, ax_contribution, ax_optical, ax_timing = axes.ravel()
 
     ax_ratio.plot(wavelength, ratio_extinction, color="#4c78a8", linewidth=1.8, label="Extinction only")
     ax_ratio.plot(wavelength, ratio_two_stream, color="#f58518", linewidth=1.8, label="Two-stream")
@@ -339,6 +340,49 @@ def _plot(
     ax_tau.set_title("Tau Diagnostic")
     ax_tau.grid(alpha=0.25, which="both")
     ax_tau.legend(frameon=False)
+
+    pressure = pressure_values_in_unit(
+        cloud.pressure_grid.centers,
+        cloud.pressure_grid.unit,
+        "bar",
+    )
+    layer_tau = cloud.extinction_tau[:, wavelength_order]
+    positive_tau = layer_tau[layer_tau > 0.0]
+    tau_floor = max(float(np.min(positive_tau)) if positive_tau.size else 1.0e-12, 1.0e-12)
+    tau_ceiling = max(float(np.max(layer_tau)), tau_floor * 10.0)
+    tau_mesh = ax_layer_tau.pcolormesh(
+        wavelength,
+        pressure,
+        np.maximum(layer_tau, tau_floor),
+        shading="auto",
+        norm=LogNorm(vmin=tau_floor, vmax=tau_ceiling),
+        cmap="magma",
+    )
+    ax_layer_tau.set_xscale("log")
+    ax_layer_tau.set_yscale("log")
+    ax_layer_tau.invert_yaxis()
+    ax_layer_tau.set_xlabel("Wavelength [micron]")
+    ax_layer_tau.set_ylabel("Pressure [bar]")
+    ax_layer_tau.set_title("Layer Cloud Extinction")
+    fig.colorbar(tau_mesh, ax=ax_layer_tau, label="Layer optical depth")
+
+    normalized_contribution = two_stream.normalized_layer_contribution()[:, wavelength_order]
+    contribution_mesh = ax_contribution.pcolormesh(
+        wavelength,
+        pressure,
+        normalized_contribution,
+        shading="auto",
+        vmin=0.0,
+        vmax=max(float(np.max(normalized_contribution)), 1.0e-12),
+        cmap="viridis",
+    )
+    ax_contribution.set_xscale("log")
+    ax_contribution.set_yscale("log")
+    ax_contribution.invert_yaxis()
+    ax_contribution.set_xlabel("Wavelength [micron]")
+    ax_contribution.set_ylabel("Pressure [bar]")
+    ax_contribution.set_title("Two-Stream Thermal Contribution")
+    fig.colorbar(contribution_mesh, ax=ax_contribution, label="Normalized contribution")
 
     mean_ssa = np.mean(cloud.single_scattering_albedo, axis=0)[wavelength_order]
     mean_g = np.mean(cloud.asymmetry_factor, axis=0)[wavelength_order]
@@ -432,6 +476,11 @@ def _zero_gas_tau(cloud: CloudOpticalProperties):
     atmosphere = AtmosphereState(
         pressure_grid=pressure_grid,
         temperature=temperature,
+        temperature_edges=np.interp(
+            np.log(pressure_grid.edges),
+            np.log(pressure_grid.centers),
+            temperature,
+        ),
         composition={
             "H2O": np.full(pressure_grid.n_layers, 1.0e-12),
             "H2": np.full(pressure_grid.n_layers, 0.84),

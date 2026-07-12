@@ -13,6 +13,7 @@ from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
 
 from .extinction import LayerOpticalDepth
+from .optical_depth import GasOpticalDepth
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,7 @@ class CloudOpticalProperties:
     pressure_grid: PressureGrid
     single_scattering_albedo: ArrayLike | float = 0.0
     asymmetry_factor: ArrayLike | float = 0.0
+    phase_function_moments: ArrayLike | None = None
     unit: str = "dimensionless"
     metadata: Mapping[str, str] = field(default_factory=dict)
 
@@ -58,10 +60,26 @@ class CloudOpticalProperties:
         )
         if np.any(asymmetry_factor < -1.0) or np.any(asymmetry_factor > 1.0):
             raise RobertValidationError("asymmetry_factor must be in [-1, 1]")
+        phase_function_moments = None
+        if self.phase_function_moments is not None:
+            phase_function_moments = _readonly_phase_function_moments(
+                self.phase_function_moments,
+                target_shape,
+            )
+            if not np.allclose(
+                phase_function_moments[1] / 3.0,
+                asymmetry_factor,
+                rtol=2.0e-8,
+                atol=2.0e-10,
+            ):
+                raise RobertValidationError(
+                    "phase_function_moments[1] / 3 must match asymmetry_factor"
+                )
 
         object.__setattr__(self, "extinction_tau", extinction_tau)
         object.__setattr__(self, "single_scattering_albedo", single_scattering_albedo)
         object.__setattr__(self, "asymmetry_factor", asymmetry_factor)
+        object.__setattr__(self, "phase_function_moments", phase_function_moments)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
@@ -111,6 +129,7 @@ class CloudOpticalProperties:
             pressure_grid=self.pressure_grid,
             kind="cloud_scattering_extinction",
             unit=self.unit,
+            phase_function_moments=self.phase_function_moments,
             metadata=self._component_metadata("scattering"),
         )
 
@@ -172,6 +191,45 @@ def grey_cloud_deck(
             "vertical_model": "grey_cloud_deck_uniform_tau_below_top",
             "cloud_top_pressure_pa": f"{float(top_pressure_pa):.12g}",
             "input_optical_depth": f"{tau_total:.12g}",
+        },
+    )
+
+
+def grey_cloud_from_mass_extinction(
+    gas_optical_depth: GasOpticalDepth,
+    *,
+    mass_extinction_cm2_g: float,
+    name: str = "vertically uniform grey cloud",
+    single_scattering_albedo: ArrayLike | float = 1.0,
+    asymmetry_factor: ArrayLike | float = 0.0,
+) -> CloudOpticalProperties:
+    """Convert a constant cloud mass-extinction coefficient into layer tau.
+
+    The coefficient is per gram of bulk atmosphere. Hydrostatic mass column
+    gives ``tau_layer = kappa * delta_pressure / gravity`` after converting
+    ``cm2/g`` to ``m2/kg``. This matches the vertically uniform gray-opacity
+    parameterization used by the Schlawin et al. (2024) two-region model.
+    """
+
+    opacity = _non_negative_scalar(mass_extinction_cm2_g, "mass_extinction_cm2_g")
+    layer_tau = (
+        opacity
+        * 0.1
+        * gas_optical_depth.layer_pressure_thickness_pa
+        / gas_optical_depth.gravity_m_s2
+    )
+    tau = np.repeat(layer_tau[:, None], gas_optical_depth.spectral_grid.size, axis=1)
+    return CloudOpticalProperties(
+        name=name,
+        extinction_tau=tau,
+        spectral_grid=gas_optical_depth.spectral_grid,
+        pressure_grid=gas_optical_depth.pressure_grid,
+        single_scattering_albedo=single_scattering_albedo,
+        asymmetry_factor=asymmetry_factor,
+        metadata={
+            "vertical_model": "constant_mass_extinction_per_bulk_atmosphere_mass",
+            "mass_extinction_cm2_g": f"{opacity:.17g}",
+            "hydrostatic_conversion": "tau=kappa*delta_pressure/gravity",
         },
     )
 
@@ -249,6 +307,29 @@ def _readonly_broadcast_property(
     broadcast = np.array(broadcast, dtype=float, copy=True)
     broadcast.setflags(write=False)
     return broadcast
+
+
+def _readonly_phase_function_moments(
+    values: ArrayLike,
+    shape: tuple[int, int],
+) -> NDArray[np.float64]:
+    array = np.array(values, dtype=float, copy=True)
+    if array.shape == (5, shape[1]):
+        array = np.repeat(array[:, None, :], shape[0], axis=1)
+    elif array.shape != (5, shape[0], shape[1]):
+        raise RobertValidationError(
+            "phase_function_moments must have shape (5, spectral) or "
+            "(5, layer, spectral)"
+        )
+    if not np.all(np.isfinite(array)):
+        raise RobertValidationError("phase_function_moments must be finite")
+    limits = (2.0 * np.arange(5) + 1.0)[:, None, None]
+    if np.any(np.abs(array) > limits * (1.0 + 1.0e-10)):
+        raise RobertValidationError("phase_function_moments exceed physical bounds")
+    if not np.allclose(array[0], 1.0, rtol=0.0, atol=1.0e-12):
+        raise RobertValidationError("phase_function_moments[0] must equal one")
+    array.setflags(write=False)
+    return array
 
 
 def _positive_scalar(value: float, name: str) -> float:

@@ -1,0 +1,138 @@
+J/AJ/168/104   WASP-69b JWST NIRCam & MIRI eclipse depth sp.   (Schlawin+, 2024)
+================================================================================
+Multiple clues for dayside aerosols and temperature gradients in WASP-69 b from
+a Panchromatic JWST Emission Spectrum.
+    Schlawin E., Mukherjee S., Ohno K., Bell T.J., Beatty T.G., Greene T.P.,
+    Line M., Challener R.C., Parmentier V., Fortney J.J., Rauscher E.,
+    Wiser L., Welbanks L., Murphy M., Edelman I., Batalha N., Moran S.E.,
+    Mehta N., Rieke M.
+   <Astron. J., 168, 104 (2024)>
+   =2024AJ....168..104S
+================================================================================
+ADC_Keywords: Exoplanets; Spectra, infrared
+Keywords: Exoplanet astronomy ; Exoplanet atmospheres ;
+          Exoplanet atmospheric composition ; Infrared spectroscopy ;
+          Chemical enrichment ; James Webb Space Telescope ;
+          Atmospheric clouds ; Albedo ; Planetary science
+
+Abstract:
+    WASP-69 b is a hot, inflated, Saturn-mass planet (0.26M_Jup_) with a
+    zero-albedo equilibrium temperature of 963K. Here, we report the JWST
+    2-12{mu}m emission spectrum of the planet consisting of two eclipses
+    observed with NIRCam grism time series and one eclipse observed with
+    the MIRI low-resolution spectrometer (LRS). The emission spectrum
+    shows absorption features of water vapor, carbon dioxide, and carbon
+    monoxide, but no strong evidence for methane. WASP-69 b's emission
+    spectrum is poorly fit by cloud-free homogeneous models. We find three
+    possible model scenarios for the planet: (1) a scattering model that
+    raises the brightness at short wavelengths with a free geometric
+    albedo parameter; (2) a cloud-layer model that includes high-altitude
+    silicate aerosols to moderate long-wavelength emission; and (3) a
+    two-region model that includes significant dayside inhomogeneity and
+    cloud opacity with two different temperature-pressure profiles. In all
+    cases, aerosols are needed to fit the spectrum of the planet. The
+    scattering model requires an unexpectedly high geometric albedo of
+    0.64. Our atmospheric retrievals indicate inefficient redistribution
+    of heat and an inhomogeneous dayside distribution, which is
+    tentatively supported by MIRI LRS broadband eclipse maps that show a
+    central concentration of brightness. Our more plausible models (2 and
+    3) retrieve chemical abundances enriched in heavy elements relative to
+    solar composition by 6x to 14x solar and a C/O ratio of 0.65-0.94,
+    whereas the less plausible highly reflective scenario (1) retrieves a
+    slightly lower metallicity and lower C/O ratio.
+
+Description:
+    WASP-69 b was observed as part of the MIRI And NIRCam Assay for the
+    Transmission and Emission of Exoplanets (MANATEE) program, which
+    combines observations from MIRI/LRS 5-14um GTO program 1177 (on
+    2023-05-02) and NIRCam GTO program 1185 (on 2022-10-25 with F322W2:
+    2.4-4.01um and on 2023-06-06 with F444W: 3.88-4.98um) to build up
+    near-infrared to mid-infrared spectra on a wide variety of planets.
+
+Objects:
+    ----------------------------------------------------------
+        RA   (ICRS)   DE        Designation(s)
+    ----------------------------------------------------------
+     21 00 06.19  -05 05 40.0   WASP-69 b = NAME Makombe
+    ----------------------------------------------------------
+
+File Summary:
+--------------------------------------------------------------------------------
+ FileName    Lrecl  Records   Explanations
+--------------------------------------------------------------------------------
+ReadMe          80        .   This file
+sp.dat          79      280   Combined JWST NIRCam & MIRI eclipse depth spectrum
+                               (Data behind Figure 5 - top panel)
+spbin.dat      134       79   Rebinned, merged JWST eclipse depth and brightness
+                               temperature spectra (Data behind Figure 5 -
+                               middle and bottom panels)
+--------------------------------------------------------------------------------
+
+See also:
+ VII/233 : 2MASS All-Sky Extended Source Catalog (XSC) (IPAC/UMass, 2003-2006)
+ VI/151  : Search for radio emission from giant exoplanets (Griessmeier, 2016)
+ J/ApJ/683/1076   : Transits of exoplanet XO-3b (Winn+, 2008)
+ J/MNRAS/445/1114 : WASP-69b, WASP-70Ab and WASP-84b (Anderson+, 2014)
+ J/A+A/564/A125   : AGN Torus model comparison of AGN in CDFS (Buchner+, 2014)
+ J/AJ/153/136     : Planets and their host stars with Gaia plx (Stassun+, 2017)
+ J/ApJ/834/17     : Mass & radius of planets & low mass stars (Chen+, 2017)
+ J/A+A/608/A135   : Sodium detection in WASP-69b atm. (Casasayas-Barris+, 2017)
+ J/ApJS/239/14    : Revised exoplanet radii from Gaia DR2 (Johns+, 2018)
+ J/ApJ/874/L31    : Giant planet bulk and atm. metallicities (Thorngren+, 2019)
+ J/A+A/630/A135   : Beyond exoplanet mass-radius relations (Ulmer-Moll+, 2019)
+ J/A+A/641/A158   : GTC transit light curves of WASP-69b (Murgas+, 2020)
+ J/ApJ/890/23     : NUV and FUV measurements of planet host stars (Loyd+, 2020)
+ J/AJ/159/278     : He-filter obs. of WASP-69b & WASP-52b (Vissapragada+, 2020)
+ J/AJ/161/174     : Transit depth biases for 31 planets (Morello+, 2021)
+ J/ApJS/258/40    : ExoClock project. II. Exoplanet ephemerides (Kokori+, 2022)
+ J/MNRAS/512/2062 : 10 exoplanet systems transit timing (Basturk+, 2022)
+ J/A+A/659/L4     : Geometric albedo of HD 209458 b (Brandeker+, 2022)
+ J/A+A/672/A24    : Geometric albedo of HD 189733b (Krenn+, 2023)
+ J/AJ/165/104     : Emergent sp. IR fluxes of 122 hot Jupiters (Deming+, 2023)
+ J/AJ/167/213     : Absolute Calib. IV. Bright star templates (Rieke+, 2024)
+ J/ApJS/270/14    : Transit times of hot Jupiters from TESS (Wang+, 2024)
+
+Byte-by-byte Description of file: sp.dat
+--------------------------------------------------------------------------------
+   Bytes Format Units   Label   Explanations
+--------------------------------------------------------------------------------
+   1- 19 F19.16 um      lambda  [2.45/11.9] Wavelength, spectral element bin
+                                 center
+  21- 26 F6.4   um      Width   [0.0096/0.25] Wavelength, width of spectral
+                                 element
+  28- 49 E22.16 %       Depth   [-4.51e-06/0.003] Eclipse depth, fraction
+  51- 72 E22.16 %     e_Depth   [3.8e-05/0.0003] Uncertainty in Depth
+  74- 79 A6     ---     Filter  Filter or Filters used (1)
+--------------------------------------------------------------------------------
+Note (1): Filter as follows:
+ F322W2 = JWST/NIRCam obs. on 2022-10-25 (2.4-4.01um; 144 occurrences)
+ F444W  = JWST/NIRCam obs. on 2023-06-06 (3.88-4.98um; 102 occurrences)
+ LRS    = JWST/MIRI obs. on 2023-05-02 (5.0-14um; 28 occurrences)
+ Avg    = Average of F322W2 and F444W (6 occurrences)
+--------------------------------------------------------------------------------
+
+Byte-by-byte Description of file: spbin.dat
+--------------------------------------------------------------------------------
+   Bytes Format Units   Label   Explanations
+--------------------------------------------------------------------------------
+  1-  19 F19.16 um      lambda  [2/11.9] Wavelength, spectral element bin
+                                 center
+ 21-  39 F19.17 um      Width   [0.049/0.25] Wavelength, width of spectral
+                                 element
+ 41-  62 F22.20 ---     Depth   [0.00013/0.003] Eclipse depth, fraction
+ 64-  85 E22.16 ---   e_Depth   [2e-05/0.0003] Uncertainty in Depth
+ 87-  96 A10    ---     Filter  Filter or Filters used (1)
+ 98- 115 F18.13 K       Tb      [848/1178] Brightness Temperature
+117- 134 F18.15 K     e_Tb      [8.8/66.5] Uncertainty in Tb
+--------------------------------------------------------------------------------
+Note (1): Filters as follows:
+ binned NC  = (50 occurrences)
+ LRS        = (28 occurrences)
+ F240M-comb = (1 occurrence)
+--------------------------------------------------------------------------------
+
+History:
+    From electronic version of the journal
+
+================================================================================
+(End)                    Prepared by [AAS], Emmanuelle Perret [CDS]  27-Nov-2024

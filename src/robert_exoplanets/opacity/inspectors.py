@@ -248,14 +248,6 @@ def inspect_hitran_cia_file(
     )
 
 
-def inspect_robert_npz_archive(path: str | Path) -> OpacityDatabase:
-    """Read ROBERT compressed archive metadata from a `.npz` manifest."""
-
-    from .archive import inspect_robert_npz_archive as inspect_archive
-
-    return inspect_archive(path)
-
-
 def file_sha256(path: str | Path, *, chunk_size: int = 1024 * 1024) -> str:
     """Return a SHA256 checksum for a local file."""
 
