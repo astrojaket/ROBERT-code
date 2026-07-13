@@ -128,13 +128,13 @@ def test_exok_bins_correlated_k_distributions_to_observation_bins(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    pytest.importorskip("exo_k")
     cache_dir = tmp_path / "numba-cache"
     cache_dir.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache_dir))
     import numba
 
     monkeypatch.setattr(numba.config, "CACHE_DIR", str(cache_dir))
-    pytest.importorskip("exo_k")
     path, _expected = _write_synthetic_kta(tmp_path / "H2O_exok_test.kta")
     provider = CorrelatedKOpacityProvider.from_kta_paths({"H2O": path})
     wavenumber_centres = np.array([3500.0, 2500.0, 1500.0])
@@ -158,13 +158,13 @@ def test_exok_replaces_zero_coefficients_before_correlated_k_binning(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    pytest.importorskip("exo_k")
     cache_dir = tmp_path / "numba-cache"
     cache_dir.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache_dir))
     import numba
 
     monkeypatch.setattr(numba.config, "CACHE_DIR", str(cache_dir))
-    pytest.importorskip("exo_k")
     path, _expected = _write_synthetic_kta(
         tmp_path / "CO_exok_zero_test.kta",
         zero_index=(0, 0, 1, 0),
@@ -211,13 +211,13 @@ def test_provider_loads_and_bins_exomol_hdf5_through_exok(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    exok = pytest.importorskip("exo_k")
     cache_dir = tmp_path / "numba-cache"
     cache_dir.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache_dir))
     import numba
 
     monkeypatch.setattr(numba.config, "CACHE_DIR", str(cache_dir))
-    exok = pytest.importorskip("exo_k")
     kta_path, _expected = _write_synthetic_kta(tmp_path / "TiO_source.kta")
     hdf5_path = tmp_path / "TiO_exomol.h5"
     native = exok.Ktable(filename=str(kta_path), mol="TiO", remove_zeros=False)
