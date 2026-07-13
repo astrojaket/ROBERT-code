@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "benchmark": "official_independent_PICASO_molecular_cloud_emission_transmission",
+  "interpretation": "This is a cross-database science comparison, not a same-opacity solver-parity test. Molecular spectral differences are expected and are reported rather than gated.",
+  "physical_contract": {
+    "shared": [
+      "pressure_temperature_and_exact_volume_mixing_ratios",
+      "MgSiO3_refractive_index_and_particle_distribution",
+      "vertical_condensate_profile_gravity_and_body_geometry"
+    ],
+    "not_shared": [
+      "molecular_or_CIA_opacity",
+      "gas_or_cloud_optical_depth",
+      "Mie_efficiency",
+      "emission_or_transmission_spectrum"
+    ],
+    "layers": 72,
+    "cloud_wavelengths": 192,
+    "output_bins": 240,
+    "gas_species": [
+      "H2O",
+      "CO",
+      "CO2",
+      "CH4"
+    ],
+    "h2_vmr": 0.84,
+    "he_vmr_range": [
+      0.15878053560913757,
+      0.15903901140924634
+    ]
+  },
+  "provenance": {
+    "picaso_database": {
+      "doi": "10.5281/zenodo.14861730",
+      "archive_md5": "2f003f823d5f4b3f7a206d0ece9874b1",
+      "extracted_size_bytes": 7344152576,
+      "extracted_sha256": "93696f7b17a90503b91404a0bbb9e27f1f8bc29e23c8c4bf3dac115d84b3aa09",
+      "database_metadata": {
+        "version": "default_3.3",
+        "resolution": 15000,
+        "wavelength_micron": [
+          0.3,
+          15.0
+        ]
+      },
+      "picaso_version": "3.2.2",
+      "virga_version": "0.4"
+    },
+    "robert_exomolop": {
+      "H2O": {
+        "path": "opacity_data/exomol_xsec/H2O.h5",
+        "sha256": "ba9d455db93809661aee79e7d322fde19da0236af1c1a9bb68f5b24735efb7fb",
+        "doi": "10.1093/mnras/sty1877",
+        "embedded_doi": "10.1093/mnras/sty1877",
+        "line_list": "1H2-16O__POKAZATEL"
+      },
+      "CO": {
+        "path": "opacity_data/exomol_xsec/CO.h5",
+        "sha256": "4f66cfca115eeb76fd8580bdf10f616db038d928b4af9d18ddc0c584a7116596",
+        "doi": "10.1088/0067-0049/216/1/15",
+        "embedded_doi": "10.1088/0067-0049/216/1/15",
+        "line_list": "12C-16O__Li2015"
+      },
+      "CO2": {
+        "path": "opacity_data/exomol_xsec/CO2.h5",
+        "sha256": "de25847fada9879ee11dc9bfd031b57e8747bbef108d05c242b62c2cfe82b314",
+        "doi": "10.1093/mnras/staa1874",
+        "embedded_doi": "qqq",
+        "line_list": "12C-16O2__UCL-4000"
+      },
+      "CH4": {
+        "path": "opacity_data/exomol_xsec/CH4.h5",
+        "sha256": "87fe3971038a3b1975a341cf2ef8632d76ec612b093f812479833072c738d11d",
+        "doi": "10.1051/0004-6361/201731026",
+        "embedded_doi": "10.1051/0004-6361/201731026",
+        "line_list": "12C-1H4__YT34to10"
+      }
+    },
+    "robert_cia": "NemesisPy v1.0.1 HITRAN-2012 H2-H2/H2-He table"
+  },
+  "sampling": {
+    "opacity_stride": 1,
+    "robert_native_samples": 37275,
+    "picaso_native_samples": 37273,
+    "effective_opacity_sampling_R": 15000.0,
+    "comparison_output_R_approx": 96.58310505164272,
+    "robert_seconds": 19.24070229101926,
+    "picaso_timing_seconds": {
+      "clear_thermal": 8.067849458020646,
+      "clear_transmission": 0.916895458009094,
+      "cloudy_thermal": 8.83494079200318,
+      "cloudy_transmission": 2.010081041022204,
+      "mie": 4.754644708998967,
+      "opacity_connection": 1.6408892080071382
+    }
+  },
+  "metrics": {
+    "cloud_mass_extinction": {
+      "max_abs_relative_difference": 8.22281501737082e-06,
+      "rms_relative_difference": 1.581655915236058e-06,
+      "median_relative_difference": 2.2366272331502822e-14
+    },
+    "molecular_column_tau_by_species": {
+      "H2O": {
+        "rms_log10_tau_difference_dex": 0.01903130059074451,
+        "median_log10_tau_ratio_dex": -0.0038756651646356666,
+        "max_abs_log10_tau_difference_dex": 0.0838462263598303
+      },
+      "CO": {
+        "rms_log10_tau_difference_dex": 1.789115041198167,
+        "median_log10_tau_ratio_dex": 0.006883841423140691,
+        "max_abs_log10_tau_difference_dex": 14.992698169888468
+      },
+      "CO2": {
+        "rms_log10_tau_difference_dex": 0.28061292348679384,
+        "median_log10_tau_ratio_dex": -0.02803761061095522,
+        "max_abs_log10_tau_difference_dex": 1.206896243632686
+      },
+      "CH4": {
+        "rms_log10_tau_difference_dex": 0.1748527822149811,
+        "median_log10_tau_ratio_dex": 0.10641703690231202,
+        "max_abs_log10_tau_difference_dex": 0.5481142963288375
+      }
+    },
+    "clear_emission_difference_ppm": {
+      "rms": 23.17119846269338,
+      "median": -0.47372496378416473,
+      "minimum": -74.9688419934163,
+      "maximum": 90.01947444526063,
+      "max_abs": 90.01947444526063
+    },
+    "cloudy_emission_difference_ppm": {
+      "rms": 21.429936436403146,
+      "median": -0.4912312786610048,
+      "minimum": -75.01679641800513,
+      "maximum": 87.91795161073429,
+      "max_abs": 87.91795161073429
+    },
+    "clear_transmission_difference_ppm": {
+      "rms": 205.85523682702635,
+      "median": -187.72588347330117,
+      "minimum": -409.50907078975837,
+      "maximum": -69.44470089447971,
+      "max_abs": 409.50907078975837
+    },
+    "cloudy_transmission_difference_ppm": {
+      "rms": 228.8447124483373,
+      "median": -217.76201098014369,
+      "minimum": -409.3301201863256,
+      "maximum": -107.96168427556346,
+      "max_abs": 409.3301201863256
+    },
+    "robert_emission_cloud_effect_ppm": {
+      "rms": 87.07677853196519,
+      "median": -35.597152282016836,
+      "minimum": -262.3771782697243,
+      "maximum": -0.3954752172980608,
+      "max_abs": 262.3771782697243
+    },
+    "picaso_emission_cloud_effect_ppm": {
+      "rms": 88.80952386768901,
+      "median": -34.26588496201053,
+      "minimum": -259.01491374704756,
+      "maximum": -0.22236422543477768,
+      "max_abs": 259.01491374704756
+    },
+    "emission_cloud_effect_disagreement_ppm": {
+      "rms": 5.038288940590198,
+      "median": -0.11799119120550072,
+      "minimum": -17.58487812099932,
+      "maximum": 17.51911199028524,
+      "max_abs": 17.58487812099932
+    },
+    "robert_transmission_cloud_effect_ppm": {
+      "rms": 350.088385091312,
+      "median": 124.03118711990825,
+      "minimum": 0.10116129266560248,
+      "maximum": 1269.2380260831485,
+      "max_abs": 1269.2380260831485
+    },
+    "picaso_transmission_cloud_effect_ppm": {
+      "rms": 394.98717010896314,
+      "median": 148.72639845322362,
+      "minimum": 0.04166955312398524,
+      "maximum": 1414.743212259255,
+      "max_abs": 1414.743212259255
+    },
+    "transmission_cloud_effect_disagreement_ppm": {
+      "rms": 46.83005084250649,
+      "median": -13.770454671841613,
+      "minimum": -148.29961330734704,
+      "maximum": 21.945502614091623,
+      "max_abs": 148.29961330734704
+    },
+    "acceptance": {
+      "official_database_verified": true,
+      "all_outputs_finite": true,
+      "independent_cloud_mass_extinction_rms_lt_2e-5": true,
+      "spectral_agreement_is_not_an_acceptance_gate": true,
+      "all_pass": true
+    }
+  }
+}
