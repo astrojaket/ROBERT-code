@@ -29,9 +29,14 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     planck_radiance_wavelength,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 from robert_exoplanets.rt.toon import solve_thermal_two_stream
+from robert_exoplanets.diagnostics.benchmark_style import (
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
+)
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "grey_cloud_rt_picaso"
 PICASO_RUNNER = Path(__file__).with_name("run_picaso_grey_rt_reference.py")
@@ -193,7 +198,7 @@ def _run_robert(
         single_scattering_albedo=case.single_scattering_albedo,
         asymmetry_factor=case.asymmetry_factor,
     )
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         emission_angle_cosines=emission_mu,
         emission_angle_weights=emission_weight,
@@ -291,8 +296,8 @@ def _plot(
     fig, axes = plt.subplots(len(spectra), 2, figsize=(12.5, 3.0 * len(spectra)), constrained_layout=True)
     for row, (name, (robert, picaso)) in enumerate(spectra.items()):
         ax_spectrum, ax_residual = axes[row]
-        ax_spectrum.plot(wavelength_micron, picaso, color="#111111", label="PICASO Toon")
-        ax_spectrum.plot(wavelength_micron, robert, color="#e45756", linestyle="--", label="ROBERT")
+        ax_spectrum.plot(wavelength_micron, picaso, color=REFERENCE_COLOR, label="PICASO Toon")
+        ax_spectrum.plot(wavelength_micron, robert, color=ROBERT_COLOR, linestyle="--", label="ROBERT")
         ax_spectrum.set_xscale("log")
         ax_spectrum.set_yscale("log")
         ax_spectrum.set_ylabel("Radiance [W m$^{-2}$ m$^{-1}$ sr$^{-1}$]")
@@ -300,8 +305,8 @@ def _plot(
         ax_spectrum.grid(alpha=0.25, which="both")
         ax_spectrum.legend(frameon=False)
         relative = (robert - picaso) / np.maximum(np.abs(picaso), np.finfo(float).tiny)
-        ax_residual.plot(wavelength_micron, 100.0 * relative, color="#4c78a8")
-        ax_residual.axhline(0.0, color="#111111", linewidth=0.8)
+        ax_residual.plot(wavelength_micron, 100.0 * relative, color=RESIDUAL_COLOR)
+        ax_residual.axhline(0.0, color=REFERENCE_COLOR, linewidth=0.8)
         ax_residual.set_xscale("log")
         ax_residual.set_ylabel("(ROBERT - PICASO) / PICASO [%]")
         ax_residual.grid(alpha=0.25, which="both")

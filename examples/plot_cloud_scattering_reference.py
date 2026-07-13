@@ -24,7 +24,7 @@ from robert_exoplanets import (
     assemble_gas_optical_depth,
     grey_cloud_deck,
     power_law_haze,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "cloud_scattering_reference"
@@ -69,13 +69,13 @@ def main() -> Path:
     )
     cloud_terms = [cloud_deck, haze]
 
-    clear = solve_clear_sky_emission(gas_tau, bottom_boundary="blackbody")
-    extinction_only = solve_clear_sky_emission(
+    clear = solve_emission(gas_tau, bottom_boundary="blackbody")
+    extinction_only = solve_emission(
         gas_tau,
         bottom_boundary="blackbody",
         additional_optical_depths=cloud_terms,
     )
-    two_stream = solve_clear_sky_emission(
+    two_stream = solve_emission(
         gas_tau,
         bottom_boundary="blackbody",
         additional_optical_depths=cloud_terms,
@@ -96,9 +96,9 @@ def _plot_reference(
     two_stream,
 ) -> None:
     wavelength = clear.radiance.spectral_grid.values
-    clear_radiance = clear.radiance.values
-    extinction_ratio = extinction_only.radiance.values / clear_radiance
-    two_stream_ratio = two_stream.radiance.values / clear_radiance
+    cloud_free_radiance = clear.radiance.values
+    extinction_ratio = extinction_only.radiance.values / cloud_free_radiance
+    two_stream_ratio = two_stream.radiance.values / cloud_free_radiance
     physical_tau = np.sum(extinction_only.extinction_optical_depth, axis=0)[:, 0]
     effective_tau = np.sum(two_stream.total_optical_depth, axis=0)[:, 0]
     cloud_contribution = np.mean(two_stream.normalized_layer_contribution(), axis=1)
@@ -117,7 +117,7 @@ def _plot_reference(
     ax_ratio.axhline(1.0, color="#333333", linewidth=0.9, alpha=0.45)
     ax_ratio.set_xscale("log")
     ax_ratio.set_xlabel("Wavelength [micron]")
-    ax_ratio.set_ylabel("Cloudy / clear thermal radiance")
+    ax_ratio.set_ylabel("Cloudy / cloud-free thermal radiance")
     ax_ratio.set_title("Cloudy Emission Ratio")
     ax_ratio.grid(alpha=0.25, which="both")
     ax_ratio.legend(frameon=False)

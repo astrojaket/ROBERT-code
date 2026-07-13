@@ -3,11 +3,11 @@
 import numpy as np
 
 from examples import benchmark_wasp69b_multi_instrument
-from examples.retrieve_wasp69b_nircam_clear import parameters
+from examples.retrieve_wasp69b_nircam_cloud_free import parameters
 from examples.wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
 
 
-def test_wasp69b_clear_retrieval_uses_requested_chemistry_priors() -> None:
+def test_wasp69b_cloud_free_retrieval_uses_requested_chemistry_priors() -> None:
     bounds = {parameter.name: parameter.bounds for parameter in parameters().parameters}
 
     assert bounds["metallicity"] == (-1.0, 2.0)

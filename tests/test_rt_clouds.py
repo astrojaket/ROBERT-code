@@ -17,8 +17,8 @@ from robert_exoplanets import (
     grey_cloud_from_mass_extinction,
     planck_radiance_wavelength,
     power_law_haze,
-    solve_clear_sky_emission,
-    solve_clear_sky_emission_spectrum,
+    solve_emission,
+    solve_emission_spectrum,
     two_stream_scattering_diagnostics,
 )
 from robert_exoplanets.core import RobertValidationError
@@ -139,7 +139,7 @@ def test_emission_solver_accepts_cloud_optical_properties() -> None:
         single_scattering_albedo=0.2,
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
@@ -167,12 +167,12 @@ def test_cloud_object_and_split_layer_optical_depths_are_equivalent() -> None:
         single_scattering_albedo=0.2,
     )
 
-    direct = solve_clear_sky_emission(
+    direct = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
     )
-    split = solve_clear_sky_emission(
+    split = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=list(cloud.as_layer_optical_depths()),
@@ -194,14 +194,14 @@ def test_two_stream_backend_solves_coupled_mixed_absorption_scattering() -> None
         asymmetry_factor=0.0,
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
         multiple_scattering_backend="two_stream",
     )
 
-    extinction_only = solve_clear_sky_emission(
+    extinction_only = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
@@ -234,7 +234,7 @@ def test_two_stream_one_layer_preserves_physical_tau_and_contributions() -> None
         asymmetry_factor=0.4,
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
@@ -261,7 +261,7 @@ def test_sh4_backend_uses_higher_order_multiple_scattering() -> None:
         asymmetry_factor=0.7,
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
@@ -297,13 +297,13 @@ def test_sh4_spectrum_only_backend_matches_diagnostic_solver() -> None:
         single_scattering_albedo=0.9,
         asymmetry_factor=0.7,
     )
-    reference = solve_clear_sky_emission(
+    reference = solve_emission(
         gas_tau,
         bottom_boundary="blackbody",
         additional_optical_depths=[cloud],
         multiple_scattering_backend="sh4",
     )
-    spectrum = solve_clear_sky_emission_spectrum(
+    spectrum = solve_emission_spectrum(
         gas_tau,
         bottom_boundary="blackbody",
         additional_optical_depths=[cloud],
@@ -339,13 +339,13 @@ def test_sh4_uses_supplied_non_hg_phase_moments() -> None:
         asymmetry_factor=0.5,
     )
 
-    exact_result = solve_clear_sky_emission(
+    exact_result = solve_emission(
         gas_tau,
         bottom_boundary="blackbody",
         additional_optical_depths=[exact],
         multiple_scattering_backend="sh4",
     )
-    hg_result = solve_clear_sky_emission(
+    hg_result = solve_emission(
         gas_tau,
         bottom_boundary="blackbody",
         additional_optical_depths=[hg],
@@ -371,12 +371,12 @@ def test_cloud_split_preserves_phase_moments_for_sh4() -> None:
         phase_function_moments=moments,
     )
 
-    direct = solve_clear_sky_emission(
+    direct = solve_emission(
         gas_tau,
         additional_optical_depths=[cloud],
         multiple_scattering_backend="sh4",
     )
-    split = solve_clear_sky_emission(
+    split = solve_emission(
         gas_tau,
         additional_optical_depths=list(cloud.as_layer_optical_depths()),
         multiple_scattering_backend="sh4",
@@ -409,7 +409,7 @@ def test_two_stream_two_layer_uses_explicit_level_temperatures() -> None:
         asymmetry_factor=np.array([0.0, 0.5]),
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[cloud],
@@ -442,7 +442,7 @@ def test_emission_solver_rejects_unknown_multiple_scattering_backend() -> None:
     gas_tau = _zero_gas_tau(spectral_grid=spectral_grid, temperature=1000.0)
 
     with pytest.raises(RobertValidationError, match="multiple_scattering_backend"):
-        solve_clear_sky_emission(
+        solve_emission(
             gas_tau,
             bottom_boundary="none",
             multiple_scattering_backend="fancy",

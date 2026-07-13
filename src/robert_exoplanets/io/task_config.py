@@ -212,8 +212,13 @@ class AtmosphereConfig(ConfigModel):
     chemistry: ChemistryConfig
 
 
-class ClearCloudConfig(ConfigModel):
+class CloudFreeConfig(ConfigModel):
     model: Literal["none"] = "none"
+
+
+# Backward-compatible alias for configuration code written before the
+# cloud-free terminology was standardized.
+ClearCloudConfig = CloudFreeConfig
 
 
 class MieCatalogCloudConfig(ConfigModel):
@@ -284,7 +289,7 @@ class MieDirectNkCloudConfig(ConfigModel):
 
 
 CloudsConfig = Annotated[
-    ClearCloudConfig | MieCatalogCloudConfig | MieDirectNkCloudConfig,
+    CloudFreeConfig | MieCatalogCloudConfig | MieDirectNkCloudConfig,
     Field(discriminator="model"),
 ]
 
@@ -310,7 +315,7 @@ class GeometryConfig(ConfigModel):
 
 
 class RadiativeTransferConfig(ConfigModel):
-    model: Literal["clear_emission"] = "clear_emission"
+    model: Literal["emission"] = "emission"
     geometry: GeometryConfig = GeometryConfig()
     include_rayleigh: bool = True
     gas_combination: Literal["random_overlap", "equivalent_extinction"] = (
@@ -385,7 +390,7 @@ class TaskConfig(ConfigModel):
     bodies: BodiesConfig
     observations: ObservationsConfig
     atmosphere: AtmosphereConfig
-    clouds: CloudsConfig = ClearCloudConfig()
+    clouds: CloudsConfig = CloudFreeConfig()
     opacity: OpacityConfig
     radiative_transfer: RadiativeTransferConfig
     likelihood: LikelihoodConfig = LikelihoodConfig()

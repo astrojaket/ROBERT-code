@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 
 from robert_exoplanets import (
-    ClearSkyEmissionFactoryConfig,
-    ClearSkyEmissionModelConfig,
+    EmissionFactoryConfig,
+    EmissionModelConfig,
     CorrelatedKOpacityProvider,
     CorrelatedKTable,
     ExoKOpacitySource,
@@ -17,19 +17,19 @@ from robert_exoplanets import (
     FreeChemistry,
     IsothermalTemperatureProfile,
     Planet,
-    ParameterizedClearSkyEmissionFactoryConfig,
+    ParameterizedEmissionFactoryConfig,
     ParameterizedGreyCloudEmissionForwardModel,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
-    ParameterizedClearSkyEmissionModelConfig,
+    ParameterizedEmissionModelConfig,
     RefractiveIndexCloudConfig,
     RefractiveIndexSpectrum,
     GreyScatteringCloudConfig,
     MultiDatasetEmissionForwardModel,
     SpectralGrid,
     Star,
-    build_clear_sky_emission_model,
+    build_emission_model,
     build_multi_dataset_emission_model,
-    build_parameterized_clear_sky_emission_model,
+    build_parameterized_emission_model,
     pressure_grid_from_opacity,
 )
 from robert_exoplanets.core import RobertConfigError, RobertValidationError
@@ -63,8 +63,8 @@ def _provider() -> CorrelatedKOpacityProvider:
     )
 
 
-def _factory_config() -> ClearSkyEmissionFactoryConfig:
-    return ClearSkyEmissionFactoryConfig(
+def _factory_config() -> EmissionFactoryConfig:
+    return EmissionFactoryConfig(
         planet=Planet(name="Configured b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(
             name="Configured star",
@@ -75,7 +75,7 @@ def _factory_config() -> ClearSkyEmissionFactoryConfig:
         temperature_parameters={"temperature": 1000.0},
         opacity_source=_provider(),
         opacity_binning=None,
-        model=ClearSkyEmissionModelConfig(
+        model=EmissionModelConfig(
             opacity_species=("H2O",),
             log_vmr_parameters={"H2O": "log_h2o"},
             include_rayleigh=False,
@@ -85,7 +85,7 @@ def _factory_config() -> ClearSkyEmissionFactoryConfig:
 
 
 def test_factory_builds_evaluable_model_from_python_objects() -> None:
-    model = build_clear_sky_emission_model(
+    model = build_emission_model(
         _factory_config(), spectral_grid=_spectral_grid()
     )
 
@@ -137,7 +137,7 @@ def test_pressure_grid_factory_supports_descending_opacity_centers() -> None:
 def test_factory_config_validates_temperature_and_opacity_species() -> None:
     base = _factory_config()
     with pytest.raises(RobertConfigError, match="temperature parameters are missing"):
-        ClearSkyEmissionFactoryConfig(
+        EmissionFactoryConfig(
             planet=base.planet,
             star=base.star,
             temperature_profile=base.temperature_profile,
@@ -147,14 +147,14 @@ def test_factory_config_validates_temperature_and_opacity_species() -> None:
         )
 
     with pytest.raises(RobertConfigError, match="missing model species"):
-        ClearSkyEmissionFactoryConfig(
+        EmissionFactoryConfig(
             planet=base.planet,
             star=base.star,
             temperature_profile=base.temperature_profile,
             temperature_parameters=base.temperature_parameters,
             opacity_source=base.opacity_source,
             opacity_binning=None,
-            model=ClearSkyEmissionModelConfig(
+            model=EmissionModelConfig(
                 opacity_species=("CO",),
                 log_vmr_parameters={"CO": "log_co"},
             ),
@@ -220,7 +220,7 @@ def test_pressure_grid_inference_requires_two_points() -> None:
 
 
 def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() -> None:
-    config = ParameterizedClearSkyEmissionFactoryConfig(
+    config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Parameterized b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Parameterized", radius_m=7.0e8, effective_temperature_k=5500.0),
         temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
@@ -231,13 +231,13 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
         ),
         opacity_source=_provider(),
         opacity_binning=None,
-        model=ParameterizedClearSkyEmissionModelConfig(
+        model=ParameterizedEmissionModelConfig(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
         ),
     )
-    model = build_parameterized_clear_sky_emission_model(
+    model = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )
@@ -255,7 +255,7 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
 def test_shared_atmosphere_multi_dataset_model_matches_independent_models(
     monkeypatch,
 ) -> None:
-    config = ParameterizedClearSkyEmissionFactoryConfig(
+    config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Shared b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Shared", radius_m=7.0e8, effective_temperature_k=5500.0),
         temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
@@ -266,17 +266,17 @@ def test_shared_atmosphere_multi_dataset_model_matches_independent_models(
         ),
         opacity_source=_provider(),
         opacity_binning=None,
-        model=ParameterizedClearSkyEmissionModelConfig(
+        model=ParameterizedEmissionModelConfig(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
         ),
     )
-    first = build_parameterized_clear_sky_emission_model(
+    first = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )
-    independent_second = build_parameterized_clear_sky_emission_model(
+    independent_second = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )
@@ -314,7 +314,7 @@ def test_shared_atmosphere_multi_dataset_model_matches_independent_models(
 
 
 def test_shared_atmosphere_multi_dataset_model_rejects_distinct_builders() -> None:
-    config = ParameterizedClearSkyEmissionFactoryConfig(
+    config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Shared b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Shared", radius_m=7.0e8, effective_temperature_k=5500.0),
         temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
@@ -325,17 +325,17 @@ def test_shared_atmosphere_multi_dataset_model_rejects_distinct_builders() -> No
         ),
         opacity_source=_provider(),
         opacity_binning=None,
-        model=ParameterizedClearSkyEmissionModelConfig(
+        model=ParameterizedEmissionModelConfig(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
         ),
     )
-    first = build_parameterized_clear_sky_emission_model(
+    first = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )
-    second = build_parameterized_clear_sky_emission_model(
+    second = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )
@@ -345,7 +345,7 @@ def test_shared_atmosphere_multi_dataset_model_rejects_distinct_builders() -> No
 
 
 def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> None:
-    config = ParameterizedClearSkyEmissionFactoryConfig(
+    config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Generic star", radius_m=7.0e8, effective_temperature_k=5500.0),
         temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
@@ -356,13 +356,13 @@ def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> No
         ),
         opacity_source=_provider(),
         opacity_binning=None,
-        model=ParameterizedClearSkyEmissionModelConfig(
+        model=ParameterizedEmissionModelConfig(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
         ),
     )
-    clear = build_parameterized_clear_sky_emission_model(
+    clear = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )
@@ -396,7 +396,7 @@ def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> No
 def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles() -> (
     None
 ):
-    config = ParameterizedClearSkyEmissionFactoryConfig(
+    config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Generic star", radius_m=7.0e8, effective_temperature_k=5500.0),
         temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
@@ -407,13 +407,13 @@ def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles(
         ),
         opacity_source=_provider(),
         opacity_binning=None,
-        model=ParameterizedClearSkyEmissionModelConfig(
+        model=ParameterizedEmissionModelConfig(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
         ),
     )
-    clear = build_parameterized_clear_sky_emission_model(
+    clear = build_parameterized_emission_model(
         config,
         spectral_grid=_spectral_grid(),
     )

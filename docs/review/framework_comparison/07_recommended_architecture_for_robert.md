@@ -131,7 +131,7 @@ The first substantial ROBERT release should include:
 - Gaussian independent-error likelihood.
 - dynesty sampler adapter.
 - Run manifest and posterior output.
-- Reference tests for a clear atmosphere and a cloudy atmosphere.
+- Reference tests for a cloud-free atmosphere and a cloudy atmosphere.
 
 ## Testing Strategy
 

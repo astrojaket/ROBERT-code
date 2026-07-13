@@ -65,7 +65,7 @@ Deliverables:
   correlated-k evaluation.
 - Gas optical-depth assembly, random-overlap mixing, CIA/Rayleigh optical-depth
   terms, and tau/contribution plotting diagnostics.
-- NumPy clear-sky thermal-emission reference solver with disc geometries and a
+- NumPy cloud-free thermal-emission reference solver with disc geometries and a
   first-order single-scattering source diagnostic.
 
 Success criteria:

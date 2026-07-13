@@ -2,7 +2,10 @@
 
 from .emission import (
     ClearSkyEmissionResult,
+    EmissionResult,
     disk_average_quadrature,
+    solve_emission,
+    solve_emission_spectrum,
     solve_clear_sky_emission,
     solve_clear_sky_emission_spectrum,
 )
@@ -93,6 +96,7 @@ from .transmission import AbsorptionTransmissionResult, solve_absorption_transmi
 
 __all__ = [
     "ClearSkyEmissionResult",
+    "EmissionResult",
     "AbsorptionTransmissionResult",
     "CloudOpticalProperties",
     "DirectStellarBeam",
@@ -147,6 +151,8 @@ __all__ = [
     "rayleigh_scattering_optical_depth",
     "read_cia_table",
     "refractive_index_from_parameters",
+    "solve_emission",
+    "solve_emission_spectrum",
     "solve_clear_sky_emission",
     "solve_clear_sky_emission_spectrum",
     "solve_absorption_transmission",

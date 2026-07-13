@@ -34,7 +34,7 @@ opacity_data/
 opacities/
 input_data/
 
-# The validated, exo_k-binned HAT-P-32b benchmark tables are intentionally
-# versioned; arbitrary user opacity directories remain ignored.
-!examples/data/hat_p_32b/opacities/
-!examples/data/hat_p_32b/opacities/*.robert-opacity.npz
+# The historical, exo_k-binned HAT-P-32b tables remain versioned inside the
+# depreciated benchmark archive; arbitrary user opacity directories are ignored.
+!examples/Depreciated_Benchmarks/HAT_P_32b/data/hat_p_32b/opacities/
+!examples/Depreciated_Benchmarks/HAT_P_32b/data/hat_p_32b/opacities/*.robert-opacity.npz

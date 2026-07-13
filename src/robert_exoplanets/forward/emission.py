@@ -1,4 +1,4 @@
-"""Reusable parameterized clear-sky emission forward model."""
+"""Reusable parameterized cloud-free emission forward model."""
 
 from __future__ import annotations
 
@@ -38,8 +38,8 @@ from robert_exoplanets.rt import (
     mie_cloud_from_mass_fraction,
     rayleigh_scattering_optical_depth,
     refractive_index_from_parameters,
-    solve_clear_sky_emission,
-    solve_clear_sky_emission_spectrum,
+    solve_emission,
+    solve_emission_spectrum,
     sh4_spectrum_backend_name,
     thermal_integration_backend_name,
 )
@@ -48,8 +48,8 @@ GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 
 
 @dataclass(frozen=True)
-class ClearSkyEmissionModelConfig:
-    """Typed physical and numerical choices for a clear-sky emission model.
+class EmissionModelConfig:
+    """Typed physical and numerical choices for a cloud-free emission model.
 
     Trace-gas parameters represent constant-with-altitude log10 volume mixing
     ratios. Temperature and radius parameters are optional uniform offset and
@@ -159,7 +159,7 @@ class ClearSkyEmissionModelConfig:
 
 
 @dataclass(frozen=True)
-class ParameterizedClearSkyEmissionModelConfig:
+class ParameterizedEmissionModelConfig:
     """RT choices for a model driven by atmosphere parameterization objects."""
 
     opacity_species: tuple[str, ...]
@@ -211,8 +211,8 @@ class ParameterizedClearSkyEmissionModelConfig:
 
 
 @dataclass(frozen=True)
-class ClearSkyEmissionForwardModel:
-    """Parameterized correlated-k clear-sky emission model.
+class EmissionForwardModel:
+    """Parameterized correlated-k cloud-free emission model.
 
     Opacity must already be prepared on ``spectral_grid`` (for example using
     exo_k binning). The model performs no file discovery or spectral resampling
@@ -225,17 +225,17 @@ class ClearSkyEmissionForwardModel:
     pressure_grid: PressureGrid
     base_temperature_K: ArrayLike
     opacity_provider: OpacityProvider
-    config: ClearSkyEmissionModelConfig
+    config: EmissionModelConfig
     geometry: DiscGeometry | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
     gravity_m_s2: float = field(init=False)
 
     def __post_init__(self) -> None:
         if self.planet.radius_m is None:
-            raise RobertValidationError("clear-sky emission requires planet.radius_m")
+            raise RobertValidationError("cloud-free emission requires planet.radius_m")
         if self.star.radius_m is None or self.star.effective_temperature_k is None:
             raise RobertValidationError(
-                "clear-sky emission requires star.radius_m and star.effective_temperature_k"
+                "cloud-free emission requires star.radius_m and star.effective_temperature_k"
             )
         temperature = np.array(self.base_temperature_K, dtype=float, copy=True)
         if temperature.shape != (self.pressure_grid.n_layers,):
@@ -295,7 +295,7 @@ class ClearSkyEmissionForwardModel:
 
         return immutable_mapping(
             {
-                "forward_model": "clear_sky_emission",
+                "forward_model": "emission",
                 "planet_name": self.planet.name,
                 "planet_radius_m": f"{self.planet.radius_m:.17g}",
                 "planet_gravity_m_s2": f"{self.gravity_m_s2:.17g}",
@@ -360,13 +360,13 @@ class ClearSkyEmissionForwardModel:
         )
         if missing:
             raise RobertValidationError(
-                f"clear-sky emission parameters are missing: {', '.join(missing)}"
+                f"cloud-free emission parameters are missing: {', '.join(missing)}"
             )
         parameter_values = {
             name: float(parameters[name]) for name in self.required_parameters
         }
         if not all(np.isfinite(value) for value in parameter_values.values()):
-            raise RobertValidationError("clear-sky emission parameters must be finite")
+            raise RobertValidationError("cloud-free emission parameters must be finite")
         trace_abundances = {
             species: float(
                 np.power(
@@ -417,7 +417,7 @@ class ClearSkyEmissionForwardModel:
                 self.pressure_grid.n_layers,
                 self.config.mean_molecular_weight,
             ),
-            metadata={"forward_model": "clear_sky_emission"},
+            metadata={"forward_model": "emission"},
         )
         gas_optical_depth = _evaluate_gas_optical_depth(
             self.opacity_provider,
@@ -433,7 +433,7 @@ class ClearSkyEmissionForwardModel:
                 rayleigh_scattering_optical_depth(gas_optical_depth)
             )
         if not self.config.compute_diagnostics:
-            return solve_clear_sky_emission_spectrum(
+            return solve_emission_spectrum(
                 gas_optical_depth,
                 geometry=self.geometry,
                 additional_optical_depths=additional_optical_depths,
@@ -442,7 +442,7 @@ class ClearSkyEmissionForwardModel:
                 star_temperature_k=self.star.effective_temperature_k,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
-        result = solve_clear_sky_emission(
+        result = solve_emission(
             gas_optical_depth,
             geometry=self.geometry,
             additional_optical_depths=additional_optical_depths,
@@ -453,7 +453,7 @@ class ClearSkyEmissionForwardModel:
         )
         if result.eclipse_depth is None:
             raise RobertValidationError(
-                "clear-sky emission solver did not return eclipse depth"
+                "cloud-free emission solver did not return eclipse depth"
             )
         return result.eclipse_depth
 
@@ -472,15 +472,15 @@ class ClearSkyEmissionForwardModel:
 
 
 @dataclass(frozen=True)
-class ParameterizedClearSkyEmissionForwardModel:
-    """Clear-sky emission model with runtime temperature and chemistry profiles."""
+class ParameterizedEmissionForwardModel:
+    """Cloud-free emission model with runtime temperature and chemistry profiles."""
 
     planet: Planet
     star: Star
     spectral_grid: SpectralGrid
     atmosphere_builder: AtmosphereBuilder
     opacity_provider: OpacityProvider
-    config: ParameterizedClearSkyEmissionModelConfig
+    config: ParameterizedEmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     geometry: DiscGeometry | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
@@ -576,7 +576,7 @@ class ParameterizedClearSkyEmissionForwardModel:
         )
         return immutable_mapping(
             {
-                "forward_model": "parameterized_clear_sky_emission",
+                "forward_model": "parameterized_emission",
                 "planet_name": self.planet.name,
                 "planet_radius_m": f"{self.planet.radius_m:.17g}",
                 "planet_gravity_m_s2": f"{self.gravity_m_s2:.17g}",
@@ -728,7 +728,7 @@ class ParameterizedClearSkyEmissionForwardModel:
         if radius_scale <= 0.0:
             raise RobertValidationError("radius scale must be positive")
         if not self.config.compute_diagnostics:
-            return solve_clear_sky_emission_spectrum(
+            return solve_emission_spectrum(
                 gas_optical_depth,
                 geometry=self.geometry,
                 additional_optical_depths=additional_optical_depths,
@@ -737,7 +737,7 @@ class ParameterizedClearSkyEmissionForwardModel:
                 star_temperature_k=self.star.effective_temperature_k,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
-        result = solve_clear_sky_emission(
+        result = solve_emission(
             gas_optical_depth,
             geometry=self.geometry,
             additional_optical_depths=additional_optical_depths,
@@ -748,7 +748,7 @@ class ParameterizedClearSkyEmissionForwardModel:
         )
         if result.eclipse_depth is None:
             raise RobertValidationError(
-                "clear-sky emission solver did not return eclipse depth"
+                "cloud-free emission solver did not return eclipse depth"
             )
         return result.eclipse_depth
 
@@ -789,7 +789,7 @@ class GreyScatteringCloudConfig:
 
 @dataclass(frozen=True)
 class ParameterizedGreyCloudEmissionForwardModel(
-    ParameterizedClearSkyEmissionForwardModel
+    ParameterizedEmissionForwardModel
 ):
     """Parameterized emission column with a uniform gray scattering opacity."""
 
@@ -897,7 +897,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
             not self.config.compute_diagnostics
             and self.cloud.multiple_scattering_backend in {"sh4", "p3"}
         ):
-            return solve_clear_sky_emission_spectrum(
+            return solve_emission_spectrum(
                 gas_optical_depth,
                 geometry=self.geometry,
                 additional_optical_depths=additional_optical_depths,
@@ -907,7 +907,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
                 star_temperature_k=self.star.effective_temperature_k,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
-        result = solve_clear_sky_emission(
+        result = solve_emission(
             gas_optical_depth,
             geometry=self.geometry,
             additional_optical_depths=additional_optical_depths,
@@ -1080,7 +1080,7 @@ class RefractiveIndexCloudConfig:
 
 @dataclass(frozen=True)
 class ParameterizedRefractiveIndexCloudEmissionForwardModel(
-    ParameterizedClearSkyEmissionForwardModel
+    ParameterizedEmissionForwardModel
 ):
     """Emission column with directly retrieved complex cloud refractive index."""
 
@@ -1282,7 +1282,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
             not self.config.compute_diagnostics
             and self.cloud.multiple_scattering_backend in {"sh4", "p3"}
         ):
-            return solve_clear_sky_emission_spectrum(
+            return solve_emission_spectrum(
                 gas_optical_depth,
                 geometry=self.geometry,
                 additional_optical_depths=additional_optical_depths,
@@ -1292,7 +1292,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                 star_temperature_k=self.star.effective_temperature_k,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
-        result = solve_clear_sky_emission(
+        result = solve_emission(
             gas_optical_depth,
             geometry=self.geometry,
             additional_optical_depths=additional_optical_depths,
@@ -1361,13 +1361,25 @@ def _array_signature(*arrays: ArrayLike, labels: tuple[str, ...] = ()) -> str:
     return digest.hexdigest()
 
 
+# Backward-compatible aliases for the original cloud-free-only API names.
+# The implementations are now shared by cloud-free and cloudy emission models.
+ClearSkyEmissionForwardModel = EmissionForwardModel
+ClearSkyEmissionModelConfig = EmissionModelConfig
+ParameterizedClearSkyEmissionForwardModel = ParameterizedEmissionForwardModel
+ParameterizedClearSkyEmissionModelConfig = ParameterizedEmissionModelConfig
+
+
 __all__ = [
     "ClearSkyEmissionForwardModel",
     "ClearSkyEmissionModelConfig",
+    "EmissionForwardModel",
+    "EmissionModelConfig",
     "GreyScatteringCloudConfig",
+    "ParameterizedEmissionForwardModel",
     "ParameterizedClearSkyEmissionForwardModel",
+    "ParameterizedClearSkyEmissionModelConfig",
     "ParameterizedGreyCloudEmissionForwardModel",
     "ParameterizedRefractiveIndexCloudEmissionForwardModel",
-    "ParameterizedClearSkyEmissionModelConfig",
+    "ParameterizedEmissionModelConfig",
     "RefractiveIndexCloudConfig",
 ]

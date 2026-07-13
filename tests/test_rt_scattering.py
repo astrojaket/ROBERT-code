@@ -18,7 +18,7 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     rayleigh_phase_function,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 from robert_exoplanets.core import RobertValidationError
 
@@ -80,7 +80,7 @@ def test_single_scattering_source_matches_one_layer_reference_solution() -> None
         phase_function="rayleigh",
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="none",
@@ -116,7 +116,7 @@ def test_single_scattering_source_is_zero_on_nightside() -> None:
         stellar_beam=DirectStellarBeam(spectral_grid=spectral_grid, values=np.array([10.0])),
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="none",
@@ -139,7 +139,7 @@ def test_single_scattering_source_requires_scattering_optical_depth() -> None:
     )
 
     with pytest.raises(RobertValidationError, match="requires at least one positive scattering"):
-        solve_clear_sky_emission(
+        solve_emission(
             gas_tau,
             geometry=geometry,
             bottom_boundary="none",
@@ -163,7 +163,7 @@ def test_single_scattering_source_requires_stellar_geometry() -> None:
     )
 
     with pytest.raises(RobertValidationError, match="finite geometry stellar_mu"):
-        solve_clear_sky_emission(
+        solve_emission(
             gas_tau,
             geometry=geometry,
             bottom_boundary="none",

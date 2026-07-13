@@ -25,6 +25,11 @@ from compare_grey_cloud_rt_picaso import (
     _run_picaso,
 )
 from robert_exoplanets import planck_radiance_wavelength
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_DARK,
+    REFERENCE_COLOR,
+    ROBERT_COLOR,
+)
 from robert_exoplanets.rt.sh4 import solve_thermal_sh4
 from robert_exoplanets.rt.toon import solve_thermal_two_stream
 
@@ -240,13 +245,19 @@ def _plot(
 ) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(13.0, 8.5), constrained_layout=True)
     ax_spectrum, ax_residual, ax_angle, ax_speed = axes.flat
-    colors = {"toon": "#e45756", "sh4": "#4c78a8"}
+    colors = {"toon": ROBERT_COLOR, "sh4": PURPLE_DARK}
     for method in ("toon", "sh4"):
         picaso = values[f"picaso_{method}"]
         robert = values[method]
         picaso_disk = np.tensordot(disk_weight, picaso, axes=(0, 0))
         robert_disk = np.tensordot(disk_weight, robert, axes=(0, 0))
-        ax_spectrum.plot(wavelength, picaso_disk, color=colors[method], label=f"PICASO {method.upper()}")
+        ax_spectrum.plot(
+            wavelength,
+            picaso_disk,
+            color=REFERENCE_COLOR,
+            linestyle="--" if method == "toon" else ":",
+            label=f"PICASO {method.upper()}",
+        )
         ax_spectrum.plot(
             wavelength,
             robert_disk,
@@ -261,7 +272,7 @@ def _plot(
 
     ax_spectrum.set(xscale="log", yscale="log", xlabel="Wavelength [micron]", ylabel="Disk radiance [W m$^{-2}$ m$^{-1}$ sr$^{-1}$]", title="Forward-scattering grey atmosphere")
     ax_spectrum.legend(frameon=False)
-    ax_residual.axhline(0.0, color="#222222", linewidth=0.8)
+    ax_residual.axhline(0.0, color=REFERENCE_COLOR, linewidth=0.8)
     ax_residual.set(xscale="log", xlabel="Wavelength [micron]", ylabel="(ROBERT - PICASO) / PICASO [%]", title="Matched-solver spectral residual")
     ax_residual.legend(frameon=False)
     ax_angle.set(xlabel=r"Emission cosine $\mu$", ylabel="Maximum point-radiance error [%]", yscale="log", title="Angular reconstruction error")

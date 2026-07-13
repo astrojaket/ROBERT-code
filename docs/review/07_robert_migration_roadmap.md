@@ -114,7 +114,7 @@ Acceptance criteria:
 - Coverage errors are explicit.
 - No radiative-transfer kernel depends on file paths.
 
-## Phase 5: Clear-Sky Emission Forward Model
+## Phase 5: Cloud-Free Emission Forward Model
 
 Goal:
 
@@ -128,7 +128,7 @@ Implement:
 - k-table interpolation,
 - random-overlap correlated-k,
 - CIA contribution,
-- clear-sky thermal emission,
+- cloud-free thermal emission,
 - simple disc integration only if needed by fixture.
 
 Acceptance criteria:
@@ -251,11 +251,11 @@ Acceptance criteria:
 
 Milestone name:
 
-- `M1-clear-sky-emission-reference`
+- `M1-cloud-free-emission-reference`
 
 Scope:
 
-- One-dimensional clear-sky thermal emission.
+- One-dimensional cloud-free thermal emission.
 - Correlated-k gas opacity.
 - H2/He CIA.
 - JWST-like binned emission likelihood.

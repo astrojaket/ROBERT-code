@@ -1,4 +1,4 @@
-extends: wasp69b_clear_R1000.yaml
+extends: wasp69b_cloud_free_R1000.yaml
 
 run:
   name: wasp69b-mie-catalog-pg14-R1000

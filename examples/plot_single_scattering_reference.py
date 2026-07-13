@@ -26,7 +26,7 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     lobatto_phase_geometry,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "single_scattering_reference"
@@ -66,7 +66,7 @@ def main() -> Path:
     phase_results = {}
     for phase in (0.0, 90.0, 180.0):
         geometry = lobatto_phase_geometry(phase_angle_deg=phase, n_mu=4)
-        phase_results[phase] = solve_clear_sky_emission(
+        phase_results[phase] = solve_emission(
             gas_tau,
             geometry=geometry,
             bottom_boundary="none",

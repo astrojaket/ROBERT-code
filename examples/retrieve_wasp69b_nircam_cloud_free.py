@@ -1,0 +1,552 @@
+"""NIRCam-only cloud-free one-region retrieval for a configured target.
+
+WASP-69b is the default configuration. Following ROBERT's default
+multi-instrument workflow, opacity is recompressed into each mode's published
+observation bins with exo_k before inference. The user supplies an ExoMol KTA
+root and selects its model resolution explicitly.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import replace
+from importlib import import_module
+import json
+import os
+from pathlib import Path
+import tempfile
+
+os.environ.setdefault(
+    "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib")
+)
+os.environ.setdefault(
+    "NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "robert-numba-cache")
+)
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("NUMBA_NUM_THREADS", "1")
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+from robert_exoplanets import (
+    CiaTable,
+    CompositionMeanMolecularWeight,
+    CorrelatedKOpacityProvider,
+    CorrelatedKTable,
+    FastChemEquilibriumChemistry,
+    LogUniformPrior,
+    MultiDatasetGaussianLikelihood,
+    MultiDatasetRetrievalProblem,
+    ObservationCollection,
+    ParameterizedEmissionFactoryConfig,
+    ParameterizedEmissionModelConfig,
+    ParmentierGuillot2014TemperatureProfile,
+    PressureGrid,
+    RetrievalParameter,
+    RetrievalParameterSet,
+    UniformPrior,
+    build_multi_dataset_emission_model,
+    load_nemesispy_cia_table,
+    run_ultranest,
+)
+
+
+def _target_configuration():
+    module_name = os.environ.get("ROBERT_TARGET_CONFIG", "examples.wasp69b_target")
+    try:
+        return import_module(module_name)
+    except ModuleNotFoundError:
+        if "." not in module_name:
+            raise
+        return import_module(module_name.rsplit(".", 1)[-1])
+
+
+TARGET = _target_configuration()
+PLANET = TARGET.PLANET
+STAR = TARGET.STAR
+PLANET_GRAVITY_M_S2 = TARGET.PLANET_GRAVITY_M_S2
+TARGET_SLUG = TARGET.TARGET_SLUG
+
+ROOT = Path(__file__).resolve().parents[1]
+DATA = TARGET.DATA_DIRECTORY
+FASTCHEM = ROOT / "data" / "chemistry" / "fastchem"
+CACHE = TARGET.CACHE_DIRECTORY
+OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_nircam_cloud_free"
+SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
+OPACITY_RESOLUTIONS = ("R1000", "R15000")
+DEFAULT_OPACITY_RESOLUTION = "R1000"
+CALLS_PER_ATTEMPT = 5000
+
+
+def nircam_observations() -> ObservationCollection:
+    full = TARGET.load_observations(miri_offset_parameter=None)
+    return ObservationCollection(
+        datasets=tuple(dataset for dataset in full.datasets if dataset.name != "lrs"),
+        name=f"{PLANET.name} NIRCam-only published spectrum",
+        metadata={**dict(full.metadata), "selection": "NIRCam only"},
+    )
+
+
+def opacity_cache_directory(resolution: str) -> Path:
+    """Return the target cache directory for one explicit KTA resolution."""
+
+    normalized = str(resolution).strip().upper()
+    if normalized not in OPACITY_RESOLUTIONS:
+        raise ValueError(
+            f"resolution must be one of {', '.join(OPACITY_RESOLUTIONS)}"
+        )
+    return CACHE / normalized
+
+
+def prepare_opacity_cache(
+    observations: ObservationCollection,
+    *,
+    kta_path: str | Path,
+    resolution: str = DEFAULT_OPACITY_RESOLUTION,
+) -> None:
+    """Recompress selected user-supplied KTA tables into published bins."""
+
+    cache = opacity_cache_directory(resolution)
+    cache.mkdir(parents=True, exist_ok=True)
+    for species in SPECIES:
+        provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+            kta_path,
+            species=(species,),
+            resolution=resolution,
+            name=f"ExoMol-{resolution}-{species}",
+            interpolation="log_pressure_temperature_log_k_clip",
+            nonfinite_policy="floor",
+        )
+        table = provider.tables[species]
+        source = Path(str(table.metadata["source_path"]))
+        source_sha = str(table.metadata["checksum_sha256"])
+        single_species_provider = CorrelatedKOpacityProvider(
+            {species: table},
+            interpolation="log_pressure_temperature_log_k_clip",
+        )
+        for dataset in observations.datasets:
+            target = cache / f"{dataset.name}_{species}.npz"
+            if target.exists():
+                with np.load(target, allow_pickle=False) as saved:
+                    if (
+                        str(saved["source_sha256"]) == source_sha
+                        and str(saved["opacity_resolution"]) == resolution
+                    ):
+                        continue
+            binned = single_species_provider.bin_to_spectral_grid(
+                dataset.observation.spectral_grid,
+                num=300,
+                use_rebin=False,
+                remove_zeros=True,
+            ).tables[species]
+            np.savez_compressed(
+                target,
+                species=species,
+                pressure_bar=binned.pressure_bar,
+                temperature_K=binned.temperature_K,
+                wavenumber_cm_inverse=binned.wavenumber_cm_inverse,
+                wavelength_micron=binned.wavelength_micron,
+                g_samples=binned.g_samples,
+                g_weights=binned.g_weights,
+                kcoeff=binned.kcoeff,
+                unit=binned.unit,
+                source_path=str(source.resolve()),
+                source_sha256=source_sha,
+                opacity_resolution=resolution,
+                spectral_preparation="exo_k_bin_down_cp_num300",
+            )
+
+
+def _load_table(
+    dataset: str,
+    species: str,
+    resolution: str = DEFAULT_OPACITY_RESOLUTION,
+) -> CorrelatedKTable:
+    path = opacity_cache_directory(resolution) / f"{dataset}_{species}.npz"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"prepared opacity cache is missing: {path}; run this command "
+            "with --prepare-only first"
+        )
+    with np.load(path, allow_pickle=False) as saved:
+        return CorrelatedKTable(
+            species=species,
+            pressure_bar=saved["pressure_bar"],
+            temperature_K=saved["temperature_K"],
+            wavenumber_cm_inverse=saved["wavenumber_cm_inverse"],
+            wavelength_micron=saved["wavelength_micron"],
+            g_samples=saved["g_samples"],
+            g_weights=saved["g_weights"],
+            kcoeff=saved["kcoeff"],
+            unit=str(saved["unit"]),
+            metadata={
+                "source_path": str(saved["source_path"]),
+                "checksum_sha256": str(saved["source_sha256"]),
+                "opacity_resolution": str(saved["opacity_resolution"]),
+                "spectral_preparation": str(saved["spectral_preparation"]),
+            },
+        )
+
+
+def _cia_tables() -> CiaTable:
+    """Load ROBERT's vendored H2-H2/H2-He CIA table."""
+
+    return load_nemesispy_cia_table()
+
+
+def parameters() -> RetrievalParameterSet:
+    return RetrievalParameterSet(
+        (
+            RetrievalParameter(
+                "metallicity",
+                UniformPrior(-1.0, 2.0),
+                label="log10(Z/Z_sun)",
+                unit="dex",
+            ),
+            RetrievalParameter("CtoO", UniformPrior(0.0, 1.0), label="C/O"),
+            RetrievalParameter(
+                "kappa_IR", LogUniformPrior(1.0e-5, 1.0), unit="m2 kg-1"
+            ),
+            RetrievalParameter("gamma1", LogUniformPrior(1.0e-4, 100.0)),
+            RetrievalParameter("gamma2", LogUniformPrior(1.0e-4, 100.0)),
+            RetrievalParameter("T_irr", UniformPrior(800.0, 2200.0), unit="K"),
+            RetrievalParameter("alpha", UniformPrior(0.0, 1.0)),
+        )
+    )
+
+
+def build_problem(
+    observations: ObservationCollection,
+    *,
+    opacity_resolution: str = DEFAULT_OPACITY_RESOLUTION,
+) -> MultiDatasetRetrievalProblem:
+    pressure = PressureGrid.from_log_centers(
+        100.0,
+        1.0e-6,
+        n_layers=80,
+        unit="bar",
+        name=f"{PLANET.name} emission pressure grid",
+    )
+    cia = _cia_tables()
+    temperature_profile = ParmentierGuillot2014TemperatureProfile(
+        gravity=PLANET_GRAVITY_M_S2,
+        internal_temperature=100.0,
+    )
+    chemistry_model = FastChemEquilibriumChemistry(
+        fastchem_path=FASTCHEM,
+        metadata={"element_abundances": "asplund_2009"},
+    )
+    mean_molecular_weight_model = CompositionMeanMolecularWeight(
+        normalization="raw_sum"
+    )
+    model_config = ParameterizedEmissionModelConfig(
+        opacity_species=SPECIES,
+        include_rayleigh=True,
+        gas_combination="random_overlap",
+        thermal_integration_backend="auto",
+        metadata={
+            "target": PLANET.name,
+            "dataset_selection": ",".join(observations.names),
+            "dayside_geometry": "one_region_cloud_free",
+            "paper_analogue": "not_exact_EGP_grid_reproduction",
+        },
+    )
+    configs = {}
+    spectral_grids = {}
+    for dataset in observations.datasets:
+        tables = {
+            species: _load_table(dataset.name, species, opacity_resolution)
+            for species in SPECIES
+        }
+        canonical_g = tables["H2O"].g_samples
+        canonical_weights = tables["H2O"].g_weights
+        for species, table in tuple(tables.items()):
+            if not np.allclose(table.g_samples, canonical_g, rtol=0.0, atol=1.0e-8):
+                raise ValueError(
+                    f"{species} uses a genuinely different correlated-k g grid"
+                )
+            if not np.allclose(
+                table.g_weights, canonical_weights, rtol=0.0, atol=1.0e-8
+            ):
+                raise ValueError(
+                    f"{species} uses genuinely different correlated-k weights"
+                )
+            tables[species] = replace(
+                table,
+                g_samples=canonical_g,
+                g_weights=canonical_weights,
+            )
+        provider = CorrelatedKOpacityProvider(
+            tables,
+            name=(
+                f"{PLANET.name}-{dataset.name}-ExoMol-{opacity_resolution}-binned"
+            ),
+            interpolation="log_pressure_temperature_log_k_clip",
+        )
+        configs[dataset.name] = ParameterizedEmissionFactoryConfig(
+            planet=PLANET,
+            star=STAR,
+            temperature_profile=temperature_profile,
+            chemistry_model=chemistry_model,
+            mean_molecular_weight_model=mean_molecular_weight_model,
+            pressure_grid=pressure,
+            cia_table=cia,
+            opacity_source=provider,
+            opacity_binning=None,
+            model=model_config,
+        )
+        spectral_grids[dataset.name] = dataset.observation.spectral_grid
+    forward_model = build_multi_dataset_emission_model(
+        configs,
+        spectral_grids=spectral_grids,
+    )
+    opacity_ids = {}
+    for dataset_name, model in forward_model.models.items():
+        opacity_ids.update(
+            {
+                f"{dataset_name}:{key}": value
+                for key, value in model.opacity_identifiers.items()
+            }
+        )
+    return MultiDatasetRetrievalProblem(
+        name=f"{TARGET_SLUG}-nircam-cloud-free-one-region",
+        observations=observations,
+        parameters=parameters(),
+        forward_model=forward_model,
+        likelihood=MultiDatasetGaussianLikelihood(include_normalization=True),
+        invalid_loglike=-1.0e100,
+        metadata={
+            "comparison": f"{PLANET.name}_published_eclipse_spectrum",
+            "difference": "NIRCam-only equilibrium chemistry with PG14 analytic TP",
+            "opacity_resolution": opacity_resolution,
+        },
+        opacity_identifiers=opacity_ids,
+    )
+
+
+def _write_products(
+    problem: MultiDatasetRetrievalProblem,
+    result,
+    output: Path,
+    *,
+    live_points: int = 50,
+    max_ncalls: int = 5000,
+    mpi_processes: int = 2,
+) -> None:
+    output.mkdir(parents=True, exist_ok=True)
+    weights = np.array(result.weights, dtype=float, copy=True)
+    weights /= np.sum(weights)
+    rng = np.random.default_rng(20260711)
+    draw_indices = rng.choice(
+        result.samples.shape[0], size=300, replace=True, p=weights
+    )
+    draws = result.samples[draw_indices]
+    spectra = {name: [] for name in problem.observations.names}
+    for draw in draws:
+        prediction = problem.model_spectra(draw)
+        for name in spectra:
+            spectra[name].append(prediction[name].values)
+    envelopes = {
+        name: np.percentile(np.asarray(values), [16.0, 50.0, 84.0], axis=0)
+        for name, values in spectra.items()
+    }
+    best = result.best_fit_parameters
+    best_spectra = problem.model_spectra(best)
+    chi2 = 0.0
+    for dataset in problem.observations.datasets:
+        residual = (
+            dataset.observation.flux - best_spectra[dataset.name].values
+        ) / dataset.observation.uncertainty
+        chi2 += float(np.sum(residual**2))
+    dof = problem.observations.n_points - problem.ndim
+    quantiles = {}
+    for index, name in enumerate(problem.parameter_names):
+        order = np.argsort(result.samples[:, index])
+        values = result.samples[order, index]
+        cumulative = np.cumsum(weights[order])
+        quantiles[name] = np.interp([0.16, 0.5, 0.84], cumulative, values).tolist()
+    summary = {
+        "selection": str(
+            problem.metadata.get(
+                "dataset_selection",
+                "NIRCam only (F322W2, overlap average, F444W)",
+            )
+        ),
+        "n_points": problem.observations.n_points,
+        "n_parameters": problem.ndim,
+        "live_points": live_points,
+        "max_ncalls": max_ncalls,
+        "mpi_processes": mpi_processes,
+        "converged": result.converged,
+        "message": result.message,
+        "log_evidence": result.log_evidence,
+        "log_evidence_error": result.log_evidence_error,
+        "best_fit": dict(best),
+        "posterior_16_50_84": quantiles,
+        "chi_squared": chi2,
+        "degrees_of_freedom": dof,
+        "reduced_chi_squared": chi2 / dof,
+        "paper_full_band_cloud_free_one_region": {
+            "metallicity_16_50_84": [1.28, 1.30, 1.32],
+            "CtoO_16_50_84": [0.10, 0.11, 0.13],
+            "reduced_chi_squared": 14.5,
+            "log_evidence": -588,
+        },
+        "comparison_warning": (
+            "Literature evidence values are not directly comparable unless the data, "
+            "priors, chemistry, temperature profile, opacity, and likelihood match."
+        ),
+    }
+    (output / "summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
+    np.savez_compressed(
+        output / "posterior_products.npz",
+        samples=result.samples,
+        weights=weights,
+        log_likelihood=result.log_likelihood,
+        **{f"{name}_q16": value[0] for name, value in envelopes.items()},
+        **{f"{name}_q50": value[1] for name, value in envelopes.items()},
+        **{f"{name}_q84": value[2] for name, value in envelopes.items()},
+    )
+    _plot(
+        problem.observations,
+        envelopes,
+        best_spectra,
+        summary,
+        output / "spectrum_1sigma.png",
+    )
+
+
+def _plot(observations, envelopes, best_spectra, summary, path: Path) -> None:
+    colors = {
+        "f322w2": "#20639b",
+        "avg": "#7a5195",
+        "f444w": "#ef5675",
+        "lrs": "#2ca25f",
+    }
+    fig, (axis, residual_axis) = plt.subplots(
+        2, 1, figsize=(10, 7), sharex=True, gridspec_kw={"height_ratios": [3, 1]}
+    )
+    for dataset in observations.datasets:
+        name = dataset.name
+        obs = dataset.observation
+        q16, q50, q84 = envelopes[name]
+        color = colors[name]
+        axis.fill_between(
+            obs.wavelength, 1.0e6 * q16, 1.0e6 * q84, color=color, alpha=0.22
+        )
+        axis.plot(obs.wavelength, 1.0e6 * q50, color=color, linewidth=1.5)
+        axis.errorbar(
+            obs.wavelength,
+            1.0e6 * obs.flux,
+            yerr=1.0e6 * obs.uncertainty,
+            fmt=".",
+            color=color,
+            alpha=0.75,
+            markersize=3,
+            label=obs.instrument,
+        )
+        residual = (obs.flux - best_spectra[name].values) / obs.uncertainty
+        residual_axis.plot(obs.wavelength, residual, ".", color=color, markersize=3)
+    axis.set_ylabel("Eclipse depth (ppm)")
+    axis.set_title(f"{PLANET.name}: ROBERT cloud-free one-region retrieval")
+    axis.text(
+        0.02,
+        0.97,
+        "Shading: posterior 68% (1-sigma) spectrum envelope\n"
+        f"ROBERT reduced chi-square = {summary['reduced_chi_squared']:.2f}\n"
+        "Literature comparisons require matched model assumptions.",
+        transform=axis.transAxes,
+        va="top",
+        fontsize=9,
+    )
+    axis.legend(loc="lower right", fontsize=8)
+    residual_axis.axhline(0.0, color="black", linewidth=0.8)
+    residual_axis.axhline(1.0, color="0.6", linewidth=0.6, linestyle="--")
+    residual_axis.axhline(-1.0, color="0.6", linewidth=0.6, linestyle="--")
+    residual_axis.set_ylabel("Residual / sigma")
+    residual_axis.set_xlabel("Wavelength (micron)")
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
+def _next_cumulative_call_limit(log_dir: Path) -> int:
+    """Advance UltraNest's cumulative call ceiling in fixed-size resume chunks."""
+
+    status_path = log_dir / "sampler_status.json"
+    if not status_path.exists():
+        return CALLS_PER_ATTEMPT
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    completed_calls = max(int(status.get("ncall", 0)), 0)
+    return completed_calls + CALLS_PER_ATTEMPT
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    configured_kta_path = os.environ.get("ROBERT_KTABLE_PATH")
+    parser.add_argument(
+        "--kta-path",
+        type=Path,
+        default=configured_kta_path,
+        required=configured_kta_path is None,
+        help="KTA root containing R1000/R15000, or the selected resolution directory",
+    )
+    parser.add_argument(
+        "--opacity-resolution",
+        choices=OPACITY_RESOLUTIONS,
+        default=os.environ.get(
+            "ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION
+        ),
+    )
+    parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--mpi-processes", type=int, default=1)
+    args = parser.parse_args()
+    observations = nircam_observations()
+    if args.prepare_only:
+        prepare_opacity_cache(
+            observations,
+            kta_path=args.kta_path,
+            resolution=args.opacity_resolution,
+        )
+        return
+    problem = build_problem(
+        observations,
+        opacity_resolution=args.opacity_resolution,
+    )
+    max_ncalls = _next_cumulative_call_limit(args.output / "ultranest")
+    result = run_ultranest(
+        problem,
+        output_dir=args.output / "ultranest",
+        min_num_live_points=50,
+        max_ncalls=max_ncalls,
+        dlogz=0.5,
+        resume="resume",
+        show_status=False,
+        mpi_nprocs=args.mpi_processes,
+        seed=20260711,
+    )
+    try:
+        from mpi4py import MPI
+
+        is_primary = MPI.COMM_WORLD.Get_rank() == 0
+    except ImportError:
+        is_primary = True
+    if is_primary:
+        _write_products(
+            problem,
+            result,
+            args.output,
+            live_points=50,
+            max_ncalls=max_ncalls,
+            mpi_processes=args.mpi_processes,
+        )
+
+
+if __name__ == "__main__":
+    main()

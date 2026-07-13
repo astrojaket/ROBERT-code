@@ -21,7 +21,7 @@ from robert_exoplanets.instruments import (
     TopHatObservationResponse,
 )
 
-from .emission import ParameterizedClearSkyEmissionForwardModel
+from .emission import ParameterizedEmissionForwardModel
 
 NativeSpectrumEvaluator = Callable[[Mapping[str, float]], Spectrum]
 
@@ -36,7 +36,7 @@ class PreparedSpectrumResponse(Protocol):
 class MultiDatasetEmissionForwardModel:
     """Evaluate one atmosphere through several prepared correlated-k models."""
 
-    models: Mapping[str, ParameterizedClearSkyEmissionForwardModel]
+    models: Mapping[str, ParameterizedEmissionForwardModel]
     responses: Mapping[str, PreparedSpectrumResponse] = field(default_factory=dict)
     atmosphere_builder: AtmosphereBuilder = field(init=False, repr=False)
     required_parameters: tuple[str, ...] = field(init=False)
@@ -48,11 +48,11 @@ class MultiDatasetEmissionForwardModel:
                 "shared-atmosphere multi-dataset models require non-empty names"
             )
         if any(
-            not isinstance(model, ParameterizedClearSkyEmissionForwardModel)
+            not isinstance(model, ParameterizedEmissionForwardModel)
             for model in models.values()
         ):
             raise RobertValidationError(
-                "shared-atmosphere models must be parameterized clear-sky emission models"
+                "shared-atmosphere models must be parameterized cloud-free emission models"
             )
         reference = next(iter(models.values()))
         for model in models.values():

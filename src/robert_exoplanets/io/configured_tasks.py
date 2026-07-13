@@ -27,12 +27,12 @@ from robert_exoplanets.atmosphere import (
 from robert_exoplanets.bodies import Planet, Star
 from robert_exoplanets.core import PressureGrid
 from robert_exoplanets.forward import (
-    ParameterizedClearSkyEmissionFactoryConfig,
-    ParameterizedClearSkyEmissionModelConfig,
+    ParameterizedEmissionFactoryConfig,
+    ParameterizedEmissionModelConfig,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     RefractiveIndexCloudConfig,
     build_multi_dataset_emission_model,
-    build_parameterized_clear_sky_emission_model,
+    build_parameterized_emission_model,
 )
 from robert_exoplanets.instruments import ObservationCollection
 from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
@@ -272,7 +272,7 @@ def build_problem(
     config: TaskConfig,
     observations: ObservationCollection | None = None,
 ) -> MultiDatasetRetrievalProblem:
-    """Construct the typed clear-emission problem selected by the YAML file."""
+    """Construct the typed emission problem selected by the YAML file."""
 
     observations = load_observations(config) if observations is None else observations
     planet, gravity = _planet(config)
@@ -377,7 +377,7 @@ def build_problem(
     )
     cia = load_nemesispy_cia_table()
     rt = config.radiative_transfer
-    model_config = ParameterizedClearSkyEmissionModelConfig(
+    model_config = ParameterizedEmissionModelConfig(
         opacity_species=config.opacity.species,
         include_rayleigh=rt.include_rayleigh,
         gas_combination=rt.gas_combination,
@@ -445,7 +445,7 @@ def build_problem(
             name=f"{planet.name}-{dataset.name}-{config.opacity.resolution}-binned",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        factory = ParameterizedClearSkyEmissionFactoryConfig(
+        factory = ParameterizedEmissionFactoryConfig(
             planet=planet,
             star=star,
             temperature_profile=temperature,
@@ -462,20 +462,20 @@ def build_problem(
         if cloud is None:
             configs[dataset.name] = factory
         else:
-            clear = build_parameterized_clear_sky_emission_model(
+            base_model = build_parameterized_emission_model(
                 factory,
                 spectral_grid=dataset.observation.spectral_grid,
             )
             cloud_models[dataset.name] = (
                 ParameterizedRefractiveIndexCloudEmissionForwardModel(
-                    planet=clear.planet,
-                    star=clear.star,
-                    spectral_grid=clear.spectral_grid,
-                    atmosphere_builder=clear.atmosphere_builder,
-                    opacity_provider=clear.opacity_provider,
-                    config=clear.config,
-                    cia_table=clear.cia_table,
-                    geometry=clear.geometry,
+                    planet=base_model.planet,
+                    star=base_model.star,
+                    spectral_grid=base_model.spectral_grid,
+                    atmosphere_builder=base_model.atmosphere_builder,
+                    opacity_provider=base_model.opacity_provider,
+                    config=base_model.config,
+                    cia_table=base_model.cia_table,
+                    geometry=base_model.geometry,
                     cloud=cloud,
                 )
             )

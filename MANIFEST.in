@@ -4,10 +4,10 @@ include environment.yml
 recursive-include docs *.md
 recursive-include data/validation *
 recursive-include examples *.py *.ipynb
-recursive-include examples/data/hat_p_32b *
+recursive-include data/chemistry/fastchem *
 recursive-include slurm *.sbatch
-recursive-include tools *.py
 global-exclude .DS_Store
 global-exclude *.py[cod]
 prune examples/notebooks/.ipynb_checkpoints
 prune examples/outputs
+prune examples/Depreciated_Benchmarks

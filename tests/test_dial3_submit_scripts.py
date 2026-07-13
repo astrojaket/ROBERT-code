@@ -9,12 +9,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = {
-    "wasp69b_nircam_clear.sbatch": "retrieve_wasp69b_nircam_clear.py",
-    "wasp69b_clear_native_modes.sbatch": "run_retrieval.py",
+    "wasp69b_nircam_cloud_free.sbatch": "retrieve_wasp69b_nircam_cloud_free.py",
+    "wasp69b_cloud_free_native_modes.sbatch": "run_retrieval.py",
     "wasp69b_mie_catalog.sbatch": "--cloud-mode catalog",
     "wasp69b_mie_direct_nk.sbatch": "--cloud-mode direct-nk",
-    "wasp80b_nircam_clear.sbatch": "retrieve_wasp80b_nircam_clear.py",
-    "wasp80b_clear_native_modes.sbatch": "retrieve_wasp80b_clear_native_modes.py",
+    "wasp80b_nircam_cloud_free.sbatch": "retrieve_wasp80b_nircam_cloud_free.py",
+    "wasp80b_cloud_free_native_modes.sbatch": "retrieve_wasp80b_cloud_free_native_modes.py",
     "wasp80b_mie_catalog.sbatch": "--cloud-mode catalog",
     "wasp80b_mie_direct_nk.sbatch": "--cloud-mode direct-nk",
 }
@@ -30,7 +30,7 @@ def test_dial3_scripts_are_valid_bash_and_use_expected_cases() -> None:
         assert "#SBATCH --ntasks=64" in text
         assert case_marker in text
         if case_marker == "run_retrieval.py":
-            assert "configurations/wasp69b_clear_R1000.yaml" in text
+            assert "configurations/wasp69b_cloud_free_R1000.yaml" in text
             assert "ROBERT_CONFIG" in text
         else:
             assert "--kta-path /scratch/dp448/dc-tayl1/ktables_exomol" in text
@@ -43,11 +43,11 @@ def test_dial3_scripts_are_valid_bash_and_use_expected_cases() -> None:
 
 def test_wasp_entry_points_reach_their_command_line_parser() -> None:
     entry_points = (
-        "retrieve_wasp69b_nircam_clear.py",
-        "retrieve_wasp69b_clear_native_modes.py",
+        "retrieve_wasp69b_nircam_cloud_free.py",
+        "retrieve_wasp69b_cloud_free_native_modes.py",
         "retrieve_wasp69b_mie_cloud.py",
-        "retrieve_wasp80b_nircam_clear.py",
-        "retrieve_wasp80b_clear_native_modes.py",
+        "retrieve_wasp80b_nircam_cloud_free.py",
+        "retrieve_wasp80b_cloud_free_native_modes.py",
         "retrieve_wasp80b_mie_cloud.py",
     )
     for name in entry_points:

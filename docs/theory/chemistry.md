@@ -24,14 +24,14 @@ Current chemistry types:
 
 ## FastChem Retrieval Chemistry
 
-The FastChem adapter is connected to the parameterized clear-sky retrieval
+The FastChem adapter is connected to the parameterized cloud-free retrieval
 model. It accepts `[M/H]` in dex through `metallicity` and a linear elemental
 carbon-to-oxygen ratio through `CtoO`. Every evaluation resets the solver from
 stored solar elemental abundances before applying these parameters, so calls do
 not inherit elemental abundances from the previous sample.
 
 The Conda environment installs `pyfastchem`, and the repository bundles the
-required FastChem inputs under `examples/data/hat_p_32b/fastchem`. Together
+required FastChem inputs under `data/chemistry/fastchem`. Together
 they pass a real smoke test, including repeated calls separated by a different
 metallicity and C/O state. The FastChem path, parameter names, species mapping,
 and elemental-abundance source are recorded in model provenance. FastChem

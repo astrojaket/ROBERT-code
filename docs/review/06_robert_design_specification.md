@@ -371,8 +371,8 @@ Recommended first scientifically meaningful scope:
 - 1D plane-parallel thermal emission.
 - Correlated-k gas opacity.
 - CIA for H2-H2 and H2-He at minimum.
-- Clear atmosphere, no scattering source function.
-- Simple clouds only after clear-sky validation.
+- Cloud-free atmosphere, no scattering source function.
+- Simple clouds only after cloud-free validation.
 - JWST-like binned emission observation.
 - Gaussian likelihood.
 - One sampler adapter plus deterministic forward tests.

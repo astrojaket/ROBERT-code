@@ -78,7 +78,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=ROOT / "configurations" / "wasp69b_clear_R1000.yaml",
+        default=ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml",
         help="source task YAML; its run.name becomes the folder name",
     )
     return parser.parse_args()

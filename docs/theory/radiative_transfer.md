@@ -6,7 +6,7 @@ ROBERT now has the first RT-facing reference building blocks:
 - random-overlap gas optical-depth combination for multi-species correlated-k
   runs,
 - layer optical-depth contributors for CIA and Rayleigh scattering extinction,
-- a NumPy clear-sky thermal-emission solver with Planck source-function
+- a NumPy cloud-free thermal-emission solver with Planck source-function
   integration,
 - explicit disc geometry objects for normal-emission, uniform thermal-disc, and
   Lobatto phase quadrature calculations,
@@ -32,10 +32,10 @@ transmission, reflected-light, and cloud-complexity recommendations.
 
 ## Reusable Retrieval Forward Model
 
-`ClearSkyEmissionForwardModel` is the package-level orchestration layer for the
-validated clear-sky retrieval path. It consumes typed `Planet`, `Star`,
+`EmissionForwardModel` is the package-level orchestration layer for the
+validated cloud-free retrieval path. It consumes typed `Planet`, `Star`,
 `PressureGrid`, `SpectralGrid`, `CorrelatedKOpacityProvider`, and
-`ClearSkyEmissionModelConfig` objects. It owns:
+`EmissionModelConfig` objects. It owns:
 
 - validation and caching of prepared opacity outside likelihood calls,
 - constant-with-altitude log10 VMR parameter mapping for arbitrary trace gases,
@@ -54,15 +54,15 @@ temperature evaluation, `exo_k` binning, and model preparation:
 from pathlib import Path
 
 from robert_exoplanets import (
-    ClearSkyEmissionFactoryConfig,
-    ClearSkyEmissionModelConfig,
+    EmissionFactoryConfig,
+    EmissionModelConfig,
     ExoKOpacitySource,
     ExoKTableBinning,
     TabulatedTemperatureProfile,
-    build_clear_sky_emission_model,
+    build_emission_model,
 )
 
-config = ClearSkyEmissionFactoryConfig(
+config = EmissionFactoryConfig(
     planet=planet,
     star=star,
     temperature_profile=TabulatedTemperatureProfile.from_csv("target_pt.csv"),
@@ -72,7 +72,7 @@ config = ClearSkyEmissionFactoryConfig(
         filename_pattern="*_R1000.kta",
     ),
     opacity_binning=ExoKTableBinning(num=300),
-    model=ClearSkyEmissionModelConfig(
+    model=EmissionModelConfig(
         opacity_species=("H2O", "CO2", "NH3"),
         log_vmr_parameters={
             "H2O": "log_h2o",
@@ -83,7 +83,7 @@ config = ClearSkyEmissionFactoryConfig(
     ),
 )
 
-model = build_clear_sky_emission_model(
+model = build_emission_model(
     config,
     spectral_grid=observation.spectral_grid,
 )
@@ -95,17 +95,17 @@ explicit `pressure_grid` when it should differ from the opacity table centers,
 and set `opacity_binning=None` only for a provider already prepared on the
 observation grid.
 
-The factory is intentionally Python-first. YAML or TOML can be added later as
-an input adapter without changing this validated typed boundary. The model does
-not discover files or resample opacity during evaluation. Manifest metadata
+The factory is the typed internal boundary used by the maintained YAML task
+adapter. The model does not discover files or resample opacity during
+evaluation. Manifest metadata
 includes the Python configuration interface, opacity source and binning
 choices, temperature parameterization, physical constants, parameter mappings,
 prepared opacity identity, and hashes of the pressure, spectral, and base
 temperature grids.
 
-The validated complete target example is
-`examples/hat_p_32b_config.py`; copy it as the starting point for another
-planet rather than copying the retrieval implementation.
+For a complete target configuration, copy
+`configurations/wasp69b_cloud_free_R1000.yaml` and change the science inputs
+rather than copying or editing the retrieval implementation.
 
 ## Current Scope
 
@@ -145,8 +145,8 @@ HAT-P-32b benchmark still matches best with the default plane-parallel secant
 path, but the spherical path object is now available for controlled geometry
 tests and future cloud, surface, transmission, or phase-curve work.
 
-`solve_clear_sky_emission` consumes a `GasOpticalDepth` object and returns
-`ClearSkyEmissionResult`, with:
+`solve_emission` consumes a `GasOpticalDepth` object and returns
+`EmissionResult`, with:
 
 - emergent spectral radiance,
 - optional blackbody-star eclipse depth,
@@ -155,7 +155,7 @@ tests and future cloud, surface, transmission, or phase-curve work.
 - total optical depth used by the solver,
 - optional point-spectrum diagnostics and disc-averaged geometry.
 
-By default, `solve_clear_sky_emission` uses a plane-parallel secant path through
+By default, `solve_emission` uses a plane-parallel secant path through
 each layer. Passing `path_geometry=hydrostatic_path_geometry(...)` switches to
 spherical shell path-length factors and records the reference pressure/radius,
 top radius, and bottom radius in solver metadata.
@@ -267,7 +267,7 @@ NumPy path.
 `DiscGeometry` is the RT-facing angular container. It stores a sequence of
 `DiscPoint` samples with emission zenith cosine, normalized disc weight, and
 optional projected-disc, latitude/longitude, stellar zenith, and stellar azimuth
-metadata. The current clear-sky solver uses the emission cosine and weight to
+metadata. The current cloud-free solver uses the emission cosine and weight to
 calculate point spectra and the disc average. The stellar-angle metadata is
 reserved for reflected-light and scattering-source-function kernels.
 
@@ -313,34 +313,12 @@ python examples/plot_synthetic_tau_weighting.py
 ```
 
 writes a tau heatmap and a wavelength-averaged weighting profile over a
-synthetic P-T profile. The same diagnostic object can later be used with the
-HAT-P-32b k-tables once the clear-sky emission backend is wired.
+synthetic P-T profile.
 
-The local HAT-P-32b emission benchmark:
-
-```bash
-python examples/benchmark_hat_p_32b_emission_rt.py
-```
-
-loads the external HAT-P-32b P-T CSV, R1000 `.kta` files, an optional local CIA
-table, and the external emission CSV. It compares ROBERT's current clear-sky
-result to the benchmark and writes both a plot and a JSON metric report. This is a
-diagnostic benchmark, not a strict pass/fail validation, because the current
-ROBERT path still omits exact benchmark layering/path parity, clouds/aerosols,
-and multiple-scattering source functions.
-
-Set `HAT_P_32B_CIA_FILE` to include a local CIA binary table in this benchmark.
-If that variable is not set, the script leaves the CIA term off unless
-`ROBERT_HAT_P_32B_INCLUDE_CIA=1` is requested explicitly.
-
-To exercise the first single-scattering source term in that benchmark, run:
-
-```bash
-ROBERT_HAT_P_32B_INCLUDE_SCATTERING_SOURCE=1 python examples/benchmark_hat_p_32b_emission_rt.py
-```
-
-The default benchmark leaves this off to preserve the historical thermal
-emission comparison.
+Current forward-model validation uses the maintained PICASO and
+petitRADTRANS comparisons listed in `examples/BENCHMARKS.md`. The superseded
+pre-YAML checks are retained under `examples/Depreciated_Benchmarks/` and are
+not part of the active validation workflow.
 
 The standalone synthetic scattering example:
 
@@ -391,7 +369,7 @@ Scattering must enter ROBERT in two separate ways:
 - as a source-function treatment when scattering redirects radiation into the
   line of sight.
 
-The current clear-sky solver handles absorption, thermal emission, optional
+The current cloud-free solver handles absorption, thermal emission, optional
 extinction-only Rayleigh terms, and optional first-order single scattering of a
 direct stellar beam. Clouds/aerosols, surfaces, and multiple-scattering source
 terms should be added as independent RT components rather than hidden inside

@@ -11,7 +11,7 @@ from robert_exoplanets.io.task_config import load_task_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_CONFIG = ROOT / "configurations" / "wasp69b_clear_R1000.yaml"
+SOURCE_CONFIG = ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
 TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
 
 
@@ -24,7 +24,7 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     )
     config = load_task_config(run_directory / "configuration.yaml")
 
-    assert run_directory.name == "wasp69b-clear-native-modes-R1000"
+    assert run_directory.name == "wasp69b-cloud-free-native-modes-R1000"
     assert (run_directory / "source_configuration.yaml").is_file()
     assert (run_directory / "run_retrieval.py").is_file()
     assert (run_directory / "run_forward.py").is_file()

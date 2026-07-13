@@ -102,14 +102,14 @@
     "picaso_native_samples": 37273,
     "effective_opacity_sampling_R": 15000.0,
     "comparison_output_R_approx": 96.58310505164272,
-    "robert_seconds": 17.722100708051585,
+    "robert_seconds": 18.579233665950596,
     "picaso_timing_seconds": {
-      "clear_thermal": 7.801294207980391,
-      "clear_transmission": 0.893062540970277,
-      "cloudy_thermal": 7.481044707994442,
-      "cloudy_transmission": 2.059118250035681,
-      "mie": 4.687998416018672,
-      "opacity_connection": 1.69395004195394
+      "cloud_free_thermal": 8.001967291987967,
+      "cloud_free_transmission": 0.8857216670294292,
+      "cloudy_thermal": 8.127915124990977,
+      "cloudy_transmission": 2.189940457988996,
+      "mie": 4.596997040964197,
+      "opacity_connection": 2.348358499992173
     }
   },
   "metrics": {
@@ -140,7 +140,7 @@
         "max_abs_log10_tau_difference_dex": 0.55517174006853
       }
     },
-    "clear_emission_difference_ppm": {
+    "emission_difference_ppm": {
       "rms": 30.94699602236081,
       "median": -9.066774333333697,
       "minimum": -96.00628495122238,
@@ -154,7 +154,7 @@
       "maximum": 70.96026510022337,
       "max_abs": 95.80763393840812
     },
-    "clear_transmission_difference_ppm": {
+    "cloud_free_transmission_difference_ppm": {
       "rms": 49.14284800026941,
       "median": 27.858226437620786,
       "minimum": -118.69296243858726,

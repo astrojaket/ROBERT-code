@@ -2,10 +2,10 @@
 
 ROBERT's user interface is a versioned YAML file. The file contains the
 science choices; the Python runners contain no target-specific settings. Start
-by copying `configurations/wasp69b_clear_R1000.yaml` to a new filename and
+by copying `configurations/wasp69b_cloud_free_R1000.yaml` to a new filename and
 editing the copy.
 
-The available WASP-69b/WASP-80b clear, Mie-cloud, and temperature-profile
+The available WASP-69b/WASP-80b cloud-free, Mie-cloud, and temperature-profile
 defaults are catalogued in [configurations/README.md](../configurations/README.md).
 
 The runners may also be copied beside that YAML in an external project
@@ -29,7 +29,7 @@ configuration's output, opacity-cache, and scratch paths inside that directory.
 cd /scratch/dp448/dc-tayl1/ROBERT-code
 python scripts/create_run_directory.py \
   --project-dir /scratch/dp448/dc-tayl1/my_project \
-  --config configurations/wasp69b_clear_R1000.yaml
+  --config configurations/wasp69b_cloud_free_R1000.yaml
 ```
 
 Edit `/scratch/dp448/dc-tayl1/my_project/<run.name>/configuration.yaml`, then
@@ -52,7 +52,7 @@ The major sections are intentionally explicit:
   tabulated CSV temperature profile; chemistry model; and the FastChem name
   corresponding to each molecule;
 - `clouds`: currently `none`, because this runner exposes only the validated
-  clear-sky path;
+  cloud-free path;
 - `opacity`: KTA root, `R1000`/`R15000`, selected opacity molecules, and an
   external cache directory;
 - `radiative_transfer`: model, geometry, Rayleigh treatment, gas combination,
@@ -68,7 +68,7 @@ Unknown fields and inconsistent molecule/parameter references are errors. To
 inspect the resolved choices without loading data or opacity, run:
 
 ```bash
-python run_retrieval.py --config configurations/wasp69b_clear_R1000.yaml --validate-only
+python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --validate-only
 ```
 
 All relative paths are resolved relative to the YAML file, not the runner or
@@ -77,20 +77,20 @@ opacity-cache, and scratch directories automatically. They can also be created
 without loading science data:
 
 ```bash
-python run_retrieval.py --config configurations/wasp69b_clear_R1000.yaml --initialize
+python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --initialize
 ```
 
 Opacity is prepared once, on one process:
 
 ```bash
-python run_retrieval.py --config configurations/wasp69b_clear_R1000.yaml --prepare-opacity
+python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --prepare-opacity
 ```
 
 Then run a one-evaluation terminal check or the retrieval:
 
 ```bash
-python run_retrieval.py --config configurations/wasp69b_clear_R1000.yaml --smoke-only
-python run_retrieval.py --config configurations/wasp69b_clear_R1000.yaml
+python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --smoke-only
+python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml
 ```
 
 The same configuration can produce a deterministic forward model. Each
@@ -98,7 +98,7 @@ parameter's `value` is used; if `value` is omitted, ROBERT uses that prior's
 midpoint.
 
 ```bash
-python run_forward.py --config configurations/wasp69b_clear_R1000.yaml
+python run_forward.py --config configurations/wasp69b_cloud_free_R1000.yaml
 ```
 
 Every executed task copies the input YAML and writes a fully resolved YAML to
@@ -126,14 +126,14 @@ as a photochemistry emulator should be added as another validated
 runner itself does not need target- or machine-specific edits.
 
 For 64 MPI processes on DiRAC, validate and prepare opacity on the login node,
-then submit `slurm/wasp69b_clear_native_modes.sbatch`. Set `ROBERT_CONFIG` when
+then submit `slurm/wasp69b_cloud_free_native_modes.sbatch`. Set `ROBERT_CONFIG` when
 submitting to select a copied configuration. The batch script uses Conda
 OpenMPI's `mpirun`, not `srun`; ROBERT checks that `MPI.COMM_WORLD` really has
 64 processes before UltraNest opens a checkpoint.
 
 ```bash
 ROBERT_CONFIG=/scratch/dp448/dc-tayl1/configs/my_run.yaml \
-  sbatch slurm/wasp69b_clear_native_modes.sbatch
+  sbatch slurm/wasp69b_cloud_free_native_modes.sbatch
 ```
 
 After any failed multi-writer launch, select a new `outputs.directory` in YAML.

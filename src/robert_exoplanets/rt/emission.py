@@ -1,4 +1,4 @@
-"""Clear-sky thermal-emission reference solver."""
+"""Cloud-free thermal-emission reference solver."""
 
 from __future__ import annotations
 
@@ -39,8 +39,8 @@ MICRON_TO_METER = 1.0e-6
 
 
 @dataclass(frozen=True)
-class ClearSkyEmissionResult:
-    """Output and diagnostics from the clear-sky thermal-emission solver."""
+class EmissionResult:
+    """Output and diagnostics from the cloud-free thermal-emission solver."""
 
     gas_optical_depth: GasOpticalDepth
     radiance: Spectrum
@@ -84,7 +84,7 @@ class ClearSkyEmissionResult:
             )
         if np.any(source < 0.0) or np.any(contribution < 0.0) or np.any(bottom < 0.0):
             raise RobertValidationError(
-                "clear-sky emission diagnostics must be non-negative"
+                "cloud-free emission diagnostics must be non-negative"
             )
         if self.total_optical_depth is None:
             total_tau = self.gas_optical_depth.total_tau
@@ -266,7 +266,7 @@ class ClearSkyEmissionResult:
         return normalized
 
 
-def solve_clear_sky_emission(
+def solve_emission(
     gas_optical_depth: GasOpticalDepth,
     *,
     emission_angle_cosines: ArrayLike | None = None,
@@ -281,8 +281,8 @@ def solve_clear_sky_emission(
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
-) -> ClearSkyEmissionResult:
-    """Solve thermal emission for a clear atmosphere.
+) -> EmissionResult:
+    """Solve thermal emission for a cloud-free atmosphere.
 
     The solver integrates Planck layer source functions through gas optical
     depth plus any additional extinction optical depths. When a
@@ -623,7 +623,7 @@ def solve_clear_sky_emission(
     radiance_values = np.sum(layer_contribution, axis=0) + bottom_contribution
     radiance_values.setflags(write=False)
     common_metadata = {
-        "rt_solver": "clear_sky_numpy_reference",
+        "rt_solver": "emission_numpy_reference",
         "bottom_boundary": bottom_mode,
         "source_function": "thermal_planck"
         if scattering_source is None
@@ -695,7 +695,7 @@ def solve_clear_sky_emission(
         ) ** 2
         if not np.all(np.isfinite(depth)) or np.any(depth < 0.0):
             raise RobertValidationError(
-                "clear-sky eclipse-depth calculation produced invalid values"
+                "cloud-free eclipse-depth calculation produced invalid values"
             )
         depth.setflags(write=False)
         eclipse_metadata = dict(common_metadata)
@@ -708,7 +708,7 @@ def solve_clear_sky_emission(
             metadata=eclipse_metadata,
         )
 
-    return ClearSkyEmissionResult(
+    return EmissionResult(
         gas_optical_depth=gas_optical_depth,
         radiance=radiance,
         eclipse_depth=eclipse_depth,
@@ -730,7 +730,7 @@ def solve_clear_sky_emission(
     )
 
 
-def solve_clear_sky_emission_spectrum(
+def solve_emission_spectrum(
     gas_optical_depth: GasOpticalDepth,
     *,
     geometry: DiscGeometry | None = None,
@@ -747,7 +747,7 @@ def solve_clear_sky_emission_spectrum(
 
     This path intentionally omits layer, disc-point, and contribution-function
     arrays. SH4 multiple scattering is supported without materializing those
-    diagnostics. Use :func:`solve_clear_sky_emission` when they are required.
+    diagnostics. Use :func:`solve_emission` when they are required.
     """
 
     bottom_mode = bottom_boundary.strip().lower()
@@ -892,7 +892,7 @@ def solve_clear_sky_emission_spectrum(
             bottom_visible=bottom_visible,
             backend=thermal_integration_backend,
         )
-        rt_solver = "clear_sky_spectrum_only"
+        rt_solver = "emission_spectrum_only"
         thermal_backend = integrated.backend
     radiance_values = np.asarray(integrated.radiance)
     metadata = {
@@ -1514,3 +1514,9 @@ def _readonly_array(
         raise RobertValidationError(f"{name} must contain only finite values")
     array.setflags(write=False)
     return array
+
+
+# Backward-compatible aliases for the original cloud-free-only solver names.
+ClearSkyEmissionResult = EmissionResult
+solve_clear_sky_emission = solve_emission
+solve_clear_sky_emission_spectrum = solve_emission_spectrum
