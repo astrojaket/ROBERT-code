@@ -35,9 +35,29 @@ class MultiDatasetRetrievalProblem:
 
     def __post_init__(self) -> None:
         if not self.name:
-            raise RobertValidationError("multi-dataset retrieval problem name must not be empty")
+            raise RobertValidationError(
+                "multi-dataset retrieval problem name must not be empty"
+            )
+        nuisance_parameters = {
+            parameter
+            for dataset in self.observations.datasets
+            for parameter in (
+                dataset.offset_parameter,
+                dataset.jitter_parameter,
+                dataset.uncertainty_scale_parameter,
+            )
+            if parameter is not None
+        }
+        missing = sorted(nuisance_parameters - set(self.parameters.names))
+        if missing:
+            raise RobertValidationError(
+                "retrieval parameter set is missing dataset nuisance parameters: "
+                + ", ".join(missing)
+            )
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
-        object.__setattr__(self, "opacity_identifiers", immutable_mapping(self.opacity_identifiers))
+        object.__setattr__(
+            self, "opacity_identifiers", immutable_mapping(self.opacity_identifiers)
+        )
 
     @property
     def parameter_names(self) -> tuple[str, ...]:
@@ -65,11 +85,17 @@ class MultiDatasetRetrievalProblem:
         parameters: Mapping[str, float] | ArrayLike,
     ) -> Mapping[str, Spectrum]:
         prediction = self.predict(parameters)
-        spectra = prediction if isinstance(prediction, Mapping) else getattr(prediction, "spectra", None)
+        spectra = (
+            prediction
+            if isinstance(prediction, Mapping)
+            else getattr(prediction, "spectra", None)
+        )
         if not isinstance(spectra, Mapping) or any(
             not isinstance(value, Spectrum) for value in spectra.values()
         ):
-            raise RobertValidationError("multi-dataset forward model must expose named spectra")
+            raise RobertValidationError(
+                "multi-dataset forward model must expose named spectra"
+            )
         return spectra
 
     def log_likelihood_from_vector(self, vector: ArrayLike) -> float:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from robert_exoplanets import (
     NativeSpectrumMultiDatasetForwardModel,
@@ -79,6 +80,34 @@ def test_multi_dataset_likelihood_applies_only_named_dataset_offset() -> None:
     )
 
     assert loglike == 0.0
+
+
+def test_multi_dataset_likelihood_inflates_only_named_dataset_uncertainty() -> None:
+    collection = ObservationCollection(
+        (
+            ObservationDataset("nircam", _observation([2.0], [1.0], "NIRCam")),
+            ObservationDataset(
+                "miri",
+                _observation([5.0], [3.0], "MIRI"),
+                uncertainty_scale_parameter="miri_error_scale",
+            ),
+        )
+    )
+    predictions = {
+        "nircam": Spectrum.from_arrays([2.0], [1.0], "eclipse_depth", "eclipse_depth"),
+        "miri": Spectrum.from_arrays([5.0], [2.8], "eclipse_depth", "eclipse_depth"),
+    }
+
+    likelihood = MultiDatasetGaussianLikelihood()
+    default = likelihood.loglike(predictions, collection, {})
+    inflated = likelihood.loglike(
+        predictions,
+        collection,
+        {"miri_error_scale": 2.0},
+    )
+
+    assert default == pytest.approx(-2.0)
+    assert inflated == pytest.approx(-0.5)
 
 
 def test_collection_reports_total_points() -> None:

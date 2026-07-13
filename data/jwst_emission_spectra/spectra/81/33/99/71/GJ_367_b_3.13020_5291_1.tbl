@@ -1,0 +1,21 @@
+\PL_NAME='GJ 367 b'
+\SPEC_TYPE='Eclipse'
+\INSTRUMENT='Mid-Infrared Instrument (MIRI)'
+\FACILITY='NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission'
+\NOTE='The fiducial emission spectrum (Table 4)'
+\REFERENCE='Zhang et al. 2024'
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|    char|      double|      double|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+          5.364     0.609      0.0051           0.001          -0.001           null       null           null           null             0     null         null         null 
+          5.973     0.609      0.0084           0.001          -0.001           null       null           null           null             0     null         null         null 
+          6.582     0.609      0.0062          0.0011         -0.0011           null       null           null           null             0     null         null         null 
+          7.191     0.609      0.0069          0.0012         -0.0012           null       null           null           null             0     null         null         null 
+          7.801     0.609       0.009          0.0012         -0.0012           null       null           null           null             0     null         null         null 
+           8.41     0.609      0.0071          0.0013         -0.0013           null       null           null           null             0     null         null         null 
+          9.018     0.609      0.0139          0.0015         -0.0015           null       null           null           null             0     null         null         null 
+          9.628     0.609      0.0076          0.0017         -0.0017           null       null           null           null             0     null         null         null 
+         10.236     0.609      0.0089           0.002          -0.002           null       null           null           null             0     null         null         null 
+         10.846     0.609      0.0079          0.0028         -0.0028           null       null           null           null             0     null         null         null 
+         11.454     0.609      0.0092          0.0038         -0.0038           null       null           null           null             0     null         null         null 

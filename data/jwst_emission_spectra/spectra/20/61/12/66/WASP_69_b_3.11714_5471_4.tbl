@@ -1,0 +1,41 @@
+\PL_NAME = WASP-69 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 4
+\INSTRUMENT = Mid-Infrared Instrument (MIRI) - LRS
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Figure 3, binned, LRS
+\REFERENCE = Schlawin et al. 2024
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          long|    double|        double|        double|         long|    char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+        5.12500   0.25000     0.09340         0.00910        -0.00910              0        965             31            -31             0     null         null         null 
+        5.37500   0.25000     0.09650         0.00540        -0.00540              0        953             18            -18             0     null         null         null 
+        5.62500   0.25000     0.08470         0.00610        -0.00610              0        892             21            -21             0     null         null         null 
+        5.87500   0.25000     0.10570         0.00450        -0.00450              0        941             14            -14             0     null         null         null 
+        6.12500   0.25000     0.12380         0.00460        -0.00460              0        976             14            -14             0     null         null         null 
+        6.37500   0.25000     0.11200         0.00600        -0.00600              0        921             18            -18             0     null         null         null 
+        6.62500   0.25000     0.10860         0.00390        -0.00390              0        891             12            -12             0     null         null         null 
+        6.87500   0.25000     0.12630         0.00950        -0.00950              0        925             28            -28             0     null         null         null 
+        7.12500   0.25000     0.12340         0.00530        -0.00530              0        898             15            -15             0     null         null         null 
+        7.37500   0.25000     0.12900         0.00380        -0.00380              0        896             11            -11             0     null         null         null 
+        7.62500   0.25000     0.13960         0.00740        -0.00740              0        910             20            -20             0     null         null         null 
+        7.87500   0.25000     0.15580         0.00480        -0.00480              0        937             13            -13             0     null         null         null 
+        8.12500   0.25000     0.15350         0.00500        -0.00500              0        916             13            -13             0     null         null         null 
+        8.37500   0.25000     0.15560         0.00590        -0.00590              0        907             15            -15             0     null         null         null 
+        8.62500   0.25000     0.15980         0.00520        -0.00520              0        904             13            -13             0     null         null         null 
+        8.87500   0.25000     0.17170         0.00530        -0.00530              0        921             13            -13             0     null         null         null 
+        9.12500   0.25000     0.17410         0.00690        -0.00690              0        915             17            -17             0     null         null         null 
+        9.37500   0.25000     0.20330         0.00560        -0.00560              0        975             14            -14             0     null         null         null 
+        9.62500   0.25000     0.20830         0.00590        -0.00590              0        976             14            -14             0     null         null         null 
+        9.87500   0.25000     0.21350         0.00740        -0.00740              0        977             18            -18             0     null         null         null 
+       10.12500   0.25000     0.22340         0.00670        -0.00670              0        989             16            -16             0     null         null         null 
+       10.37500   0.25000     0.22200         0.00960        -0.00960              0        976             23            -23             0     null         null         null 
+       10.62500   0.25000     0.20770         0.00880        -0.00880              0        932             21            -21             0     null         null         null 
+       10.87500   0.25000     0.21350         0.01390        -0.01390              0        936             33            -33             0     null         null         null 
+       11.12500   0.25000     0.21970         0.01540        -0.01540              0        941             36            -36             0     null         null         null 
+       11.37500   0.25000     0.22800         0.01520        -0.01520              0        951             35            -35             0     null         null         null 
+       11.62500   0.25000     0.24940         0.02170        -0.02170              0        992             49            -49             0     null         null         null 
+       11.87500   0.25000     0.25470         0.02210        -0.02210              0        995             50            -50             0     null         null         null 

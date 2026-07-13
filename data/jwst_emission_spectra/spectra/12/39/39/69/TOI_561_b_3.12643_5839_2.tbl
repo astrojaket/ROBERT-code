@@ -1,0 +1,20 @@
+\PL_NAME = TOI-561 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 2
+\INSTRUMENT = Near Infrared Spectrograph (NIRSpec) - G395H
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Table 1, ExoTIC JEDI 1 pipeline
+\REFERENCE = Teske et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          long|    double|        double|        double|         long|          char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+        3.00500   0.28400     0.00181         0.00065        -0.00065              0       null           null           null             0 2460431.969444         null         null 
+        3.28800   0.28300     0.00276         0.00065        -0.00065              0       null           null           null             0 2460431.969444         null         null 
+        3.57200   0.28400     0.00299         0.00069        -0.00069              0       null           null           null             0 2460431.969444         null         null 
+        3.97600   0.31100     0.00328         0.00079        -0.00079              0       null           null           null             0 2460431.969444         null         null 
+        4.28600   0.31000     0.00664         0.00100        -0.00100              0       null           null           null             0 2460431.969444         null         null 
+        4.59600   0.31100     0.00617         0.00125        -0.00125              0       null           null           null             0 2460431.969444         null         null 
+        4.90800   0.31100     0.00622         0.00160        -0.00160              0       null           null           null             0 2460431.969444         null         null 

@@ -1,6 +1,12 @@
 """Retrieval workflow components for ROBERT."""
 
-from .data import load_emission_observation_npz
+from .data import (
+    ROBERT_OBSERVATION_SCHEMA,
+    convert_emission_observation_table,
+    load_emission_observation_npz,
+    load_emission_observation_table,
+    save_emission_observation_npz,
+)
 from robert_exoplanets.instruments import Observation
 from .hybrid import (
     NestedSamplingOEResult,
@@ -14,7 +20,12 @@ from .hybrid import (
 )
 from .manifest import RunManifest
 from .optimal_estimation import OptimalEstimationResult, run_optimal_estimation
-from .priors import LogUniformPrior, RetrievalParameter, RetrievalParameterSet, UniformPrior
+from .priors import (
+    LogUniformPrior,
+    RetrievalParameter,
+    RetrievalParameterSet,
+    UniformPrior,
+)
 from .problem import RetrievalProblem
 from .multi_dataset import MultiDatasetRetrievalProblem
 from .results import RetrievalResult
@@ -50,6 +61,10 @@ __all__ = [
     "UltraNestRunConfig",
     "build_retrieval_problem",
     "load_emission_observation_npz",
+    "load_emission_observation_table",
+    "save_emission_observation_npz",
+    "convert_emission_observation_table",
+    "ROBERT_OBSERVATION_SCHEMA",
     "load_nested_sampler_result",
     "load_retrieval_status",
     "run_optimal_estimation",

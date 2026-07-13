@@ -1,0 +1,33 @@
+\PL_NAME = LTT 1445 A b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 2
+\INSTRUMENT = Mid-Infrared Instrument (MIRI)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Table 3, Eureka! pipeline, Combined Visits
+\REFERENCE = Wachiraphan et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          long|    double|        double|        double|         long|    char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+        5.24950   0.34620     0.00300         0.00200        -0.00200              0       null           null           null             0     null         null         null 
+        5.59500   0.34620     0.00620         0.00190        -0.00190              0       null           null           null             0     null         null         null 
+        5.94080   0.34630     0.00530         0.00190        -0.00190              0       null           null           null             0     null         null         null 
+        6.28600   0.34620     0.00120         0.00180        -0.00180              0       null           null           null             0     null         null         null 
+        6.63290   0.34620     0.00240         0.00220        -0.00220              0       null           null           null             0     null         null         null 
+        6.98670   0.34620     0.00340         0.00200        -0.00200              0       null           null           null             0     null         null         null 
+        7.32500   0.34630     0.00450         0.00200        -0.00200              0       null           null           null             0     null         null         null 
+        7.66950   0.34620     0.00460         0.00220        -0.00220              0       null           null           null             0     null         null         null 
+        8.01680   0.34620     0.00730         0.00210        -0.00210              0       null           null           null             0     null         null         null 
+        8.36350   0.34630     0.00800         0.00230        -0.00230              0       null           null           null             0     null         null         null 
+        8.70960   0.34620     0.00280         0.00240        -0.00240              0       null           null           null             0     null         null         null 
+        9.05440   0.34620     0.00780         0.00250        -0.00250              0       null           null           null             0     null         null         null 
+        9.40190   0.34630     0.00490         0.00250        -0.00250              0       null           null           null             0     null         null         null 
+        9.74670   0.34620     0.00950         0.00270        -0.00270              0       null           null           null             0     null         null         null 
+       10.08940   0.34620     0.01160         0.00310        -0.00310              0       null           null           null             0     null         null         null 
+       10.43200   0.34630     0.00400         0.00370        -0.00370              0       null           null           null             0     null         null         null 
+       10.77810   0.34620     0.01470         0.00440        -0.00440              0       null           null           null             0     null         null         null 
+       11.12760   0.34620     0.01500         0.00590        -0.00590              0       null           null           null             0     null         null         null 
+       11.47330   0.34630     0.01430         0.00690        -0.00690              0       null           null           null             0     null         null         null 
+       11.81420   0.34620     0.00790         0.00870        -0.00870              0       null           null           null             0     null         null         null 

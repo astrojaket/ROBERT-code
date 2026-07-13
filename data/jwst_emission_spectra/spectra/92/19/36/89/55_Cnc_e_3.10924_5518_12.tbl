@@ -1,0 +1,15 @@
+\PL_NAME = 55 Cnc e
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 12
+\INSTRUMENT = Near Infrared Camera (NIRCam)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Table 1, Obs. Date corresponds to Start date, stark pipeline
+\REFERENCE = Patel et al. 2024
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|          char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+        2.12000      null    -0.00051         0.00055        -0.00060           null       1247            190           -245             0 2459904.321620         null         null 
+        4.50000      null     0.00652         0.00223        -0.00422           null       1716            230           -315             0 2459904.321620         null         null 

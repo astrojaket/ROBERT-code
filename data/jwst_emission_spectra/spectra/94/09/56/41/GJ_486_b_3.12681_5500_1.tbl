@@ -1,0 +1,35 @@
+\PL_NAME = GJ 486 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 1
+\INSTRUMENT = Mid-Infrared Instrument (MIRI)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = SPARTA Reduction
+\REFERENCE = Weiner Mansfield et al. 2024
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|    char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+        5.21000   0.30500     0.00880         0.00140        -0.00140           null       null           null           null             0     null         null         null 
+        5.52000   0.30500     0.00860         0.00170        -0.00170           null       null           null           null             0     null         null         null 
+        5.82000   0.30500     0.01020         0.00150        -0.00150           null       null           null           null             0     null         null         null 
+        6.13000   0.30500     0.00870         0.00160        -0.00160           null       null           null           null             0     null         null         null 
+        6.43000   0.30500     0.01040         0.00170        -0.00170           null       null           null           null             0     null         null         null 
+        6.74000   0.30500     0.00640         0.00190        -0.00190           null       null           null           null             0     null         null         null 
+        7.04000   0.30500     0.01310         0.00180        -0.00180           null       null           null           null             0     null         null         null 
+        7.35000   0.30500     0.01400         0.00180        -0.00180           null       null           null           null             0     null         null         null 
+        7.65000   0.30500     0.01260         0.00170        -0.00170           null       null           null           null             0     null         null         null 
+        7.96000   0.30500     0.01500         0.00200        -0.00200           null       null           null           null             0     null         null         null 
+        8.26000   0.30500     0.01540         0.00210        -0.00210           null       null           null           null             0     null         null         null 
+        8.57000   0.30500     0.01990         0.00230        -0.00230           null       null           null           null             0     null         null         null 
+        8.87000   0.30500     0.01710         0.00230        -0.00230           null       null           null           null             0     null         null         null 
+        9.18000   0.30500     0.01950         0.00260        -0.00260           null       null           null           null             0     null         null         null 
+        9.48000   0.30500     0.02040         0.00250        -0.00250           null       null           null           null             0     null         null         null 
+        9.79000   0.30500     0.01430         0.00300        -0.00300           null       null           null           null             0     null         null         null 
+       10.09200   0.30500     0.01470         0.00300        -0.00300           null       null           null           null             0     null         null         null 
+       10.39800   0.30500     0.02290         0.00340        -0.00340           null       null           null           null             0     null         null         null 
+       10.70200   0.30500     0.02110         0.00440        -0.00440           null       null           null           null             0     null         null         null 
+       11.00800   0.30500     0.02570         0.00490        -0.00490           null       null           null           null             0     null         null         null 
+       11.31200   0.30500     0.02410         0.00650        -0.00650           null       null           null           null             0     null         null         null 
+       11.61800   0.30500     0.02760         0.00770        -0.00770           null       null           null           null             0     null         null         null 

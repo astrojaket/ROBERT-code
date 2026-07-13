@@ -41,7 +41,24 @@ observations:
   loader: schlawin2024_wasp69b   # Alternatives: wiser2025_wasp80b
   datasets: [f322w2, f444w, lrs]
   verify_checksum: true
-  miri_offset_parameter: null    # Sensitivity option: miri_offset
+  miri_offset_parameter: null    # Legacy shorthand; prefer dataset_options below.
+  # Every selected dataset may have independent or shared nuisance parameters.
+  # `uncertainty_scale` is a fixed multiplier. A retrieved scale multiplies it;
+  # additive jitter is then combined in quadrature. Omit unused controls.
+  dataset_options: {}
+    # Replace `{}` with a mapping like the examples below.
+    # f322w2:
+    #   offset_parameter: f322w2_offset
+    #   uncertainty_scale: 1.0
+    #   uncertainty_scale_parameter: f322w2_error_scale
+    #   jitter_parameter: f322w2_jitter
+    # f444w:
+    #   offset_parameter: nircam_offset  # Sharing a name ties datasets together.
+    # lrs:
+    #   offset_parameter: miri_offset
+    #   uncertainty_scale: 1.15          # Fixed 15% inflation.
+    #   uncertainty_scale_parameter: miri_error_scale
+    #   jitter_parameter: miri_jitter
   # path is populated from housekeeping.observations_directory.
 
 # =============================================================================
@@ -65,9 +82,24 @@ atmosphere:
     # temperature_column: temperature_K
     # pressure_unit: bar
     # extrapolation: clip          # Alternatives: raise, clip
+    # model: madhusudhan_seager_2009
+    # pressure_unit: bar
+    # reference_pressure: 1.0e-6   # Optional; defaults to the grid top.
+    # p1_parameter: P1             # P1/P2/P3 are log10 pressure in pressure_unit.
+    # p2_parameter: P2
+    # p3_parameter: P3
+    # t0_parameter: T0
+    # alpha1_parameter: alpha1
+    # alpha2_parameter: alpha2
+    # model: spline
+    # knot_pressure: [1.0e-6, 1.0e-4, 1.0e-2, 1.0, 100.0]
+    # parameter_names: [T_0, T_1, T_2, T_3, T_4]
+    # knot_temperature_k: [900, 1050, 1300, 1650, 1800] # Fixed alternative.
+    # pressure_unit: bar
+    # extrapolation: clip
 
   chemistry:
-    # The current YAML runner supports equilibrium FastChem chemistry.
+    # Choose equilibrium FastChem OR free, constant-with-altitude chemistry.
     model: fastchem_equilibrium
     metallicity_parameter: metallicity
     carbon_to_oxygen_parameter: CtoO
@@ -81,8 +113,15 @@ atmosphere:
       - {label: HCN, fastchem_name: C1H1N1_1}
       - {label: H2,  fastchem_name: H2}
       - {label: He,  fastchem_name: He}
-    # Constant/free chemistry and photochemistry-emulator adapters are not
-    # yet YAML-runner models. Do not add their priors as active parameters.
+    # model: free
+    # species: [H2O, CO2, CO, CH4, NH3, HCN]
+    # parameter_mode: log10       # Parameters are log10(VMR); alternative: linear.
+    # parameter_names: {H2O: log_H2O, CO2: log_CO2, CO: log_CO, CH4: log_CH4, NH3: log_NH3, HCN: log_HCN}
+    # fixed_mixing_ratios: {}     # Species listed here need no retrieval parameter.
+    # background_species: [H2, He]
+    # background_fractions: [0.8547, 0.1453]
+    # fill_background: true
+    # excess_policy: raise        # Alternative: normalize.
 
 # =============================================================================
 # CLOUD PROPERTIES
@@ -155,8 +194,36 @@ parameters:
   # --- Isothermal alternative: remove the five PG14 parameters above ---
   # - {name: temperature, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}
 
-  # --- Optional MIRI-only calibration sensitivity parameter ---
+  # --- Madhusudhan-Seager 2009 alternative: remove the PG14 parameters ---
+  # - {name: P1, label: log10(P1/bar), prior: {type: uniform, lower: -6.0, upper: 1.5}, value: -3.0}
+  # - {name: P2, label: log10(P2/bar), prior: {type: uniform, lower: -6.0, upper: 1.5}, value: -2.0}
+  # - {name: P3, label: log10(P3/bar), prior: {type: uniform, lower: -2.0, upper: 2.0}, value: 0.5}
+  # - {name: T0, unit: K, prior: {type: uniform, lower: 500.0, upper: 3500.0}, value: 1200.0}
+  # - {name: alpha1, prior: {type: uniform, lower: 0.02, upper: 2.0}, value: 0.4}
+  # - {name: alpha2, prior: {type: uniform, lower: 0.02, upper: 2.0}, value: 0.4}
+
+  # --- Five-knot spline alternative: one parameter per configured knot ---
+  # - {name: T_0, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 900.0}
+  # - {name: T_1, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1050.0}
+  # - {name: T_2, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1300.0}
+  # - {name: T_3, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1650.0}
+  # - {name: T_4, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1800.0}
+
+  # --- Free-chemistry alternative: remove metallicity and CtoO ---
+  # - {name: log_H2O, label: log10(H2O VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -3.0}
+  # - {name: log_CO2, label: log10(CO2 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -5.0}
+  # - {name: log_CO, label: log10(CO VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -4.0}
+  # - {name: log_CH4, label: log10(CH4 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -6.0}
+  # - {name: log_NH3, label: log10(NH3 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -7.0}
+  # - {name: log_HCN, label: log10(HCN VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -8.0}
+
+  # --- Dataset nuisance parameters referenced by observations.dataset_options ---
+  # - {name: f322w2_offset, unit: eclipse_depth, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}, value: 0.0}
+  # - {name: f322w2_error_scale, prior: {type: log_uniform, lower: 0.5, upper: 5.0}, value: 1.0}
+  # - {name: f322w2_jitter, unit: eclipse_depth, prior: {type: log_uniform, lower: 1.0e-7, upper: 1.0e-3}, value: 1.0e-5}
   # - {name: miri_offset, unit: eclipse_depth, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}, value: 0.0}
+  # - {name: miri_error_scale, prior: {type: log_uniform, lower: 0.5, upper: 5.0}, value: 1.0}
+  # - {name: miri_jitter, unit: eclipse_depth, prior: {type: log_uniform, lower: 1.0e-7, upper: 1.0e-3}, value: 1.0e-5}
 
   # --- Mie catalogue/direct-nk cloud-structure parameters ---
   # - {name: log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}, value: -7.0}

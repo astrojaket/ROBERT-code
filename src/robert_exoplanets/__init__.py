@@ -138,7 +138,9 @@ from .retrieval import (
     UniformPrior,
     UltraNestRunConfig,
     build_retrieval_problem,
+    convert_emission_observation_table,
     load_emission_observation_npz,
+    load_emission_observation_table,
     load_nested_sampler_result,
     load_retrieval_status,
     run_optimal_estimation,
@@ -150,6 +152,7 @@ from .retrieval import (
     run_retrieval,
     run_configured_retrieval,
     run_ultranest,
+    save_emission_observation_npz,
 )
 from .rt import (
     AbsorptionTransmissionResult,
@@ -392,6 +395,9 @@ __all__ = [
     "load_schlawin2024_wasp69b",
     "load_wiser2025_wasp80b",
     "load_emission_observation_npz",
+    "load_emission_observation_table",
+    "convert_emission_observation_table",
+    "save_emission_observation_npz",
     "load_nested_sampler_result",
     "load_retrieval_status",
     "load_picaso_cloud_optical_properties",

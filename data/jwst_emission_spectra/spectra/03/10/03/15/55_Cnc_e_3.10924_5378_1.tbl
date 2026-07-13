@@ -1,0 +1,19 @@
+\PL_NAME='55 Cnc e'
+\SPEC_TYPE='Eclipse'
+\INSTRUMENT='Mid-Infrared Instrument (MIRI)'
+\FACILITY='NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission'
+\NOTE='Fig. 3'
+\REFERENCE='Hu et al. 2024'
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|          char|      double|      double|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+         6.5825     0.609     0.01166         0.00175         -0.0017           null       null           null           null             0 2460027.500000         null         null 
+         7.1915     0.609     0.01025         0.00128        -0.00138           null       null           null           null             0 2460027.500000         null         null 
+         7.8005     0.609     0.01093         0.00137        -0.00139           null       null           null           null             0 2460027.500000         null         null 
+         8.4095     0.609     0.00946          0.0013        -0.00129           null       null           null           null             0 2460027.500000         null         null 
+         9.0185     0.609     0.01159         0.00169        -0.00167           null       null           null           null             0 2460027.500000         null         null 
+         9.6275     0.609      0.0117         0.00161        -0.00182           null       null           null           null             0 2460027.500000         null         null 
+        10.2365     0.609     0.00952          0.0017        -0.00172           null       null           null           null             0 2460027.500000         null         null 
+        10.8455     0.609     0.00996         0.00253        -0.00234           null       null           null           null             0 2460027.500000         null         null 
+        11.4545     0.609     0.00633         0.00259        -0.00245           null       null           null           null             0 2460027.500000         null         null 

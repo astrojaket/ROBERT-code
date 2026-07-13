@@ -1,0 +1,43 @@
+\PL_NAME = 55 Cnc e
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 3
+\INSTRUMENT = Near Infrared Camera (NIRCam)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Figure A.1, HANSOLO Method, Obs. Date corresponds to Start date, Visit 2
+\REFERENCE = Patel et al. 2024
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|          char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+        3.95287      null     0.00037         0.00213        -0.00037           null       null           null           null             0 2459904.321620         null         null 
+        3.98617      null     0.00034         0.00189        -0.00034           null       null           null           null             0 2459904.321620         null         null 
+        4.01947      null     0.00028         0.00104        -0.00028           null       null           null           null             0 2459904.321620         null         null 
+        4.05277      null     0.00037         0.00225        -0.00037           null       null           null           null             0 2459904.321620         null         null 
+        4.08607      null     0.00022         0.00115        -0.00022           null       null           null           null             0 2459904.321620         null         null 
+        4.11937      null     0.00280         0.00415        -0.00173           null       null           null           null             0 2459904.321620         null         null 
+        4.15267      null     0.00206         0.00295        -0.00181           null       null           null           null             0 2459904.321620         null         null 
+        4.18597      null     0.00035         0.00195        -0.00035           null       null           null           null             0 2459904.321620         null         null 
+        4.21927      null     0.00034         0.00191        -0.00034           null       null           null           null             0 2459904.321620         null         null 
+        4.25257      null     0.00053         0.00224        -0.00052           null       null           null           null             0 2459904.321620         null         null 
+        4.28587      null     0.00056         0.00306        -0.00056           null       null           null           null             0 2459904.321620         null         null 
+        4.31917      null     0.00367         0.00206        -0.00322           null       null           null           null             0 2459904.321620         null         null 
+        4.35247      null     0.00055         0.00282        -0.00052           null       null           null           null             0 2459904.321620         null         null 
+        4.38578      null     0.00107         0.00329        -0.00093           null       null           null           null             0 2459904.321620         null         null 
+        4.41908      null     0.00172         0.00407        -0.00140           null       null           null           null             0 2459904.321620         null         null 
+        4.45238      null     0.00100         0.00323        -0.00093           null       null           null           null             0 2459904.321620         null         null 
+        4.48568      null     0.00036         0.00205        -0.00036           null       null           null           null             0 2459904.321620         null         null 
+        4.51898      null     0.00073         0.00374        -0.00064           null       null           null           null             0 2459904.321620         null         null 
+        4.55228      null     0.00113         0.00402        -0.00104           null       null           null           null             0 2459904.321620         null         null 
+        4.58558      null     0.00077         0.00363        -0.00072           null       null           null           null             0 2459904.321620         null         null 
+        4.61888      null     0.00056         0.00309        -0.00056           null       null           null           null             0 2459904.321620         null         null 
+        4.65218      null     0.00066         0.00306        -0.00066           null       null           null           null             0 2459904.321620         null         null 
+        4.68548      null     0.00374         0.00194        -0.00336           null       null           null           null             0 2459904.321620         null         null 
+        4.71878      null     0.00804         0.00327        -0.00501           null       null           null           null             0 2459904.321620         null         null 
+        4.75208      null     0.00395         0.00288        -0.00350           null       null           null           null             0 2459904.321620         null         null 
+        4.78538      null     0.00852         0.00536        -0.00435           null       null           null           null             0 2459904.321620         null         null 
+        4.81868      null     0.00201         0.00316        -0.00187           null       null           null           null             0 2459904.321620         null         null 
+        4.85198      null     0.00092         0.00458        -0.00083           null       null           null           null             0 2459904.321620         null         null 
+        4.88528      null     0.00304         0.00587        -0.00259           null       null           null           null             0 2459904.321620         null         null 
+        4.91858      null     0.00873         0.00497        -0.00521           null       null           null           null             0 2459904.321620         null         null 

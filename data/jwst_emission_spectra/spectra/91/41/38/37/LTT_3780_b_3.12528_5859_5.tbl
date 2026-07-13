@@ -1,0 +1,14 @@
+\PL_NAME = LTT 3780 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 5
+\INSTRUMENT = Mid-Infrared Instrument (MIRI)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Table 2, F1500W, Alternate Reduction, Observation 15
+\REFERENCE = Allen et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|          char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+       15.00000      null     0.03050         0.00510        -0.00510           null       null           null           null             0 2460434.500000         null         null 

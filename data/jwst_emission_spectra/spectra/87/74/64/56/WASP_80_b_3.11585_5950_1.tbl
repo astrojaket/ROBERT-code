@@ -1,0 +1,41 @@
+\PL_NAME = WASP-80 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 1
+\INSTRUMENT = Near Infrared Imager and Slitless Spectrograph (NIRISS)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = SOSS, figure 3
+\REFERENCE = Morel et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|          char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+        0.71689   0.08547     0.00385         0.00300        -0.00262           null       null           null           null             0 2460243.873787         null         null 
+        0.80490   0.08951     0.00156         0.00270        -0.00357           null       null           null           null             0 2460243.873787         null         null 
+        0.88143   0.06128     0.00175         0.00256        -0.00372           null       null           null           null             0 2460243.873787         null         null 
+        0.93970   0.05339     0.00173         0.00254        -0.00348           null       null           null           null             0 2460243.873787         null         null 
+        0.99395   0.05325     0.00734         0.00226        -0.00276           null       null           null           null             0 2460243.873787         null         null 
+        1.04892   0.05484     0.00453         0.00304        -0.00543           null       null           null           null             0 2460243.873787         null         null 
+        1.10499   0.05541     0.00435         0.00267        -0.00274           null       null           null           null             0 2460243.873787         null         null 
+        1.16207   0.05685     0.00306         0.00224        -0.00308           null       null           null           null             0 2460243.873787         null         null 
+        1.22104   0.05918     0.00160         0.00354        -0.00493           null       null           null           null             0 2460243.873787         null         null 
+        1.28137   0.05955     0.00497         0.00332        -0.00501           null       null           null           null             0 2460243.873787         null         null 
+        1.34252   0.06082     0.00597         0.00251        -0.00373           null       null           null           null             0 2460243.873787         null         null 
+        1.40540   0.06301     0.00121         0.00478        -0.00471           null       null           null           null             0 2460243.873787         null         null 
+        1.46948   0.06322     0.00143         0.00243        -0.00273           null       null           null           null             0 2460243.873787         null         null 
+        1.53425   0.06436     0.00668         0.00438        -0.00474           null       null           null           null             0 2460243.873787         null         null 
+        1.60112   0.06743     0.00183         0.00410        -0.00527           null       null           null           null             0 2460243.873787         null         null 
+        1.67105   0.07048     0.00636         0.00292        -0.00353           null       null           null           null             0 2460243.873787         null         null 
+        1.74403   0.07352     0.00669         0.00443        -0.00635           null       null           null           null             0 2460243.873787         null         null 
+        1.82103   0.07852     0.00482         0.00435        -0.00458           null       null           null           null             0 2460243.873787         null         null 
+        1.90206   0.08156     0.00281         0.00455        -0.00422           null       null           null           null             0 2460243.873787         null         null 
+        1.98613   0.08461     0.00579         0.00493        -0.00398           null       null           null           null             0 2460243.873787         null         null 
+        2.07325   0.08767     0.00794         0.00327        -0.00305           null       null           null           null             0 2460243.873787         null         null 
+        2.16443   0.09272     0.01372         0.00327        -0.00486           null       null           null           null             0 2460243.873787         null         null 
+        2.25968   0.09581     0.00763         0.00378        -0.00339           null       null           null           null             0 2460243.873787         null         null 
+        2.35704   0.09693     0.00651         0.00382        -0.00370           null       null           null           null             0 2460243.873787         null         null 
+        2.45600   0.09902     0.01521         0.00307        -0.00439           null       null           null           null             0 2460243.873787         null         null 
+        2.55753   0.10204     0.01317         0.00454        -0.00386           null       null           null           null             0 2460243.873787         null         null 
+        2.66202   0.10495     0.01077         0.00550        -0.00466           null       null           null           null             0 2460243.873787         null         null 
+        2.77083   0.11064     0.00749         0.00694        -0.00463           null       null           null           null             0 2460243.873787         null         null 
