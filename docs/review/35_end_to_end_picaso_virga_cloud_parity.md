@@ -181,15 +181,14 @@ The harness writes the shared contract, both independent intermediate outputs,
 the JSON report, and the four-panel diagnostic figure. The external runner
 imports no ROBERT modules.
 
-## Remaining science-readiness boundary
+## Science-opacity extension
 
 This benchmark validates end-to-end cloud optics and cloudy thermal RT from
-physical inputs. It does not validate agreement between the pRT and PICASO
-molecular databases. A follow-up benchmark should install the official PICASO
-science opacity database, use the same elemental abundances and equilibrium
-chemistry assumptions, compare molecular optical depth species by species, and
-then rerun this cloud case without the analytic validation opacity.
+physical inputs. The former molecular-opacity boundary is now addressed by
+`docs/review/36_official_picaso_molecular_cloud_parity.md`, which uses the
+official R=15,000 PICASO database, ROBERT's independent ExoMolOP/CIA path,
+species-resolved molecular optical depths, and both emission and transmission.
 
 For the paper, report the matched-closure result as the code-parity validation
-and the exact-Mie/delta-M result as a phase-closure sensitivity. Do not present
-the analytic gas bands as a molecular-opacity validation.
+and the official-database extension as an opacity-systematics validation. Do
+not present the analytic gas bands as a molecular-opacity validation.
