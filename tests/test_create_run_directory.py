@@ -12,6 +12,7 @@ from robert_exoplanets.io.task_config import load_task_config
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_CONFIG = ROOT / "configurations" / "wasp69b_clear_R1000.yaml"
+TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
 
 
 def test_create_run_directory_copies_runners_and_isolates_writable_paths(
@@ -43,3 +44,16 @@ def test_create_run_directory_refuses_to_mix_runs(tmp_path: Path) -> None:
 
     with pytest.raises(FileExistsError, match="already exists"):
         create_run_directory(**kwargs)
+
+
+def test_create_run_directory_updates_housekeeping_writable_paths(tmp_path: Path) -> None:
+    run_directory = create_run_directory(
+        project_dir=tmp_path / "my_project",
+        source_config=TEMPLATE,
+    )
+    config = load_task_config(run_directory / "configuration.yaml")
+
+    assert config.housekeeping is not None
+    assert config.housekeeping.output_directory == run_directory / "outputs"
+    assert config.housekeeping.opacity_cache_directory == run_directory / "opacity_cache"
+    assert config.housekeeping.scratch_directory == run_directory / "scratch"

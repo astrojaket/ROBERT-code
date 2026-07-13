@@ -1,0 +1,207 @@
+# ROBERT complete user-editable template (schema version 1).
+#
+# Start every new project by copying this file. Keep ONLY one active choice for
+# each model block. Commented entries are valid options or priors but are not
+# included in the retrieval until uncommented and placed in `parameters`.
+# ROBERT rejects unknown active keys deliberately, so a typo cannot change the
+# science model silently.
+
+schema_version: 1
+
+# =============================================================================
+# RUN IDENTITY
+# =============================================================================
+run:
+  name: change-this-run-name
+  description: Describe the science question, data selection, and model.
+
+# =============================================================================
+# SYSTEM PROPERTIES
+# SI units: radius [m], mass [kg], gravity [m s-2], temperature [K].
+# Supply planet mass+radius OR direct gravity.
+# =============================================================================
+bodies:
+  planet:
+    name: WASP-69b
+    radius_m: 75781520.0
+    mass_kg: 4.935138e26
+    # gravity_m_s2: 11.0       # Alternative to mass_kg.
+  star:
+    name: WASP-69
+    radius_m: 565568100.0
+    effective_temperature_k: 4750.0
+
+# =============================================================================
+# DATA PROPERTIES
+# `loader` selects a supported published data reader. `datasets` must be
+# statistically independent likelihood terms. Do not include WASP-69b `avg`
+# with F322W2 and F444W: it is their derived six-bin overlap average.
+# =============================================================================
+observations:
+  loader: schlawin2024_wasp69b   # Alternatives: wiser2025_wasp80b
+  datasets: [f322w2, f444w, lrs]
+  verify_checksum: true
+  miri_offset_parameter: null    # Sensitivity option: miri_offset
+  # path is populated from housekeeping.observations_directory.
+
+# =============================================================================
+# ATMOSPHERE PROPERTIES
+# =============================================================================
+atmosphere:
+  pressure:
+    bottom_bar: 100.0
+    top_bar: 1.0e-6
+    layers: 80
+
+  temperature:
+    # Choose ONE supported profile.
+    model: parmentier_guillot_2014
+    internal_temperature_k: 100.0
+    # model: isothermal
+    # parameter_name: temperature
+    # model: tabulated
+    # profile_path: inputs/my_temperature_profile.csv
+    # pressure_column: pressure_bar
+    # temperature_column: temperature_K
+    # pressure_unit: bar
+    # extrapolation: clip          # Alternatives: raise, clip
+
+  chemistry:
+    # The current YAML runner supports equilibrium FastChem chemistry.
+    model: fastchem_equilibrium
+    metallicity_parameter: metallicity
+    carbon_to_oxygen_parameter: CtoO
+    # fastchem_path is populated from housekeeping.fastchem_directory.
+    species:
+      - {label: H2O, fastchem_name: H2O1}
+      - {label: CO2, fastchem_name: C1O2}
+      - {label: CO,  fastchem_name: C1O1}
+      - {label: CH4, fastchem_name: C1H4}
+      - {label: NH3, fastchem_name: H3N1}
+      - {label: HCN, fastchem_name: C1H1N1_1}
+      - {label: H2,  fastchem_name: H2}
+      - {label: He,  fastchem_name: He}
+    # Constant/free chemistry and photochemistry-emulator adapters are not
+    # yet YAML-runner models. Do not add their priors as active parameters.
+
+# =============================================================================
+# CLOUD PROPERTIES
+# Choose ONE. Cloud parameters must be present in `parameters` only when the
+# matching cloud model is active.
+# =============================================================================
+clouds:
+  model: none
+
+  # Fixed-material Mie cloud:
+  # model: mie_catalog
+  # material: MgSiO3
+  # particle_density_kg_m3: 3200.0
+  # geometric_stddev: 1.0
+  # quadrature_points: 1
+  # multiple_scattering_backend: sh4
+  # optical_constants_path is populated from housekeeping.optical_constants_directory.
+
+  # Retrieved refractive-index Mie cloud:
+  # model: mie_direct_nk
+  # refractive_index_wavelength_micron: [2.4, 4.0, 5.5, 7.0, 9.0, 12.0]
+  # real_index_parameter_names: [cloud_n_0, cloud_n_1, cloud_n_2, cloud_n_3, cloud_n_4, cloud_n_5]
+  # log10_imaginary_index_parameter_names: [cloud_logk_0, cloud_logk_1, cloud_logk_2, cloud_logk_3, cloud_logk_4, cloud_logk_5]
+  # particle_density_kg_m3: 3200.0
+  # geometric_stddev: 1.0
+  # quadrature_points: 1
+  # multiple_scattering_backend: sh4
+
+# =============================================================================
+# OPACITY AND RADIATIVE TRANSFER
+# =============================================================================
+opacity:
+  format: exomol_kta
+  resolution: R1000           # Alternative: R15000
+  species: [H2O, CO2, CO, CH4, NH3, HCN]
+  binning:
+    num: 300
+    use_rebin: false
+    remove_zeros: true
+  # path and cache_directory are populated from housekeeping.
+
+radiative_transfer:
+  model: clear_emission
+  geometry:
+    model: normal_emission    # Alternative: gauss_legendre_disk
+    points: 4                 # Used by gauss_legendre_disk only.
+  include_rayleigh: true
+  gas_combination: random_overlap  # Alternative: equivalent_extinction
+  thermal_integration_backend: auto # Alternatives: numpy, numba
+
+likelihood:
+  model: gaussian
+  include_normalization: true
+
+# =============================================================================
+# RETRIEVAL PARAMETERS AND PRIORS
+# Only uncomment/retain parameters required by the active physics above.
+# `value` is used by run_forward.py; retrievals use the prior.
+# =============================================================================
+parameters:
+  # --- PG14 temperature + FastChem equilibrium (active in this template) ---
+  - {name: metallicity, label: log10(Z/Z_sun), unit: dex, prior: {type: uniform, lower: -1.0, upper: 2.0}, value: 0.5}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.0, upper: 1.0}, value: 0.5}
+  - {name: kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}, value: 0.00316}
+  - {name: gamma1, prior: {type: log_uniform, lower: 1.0e-4, upper: 100.0}, value: 0.1}
+  - {name: gamma2, prior: {type: log_uniform, lower: 1.0e-4, upper: 100.0}, value: 0.1}
+  - {name: T_irr, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}
+  - {name: alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}, value: 0.5}
+
+  # --- Isothermal alternative: remove the five PG14 parameters above ---
+  # - {name: temperature, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}
+
+  # --- Optional MIRI-only calibration sensitivity parameter ---
+  # - {name: miri_offset, unit: eclipse_depth, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}, value: 0.0}
+
+  # --- Mie catalogue/direct-nk cloud-structure parameters ---
+  # - {name: log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}, value: -7.0}
+  # - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}, value: -1.0}
+  # - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}, value: -4.0}
+  # - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}, value: 0.5}
+
+  # --- Direct-n/k only: one pair for every refractive-index node ---
+  # - {name: cloud_n_0, prior: {type: uniform, lower: 1.0, upper: 3.0}, value: 1.6}
+  # - {name: cloud_n_1, prior: {type: uniform, lower: 1.0, upper: 3.0}, value: 1.6}
+  # - {name: cloud_n_2, prior: {type: uniform, lower: 1.0, upper: 3.0}, value: 1.6}
+  # - {name: cloud_n_3, prior: {type: uniform, lower: 1.0, upper: 3.0}, value: 1.6}
+  # - {name: cloud_n_4, prior: {type: uniform, lower: 1.0, upper: 3.0}, value: 1.6}
+  # - {name: cloud_n_5, prior: {type: uniform, lower: 1.0, upper: 3.0}, value: 1.6}
+  # - {name: cloud_logk_0, prior: {type: uniform, lower: -6.0, upper: 0.0}, value: -3.0}
+  # - {name: cloud_logk_1, prior: {type: uniform, lower: -6.0, upper: 0.0}, value: -3.0}
+  # - {name: cloud_logk_2, prior: {type: uniform, lower: -6.0, upper: 0.0}, value: -3.0}
+  # - {name: cloud_logk_3, prior: {type: uniform, lower: -6.0, upper: 0.0}, value: -3.0}
+  # - {name: cloud_logk_4, prior: {type: uniform, lower: -6.0, upper: 0.0}, value: -3.0}
+  # - {name: cloud_logk_5, prior: {type: uniform, lower: -6.0, upper: 0.0}, value: -3.0}
+
+# =============================================================================
+# SAMPLER PROPERTIES
+# =============================================================================
+sampler:
+  engine: ultranest
+  live_points: 400
+  max_calls: 200000
+  dlogz: 0.5
+  resume: resume
+  show_status: true
+  seed: 20260712
+
+runtime:
+  mpi_processes: auto
+
+# =============================================================================
+# HOUSEKEEPING: ALL MACHINE- AND PROJECT-SPECIFIC PATHS LIVE HERE.
+# Relative paths resolve relative to this YAML file.
+# =============================================================================
+housekeeping:
+  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp69b_schlawin2024
+  fastchem_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/examples/data/hat_p_32b/fastchem
+  k_table_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
+  optical_constants_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/optical_constants/exo_skryer
+  opacity_cache_directory: opacity_cache
+  output_directory: outputs
+  scratch_directory: scratch

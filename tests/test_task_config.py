@@ -17,6 +17,7 @@ from robert_exoplanets.io.task_config import (
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "configurations" / "wasp69b_clear_R1000.yaml"
+TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 
 
@@ -108,3 +109,16 @@ def test_direct_nk_default_replaces_catalogue_cloud_fields() -> None:
 
     assert config.clouds.model == "mie_direct_nk"
     assert len(config.clouds.real_index_parameter_names) == 6
+
+
+def test_complete_template_uses_housekeeping_for_internal_paths() -> None:
+    config = load_task_config(TEMPLATE)
+
+    assert config.clouds.model == "none"
+    assert config.housekeeping is not None
+    assert config.observations.path == config.housekeeping.observations_directory
+    assert config.atmosphere.chemistry.fastchem_path == config.housekeeping.fastchem_directory
+    assert config.opacity.path == config.housekeeping.k_table_directory
+    assert config.opacity.cache_directory == config.housekeeping.opacity_cache_directory
+    assert config.outputs.directory == config.housekeeping.output_directory
+    assert config.runtime.scratch_directory == config.housekeeping.scratch_directory

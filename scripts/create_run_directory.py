@@ -110,6 +110,12 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     generated["outputs"]["directory"] = str(run_directory / "outputs")
     generated["opacity"]["cache_directory"] = str(run_directory / "opacity_cache")
     generated["runtime"]["scratch_directory"] = str(run_directory / "scratch")
+    if generated.get("housekeeping") is not None:
+        generated["housekeeping"]["output_directory"] = str(run_directory / "outputs")
+        generated["housekeeping"]["opacity_cache_directory"] = str(
+            run_directory / "opacity_cache"
+        )
+        generated["housekeeping"]["scratch_directory"] = str(run_directory / "scratch")
     execution_config = run_directory / "configuration.yaml"
     execution_config.write_text(
         yaml.safe_dump(generated, sort_keys=False), encoding="utf-8"
