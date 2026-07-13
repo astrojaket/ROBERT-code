@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""Create one self-contained ROBERT run directory from a YAML configuration."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+import re
+import shutil
+
+import yaml
+
+from robert_exoplanets.io.task_config import load_task_config
+
+
+ROOT = Path(__file__).resolve().parents[1]
+_SAFE_RUN_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+_SBATCH = """#!/bin/bash -l
+#SBATCH --job-name={run_name}
+#SBATCH --account=dp448
+#SBATCH --partition=slurm
+#SBATCH --nodes=1
+#SBATCH --ntasks=64
+#SBATCH --time=48:00:00
+#SBATCH --output=%x-%j.out
+#SBATCH --error=%x-%j.err
+
+set -euo pipefail
+
+RUN_DIRECTORY="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+cd "${{RUN_DIRECTORY}}"
+source "${{ROBERT_CONDA_ROOT:-${{HOME}}/miniconda3}}/etc/profile.d/conda.sh"
+conda activate "${{ROBERT_CONDA_ENV:-robert-exoplanets}}"
+export OMP_NUM_THREADS=1
+export NUMBA_NUM_THREADS=1
+
+mpirun -np "${{SLURM_NTASKS}}" python -u run_retrieval.py --config configuration.yaml
+"""
+
+_README = """# {run_name}
+
+This directory is one isolated ROBERT run. It contains the exact source YAML,
+the generated execution YAML, the two runners, and the Slurm submission script.
+
+`configuration.yaml` is the file to edit before preparation or submission. Its
+writable paths are deliberately local to this directory:
+
+- `outputs/` — UltraNest checkpoints and run products;
+- `opacity_cache/` — K-tables prepared onto the selected observation bins; and
+- `scratch/` — Numba and Matplotlib runtime files.
+
+The input data, FastChem, and K-table paths remain the values selected in the
+source configuration. `source_configuration.yaml` is the unmodified copy for
+comparison.
+
+```bash
+python run_retrieval.py --config configuration.yaml --validate-only
+python run_retrieval.py --config configuration.yaml --initialize
+python run_retrieval.py --config configuration.yaml --prepare-opacity
+python run_retrieval.py --config configuration.yaml --smoke-only
+sbatch submit.sbatch
+```
+
+Do not reuse this directory for a different model, prior set, data selection,
+or failed MPI launch. Create another run directory instead.
+"""
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--project-dir",
+        type=Path,
+        required=True,
+        help="directory containing isolated run directories",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=ROOT / "configurations" / "wasp69b_clear_R1000.yaml",
+        help="source task YAML; its run.name becomes the folder name",
+    )
+    return parser.parse_args()
+
+
+def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
+    """Copy a configuration and runners into an isolated named run directory."""
+
+    source = source_config.expanduser().resolve()
+    config = load_task_config(source)
+    run_name = config.run.name
+    if not _SAFE_RUN_NAME.fullmatch(run_name):
+        raise ValueError(
+            "run.name may contain only letters, numbers, '.', '_' and '-': "
+            f"{run_name!r}"
+        )
+    run_directory = project_dir.expanduser().resolve() / run_name
+    if run_directory.exists():
+        raise FileExistsError(
+            f"run directory already exists: {run_directory}; choose a new run.name"
+        )
+    run_directory.mkdir(parents=True)
+
+    shutil.copy2(source, run_directory / "source_configuration.yaml")
+    for filename in ("run_retrieval.py", "run_forward.py"):
+        shutil.copy2(ROOT / filename, run_directory / filename)
+
+    generated = config.model_dump(mode="json")
+    generated["outputs"]["directory"] = str(run_directory / "outputs")
+    generated["opacity"]["cache_directory"] = str(run_directory / "opacity_cache")
+    generated["runtime"]["scratch_directory"] = str(run_directory / "scratch")
+    execution_config = run_directory / "configuration.yaml"
+    execution_config.write_text(
+        yaml.safe_dump(generated, sort_keys=False), encoding="utf-8"
+    )
+    # Validate the generated file before declaring the directory ready.
+    load_task_config(execution_config)
+
+    (run_directory / "submit.sbatch").write_text(
+        _SBATCH.format(run_name=run_name), encoding="utf-8"
+    )
+    (run_directory / "README.md").write_text(
+        _README.format(run_name=run_name), encoding="utf-8"
+    )
+    return run_directory
+
+
+def main() -> None:
+    args = _parse_args()
+    directory = create_run_directory(
+        project_dir=args.project_dir,
+        source_config=args.config,
+    )
+    print(directory)
+
+
+if __name__ == "__main__":
+    main()

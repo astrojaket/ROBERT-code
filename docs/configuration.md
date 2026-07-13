@@ -15,6 +15,31 @@ cd /path/to/my_project
 python run_retrieval.py --config configuration.yaml --validate-only
 ```
 
+## Isolated project directories
+
+For DiRAC runs, create one directory per run beneath a project directory. The
+creator uses `run.name` as the directory name, preserves the original YAML,
+copies both runners and a 64-rank `submit.sbatch`, and sets the generated
+configuration's output, opacity-cache, and scratch paths inside that directory.
+
+```bash
+cd /scratch/dp448/dc-tayl1/ROBERT-code
+python scripts/create_run_directory.py \
+  --project-dir /scratch/dp448/dc-tayl1/my_project \
+  --config configurations/wasp69b_clear_R1000.yaml
+```
+
+Edit `/scratch/dp448/dc-tayl1/my_project/<run.name>/configuration.yaml`, then
+work entirely from that directory:
+
+```bash
+cd /scratch/dp448/dc-tayl1/my_project/<run.name>
+python run_retrieval.py --config configuration.yaml --validate-only
+python run_retrieval.py --config configuration.yaml --prepare-opacity
+python run_retrieval.py --config configuration.yaml --smoke-only
+sbatch submit.sbatch
+```
+
 The major sections are intentionally explicit:
 
 - `bodies`: planetary and stellar parameters;
