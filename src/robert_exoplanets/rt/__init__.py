@@ -81,7 +81,14 @@ from .two_stream import (
     two_stream_scattering_diagnostics,
 )
 from .toon import ThermalTwoStreamResult, solve_thermal_two_stream
-from .sh4 import ThermalSH4Result, henyey_greenstein_moments, solve_thermal_sh4
+from .sh4 import (
+    ThermalSH4Result,
+    ThermalSH4SpectrumResult,
+    henyey_greenstein_moments,
+    sh4_spectrum_backend_name,
+    solve_thermal_sh4,
+    solve_thermal_sh4_spectrum,
+)
 from .transmission import AbsorptionTransmissionResult, solve_absorption_transmission
 
 __all__ = [
@@ -103,6 +110,7 @@ __all__ = [
     "ThermalEmissionSpectrumIntegrationResult",
     "ThermalTwoStreamResult",
     "ThermalSH4Result",
+    "ThermalSH4SpectrumResult",
     "TwoStreamScatteringDiagnostics",
     "assemble_gas_optical_depth",
     "assemble_opacity_sampling_gas_optical_depth",
@@ -144,6 +152,8 @@ __all__ = [
     "solve_absorption_transmission",
     "solve_thermal_two_stream",
     "solve_thermal_sh4",
+    "solve_thermal_sh4_spectrum",
+    "sh4_spectrum_backend_name",
     "henyey_greenstein_moments",
     "thermal_integration_backend_name",
     "two_stream_effective_optical_depth",
