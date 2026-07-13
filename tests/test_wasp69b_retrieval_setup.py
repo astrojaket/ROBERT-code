@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from examples import benchmark_wasp69b_multi_instrument
 from examples.retrieve_wasp69b_nircam_clear import parameters
 from examples.wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
 
@@ -19,3 +20,10 @@ def test_wasp69b_target_parameters_have_one_shared_gravity() -> None:
     assert PLANET.name == "WASP-69b"
     assert STAR.name == "WASP-69"
     np.testing.assert_allclose(PLANET_GRAVITY_M_S2, expected, rtol=0.0, atol=0.0)
+
+
+def test_multi_instrument_benchmark_owns_its_native_hdf_selection() -> None:
+    assert set(benchmark_wasp69b_multi_instrument.PATTERNS) == set(
+        benchmark_wasp69b_multi_instrument.SPECIES
+    )
+    assert benchmark_wasp69b_multi_instrument.PRT_DATA.name == "input_data"

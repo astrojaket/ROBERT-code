@@ -194,5 +194,6 @@ non-converged sampler runs cannot pass validation.
 
 - Calibrated JWST pipeline-product ingestion and multi-instrument covariance.
 - Production atmospheric parameterizations and broader sampler support.
-- PICASO/Virga cloud-scattering benchmark parity and fuller scattering solvers.
+- End-to-end PICASO/Virga parity with shared physical cloud microphysics and
+  high-stream validation beyond the controlled grey SH4 cases.
 - Long-run posterior diagnostics and science-grade validation suites.

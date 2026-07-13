@@ -58,16 +58,37 @@ try:
 except ModuleNotFoundError:  # Direct execution from the examples directory.
     from wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
 
-from retrieve_wasp69b_nircam_clear import (
-    CACHE,
-    DATA,
-    FASTCHEM,
-    PATTERNS,
-    PRT_DATA,
-    SPECIES,
-    _cia_tables,
-    _load_table,
-)
+if __package__:
+    from .retrieve_wasp69b_nircam_clear import (
+        CACHE,
+        DATA,
+        FASTCHEM,
+        SPECIES,
+        _cia_tables,
+        _load_table,
+    )
+else:
+    from retrieve_wasp69b_nircam_clear import (
+        CACHE,
+        DATA,
+        FASTCHEM,
+        SPECIES,
+        _cia_tables,
+        _load_table,
+    )
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PRT_DATA = ROOT / "opacity_data" / "petitRADTRANS" / "input_data"
+PATTERNS = {
+    "H2O": "*POKAZATEL*.ktable.petitRADTRANS.h5",
+    "CO2": "*UCL-4000*.ktable.petitRADTRANS.h5",
+    "CO": "*HITEMP*.ktable.petitRADTRANS.h5",
+    "CH4": "*YT34to10*.ktable.petitRADTRANS.h5",
+    "NH3": "*CoYuTe*.ktable.petitRADTRANS.h5",
+    "HCN": "*Harris*.ktable.petitRADTRANS.h5",
+}
+
 
 @dataclass(frozen=True)
 class IndependentModeModelsForBenchmark:
@@ -281,32 +302,21 @@ def run(
     per_mode_max_abs_difference = {
         name: float(
             np.max(
-                np.abs(
-                    independent_spectra[name].values
-                    - shared_spectra[name].values
-                )
+                np.abs(independent_spectra[name].values - shared_spectra[name].values)
             )
         )
         for name in independent_spectra
     }
     fused_reference_max_abs_difference = {
         name: float(
-            np.max(
-                np.abs(
-                    shared_spectra[name].values
-                    - reference_spectra[name].values
-                )
-            )
+            np.max(np.abs(shared_spectra[name].values - reference_spectra[name].values))
         )
         for name in shared_spectra
     }
     fused_reference_max_relative_difference = {
         name: float(
             np.max(
-                np.abs(
-                    shared_spectra[name].values
-                    - reference_spectra[name].values
-                )
+                np.abs(shared_spectra[name].values - reference_spectra[name].values)
                 / np.maximum(np.abs(reference_spectra[name].values), 1.0e-300)
             )
         )
@@ -363,9 +373,7 @@ def run(
                 )
                 for name in shared_spectra
             ),
-            "fused_reference_max_abs_difference": (
-                fused_reference_max_abs_difference
-            ),
+            "fused_reference_max_abs_difference": (fused_reference_max_abs_difference),
             "fused_reference_max_relative_difference": (
                 fused_reference_max_relative_difference
             ),
