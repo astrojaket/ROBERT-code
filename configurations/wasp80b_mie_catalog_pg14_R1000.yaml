@@ -1,0 +1,28 @@
+extends: wasp69b_mie_catalog_pg14_R1000.yaml
+
+run:
+  name: wasp80b-mie-catalog-pg14-R1000
+  description: WASP-80b one-region MgSiO3 Mie cloud with fixed catalogue optical constants and PG14 temperature profile.
+
+bodies:
+  planet:
+    name: WASP-80b
+    radius_m: 69946912.60943891
+    mass_kg: 1.02119394e27
+  star:
+    name: WASP-80
+    radius_m: 407680200.0
+    effective_temperature_k: 4145.0
+
+observations:
+  loader: wiser2025_wasp80b
+  path: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp80b_wiser2025
+  datasets: [f322w2, f444w, lrs]
+
+opacity:
+  cache_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-cache/wasp80b_native_modes
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp80b_mie_catalog_pg14_R1000
+runtime:
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp80b_mie_catalog_pg14_R1000

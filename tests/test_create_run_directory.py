@@ -31,6 +31,8 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert config.opacity.cache_directory == run_directory / "opacity_cache"
     assert config.runtime.scratch_directory == run_directory / "scratch"
     submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
+    assert f"#SBATCH --chdir={run_directory}" in submission
+    assert f'cd "{run_directory}"' in submission
     assert 'mpirun -np "${SLURM_NTASKS}"' in submission
     assert "--config configuration.yaml" in submission
 

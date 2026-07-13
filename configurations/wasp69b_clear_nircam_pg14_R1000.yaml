@@ -1,0 +1,13 @@
+extends: wasp69b_clear_R1000.yaml
+
+run:
+  name: wasp69b-clear-nircam-pg14-R1000
+  description: Cloud-free PG14 equilibrium chemistry; NIRCam F322W2, overlap average, and F444W.
+
+observations:
+  datasets: [f322w2, avg, f444w]
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_clear_nircam_pg14_R1000
+runtime:
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_clear_nircam_pg14_R1000

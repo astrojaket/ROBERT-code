@@ -112,8 +112,62 @@ class AtmosphereConfig(ConfigModel):
     chemistry: ChemistryConfig
 
 
-class CloudsConfig(ConfigModel):
+class ClearCloudConfig(ConfigModel):
     model: Literal["none"] = "none"
+
+
+class MieCatalogCloudConfig(ConfigModel):
+    """Fixed laboratory optical constants with retrieved cloud structure."""
+
+    model: Literal["mie_catalog"]
+    optical_constants_path: Path
+    material: str = Field(min_length=1)
+    particle_density_kg_m3: PositiveFloat = 3200.0
+    geometric_stddev: PositiveFloat = 1.0
+    quadrature_points: PositiveInt = 1
+    log10_mass_fraction_parameter: str = "log_cloud_mass_fraction"
+    log10_radius_micron_parameter: str = "log_cloud_radius_micron"
+    log10_top_pressure_bar_parameter: str = "log_cloud_top_pressure_bar"
+    log10_base_pressure_bar_parameter: str = "log_cloud_base_pressure_bar"
+    multiple_scattering_backend: Literal["sh4"] = "sh4"
+
+
+class MieDirectNkCloudConfig(ConfigModel):
+    """Retrieved refractive-index nodes with retrieved cloud structure."""
+
+    model: Literal["mie_direct_nk"]
+    refractive_index_wavelength_micron: tuple[PositiveFloat, ...] = (
+        2.4, 4.0, 5.5, 7.0, 9.0, 12.0,
+    )
+    real_index_parameter_names: tuple[str, ...] = (
+        "cloud_n_0", "cloud_n_1", "cloud_n_2", "cloud_n_3", "cloud_n_4", "cloud_n_5",
+    )
+    log10_imaginary_index_parameter_names: tuple[str, ...] = (
+        "cloud_logk_0", "cloud_logk_1", "cloud_logk_2", "cloud_logk_3", "cloud_logk_4", "cloud_logk_5",
+    )
+    particle_density_kg_m3: PositiveFloat = 3200.0
+    geometric_stddev: PositiveFloat = 1.0
+    quadrature_points: PositiveInt = 1
+    log10_mass_fraction_parameter: str = "log_cloud_mass_fraction"
+    log10_radius_micron_parameter: str = "log_cloud_radius_micron"
+    log10_top_pressure_bar_parameter: str = "log_cloud_top_pressure_bar"
+    log10_base_pressure_bar_parameter: str = "log_cloud_base_pressure_bar"
+    multiple_scattering_backend: Literal["sh4"] = "sh4"
+
+    @model_validator(mode="after")
+    def validate_node_names(self) -> "MieDirectNkCloudConfig":
+        count = len(self.refractive_index_wavelength_micron)
+        if len(self.real_index_parameter_names) != count:
+            raise ValueError("real_index_parameter_names must match refractive-index nodes")
+        if len(self.log10_imaginary_index_parameter_names) != count:
+            raise ValueError("log10_imaginary_index_parameter_names must match refractive-index nodes")
+        return self
+
+
+CloudsConfig = Annotated[
+    ClearCloudConfig | MieCatalogCloudConfig | MieDirectNkCloudConfig,
+    Field(discriminator="model"),
+]
 
 
 class OpacityBinningConfig(ConfigModel):
@@ -198,7 +252,7 @@ class TaskConfig(ConfigModel):
     bodies: BodiesConfig
     observations: ObservationsConfig
     atmosphere: AtmosphereConfig
-    clouds: CloudsConfig = CloudsConfig()
+    clouds: CloudsConfig = ClearCloudConfig()
     opacity: OpacityConfig
     radiative_transfer: RadiativeTransferConfig
     likelihood: LikelihoodConfig = LikelihoodConfig()
@@ -233,6 +287,23 @@ class TaskConfig(ConfigModel):
         missing_parameters = sorted(required - set(names))
         if missing_parameters:
             raise ValueError("required model parameters are missing: " + ", ".join(missing_parameters))
+        clouds = self.clouds
+        if clouds.model != "none":
+            cloud_parameters = {
+                clouds.log10_mass_fraction_parameter,
+                clouds.log10_radius_micron_parameter,
+                clouds.log10_top_pressure_bar_parameter,
+                clouds.log10_base_pressure_bar_parameter,
+            }
+            if clouds.model == "mie_direct_nk":
+                cloud_parameters.update(clouds.real_index_parameter_names)
+                cloud_parameters.update(clouds.log10_imaginary_index_parameter_names)
+            missing_cloud_parameters = sorted(cloud_parameters - set(names))
+            if missing_cloud_parameters:
+                raise ValueError(
+                    "required cloud parameters are missing: "
+                    + ", ".join(missing_cloud_parameters)
+                )
         return self
 
 
@@ -242,15 +313,14 @@ def load_task_config(path: str | Path) -> TaskConfig:
     source = Path(path).expanduser().resolve()
     if not source.is_file():
         raise FileNotFoundError(source)
-    raw = yaml.safe_load(source.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError("ROBERT configuration must be a YAML mapping")
+    raw = _load_yaml_mapping(source)
     for keys in (
         ("observations", "path"),
         ("atmosphere", "chemistry", "fastchem_path"),
         ("atmosphere", "temperature", "profile_path"),
         ("opacity", "path"),
         ("opacity", "cache_directory"),
+        ("clouds", "optical_constants_path"),
         ("outputs", "directory"),
         ("runtime", "scratch_directory"),
     ):
@@ -265,6 +335,44 @@ def load_task_config(path: str | Path) -> TaskConfig:
             value = Path(section[keys[-1]]).expanduser()
             section[keys[-1]] = str(value if value.is_absolute() else source.parent / value)
     return TaskConfig.model_validate(raw)
+
+
+def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:
+    """Load one YAML mapping, resolving an optional relative ``extends`` file."""
+
+    if source in ancestors:
+        chain = " -> ".join(str(path) for path in (*ancestors, source))
+        raise ValueError(f"configuration extends cycle: {chain}")
+    raw = yaml.safe_load(source.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError("ROBERT configuration must be a YAML mapping")
+    extends = raw.pop("extends", None)
+    if extends is None:
+        return raw
+    if not isinstance(extends, str) or not extends.strip():
+        raise ValueError("configuration extends must be a non-empty YAML path")
+    parent = Path(extends).expanduser()
+    parent = (source.parent / parent).resolve() if not parent.is_absolute() else parent.resolve()
+    if not parent.is_file():
+        raise FileNotFoundError(parent)
+    return _deep_merge(_load_yaml_mapping(parent, (*ancestors, source)), raw)
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Merge mappings recursively; lists and scalar values replace wholesale."""
+
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            # Discriminated configuration sections (for example clouds.model)
+            # cannot retain fields belonging to a different variant.
+            if value.get("model") and value.get("model") != merged[key].get("model"):
+                merged[key] = value
+            else:
+                merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def initialize_task_directories(config: TaskConfig) -> tuple[Path, ...]:

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from json import dumps
 import os
 from pathlib import Path
 import shutil
 import time
+from typing import Mapping
 
 import numpy as np
 import yaml
@@ -24,7 +25,10 @@ from robert_exoplanets.core import PressureGrid
 from robert_exoplanets.forward import (
     ParameterizedClearSkyEmissionFactoryConfig,
     ParameterizedClearSkyEmissionModelConfig,
+    ParameterizedRefractiveIndexCloudEmissionForwardModel,
+    RefractiveIndexCloudConfig,
     build_multi_dataset_emission_model,
+    build_parameterized_clear_sky_emission_model,
 )
 from robert_exoplanets.instruments import ObservationCollection
 from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
@@ -41,11 +45,22 @@ from robert_exoplanets.rt import (
     gauss_legendre_disk_geometry,
     load_nemesispy_cia_table,
     normal_emission_geometry,
+    OpticalConstantsCatalog,
 )
 
 from .task_config import ParameterConfig, TaskConfig, initialize_task_directories
 from .wasp69b import load_schlawin2024_wasp69b
 from .wasp80b import load_wiser2025_wasp80b
+
+
+@dataclass(frozen=True)
+class NamedRegionalModels:
+    """Evaluate one configured forward model for each observation dataset."""
+
+    models: Mapping[str, object]
+
+    def __call__(self, values: Mapping[str, float]) -> Mapping[str, object]:
+        return {name: model(values) for name, model in self.models.items()}
 
 
 def mpi_rank() -> int:
@@ -295,7 +310,43 @@ def build_problem(
         metadata={"configured_geometry": geometry_item.model},
     )
     configs = {}
+    cloud_models = {}
     spectral_grids = {}
+    clouds = config.clouds
+    cloud = None
+    if clouds.model == "mie_catalog":
+        cloud = RefractiveIndexCloudConfig(
+            refractive_index_wavelength_micron=(),
+            real_index_parameter_names=(),
+            log10_imaginary_index_parameter_names=(),
+            fixed_refractive_index=OpticalConstantsCatalog(
+                clouds.optical_constants_path
+            ).load(clouds.material),
+            log10_condensate_mass_fraction_parameter=clouds.log10_mass_fraction_parameter,
+            log10_effective_radius_micron_parameter=clouds.log10_radius_micron_parameter,
+            particle_density_kg_m3=clouds.particle_density_kg_m3,
+            geometric_stddev=clouds.geometric_stddev,
+            log10_cloud_top_pressure_bar_parameter=clouds.log10_top_pressure_bar_parameter,
+            log10_cloud_base_pressure_bar_parameter=clouds.log10_base_pressure_bar_parameter,
+            quadrature_points=clouds.quadrature_points,
+            refractive_index_extrapolation="raise",
+            multiple_scattering_backend=clouds.multiple_scattering_backend,
+        )
+    elif clouds.model == "mie_direct_nk":
+        cloud = RefractiveIndexCloudConfig(
+            refractive_index_wavelength_micron=clouds.refractive_index_wavelength_micron,
+            real_index_parameter_names=clouds.real_index_parameter_names,
+            log10_imaginary_index_parameter_names=clouds.log10_imaginary_index_parameter_names,
+            log10_condensate_mass_fraction_parameter=clouds.log10_mass_fraction_parameter,
+            log10_effective_radius_micron_parameter=clouds.log10_radius_micron_parameter,
+            particle_density_kg_m3=clouds.particle_density_kg_m3,
+            geometric_stddev=clouds.geometric_stddev,
+            log10_cloud_top_pressure_bar_parameter=clouds.log10_top_pressure_bar_parameter,
+            log10_cloud_base_pressure_bar_parameter=clouds.log10_base_pressure_bar_parameter,
+            quadrature_points=clouds.quadrature_points,
+            refractive_index_extrapolation="raise",
+            multiple_scattering_backend=clouds.multiple_scattering_backend,
+        )
     for dataset in observations.datasets:
         tables = {
             species: _load_cached_table(config, dataset.name, species)
@@ -315,7 +366,7 @@ def build_problem(
             name=f"{planet.name}-{dataset.name}-{config.opacity.resolution}-binned",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        configs[dataset.name] = ParameterizedClearSkyEmissionFactoryConfig(
+        factory = ParameterizedClearSkyEmissionFactoryConfig(
             planet=planet,
             star=star,
             temperature_profile=temperature,
@@ -329,12 +380,38 @@ def build_problem(
             model=model_config,
         )
         spectral_grids[dataset.name] = dataset.observation.spectral_grid
-    forward_model = build_multi_dataset_emission_model(configs, spectral_grids=spectral_grids)
-    opacity_ids = {
-        f"{dataset}:{key}": value
-        for dataset, model in forward_model.models.items()
-        for key, value in model.opacity_identifiers.items()
-    }
+        if cloud is None:
+            configs[dataset.name] = factory
+        else:
+            clear = build_parameterized_clear_sky_emission_model(
+                factory,
+                spectral_grid=dataset.observation.spectral_grid,
+            )
+            cloud_models[dataset.name] = ParameterizedRefractiveIndexCloudEmissionForwardModel(
+                planet=clear.planet,
+                star=clear.star,
+                spectral_grid=clear.spectral_grid,
+                atmosphere_builder=clear.atmosphere_builder,
+                opacity_provider=clear.opacity_provider,
+                config=clear.config,
+                cia_table=clear.cia_table,
+                geometry=clear.geometry,
+                cloud=cloud,
+            )
+    if cloud is None:
+        forward_model = build_multi_dataset_emission_model(configs, spectral_grids=spectral_grids)
+        opacity_ids = {
+            f"{dataset}:{key}": value
+            for dataset, model in forward_model.models.items()
+            for key, value in model.opacity_identifiers.items()
+        }
+    else:
+        forward_model = NamedRegionalModels(cloud_models)
+        opacity_ids = {
+            f"{dataset}:{key}": value
+            for dataset, model in cloud_models.items()
+            for key, value in model.opacity_identifiers.items()
+        }
     return MultiDatasetRetrievalProblem(
         name=config.run.name,
         observations=observations,

@@ -5,6 +5,9 @@ science choices; the Python runners contain no target-specific settings. Start
 by copying `configurations/wasp69b_clear_R1000.yaml` to a new filename and
 editing the copy.
 
+The available WASP-69b/WASP-80b clear, Mie-cloud, and temperature-profile
+defaults are catalogued in [configurations/README.md](../configurations/README.md).
+
 The runners may also be copied beside that YAML in an external project
 directory. They import the installed `robert-exoplanets` package and do not
 depend on their own location:
