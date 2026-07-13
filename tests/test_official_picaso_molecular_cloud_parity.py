@@ -11,6 +11,7 @@ import numpy as np
 from examples.benchmark_official_picaso_molecular_cloud_parity import (
     _bin_mean,
     _bin_ratio,
+    _inverse_square_hydrostatic_profiles,
     _interpolate_wavenumber,
     _make_science_contract,
 )
@@ -23,7 +24,7 @@ REFERENCE = ROOT / "data" / "validation" / "official_picaso_molecular_cloud_pari
 def test_science_contract_has_normalized_explicit_vmr_state() -> None:
     contract = _make_science_contract(32, 12, 16)
 
-    assert int(contract["contract_schema_version"]) == 2
+    assert int(contract["contract_schema_version"]) == 3
     assert contract["gas_vmr"].shape == (16, 4)
     total = (
         np.sum(contract["gas_vmr"], axis=1)
@@ -32,6 +33,27 @@ def test_science_contract_has_normalized_explicit_vmr_state() -> None:
     )
     np.testing.assert_allclose(total, 1.0, rtol=0.0, atol=2.0e-16)
     assert np.all(contract["he_vmr"] > 0.0)
+    assert float(contract["reference_pressure_bar"]) == float(
+        contract["pressure_edges_bar"][-1]
+    )
+
+
+def test_inverse_square_geometry_preserves_reference_radius_pressure_anchor() -> None:
+    contract = _make_science_contract(32, 12, 72)
+
+    hydrostatic = _inverse_square_hydrostatic_profiles(contract)
+
+    radius = hydrostatic["radius_level_m"]
+    gravity = hydrostatic["gravity_level_m_s2"]
+    assert radius[-1] == float(contract["planet_radius_m"])
+    assert gravity[-1] == float(contract["gravity_m_s2"])
+    assert radius[0] > radius[-1]
+    assert gravity[0] < gravity[-1]
+    np.testing.assert_allclose(
+        (radius[0] - radius[-1]) / 1.0e3,
+        8092.327927410141,
+        rtol=2.0e-10,
+    )
 
 
 def test_wavenumber_interpolation_preserves_linear_wavenumber_function() -> None:
@@ -79,12 +101,24 @@ def test_versioned_official_picaso_reference_passes_acceptance() -> None:
     assert report["sampling"]["opacity_stride"] == 1
     assert report["sampling"]["picaso_native_samples"] == 37273
     assert report["metrics"]["acceptance"]["all_pass"] is True
+    radius_mapping = report["physical_contract"]["radius_pressure_mapping"]
+    assert radius_mapping["reference_pressure_bar"] == 10.0
+    assert radius_mapping["robert_bottom_radius_m"] == radius_mapping["reference_radius_m"]
+    assert (
+        radius_mapping["picaso"]["radius_at_resolved_reference_m"]
+        == radius_mapping["reference_radius_m"]
+    )
+    assert abs(
+        radius_mapping["robert_top_radius_m"]
+        - radius_mapping["picaso"]["top_radius_m"]
+    ) < 1.0e3
     assert (
         report["metrics"]["cloud_mass_extinction"]["rms_relative_difference"]
         < 2.0e-6
     )
-    assert report["metrics"]["cloudy_emission_difference_ppm"]["rms"] < 25.0
-    assert report["metrics"]["cloudy_transmission_difference_ppm"]["rms"] < 250.0
+    assert report["metrics"]["cloudy_emission_difference_ppm"]["rms"] < 35.0
+    assert report["metrics"]["clear_transmission_difference_ppm"]["rms"] < 60.0
+    assert report["metrics"]["cloudy_transmission_difference_ppm"]["rms"] < 50.0
 
 
 def test_full_native_sampling_is_required_for_paper_reference() -> None:

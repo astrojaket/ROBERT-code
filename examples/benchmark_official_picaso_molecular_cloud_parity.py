@@ -86,6 +86,8 @@ ARCHIVE_MD5 = "2f003f823d5f4b3f7a206d0ece9874b1"
 VERIFIED_LINE_LIST_DOIS = {
     "12C-16O2__UCL-4000": "10.1093/mnras/staa1874",
 }
+BOLTZMANN_CONSTANT_J_K = 1.380649e-23
+ATOMIC_MASS_KG = 1.66053906660e-27
 
 
 def main() -> dict[str, Any]:
@@ -135,23 +137,24 @@ def run(
             raise FileNotFoundError(path)
     output_dir.mkdir(parents=True, exist_ok=True)
     contract = _make_science_contract(cloud_wavelengths, 36, layers)
-    contract_path = output_dir / "shared_science_physical_contract.npz"
-    np.savez_compressed(contract_path, **contract)
+    with tempfile.TemporaryDirectory(prefix="robert-picaso-contract-") as scratch:
+        contract_path = Path(scratch) / "shared_science_physical_contract.npz"
+        external_path = Path(scratch) / f"picaso_official_stride_{opacity_stride}.npz"
+        np.savez_compressed(contract_path, **contract)
 
-    started = perf_counter()
-    robert = _evaluate_robert(contract, opacity_stride)
-    robert_seconds = perf_counter() - started
-    external_path = output_dir / f"picaso_official_stride_{opacity_stride}.npz"
-    _run_external(
-        picaso_python,
-        picaso_reference,
-        picaso_database,
-        contract_path,
-        external_path,
-        opacity_stride,
-    )
-    with np.load(external_path, allow_pickle=False) as archive:
-        picaso = {name: np.array(archive[name], copy=True) for name in archive.files}
+        started = perf_counter()
+        robert = _evaluate_robert(contract, opacity_stride)
+        robert_seconds = perf_counter() - started
+        _run_external(
+            picaso_python,
+            picaso_reference,
+            picaso_database,
+            contract_path,
+            external_path,
+            opacity_stride,
+        )
+        with np.load(external_path, allow_pickle=False) as archive:
+            picaso = {name: np.array(archive[name], copy=True) for name in archive.files}
     external_metadata = json.loads(str(picaso["metadata_json"]))
 
     edges = np.geomspace(1.0, 12.0, output_bins + 1)
@@ -199,6 +202,14 @@ def run(
                 float(np.min(contract["he_vmr"])),
                 float(np.max(contract["he_vmr"])),
             ],
+            "radius_pressure_mapping": {
+                "reference_pressure_bar": float(contract["reference_pressure_bar"]),
+                "reference_radius_m": float(contract["planet_radius_m"]),
+                "gravity_mode": "inverse_square_from_reference_radius",
+                "robert_bottom_radius_m": float(robert["bottom_radius_m"]),
+                "robert_top_radius_m": float(robert["top_radius_m"]),
+                "picaso": external_metadata["radius_pressure_mapping"],
+            },
         },
         "provenance": {
             "picaso_database": {
@@ -251,11 +262,88 @@ def _make_science_contract(n_wavelength: int, n_radius: int, n_layer: int):
     he = 1.0 - h2 - np.sum(gas_vmr, axis=1)
     if np.any(he <= 0.0):
         raise ValueError("gas volume mixing ratios do not leave a positive He background")
-    contract["contract_schema_version"] = np.array(2)
+    contract["contract_schema_version"] = np.array(3)
     contract["gas_vmr"] = gas_vmr
     contract["h2_vmr"] = np.array(h2)
     contract["he_vmr"] = he
+    contract["reference_pressure_bar"] = np.array(
+        float(contract["pressure_edges_bar"][-1])
+    )
     return contract
+
+
+def _inverse_square_hydrostatic_profiles(contract):
+    """Return PICASO-compatible radii and gravity from the shared anchor.
+
+    PICASO anchors the supplied radius at ``p_reference`` and integrates
+    upward with inverse-square gravity, using the temperature and mean
+    molecular weight at the deeper bounding level of each layer.  Reproduce
+    that physical convention independently so ROBERT's gas columns and
+    spherical shells use the same pressure-radius mapping.
+    """
+
+    pressure = np.asarray(contract["pressure_edges_bar"], dtype=float)
+    pressure_layer = np.sqrt(pressure[:-1] * pressure[1:])
+    log_pressure = np.log(pressure)
+    log_layer = np.log(pressure_layer)
+    gas_vmr_level = np.stack(
+        [
+            np.interp(
+                log_pressure,
+                log_layer,
+                contract["gas_vmr"][:, index],
+                left=contract["gas_vmr"][0, index],
+                right=contract["gas_vmr"][-1, index],
+            )
+            for index in range(len(SPECIES))
+        ],
+        axis=1,
+    )
+    h2_level = np.full(pressure.size, float(contract["h2_vmr"]))
+    he_level = 1.0 - h2_level - np.sum(gas_vmr_level, axis=1)
+    mean_molecular_weight_level = (
+        h2_level * MOLECULAR_WEIGHTS["H2"]
+        + he_level * MOLECULAR_WEIGHTS["He"]
+        + sum(
+            gas_vmr_level[:, index] * MOLECULAR_WEIGHTS[name]
+            for index, name in enumerate(SPECIES)
+        )
+    )
+
+    reference_pressure = float(contract["reference_pressure_bar"])
+    if not np.isclose(reference_pressure, pressure[-1], rtol=0.0, atol=0.0):
+        raise ValueError("the paper benchmark requires the reference pressure at the bottom edge")
+    reference_radius = float(contract["planet_radius_m"])
+    reference_gravity = float(contract["gravity_m_s2"])
+    radius_level = np.empty(pressure.size, dtype=float)
+    gravity_level = np.empty(pressure.size, dtype=float)
+    radius_level[-1] = reference_radius
+    gravity_level[-1] = reference_gravity
+    for layer_index in range(pressure.size - 2, -1, -1):
+        lower_level = layer_index + 1
+        scale_height = (
+            BOLTZMANN_CONSTANT_J_K
+            * contract["temperature_level_k"][lower_level]
+            / (
+                mean_molecular_weight_level[lower_level]
+                * ATOMIC_MASS_KG
+                * gravity_level[lower_level]
+            )
+        )
+        radius_level[layer_index] = radius_level[lower_level] + scale_height * np.log(
+            pressure[lower_level] / pressure[layer_index]
+        )
+        gravity_level[layer_index] = reference_gravity * (
+            reference_radius / radius_level[layer_index]
+        ) ** 2
+
+    return {
+        "mean_molecular_weight_level": mean_molecular_weight_level,
+        "radius_level_m": radius_level,
+        "gravity_level_m_s2": gravity_level,
+        "column_gravity_m_s2": 0.5 * (gravity_level[:-1] + gravity_level[1:]),
+        "geometry_gravity_m_s2": gravity_level[1:],
+    }
 
 
 def _evaluate_robert(contract, opacity_stride: int):
@@ -285,6 +373,7 @@ def _evaluate_robert(contract, opacity_stride: int):
         composition=composition,
         mean_molecular_weight=mean_molecular_weight,
     )
+    hydrostatic = _inverse_square_hydrostatic_profiles(contract)
     provider = OpacitySamplingProvider.from_exomol_paths(
         {name: EXOMOL / f"{name}.h5" for name in SPECIES},
         interpolation="log_pressure_temperature_log_xsec_clip",
@@ -300,7 +389,7 @@ def _evaluate_robert(contract, opacity_stride: int):
     gas = assemble_gas_optical_depth(
         atmosphere,
         evaluated,
-        gravity_m_s2=float(contract["gravity_m_s2"]),
+        gravity_m_s2=hydrostatic["column_gravity_m_s2"],
         retain_species_tau=True,
     )
     cia = cia_optical_depth(
@@ -377,11 +466,18 @@ def _evaluate_robert(contract, opacity_stride: int):
     area_ratio = (
         float(contract["planet_radius_m"]) / float(contract["star_radius_m"])
     ) ** 2
+    geometry_atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=contract["temperature_level_k"][1:],
+        temperature_edges=contract["temperature_level_k"],
+        composition=composition,
+        mean_molecular_weight=hydrostatic["mean_molecular_weight_level"][1:],
+    )
     geometry = hydrostatic_path_geometry(
-        atmosphere,
-        gravity_m_s2=float(contract["gravity_m_s2"]),
+        geometry_atmosphere,
+        gravity_m_s2=hydrostatic["geometry_gravity_m_s2"],
         reference_radius_m=float(contract["planet_radius_m"]),
-        reference_pressure=float(pressure_edges[-1]),
+        reference_pressure=float(contract["reference_pressure_bar"]),
         reference_pressure_unit="bar",
     )
     clear_transmission = solve_absorption_transmission(
@@ -414,6 +510,8 @@ def _evaluate_robert(contract, opacity_stride: int):
         "cloudy_eclipse_depth": cloudy.radiance / stellar * area_ratio,
         "clear_transit_depth": np.asarray(clear_transmission.transit_depth.values),
         "cloudy_transit_depth": np.asarray(cloudy_transmission.transit_depth.values),
+        "bottom_radius_m": np.array(geometry.bottom_radius_m),
+        "top_radius_m": np.array(geometry.top_radius_m),
         "opacity_doi": np.array([provider.tables[name].metadata["doi"] for name in SPECIES]),
         "opacity_line_list": np.array(
             [provider.tables[name].metadata["line_list"] for name in SPECIES]

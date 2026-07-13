@@ -11,6 +11,10 @@ independent ExoMolOP molecular cross sections plus its vendored CIA table;
 PICASO queries its official SQLite molecular and continuum database. No opacity,
 optical depth, or spectrum is shared.
 
+The planet radius is anchored at exactly 10 bar in both frameworks. Both paths
+use inverse-square gravity above that reference level; their independently
+integrated top radii agree within 0.77 km across the full `1e-5`-10 bar column.
+
 Files:
 
 - `official_picaso_molecular_cloud_parity.json`: provenance and science metrics;
