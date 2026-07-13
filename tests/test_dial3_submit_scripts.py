@@ -10,7 +10,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = {
     "wasp69b_nircam_clear.sbatch": "retrieve_wasp69b_nircam_clear.py",
-    "wasp69b_clear_native_modes.sbatch": "retrieve_wasp69b_clear_native_modes.py",
+    "wasp69b_clear_native_modes.sbatch": "run_retrieval.py",
     "wasp69b_mie_catalog.sbatch": "--cloud-mode catalog",
     "wasp69b_mie_direct_nk.sbatch": "--cloud-mode direct-nk",
     "wasp80b_nircam_clear.sbatch": "retrieve_wasp80b_nircam_clear.py",
@@ -29,10 +29,14 @@ def test_dial3_scripts_are_valid_bash_and_use_expected_cases() -> None:
         assert "#SBATCH --partition=slurm" in text
         assert "#SBATCH --ntasks=64" in text
         assert case_marker in text
-        assert "--kta-path /scratch/dp448/dc-tayl1/ktables_exomol" in text
-        assert "--opacity-resolution R1000" in text
-        assert "--mpi-processes \"${SLURM_NTASKS}\"" in text
-        assert "/scratch/dp448/dc-tayl1/retrieval_runs/" in text
+        if case_marker == "run_retrieval.py":
+            assert "configurations/wasp69b_clear_R1000.yaml" in text
+            assert "ROBERT_CONFIG" in text
+        else:
+            assert "--kta-path /scratch/dp448/dc-tayl1/ktables_exomol" in text
+            assert "--opacity-resolution R1000" in text
+            assert "--mpi-processes \"${SLURM_NTASKS}\"" in text
+            assert "/scratch/dp448/dc-tayl1/retrieval_runs/" in text
         assert 'source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"' in text
         assert 'srun --ntasks="${SLURM_NTASKS}" python -u' in text
 
@@ -55,3 +59,15 @@ def test_wasp_entry_points_reach_their_command_line_parser() -> None:
         )
         assert completed.returncode == 0, completed.stderr
         assert "usage:" in completed.stdout
+
+
+def test_configured_entry_points_reach_their_command_line_parser() -> None:
+    for name in ("run_retrieval.py", "run_forward.py"):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / name), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert "--config" in completed.stdout

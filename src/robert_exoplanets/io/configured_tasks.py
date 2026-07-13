@@ -1,0 +1,441 @@
+"""Build and run ROBERT tasks from the strict user-facing configuration."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from json import dumps
+import os
+from pathlib import Path
+import shutil
+import time
+
+import numpy as np
+import yaml
+
+from robert_exoplanets.atmosphere import (
+    CompositionMeanMolecularWeight,
+    FastChemEquilibriumChemistry,
+    IsothermalTemperatureProfile,
+    ParmentierGuillot2014TemperatureProfile,
+    TabulatedTemperatureProfile,
+)
+from robert_exoplanets.bodies import Planet, Star
+from robert_exoplanets.core import PressureGrid
+from robert_exoplanets.forward import (
+    ParameterizedClearSkyEmissionFactoryConfig,
+    ParameterizedClearSkyEmissionModelConfig,
+    build_multi_dataset_emission_model,
+)
+from robert_exoplanets.instruments import ObservationCollection
+from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
+from robert_exoplanets.opacity import CorrelatedKOpacityProvider, CorrelatedKTable
+from robert_exoplanets.retrieval import (
+    LogUniformPrior,
+    MultiDatasetRetrievalProblem,
+    RetrievalParameter,
+    RetrievalParameterSet,
+    UniformPrior,
+)
+from robert_exoplanets.retrieval.samplers import run_ultranest
+from robert_exoplanets.rt import (
+    gauss_legendre_disk_geometry,
+    load_nemesispy_cia_table,
+    normal_emission_geometry,
+)
+
+from .task_config import ParameterConfig, TaskConfig, initialize_task_directories
+from .wasp69b import load_schlawin2024_wasp69b
+from .wasp80b import load_wiser2025_wasp80b
+
+
+def mpi_rank() -> int:
+    try:
+        from mpi4py import MPI
+
+        return int(MPI.COMM_WORLD.Get_rank())
+    except ImportError:
+        return 0
+
+
+def mpi_processes(config: TaskConfig) -> int:
+    configured = config.runtime.mpi_processes
+    return int(os.environ.get("SLURM_NTASKS", "1")) if configured == "auto" else configured
+
+
+def describe_config(config: TaskConfig) -> str:
+    """Return a concise preflight summary suitable for terminal inspection."""
+
+    return "\n".join(
+        [
+            f"Run: {config.run.name}",
+            f"Target: {config.bodies.planet.name} / {config.bodies.star.name}",
+            f"Data: {config.observations.loader} [{', '.join(config.observations.datasets)}]",
+            f"Atmosphere: {config.atmosphere.temperature.model}, {config.atmosphere.chemistry.model}, clouds={config.clouds.model}",
+            f"Opacity: {config.opacity.resolution} [{', '.join(config.opacity.species)}]",
+            f"Geometry: {config.radiative_transfer.geometry.model}",
+            f"Parameters: {', '.join(item.name for item in config.parameters)}",
+            f"Sampler: {config.sampler.engine}, live_points={config.sampler.live_points}, max_calls={config.sampler.max_calls}",
+            f"MPI processes: {mpi_processes(config)}",
+            f"Output: {config.outputs.directory}",
+        ]
+    )
+
+
+def load_observations(config: TaskConfig) -> ObservationCollection:
+    loaders = {
+        "schlawin2024_wasp69b": load_schlawin2024_wasp69b,
+        "wiser2025_wasp80b": load_wiser2025_wasp80b,
+    }
+    published = loaders[config.observations.loader](
+        config.observations.path,
+        verify_checksum=config.observations.verify_checksum,
+        miri_offset_parameter=config.observations.miri_offset_parameter,
+    )
+    requested = config.observations.datasets
+    available = {dataset.name: dataset for dataset in published.datasets}
+    missing = sorted(set(requested) - set(available))
+    if missing:
+        raise ValueError(
+            f"unknown observation datasets {missing}; available: {sorted(available)}"
+        )
+    return ObservationCollection(
+        datasets=tuple(available[name] for name in requested),
+        name=f"{published.name} (configured selection)",
+        metadata={**dict(published.metadata), "selection": ",".join(requested)},
+    )
+
+
+def cache_directory(config: TaskConfig) -> Path:
+    return config.opacity.cache_directory / config.opacity.resolution
+
+
+def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> None:
+    """Recompress the selected KTA species into each observed spectral grid."""
+
+    cache = cache_directory(config)
+    cache.mkdir(parents=True, exist_ok=True)
+    binning = config.opacity.binning
+    for species in config.opacity.species:
+        provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+            config.opacity.path,
+            species=(species,),
+            resolution=config.opacity.resolution,
+            name=f"ExoMol-{config.opacity.resolution}-{species}",
+            interpolation="log_pressure_temperature_log_k_clip",
+            nonfinite_policy="floor",
+        )
+        table = provider.tables[species]
+        source = Path(str(table.metadata["source_path"]))
+        source_sha = str(table.metadata["checksum_sha256"])
+        for dataset in observations.datasets:
+            target = cache / f"{dataset.name}_{species}.npz"
+            if target.exists():
+                with np.load(target, allow_pickle=False) as saved:
+                    current = {"opacity_resolution", "binning_num"}.issubset(saved.files) and (
+                        str(saved["source_sha256"]) == source_sha
+                        and str(saved["opacity_resolution"]) == config.opacity.resolution
+                        and int(saved["binning_num"]) == binning.num
+                    )
+                if current:
+                    continue
+            binned = provider.bin_to_spectral_grid(
+                dataset.observation.spectral_grid,
+                num=binning.num,
+                use_rebin=binning.use_rebin,
+                remove_zeros=binning.remove_zeros,
+            ).tables[species]
+            np.savez_compressed(
+                target,
+                species=species,
+                pressure_bar=binned.pressure_bar,
+                temperature_K=binned.temperature_K,
+                wavenumber_cm_inverse=binned.wavenumber_cm_inverse,
+                wavelength_micron=binned.wavelength_micron,
+                g_samples=binned.g_samples,
+                g_weights=binned.g_weights,
+                kcoeff=binned.kcoeff,
+                unit=binned.unit,
+                source_path=str(source.resolve()),
+                source_sha256=source_sha,
+                opacity_resolution=config.opacity.resolution,
+                binning_num=binning.num,
+                spectral_preparation="exo_k_bin_down_cp",
+            )
+
+
+def _load_cached_table(config: TaskConfig, dataset: str, species: str) -> CorrelatedKTable:
+    path = cache_directory(config) / f"{dataset}_{species}.npz"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"prepared opacity cache is missing: {path}\n"
+            "Run `python run_retrieval.py --config CONFIG --prepare-opacity` first."
+        )
+    with np.load(path, allow_pickle=False) as saved:
+        opacity_resolution = (
+            str(saved["opacity_resolution"])
+            if "opacity_resolution" in saved.files
+            else config.opacity.resolution
+        )
+        spectral_preparation = (
+            str(saved["spectral_preparation"])
+            if "spectral_preparation" in saved.files
+            else "legacy_prepared_cache"
+        )
+        return CorrelatedKTable(
+            species=species,
+            pressure_bar=saved["pressure_bar"],
+            temperature_K=saved["temperature_K"],
+            wavenumber_cm_inverse=saved["wavenumber_cm_inverse"],
+            wavelength_micron=saved["wavelength_micron"],
+            g_samples=saved["g_samples"],
+            g_weights=saved["g_weights"],
+            kcoeff=saved["kcoeff"],
+            unit=str(saved["unit"]),
+            metadata={
+                "source_path": str(saved["source_path"]),
+                "checksum_sha256": str(saved["source_sha256"]),
+                "opacity_resolution": opacity_resolution,
+                "spectral_preparation": spectral_preparation,
+            },
+        )
+
+
+def _planet(config: TaskConfig) -> tuple[Planet, float]:
+    item = config.bodies.planet
+    planet = Planet(
+        name=item.name,
+        radius_m=item.radius_m,
+        mass_kg=item.mass_kg,
+        gravity_m_s2=item.gravity_m_s2,
+    )
+    gravity = item.gravity_m_s2
+    if gravity is None:
+        gravity = 6.67430e-11 * float(item.mass_kg) / item.radius_m**2
+    return planet, float(gravity)
+
+
+def _parameters(items: tuple[ParameterConfig, ...]) -> RetrievalParameterSet:
+    parameters = []
+    for item in items:
+        prior_class = UniformPrior if item.prior.type == "uniform" else LogUniformPrior
+        parameters.append(
+            RetrievalParameter(
+                item.name,
+                prior_class(item.prior.lower, item.prior.upper),
+                label=item.label,
+                unit=item.unit,
+            )
+        )
+    return RetrievalParameterSet(tuple(parameters))
+
+
+def build_problem(
+    config: TaskConfig,
+    observations: ObservationCollection | None = None,
+) -> MultiDatasetRetrievalProblem:
+    """Construct the typed clear-emission problem selected by the YAML file."""
+
+    observations = load_observations(config) if observations is None else observations
+    planet, gravity = _planet(config)
+    star_item = config.bodies.star
+    star = Star(
+        name=star_item.name,
+        radius_m=star_item.radius_m,
+        effective_temperature_k=star_item.effective_temperature_k,
+    )
+    pressure_item = config.atmosphere.pressure
+    pressure = PressureGrid.from_log_centers(
+        pressure_item.bottom_bar,
+        pressure_item.top_bar,
+        n_layers=pressure_item.layers,
+        unit="bar",
+        name=f"{planet.name} configured pressure grid",
+    )
+    temperature_item = config.atmosphere.temperature
+    if temperature_item.model == "parmentier_guillot_2014":
+        temperature = ParmentierGuillot2014TemperatureProfile(
+            gravity=gravity,
+            internal_temperature=temperature_item.internal_temperature_k,
+        )
+    elif temperature_item.model == "isothermal":
+        temperature = IsothermalTemperatureProfile(
+            temperature=temperature_item.temperature_k,
+            parameter_name=temperature_item.parameter_name,
+        )
+    else:
+        temperature = TabulatedTemperatureProfile.from_csv(
+            temperature_item.profile_path,
+            pressure_column=temperature_item.pressure_column,
+            temperature_column=temperature_item.temperature_column,
+            pressure_unit=temperature_item.pressure_unit,
+            extrapolation=temperature_item.extrapolation,
+        )
+    chemistry_item = config.atmosphere.chemistry
+    chemistry = FastChemEquilibriumChemistry(
+        fastchem_path=chemistry_item.fastchem_path,
+        fastchem_species=tuple(item.fastchem_name for item in chemistry_item.species),
+        labels=tuple(item.label for item in chemistry_item.species),
+        metallicity_parameter_name=chemistry_item.metallicity_parameter,
+        carbon_to_oxygen_parameter_name=chemistry_item.carbon_to_oxygen_parameter,
+    )
+    mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
+    geometry_item = config.radiative_transfer.geometry
+    geometry = (
+        normal_emission_geometry()
+        if geometry_item.model == "normal_emission"
+        else gauss_legendre_disk_geometry(geometry_item.points)
+    )
+    cia = load_nemesispy_cia_table()
+    rt = config.radiative_transfer
+    model_config = ParameterizedClearSkyEmissionModelConfig(
+        opacity_species=config.opacity.species,
+        include_rayleigh=rt.include_rayleigh,
+        gas_combination=rt.gas_combination,
+        thermal_integration_backend=rt.thermal_integration_backend,
+        metadata={"configured_geometry": geometry_item.model},
+    )
+    configs = {}
+    spectral_grids = {}
+    for dataset in observations.datasets:
+        tables = {
+            species: _load_cached_table(config, dataset.name, species)
+            for species in config.opacity.species
+        }
+        reference = next(iter(tables.values()))
+        for species, table in tuple(tables.items()):
+            if not np.allclose(table.g_samples, reference.g_samples, rtol=0.0, atol=1.0e-8):
+                raise ValueError(f"{species} uses a different correlated-k g grid")
+            if not np.allclose(table.g_weights, reference.g_weights, rtol=0.0, atol=1.0e-8):
+                raise ValueError(f"{species} uses different correlated-k weights")
+            tables[species] = replace(
+                table, g_samples=reference.g_samples, g_weights=reference.g_weights
+            )
+        provider = CorrelatedKOpacityProvider(
+            tables,
+            name=f"{planet.name}-{dataset.name}-{config.opacity.resolution}-binned",
+            interpolation="log_pressure_temperature_log_k_clip",
+        )
+        configs[dataset.name] = ParameterizedClearSkyEmissionFactoryConfig(
+            planet=planet,
+            star=star,
+            temperature_profile=temperature,
+            chemistry_model=chemistry,
+            mean_molecular_weight_model=mean_molecular_weight,
+            pressure_grid=pressure,
+            cia_table=cia,
+            geometry=geometry,
+            opacity_source=provider,
+            opacity_binning=None,
+            model=model_config,
+        )
+        spectral_grids[dataset.name] = dataset.observation.spectral_grid
+    forward_model = build_multi_dataset_emission_model(configs, spectral_grids=spectral_grids)
+    opacity_ids = {
+        f"{dataset}:{key}": value
+        for dataset, model in forward_model.models.items()
+        for key, value in model.opacity_identifiers.items()
+    }
+    return MultiDatasetRetrievalProblem(
+        name=config.run.name,
+        observations=observations,
+        parameters=_parameters(config.parameters),
+        forward_model=forward_model,
+        likelihood=MultiDatasetGaussianLikelihood(
+            include_normalization=config.likelihood.include_normalization
+        ),
+        invalid_loglike=-1.0e100,
+        metadata={
+            "configuration_schema_version": str(config.schema_version),
+            "opacity_resolution": config.opacity.resolution,
+            "cloud_model": config.clouds.model,
+            "geometry": geometry_item.model,
+        },
+        opacity_identifiers=opacity_ids,
+    )
+
+
+def smoke_evaluation(problem: MultiDatasetRetrievalProblem) -> dict[str, float]:
+    theta = problem.prior_transform(np.full(problem.ndim, 0.5))
+    started = time.perf_counter()
+    value = problem.log_likelihood_from_vector(theta)
+    elapsed = time.perf_counter() - started
+    if not np.isfinite(value) or value <= problem.invalid_loglike:
+        raise RuntimeError("prior-midpoint smoke evaluation returned an invalid likelihood")
+    return {"elapsed_seconds": elapsed, "log_likelihood": float(value)}
+
+
+def write_config_snapshot(config: TaskConfig, source: Path) -> None:
+    if mpi_rank() != 0:
+        return
+    output = config.outputs.directory
+    output.mkdir(parents=True, exist_ok=True)
+    destination = output / "input_config.yaml"
+    if source.resolve() != destination.resolve():
+        shutil.copyfile(source.resolve(), destination)
+    normalized = config.model_dump(mode="json")
+    (output / "resolved_config.yaml").write_text(
+        yaml.safe_dump(normalized, sort_keys=False), encoding="utf-8"
+    )
+
+
+def run_retrieval_task(config: TaskConfig, source: Path):
+    initialize_task_directories(config)
+    observations = load_observations(config)
+    problem = build_problem(config, observations)
+    smoke = smoke_evaluation(problem)
+    write_config_snapshot(config, source)
+    if mpi_rank() == 0:
+        (config.outputs.directory / "smoke_evaluation.json").write_text(
+            dumps(smoke, indent=2), encoding="utf-8"
+        )
+    sampler = config.sampler
+    return run_ultranest(
+        problem,
+        output_dir=config.outputs.directory / "ultranest",
+        min_num_live_points=sampler.live_points,
+        max_ncalls=sampler.max_calls,
+        dlogz=sampler.dlogz,
+        resume=sampler.resume,
+        show_status=sampler.show_status,
+        mpi_nprocs=mpi_processes(config),
+        seed=sampler.seed,
+    )
+
+
+def run_smoke_task(config: TaskConfig, source: Path) -> dict[str, float]:
+    """Run one likelihood evaluation and persist its exact configuration."""
+
+    initialize_task_directories(config)
+    problem = build_problem(config, load_observations(config))
+    smoke = smoke_evaluation(problem)
+    write_config_snapshot(config, source)
+    if mpi_rank() == 0:
+        (config.outputs.directory / "smoke_evaluation.json").write_text(
+            dumps(smoke, indent=2), encoding="utf-8"
+        )
+    return smoke
+
+
+def run_forward_task(config: TaskConfig, source: Path) -> Path:
+    initialize_task_directories(config)
+    observations = load_observations(config)
+    problem = build_problem(config, observations)
+    values = {}
+    for configured, parameter in zip(config.parameters, problem.parameters.parameters, strict=True):
+        values[parameter.name] = parameter.midpoint if configured.value is None else configured.value
+    spectra = problem.model_spectra(values)
+    write_config_snapshot(config, source)
+    target = config.outputs.directory / "forward_model.npz"
+    np.savez_compressed(
+        target,
+        **{f"{name}_wavelength_micron": spectrum.spectral_grid.values for name, spectrum in spectra.items()},
+        **{f"{name}_model": spectrum.values for name, spectrum in spectra.items()},
+        **{f"parameter_{name}": value for name, value in values.items()},
+    )
+    return target
+
+
+__all__ = [
+    "build_problem", "describe_config", "load_observations", "prepare_opacity",
+    "run_forward_task", "run_retrieval_task", "run_smoke_task", "smoke_evaluation",
+]

@@ -1,9 +1,9 @@
 # Running ROBERT on DiRAC DIaL3
 
-ROBERT is installed at `/scratch/dp448/dc-tayl1/ROBERT-code`, and the ExoMol
-KTA root is `/scratch/dp448/dc-tayl1/ktables_exomol`. Pass
-`--opacity-resolution R1000` or `R15000` to select the matching subdirectory
-and filenames.
+ROBERT is installed at `/scratch/dp448/dc-tayl1/ROBERT-code`. Machine, data,
+opacity, cache, scratch, and output paths are selected in a copied YAML file;
+the Python and Slurm runners contain no science paths. Set `resolution` to
+`R1000` or `R15000` in YAML to select matching KTA directories and filenames.
 
 The clear native-mode workflow uses NIRCam/F322W2, NIRCam/F444W, and MIRI/LRS
 as independent likelihood terms. The NIRCam overlap-average product is omitted.
@@ -14,8 +14,6 @@ as independent likelihood terms. The NIRCam overlap-average product is omitted.
 cd /scratch/dp448/dc-tayl1/ROBERT-code
 conda env create -f environment.yml
 conda activate robert-exoplanets
-export NUMBA_CACHE_DIR=/tmp/${USER}-robert-numba
-mkdir -p "$NUMBA_CACHE_DIR"
 python -c "import exo_k, mpi4py, ultranest, robert_exoplanets; print('ROBERT environment OK')"
 ```
 
@@ -36,47 +34,58 @@ srun --account=dp448 --partition=slurm \
   --time=02:00:00 --mem=8G --pty bash -l
 ```
 
-Inside that shell:
+Inside that shell, copy the example to the terminal-check project and edit all
+paths and science choices there. In particular, set `outputs.directory` to
+`/scratch/dp448/dc-tayl1/1_CPU_Terminal_Check` and give the run its own
+`runtime.scratch_directory`:
 
 ```bash
 cd /scratch/dp448/dc-tayl1/ROBERT-code
 source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"
 conda activate robert-exoplanets
 mkdir -p /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check
+cp configurations/wasp69b_clear_R1000.yaml \
+  /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml
+nano /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml
 ```
 
-Prepare the R1000 opacity cache for F322W2, F444W, and MIRI/LRS:
+Validate the YAML and create all configured directories:
 
 ```bash
-python -u /scratch/dp448/dc-tayl1/ROBERT-code/examples/retrieve_wasp69b_clear_native_modes.py \
-  --kta-path /scratch/dp448/dc-tayl1/ktables_exomol \
-  --opacity-resolution R1000 \
-  --prepare-only
+python -u run_retrieval.py \
+  --config /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml \
+  --validate-only
+python -u run_retrieval.py \
+  --config /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml \
+  --initialize
 ```
 
-Write and inspect a deterministic one-CPU smoke configuration:
+Prepare the R1000 opacity cache for F322W2, F444W, and MIRI/LRS once, on one
+process:
 
 ```bash
-python -u /scratch/dp448/dc-tayl1/ROBERT-code/examples/retrieve_wasp69b_clear_native_modes.py \
-  --kta-path /scratch/dp448/dc-tayl1/ktables_exomol \
-  --opacity-resolution R1000 \
-  --mpi-processes 1 \
-  --smoke-only \
-  --max-ncalls 200 \
-  --output /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check
-
-less /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/run_configuration.json
+python -u run_retrieval.py \
+  --config /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml \
+  --prepare-opacity
 ```
 
-Start the small resumable sampler check:
+Run and inspect one deterministic prior-midpoint likelihood evaluation:
 
 ```bash
-python -u /scratch/dp448/dc-tayl1/ROBERT-code/examples/retrieve_wasp69b_clear_native_modes.py \
-  --kta-path /scratch/dp448/dc-tayl1/ktables_exomol \
-  --opacity-resolution R1000 \
-  --mpi-processes 1 \
-  --max-ncalls 200 \
-  --output /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check
+python -u run_retrieval.py \
+  --config /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml \
+  --smoke-only
+
+less /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/resolved_config.yaml
+cat /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/smoke_evaluation.json
+```
+
+To start a small resumable sampler check, first set a small `sampler.max_calls`
+in this copied terminal-check YAML, then run:
+
+```bash
+python -u run_retrieval.py \
+  --config /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml
 ```
 
 After UltraNest reports iterations, press `Ctrl-C` once and inspect:
@@ -89,19 +98,19 @@ exit
 
 ## Submit a 64-CPU run
 
-The production scripts request 64 MPI ranks with account `dp448` on the
-DIaL3 `slurm` partition and launch them with `srun`. Results default to
-`/scratch/dp448/dc-tayl1/retrieval_runs`, outside the clone.
+The production script requests 64 MPI ranks with account `dp448` on the DIaL3
+`slurm` partition and launches them with `srun`. Its only run input is the
+YAML path.
 
 ```bash
 cd /scratch/dp448/dc-tayl1/ROBERT-code
 sbatch slurm/wasp69b_clear_native_modes.sbatch
 ```
 
-Choose a project-specific output directory without editing the script:
+Choose any project-specific copied YAML without editing the Slurm script:
 
 ```bash
-sbatch --export=ALL,ROBERT_OUTPUT_DIR=/scratch/dp448/dc-tayl1/my_project/wasp69b_clear_R1000 \
+sbatch --export=ALL,ROBERT_CONFIG=/scratch/dp448/dc-tayl1/my_project/configuration.yaml \
   slurm/wasp69b_clear_native_modes.sbatch
 ```
 

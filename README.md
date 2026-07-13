@@ -49,6 +49,20 @@ For the runnable Jupyter examples, include the notebook environment:
 python -m pip install -e ".[dev,notebooks,opacity,retrieval]"
 ```
 
+Science runs use a strict, versioned YAML file rather than an edited Python
+workflow. Validate the supplied WASP-69b NIRCam+MIRI example without loading
+its external data or opacity:
+
+```bash
+python run_retrieval.py \
+  --config configurations/wasp69b_clear_R1000.yaml \
+  --validate-only
+```
+
+See [Configuring and running ROBERT](docs/configuration.md) for portable paths,
+directory initialization, opacity preparation, forward modelling, retrievals,
+and 64-rank Slurm submission.
+
 The plotting example writes local figures under `examples/outputs/`, which is
 ignored by git.
 
@@ -89,8 +103,8 @@ non-converged sampler runs cannot pass validation.
 
 - A minimal `robert_exoplanets` Python package.
 - Core grid, spectrum, planet, star, and observation containers.
-- Typed, executable retrieval configuration for optimal estimation and
-  UltraNest workflows.
+- Strict YAML task configuration plus typed internal configuration for
+  forward modelling, optimal estimation, and UltraNest workflows.
 - Blackbody reference diagnostics for visual sanity checks.
 - Opacity metadata, coverage checks, and lightweight inspectors for ExoMol,
   ExoMolOP/exo_k `.kta`, HITRAN `.par`, HITRAN CIA, and future ROBERT archives.
