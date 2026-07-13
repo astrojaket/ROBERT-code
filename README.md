@@ -1,12 +1,14 @@
 # ROBERT
 
-ROBERT is an early-stage JWST exoplanet emission retrieval code. It now
-contains typed core domain objects, modular atmosphere and chemistry
-components, opacity import/archive helpers, RT-facing optical-depth objects, a
-NumPy emission reference solver, first cloud/aerosol scattering hooks, optimal
-estimation, and an optional UltraNest adapter. The retrieval layer is suitable
-for validation runs, but the physical model is not yet a production science
-retrieval.
+ROBERT is a JWST exoplanet emission retrieval code with typed core domain
+objects, modular atmosphere and chemistry components, opacity import/archive
+helpers, RT-facing optical-depth objects, clear and cloudy emission solvers,
+optimal estimation, and an optional UltraNest adapter. The physical forward
+model is ready for controlled science analyses within the validated clear-sky
+and benchmarked cloudy-emission regimes described below. It is not yet a
+general-purpose production retrieval: calibrated pipeline-product ingestion,
+broader atmospheric parameterizations, independent end-to-end cloudy
+validation, and long-run posterior validation remain planned.
 
 The Python distribution name is `robert-exoplanets` to avoid colliding with the existing `robert` package on PyPI.
 
