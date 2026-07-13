@@ -172,6 +172,10 @@ non-converged sampler runs cannot pass validation.
 - A four-term spherical-harmonics (P3/SH4) thermal multiple-scattering backend
   for higher-fidelity cloudy emission, with physical or HG phase moments,
   delta-M scaling, matched PICASO tests, and retrieval-scale timing benchmarks.
+- An independently evaluated end-to-end MgSiO3 cloud benchmark: ROBERT and
+  PICASO/Virga separately assemble validation gas opacity, Mie efficiencies,
+  particle-averaged cloud optics, vertical optical depth, and SH4 emission from
+  one checksum-pinned physical contract.
 - Exact linear-in-optical-depth clear thermal source integration and a first
   absorption-dominated spherical-shell transmission solver with correlated-k
   impact-parameter integration.
@@ -194,6 +198,6 @@ non-converged sampler runs cannot pass validation.
 
 - Calibrated JWST pipeline-product ingestion and multi-instrument covariance.
 - Production atmospheric parameterizations and broader sampler support.
-- End-to-end PICASO/Virga parity with shared physical cloud microphysics and
-  high-stream validation beyond the controlled grey SH4 cases.
+- End-to-end PICASO/Virga parity using independent science molecular-opacity
+  databases, plus high-stream validation beyond the matched SH4 closure.
 - Long-run posterior diagnostics and science-grade validation suites.
