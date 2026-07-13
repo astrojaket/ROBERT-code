@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import cProfile
 from dataclasses import dataclass, replace
+from importlib import import_module
 import json
 import os
 from pathlib import Path
@@ -33,7 +34,6 @@ os.environ.setdefault(
     "NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "robert-numba-cache")
 )
 
-import h5py
 import numpy as np
 
 from robert_exoplanets import (
@@ -105,6 +105,7 @@ def _native_table(
 ) -> CorrelatedKTable:
     """Read only the native-opacity wavelength slab needed by the data."""
 
+    h5py = import_module("h5py")
     with h5py.File(path, "r") as handle:
         wavelength = 10000.0 / np.asarray(handle["bin_centers"], dtype=float)
         selected = np.flatnonzero((wavelength >= lower) & (wavelength <= upper))
