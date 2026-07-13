@@ -213,6 +213,19 @@ python examples/benchmark_wasp69b_multi_instrument.py \
   --profile wasp69b-forward-model.prof
 ```
 
+The matched six-gas clear versus MgSiO3/Mie/SH4 benchmark measures the cloudy
+multiple-scattering overhead and can profile both warmed paths:
+
+```bash
+python examples/benchmark_wasp69b_mgsio3_cloud.py \
+  --profile-clear clear.prof \
+  --profile-cloudy cloudy.prof
+```
+
+The baseline, implemented Numba spectrum-only results, and remaining
+physics-preserving SH4 acceleration plan are recorded in
+`docs/review/33_mgsio3_cloud_forward_performance_plan.md`.
+
 Environment variables `ROBERT_BENCH_REPEAT` and `ROBERT_BENCH_WARMUP` control
 the number of measured and warmup calls.
 

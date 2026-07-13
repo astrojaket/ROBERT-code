@@ -40,6 +40,7 @@ from robert_exoplanets.rt import (
     refractive_index_from_parameters,
     solve_clear_sky_emission,
     solve_clear_sky_emission_spectrum,
+    sh4_spectrum_backend_name,
     thermal_integration_backend_name,
 )
 
@@ -819,6 +820,15 @@ class ParameterizedGreyCloudEmissionForwardModel(
                 ),
                 "cloud_asymmetry_factor": f"{self.cloud.asymmetry_factor:.17g}",
                 "cloud_multiple_scattering_backend": self.cloud.multiple_scattering_backend,
+                "cloud_spectrum_only": str(
+                    not self.config.compute_diagnostics
+                    and self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+                ).lower(),
+                "cloud_sh4_spectrum_backend": (
+                    sh4_spectrum_backend_name(self.config.thermal_integration_backend)
+                    if self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+                    else ""
+                ),
                 **dict(self.cloud.metadata),
             }
         )
@@ -846,6 +856,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
             atmosphere,
             gravity_m_s2=self.gravity_m_s2,
             gas_combination=self.config.gas_combination,
+            retain_species_tau=self.config.compute_diagnostics,
         )
         additional_optical_depths = []
         for table in self.cia_tables:
@@ -882,6 +893,20 @@ class ParameterizedGreyCloudEmissionForwardModel(
         )
         if radius_scale <= 0.0:
             raise RobertValidationError("radius scale must be positive")
+        if (
+            not self.config.compute_diagnostics
+            and self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+        ):
+            return solve_clear_sky_emission_spectrum(
+                gas_optical_depth,
+                geometry=self.geometry,
+                additional_optical_depths=additional_optical_depths,
+                multiple_scattering_backend=self.cloud.multiple_scattering_backend,
+                planet_radius_m=self.planet.radius_m * radius_scale,
+                star_radius_m=self.star.radius_m,
+                star_temperature_k=self.star.effective_temperature_k,
+                thermal_integration_backend=self.config.thermal_integration_backend,
+            )
         result = solve_clear_sky_emission(
             gas_optical_depth,
             geometry=self.geometry,
@@ -1107,6 +1132,15 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                 "cloud_geometric_stddev": f"{self.cloud.geometric_stddev:.17g}",
                 "cloud_quadrature_points": str(self.cloud.quadrature_points),
                 "cloud_multiple_scattering_backend": self.cloud.multiple_scattering_backend,
+                "cloud_spectrum_only": str(
+                    not self.config.compute_diagnostics
+                    and self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+                ).lower(),
+                "cloud_sh4_spectrum_backend": (
+                    sh4_spectrum_backend_name(self.config.thermal_integration_backend)
+                    if self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+                    else ""
+                ),
                 "cloud_phase_function_closure": "exact_mie_legendre_moments_through_l4",
                 "cloud_refractive_index_mode": (
                     "retrieved_nodal_n_log10_k"
@@ -1145,6 +1179,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
             atmosphere,
             gravity_m_s2=self.gravity_m_s2,
             gas_combination=self.config.gas_combination,
+            retain_species_tau=self.config.compute_diagnostics,
         )
         additional_optical_depths = [
             cia_optical_depth(
@@ -1243,6 +1278,20 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
         )
         if radius_scale <= 0.0:
             raise RobertValidationError("radius scale must be positive")
+        if (
+            not self.config.compute_diagnostics
+            and self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+        ):
+            return solve_clear_sky_emission_spectrum(
+                gas_optical_depth,
+                geometry=self.geometry,
+                additional_optical_depths=additional_optical_depths,
+                multiple_scattering_backend=self.cloud.multiple_scattering_backend,
+                planet_radius_m=self.planet.radius_m * radius_scale,
+                star_radius_m=self.star.radius_m,
+                star_temperature_k=self.star.effective_temperature_k,
+                thermal_integration_backend=self.config.thermal_integration_backend,
+            )
         result = solve_clear_sky_emission(
             gas_optical_depth,
             geometry=self.geometry,
