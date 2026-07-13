@@ -18,7 +18,7 @@ export NUMBA_NUM_THREADS=1
 export NUMBA_CACHE_DIR="${SLURM_TMPDIR:-/tmp}/robert-numba-${SLURM_JOB_ID}"
 mkdir -p "${NUMBA_CACHE_DIR}"
 
-srun --ntasks="${SLURM_NTASKS}" python -u \
+mpirun -np "${SLURM_NTASKS}" python -u \
   examples/retrieve_wasp69b_nircam_clear.py \
   --kta-path /scratch/dp448/dc-tayl1/ktables_exomol \
   --opacity-resolution R1000 \

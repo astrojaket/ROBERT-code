@@ -16,5 +16,5 @@ conda activate "${ROBERT_CONDA_ENV:-robert-exoplanets}"
 export OMP_NUM_THREADS=1
 export NUMBA_NUM_THREADS=1
 
-srun --ntasks="${SLURM_NTASKS}" python -u run_retrieval.py \
+mpirun -np "${SLURM_NTASKS}" python -u run_retrieval.py \
   --config "${ROBERT_CONFIG:-configurations/wasp69b_clear_R1000.yaml}"

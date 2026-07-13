@@ -99,8 +99,10 @@ exit
 ## Submit a 64-CPU run
 
 The production script requests 64 MPI ranks with account `dp448` on the DIaL3
-`slurm` partition and launches them with `srun`. Its only run input is the
-YAML path.
+`slurm` partition. It uses the Conda OpenMPI `mpirun` launcher so all processes
+join one `MPI.COMM_WORLD`; using `srun` with this environment launched 64
+independent size-one communicators and caused simultaneous writes to the same
+UltraNest HDF5 checkpoint. Its only run input is the YAML path.
 
 ```bash
 cd /scratch/dp448/dc-tayl1/ROBERT-code
@@ -116,4 +118,7 @@ sbatch --export=ALL,ROBERT_CONFIG=/scratch/dp448/dc-tayl1/my_project/configurati
 
 Use `squeue -u "$USER"` to monitor jobs and `scancel JOB_ID` to cancel one.
 Use a different output directory whenever the target, priors, resolution, or
-model changes so incompatible UltraNest checkpoints are never mixed.
+model changes so incompatible UltraNest checkpoints are never mixed. Do not
+resume the output directory from the failed 64-writer test: change
+`outputs.directory` in the copied YAML to a fresh directory before submitting
+again.
