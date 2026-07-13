@@ -454,6 +454,7 @@ class CorrelatedKOpacityProvider:
         directory: str | Path,
         *,
         species: Iterable[str] | None = None,
+        resolution: str | int | None = None,
         filename_pattern: str = "*.kta",
         name: str = "exomol-correlated-k",
         interpolation: str = "exact",
@@ -461,15 +462,27 @@ class CorrelatedKOpacityProvider:
         nonfinite_fill_value: float = 1.0e-300,
         cache_log_kcoeff: bool = True,
     ) -> "CorrelatedKOpacityProvider":
-        """Discover precomputed ExoMol/exo_k KTA tables in any directory.
+        """Discover precomputed ExoMol/exo_k KTA tables in a user directory.
 
         Species names are inferred from the filename token before the first
         underscore. If multiple files map to one species, callers must choose
         explicitly with :meth:`from_kta_paths` so resolution/isotopologue
-        selection is never implicit.
+        selection is never implicit. When ``resolution`` is supplied, ROBERT
+        accepts either a parent containing an ``R<value>`` subdirectory or the
+        resolution directory itself, and only loads ``*_<resolution>.kta``.
         """
 
         root = Path(directory).expanduser()
+        resolution_name = _normalize_kta_resolution(resolution)
+        if resolution_name is not None:
+            resolution_directory = root / resolution_name
+            if resolution_directory.is_dir():
+                root = resolution_directory
+            elif root.name.casefold() != resolution_name.casefold():
+                raise RobertValidationError(
+                    "ExoMol opacity root does not contain the requested "
+                    f"resolution directory {resolution_name}: {root}"
+                )
         if not root.is_dir():
             raise RobertValidationError(
                 f"ExoMol opacity directory does not exist: {root}"
@@ -480,6 +493,10 @@ class CorrelatedKOpacityProvider:
         discovered: dict[str, Path] = {}
         for path in sorted(root.glob(pattern)):
             if not path.is_file() or path.suffix.lower() != ".kta":
+                continue
+            if resolution_name is not None and not path.stem.casefold().endswith(
+                f"_{resolution_name}".casefold()
+            ):
                 continue
             inferred = _species_name_from_opacity_path(path)
             key = inferred.casefold()
@@ -1047,6 +1064,19 @@ def _species_name_from_opacity_path(path: Path) -> str:
             f"could not infer a species name from opacity file: {path}"
         )
     return species
+
+
+def _normalize_kta_resolution(resolution: str | int | None) -> str | None:
+    if resolution is None:
+        return None
+    value = str(resolution).strip().upper()
+    if value.startswith("R"):
+        value = value[1:]
+    if not value.isdigit() or int(value) <= 0:
+        raise RobertValidationError(
+            "KTA resolution must be a positive integer or 'R<integer>'"
+        )
+    return f"R{int(value)}"
 
 
 def _correlated_k_cache_key(

@@ -2,15 +2,14 @@
 
 WASP-69b is the default configuration. Following ROBERT's default
 multi-instrument workflow, opacity is recompressed into each mode's published
-observation bins with exo_k before inference. Native-resolution spectra are
-reserved for plotting and diagnostics.
+observation bins with exo_k before inference. The user supplies an ExoMol KTA
+root and selects its model resolution explicitly.
 """
 
 from __future__ import annotations
 
 import argparse
 from dataclasses import replace
-import hashlib
 from importlib import import_module
 import json
 import os
@@ -50,6 +49,7 @@ from robert_exoplanets import (
     RetrievalParameterSet,
     UniformPrior,
     build_multi_dataset_emission_model,
+    load_nemesispy_cia_table,
     run_ultranest,
 )
 
@@ -72,19 +72,12 @@ TARGET_SLUG = TARGET.TARGET_SLUG
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = TARGET.DATA_DIRECTORY
-PRT_DATA = ROOT / "opacity_data" / "petitRADTRANS" / "input_data"
 FASTCHEM = ROOT / "examples" / "data" / "hat_p_32b" / "fastchem"
 CACHE = TARGET.CACHE_DIRECTORY
 OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_nircam_clear"
 SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
-PATTERNS = {
-    "H2O": "*POKAZATEL*.ktable.petitRADTRANS.h5",
-    "CO2": "*UCL-4000*.ktable.petitRADTRANS.h5",
-    "CO": "*HITEMP*.ktable.petitRADTRANS.h5",
-    "CH4": "*YT34to10*.ktable.petitRADTRANS.h5",
-    "NH3": "*CoYuTe*.ktable.petitRADTRANS.h5",
-    "HCN": "*Harris*.ktable.petitRADTRANS.h5",
-}
+OPACITY_RESOLUTIONS = ("R1000", "R15000")
+DEFAULT_OPACITY_RESOLUTION = "R1000"
 CALLS_PER_ATTEMPT = 5000
 
 
@@ -97,25 +90,53 @@ def nircam_observations() -> ObservationCollection:
     )
 
 
-def prepare_opacity_cache(observations: ObservationCollection) -> None:
-    """Recompress native pRT/ExoMol correlated-k data into published bins."""
+def opacity_cache_directory(resolution: str) -> Path:
+    """Return the target cache directory for one explicit KTA resolution."""
 
-    CACHE.mkdir(parents=True, exist_ok=True)
+    normalized = str(resolution).strip().upper()
+    if normalized not in OPACITY_RESOLUTIONS:
+        raise ValueError(
+            f"resolution must be one of {', '.join(OPACITY_RESOLUTIONS)}"
+        )
+    return CACHE / normalized
+
+
+def prepare_opacity_cache(
+    observations: ObservationCollection,
+    *,
+    kta_path: str | Path,
+    resolution: str = DEFAULT_OPACITY_RESOLUTION,
+) -> None:
+    """Recompress selected user-supplied KTA tables into published bins."""
+
+    cache = opacity_cache_directory(resolution)
+    cache.mkdir(parents=True, exist_ok=True)
     for species in SPECIES:
-        source = next(PRT_DATA.rglob(PATTERNS[species]))
-        source_sha = _sha256(source)
-        table = CorrelatedKTable.from_petitradtrans_hdf(source, species=species)
-        provider = CorrelatedKOpacityProvider(
+        provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+            kta_path,
+            species=(species,),
+            resolution=resolution,
+            name=f"ExoMol-{resolution}-{species}",
+            interpolation="log_pressure_temperature_log_k_clip",
+            nonfinite_policy="floor",
+        )
+        table = provider.tables[species]
+        source = Path(str(table.metadata["source_path"]))
+        source_sha = str(table.metadata["checksum_sha256"])
+        single_species_provider = CorrelatedKOpacityProvider(
             {species: table},
             interpolation="log_pressure_temperature_log_k_clip",
         )
         for dataset in observations.datasets:
-            target = CACHE / f"{dataset.name}_{species}.npz"
+            target = cache / f"{dataset.name}_{species}.npz"
             if target.exists():
                 with np.load(target, allow_pickle=False) as saved:
-                    if str(saved["source_sha256"]) == source_sha:
+                    if (
+                        str(saved["source_sha256"]) == source_sha
+                        and str(saved["opacity_resolution"]) == resolution
+                    ):
                         continue
-            binned = provider.bin_to_spectral_grid(
+            binned = single_species_provider.bin_to_spectral_grid(
                 dataset.observation.spectral_grid,
                 num=300,
                 use_rebin=False,
@@ -134,12 +155,22 @@ def prepare_opacity_cache(observations: ObservationCollection) -> None:
                 unit=binned.unit,
                 source_path=str(source.resolve()),
                 source_sha256=source_sha,
+                opacity_resolution=resolution,
                 spectral_preparation="exo_k_bin_down_cp_num300",
             )
 
 
-def _load_table(dataset: str, species: str) -> CorrelatedKTable:
-    path = CACHE / f"{dataset}_{species}.npz"
+def _load_table(
+    dataset: str,
+    species: str,
+    resolution: str = DEFAULT_OPACITY_RESOLUTION,
+) -> CorrelatedKTable:
+    path = opacity_cache_directory(resolution) / f"{dataset}_{species}.npz"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"prepared opacity cache is missing: {path}; run this command "
+            "with --prepare-only first"
+        )
     with np.load(path, allow_pickle=False) as saved:
         return CorrelatedKTable(
             species=species,
@@ -154,18 +185,16 @@ def _load_table(dataset: str, species: str) -> CorrelatedKTable:
             metadata={
                 "source_path": str(saved["source_path"]),
                 "checksum_sha256": str(saved["source_sha256"]),
+                "opacity_resolution": str(saved["opacity_resolution"]),
                 "spectral_preparation": str(saved["spectral_preparation"]),
             },
         )
 
 
-def _cia_tables() -> tuple[CiaTable, CiaTable]:
-    h2_h2 = next(PRT_DATA.rglob("*H2--H2*.ciatable.petitRADTRANS.h5"))
-    h2_he = next(PRT_DATA.rglob("*H2--He*.ciatable.petitRADTRANS.h5"))
-    return (
-        CiaTable.from_petitradtrans_hdf(h2_h2, collision_pair="H2-H2"),
-        CiaTable.from_petitradtrans_hdf(h2_he, collision_pair="H2-He"),
-    )
+def _cia_tables() -> CiaTable:
+    """Load ROBERT's vendored H2-H2/H2-He CIA table."""
+
+    return load_nemesispy_cia_table()
 
 
 def parameters() -> RetrievalParameterSet:
@@ -189,7 +218,11 @@ def parameters() -> RetrievalParameterSet:
     )
 
 
-def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalProblem:
+def build_problem(
+    observations: ObservationCollection,
+    *,
+    opacity_resolution: str = DEFAULT_OPACITY_RESOLUTION,
+) -> MultiDatasetRetrievalProblem:
     pressure = PressureGrid.from_log_centers(
         100.0,
         1.0e-6,
@@ -224,7 +257,10 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
     configs = {}
     spectral_grids = {}
     for dataset in observations.datasets:
-        tables = {species: _load_table(dataset.name, species) for species in SPECIES}
+        tables = {
+            species: _load_table(dataset.name, species, opacity_resolution)
+            for species in SPECIES
+        }
         canonical_g = tables["H2O"].g_samples
         canonical_weights = tables["H2O"].g_weights
         for species, table in tuple(tables.items()):
@@ -245,7 +281,9 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
             )
         provider = CorrelatedKOpacityProvider(
             tables,
-            name=f"{PLANET.name}-NIRCam-{dataset.name}-ExoMol-pRT-R1000-binned",
+            name=(
+                f"{PLANET.name}-{dataset.name}-ExoMol-{opacity_resolution}-binned"
+            ),
             interpolation="log_pressure_temperature_log_k_clip",
         )
         configs[dataset.name] = ParameterizedClearSkyEmissionFactoryConfig(
@@ -283,6 +321,7 @@ def build_problem(observations: ObservationCollection) -> MultiDatasetRetrievalP
         metadata={
             "comparison": f"{PLANET.name}_published_eclipse_spectrum",
             "difference": "NIRCam-only equilibrium chemistry with PG14 analytic TP",
+            "opacity_resolution": opacity_resolution,
         },
         opacity_identifiers=opacity_ids,
     )
@@ -436,14 +475,6 @@ def _plot(observations, envelopes, best_spectra, summary, path: Path) -> None:
     plt.close(fig)
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
 def _next_cumulative_call_limit(log_dir: Path) -> int:
     """Advance UltraNest's cumulative call ceiling in fixed-size resume chunks."""
 
@@ -457,14 +488,37 @@ def _next_cumulative_call_limit(log_dir: Path) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    configured_kta_path = os.environ.get("ROBERT_KTABLE_PATH")
+    parser.add_argument(
+        "--kta-path",
+        type=Path,
+        default=configured_kta_path,
+        required=configured_kta_path is None,
+        help="KTA root containing R1000/R15000, or the selected resolution directory",
+    )
+    parser.add_argument(
+        "--opacity-resolution",
+        choices=OPACITY_RESOLUTIONS,
+        default=os.environ.get(
+            "ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION
+        ),
+    )
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--output", type=Path, default=OUTPUT)
+    parser.add_argument("--mpi-processes", type=int, default=1)
     args = parser.parse_args()
     observations = nircam_observations()
     if args.prepare_only:
-        prepare_opacity_cache(observations)
+        prepare_opacity_cache(
+            observations,
+            kta_path=args.kta_path,
+            resolution=args.opacity_resolution,
+        )
         return
-    problem = build_problem(observations)
+    problem = build_problem(
+        observations,
+        opacity_resolution=args.opacity_resolution,
+    )
     max_ncalls = _next_cumulative_call_limit(args.output / "ultranest")
     result = run_ultranest(
         problem,
@@ -474,7 +528,7 @@ def main() -> None:
         dlogz=0.5,
         resume="resume",
         show_status=False,
-        mpi_nprocs=2,
+        mpi_nprocs=args.mpi_processes,
         seed=20260711,
     )
     try:
@@ -490,7 +544,7 @@ def main() -> None:
             args.output,
             live_points=50,
             max_ncalls=max_ncalls,
-            mpi_processes=2,
+            mpi_processes=args.mpi_processes,
         )
 
 

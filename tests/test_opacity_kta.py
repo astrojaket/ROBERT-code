@@ -207,6 +207,48 @@ def test_provider_requires_explicit_selection_for_duplicate_species_files(tmp_pa
         CorrelatedKOpacityProvider.from_exomol_kta_directory(tmp_path)
 
 
+def test_provider_selects_resolution_subdirectory_and_filename(tmp_path: Path) -> None:
+    r1000 = tmp_path / "R1000"
+    r15000 = tmp_path / "R15000"
+    r1000.mkdir()
+    r15000.mkdir()
+    _write_synthetic_kta(r1000 / "H2O_R1000.kta")
+    _write_synthetic_kta(r15000 / "H2O_R15000.kta")
+
+    provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+        tmp_path,
+        species=("H2O",),
+        resolution="R1000",
+    )
+
+    assert provider.tables["H2O"].metadata["source_path"].endswith(
+        "R1000/H2O_R1000.kta"
+    )
+
+
+def test_provider_accepts_exact_resolution_directory(tmp_path: Path) -> None:
+    directory = tmp_path / "R15000"
+    directory.mkdir()
+    _write_synthetic_kta(directory / "CO_R15000.kta")
+
+    provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+        directory,
+        species=("CO",),
+        resolution=15000,
+    )
+
+    assert provider.species == ("CO",)
+
+
+def test_provider_reports_missing_resolution_directory(tmp_path: Path) -> None:
+    with pytest.raises(RobertValidationError, match="R1000"):
+        CorrelatedKOpacityProvider.from_exomol_kta_directory(
+            tmp_path,
+            species=("H2O",),
+            resolution="R1000",
+        )
+
+
 def test_provider_loads_and_bins_exomol_hdf5_through_exok(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

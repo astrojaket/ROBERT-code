@@ -178,6 +178,19 @@ def test_exok_source_requires_one_source_and_matching_paths() -> None:
     with pytest.raises(TypeError):
         source.paths["CO"] = Path("co.h5")  # type: ignore[index]
 
+    directory_source = ExoKOpacitySource(
+        species=("H2O",),
+        directory=Path("ktables"),
+        resolution=1000,
+    )
+    assert directory_source.resolution == "R1000"
+    with pytest.raises(RobertConfigError, match="only valid"):
+        ExoKOpacitySource(
+            species=("H2O",),
+            paths={"H2O": Path("water.h5")},
+            resolution="R1000",
+        )
+
 
 def test_exok_binning_requires_observation_bin_edges() -> None:
     with pytest.raises(RobertConfigError, match="bin edges"):

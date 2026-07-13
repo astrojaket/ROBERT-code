@@ -56,6 +56,8 @@ from robert_exoplanets.core import Spectrum
 
 from retrieve_wasp69b_nircam_clear import (
     FASTCHEM,
+    DEFAULT_OPACITY_RESOLUTION,
+    OPACITY_RESOLUTIONS,
     PLANET,
     PLANET_GRAVITY_M_S2,
     SPECIES,
@@ -132,6 +134,7 @@ def build_problem(
     cloud_mode: str,
     material: str,
     particle_density_kg_m3: float,
+    opacity_resolution: str = DEFAULT_OPACITY_RESOLUTION,
 ) -> MultiDatasetRetrievalProblem:
     selected_observations = observations()
     pressure = PressureGrid.from_log_centers(
@@ -177,7 +180,10 @@ def build_problem(
     models = {}
     opacity_ids = {}
     for dataset in selected_observations.datasets:
-        tables = {species: _load_table(dataset.name, species) for species in SPECIES}
+        tables = {
+            species: _load_table(dataset.name, species, opacity_resolution)
+            for species in SPECIES
+        }
         canonical_g = tables["H2O"].g_samples
         canonical_weights = tables["H2O"].g_weights
         for species, table in tuple(tables.items()):
@@ -198,7 +204,10 @@ def build_problem(
             )
         provider = CorrelatedKOpacityProvider(
             tables,
-            name=f"{PLANET.name}-{dataset.name}-ExoMol-pRT-observation-binned",
+            name=(
+                f"{PLANET.name}-{dataset.name}-ExoMol-"
+                f"{opacity_resolution}-observation-binned"
+            ),
             interpolation="log_pressure_temperature_log_k_clip",
         )
         factory = ParameterizedClearSkyEmissionFactoryConfig(
@@ -266,6 +275,7 @@ def build_problem(
             "material": material if cloud_mode == "catalog" else "retrieved_n_k",
             "geometry": "one_region",
             "phase_function": "exact_Mie_moments_SH4_delta_M",
+            "opacity_resolution": opacity_resolution,
         },
         opacity_identifiers=opacity_ids,
     )
@@ -273,6 +283,21 @@ def build_problem(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    configured_kta_path = os.environ.get("ROBERT_KTABLE_PATH")
+    parser.add_argument(
+        "--kta-path",
+        type=Path,
+        default=configured_kta_path,
+        required=configured_kta_path is None,
+        help="KTA root containing R1000/R15000, or the selected resolution directory",
+    )
+    parser.add_argument(
+        "--opacity-resolution",
+        choices=OPACITY_RESOLUTIONS,
+        default=os.environ.get(
+            "ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION
+        ),
+    )
     parser.add_argument(
         "--cloud-mode", choices=("catalog", "direct-nk"), default="catalog"
     )
@@ -288,12 +313,17 @@ def main() -> None:
 
     selected_observations = observations()
     if args.prepare_only:
-        prepare_opacity_cache(selected_observations)
+        prepare_opacity_cache(
+            selected_observations,
+            kta_path=args.kta_path,
+            resolution=args.opacity_resolution,
+        )
         return
     problem = build_problem(
         cloud_mode=args.cloud_mode,
         material=args.material,
         particle_density_kg_m3=args.particle_density_kg_m3,
+        opacity_resolution=args.opacity_resolution,
     )
     if args.smoke_only:
         start = time.perf_counter()

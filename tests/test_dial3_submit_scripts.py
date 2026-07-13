@@ -1,4 +1,4 @@
-"""Static checks for the DIaL3 WASP-69b submission scripts."""
+"""Static checks for the COSMA8 WASP submission scripts."""
 
 from __future__ import annotations
 
@@ -9,34 +9,32 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = {
-    "wasp69b_nircam_clear.sbatch": (2, "retrieve_wasp69b_nircam_clear.py"),
-    "wasp69b_clear_native_modes.sbatch": (
-        3,
-        "retrieve_wasp69b_clear_native_modes.py",
-    ),
-    "wasp69b_mie_catalog.sbatch": (4, "--cloud-mode catalog"),
-    "wasp69b_mie_direct_nk.sbatch": (4, "--cloud-mode direct-nk"),
-    "wasp80b_nircam_clear.sbatch": (2, "retrieve_wasp80b_nircam_clear.py"),
-    "wasp80b_clear_native_modes.sbatch": (
-        3,
-        "retrieve_wasp80b_clear_native_modes.py",
-    ),
-    "wasp80b_mie_catalog.sbatch": (4, "--cloud-mode catalog"),
-    "wasp80b_mie_direct_nk.sbatch": (4, "--cloud-mode direct-nk"),
+    "wasp69b_nircam_clear.sbatch": "retrieve_wasp69b_nircam_clear.py",
+    "wasp69b_clear_native_modes.sbatch": "retrieve_wasp69b_clear_native_modes.py",
+    "wasp69b_mie_catalog.sbatch": "--cloud-mode catalog",
+    "wasp69b_mie_direct_nk.sbatch": "--cloud-mode direct-nk",
+    "wasp80b_nircam_clear.sbatch": "retrieve_wasp80b_nircam_clear.py",
+    "wasp80b_clear_native_modes.sbatch": "retrieve_wasp80b_clear_native_modes.py",
+    "wasp80b_mie_catalog.sbatch": "--cloud-mode catalog",
+    "wasp80b_mie_direct_nk.sbatch": "--cloud-mode direct-nk",
 }
 
 
-def test_dial3_scripts_are_valid_bash_and_use_expected_cases() -> None:
-    for name, (tasks, case_marker) in SCRIPTS.items():
+def test_cosma8_scripts_are_valid_bash_and_use_expected_cases() -> None:
+    for name, case_marker in SCRIPTS.items():
         path = ROOT / "slurm" / name
         text = path.read_text(encoding="utf-8")
         subprocess.run(["bash", "-n", str(path)], check=True)
-        assert "#SBATCH --account=CHANGE_ME" in text
-        assert "#SBATCH --partition=slurm" in text
-        assert f"#SBATCH --ntasks={tasks}" in text
+        assert "#SBATCH --account=dp448" in text
+        assert "#SBATCH --partition=cosma8-serial" in text
+        assert "#SBATCH --ntasks=64" in text
         assert case_marker in text
-        assert 'source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/bin/activate"' in text
-        assert 'srun --ntasks="${SLURM_NTASKS}"' in text
+        assert "--kta-path /scratch/dp448/dc-tayl1/ktables_exomol" in text
+        assert "--opacity-resolution R1000" in text
+        assert "--mpi-processes \"${SLURM_NTASKS}\"" in text
+        assert "/scratch/dp448/dc-tayl1/retrieval_runs/" in text
+        assert 'source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"' in text
+        assert 'mpirun -np "${SLURM_NTASKS}" python -u' in text
 
 
 def test_wasp_entry_points_reach_their_command_line_parser() -> None:
