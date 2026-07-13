@@ -1,0 +1,11 @@
+\PL_NAME='TRAPPIST-1 b'
+\SPEC_TYPE='Eclipse'
+\INSTRUMENT='Mid-Infrared Instrument (MIRI)'
+\FACILITY='NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission'
+\NOTE='None'
+\REFERENCE='Greene et al. 2023'
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          long|    double|        double|        double|         long|  double|      double|      double|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+           15.0       3.0      0.0861          0.0099         -0.0099              0      503.0           26.0          -27.0             0     null         null         null 

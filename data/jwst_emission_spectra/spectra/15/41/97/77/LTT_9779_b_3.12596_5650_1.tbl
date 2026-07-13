@@ -1,0 +1,45 @@
+\PL_NAME = LTT 9779 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 1
+\INSTRUMENT = Near Infrared Imager and Slitless Spectrograph (NIRISS)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = Extended Data Figure 4
+\REFERENCE = Coulombe et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|    char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+        0.61564      null     0.00994         0.00399        -0.00382           null       null           null           null             0     null         null         null 
+        0.64639      null     0.00756         0.00289        -0.00282           null       null           null           null             0     null         null         null 
+        0.67869      null     0.00328         0.00224        -0.00238           null       null           null           null             0     null         null         null 
+        0.71275      null     0.00799         0.00215        -0.00213           null       null           null           null             0     null         null         null 
+        0.74834      null     0.00858         0.00225        -0.00205           null       null           null           null             0     null         null         null 
+        0.78567      null     0.01107         0.00245        -0.00220           null       null           null           null             0     null         null         null 
+        0.82494      null     0.00607         0.00264        -0.00275           null       null           null           null             0     null         null         null 
+        0.86613      null     0.00892         0.00361        -0.00366           null       null           null           null             0     null         null         null 
+        0.87339      null     0.00806         0.00223        -0.00227           null       null           null           null             0     null         null         null 
+        0.91722      null     0.01293         0.00231        -0.00210           null       null           null           null             0     null         null         null 
+        0.96294      null     0.01104         0.00198        -0.00207           null       null           null           null             0     null         null         null 
+        1.01099      null     0.01117         0.00182        -0.00185           null       null           null           null             0     null         null         null 
+        1.06186      null     0.01442         0.00185        -0.00178           null       null           null           null             0     null         null         null 
+        1.11509      null     0.01510         0.00182        -0.00178           null       null           null           null             0     null         null         null 
+        1.17067      null     0.01749         0.00170        -0.00156           null       null           null           null             0     null         null         null 
+        1.22906      null     0.01637         0.00181        -0.00175           null       null           null           null             0     null         null         null 
+        1.29027      null     0.02080         0.00165        -0.00166           null       null           null           null             0     null         null         null 
+        1.35476      null     0.01781         0.00162        -0.00163           null       null           null           null             0     null         null         null 
+        1.42249      null     0.01803         0.00164        -0.00180           null       null           null           null             0     null         null         null 
+        1.49346      null     0.02031         0.00198        -0.00181           null       null           null           null             0     null         null         null 
+        1.56860      null     0.02287         0.00193        -0.00193           null       null           null           null             0     null         null         null 
+        1.72879      null     0.02817         0.00205        -0.00205           null       null           null           null             0     null         null         null 
+        1.81572      null     0.02898         0.00226        -0.00217           null       null           null           null             0     null         null         null 
+        1.90664      null     0.02391         0.00244        -0.00236           null       null           null           null             0     null         null         null 
+        2.00153      null     0.02579         0.00247        -0.00279           null       null           null           null             0     null         null         null 
+        2.10184      null     0.02819         0.00263        -0.00265           null       null           null           null             0     null         null         null 
+        2.20708      null     0.02994         0.00294        -0.00285           null       null           null           null             0     null         null         null 
+        2.31731      null     0.03209         0.00305        -0.00295           null       null           null           null             0     null         null         null 
+        2.43315      null     0.03411         0.00337        -0.00332           null       null           null           null             0     null         null         null 
+        2.55480      null     0.02348         0.00376        -0.00364           null       null           null           null             0     null         null         null 
+        2.68261      null     0.03478         0.00479        -0.00438           null       null           null           null             0     null         null         null 
+        2.78933      null     0.02975         0.00560        -0.00583           null       null           null           null             0     null         null         null 

@@ -1,0 +1,66 @@
+\PL_NAME = HD 189733 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 2
+\INSTRUMENT = Near Infrared Camera (NIRCam)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = null
+\REFERENCE = Zhang et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|    char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+        2.42500   0.05000     0.04745         0.00423        -0.00460           null       null           null           null             0     null         null         null 
+        2.47500   0.05000     0.04256         0.00377        -0.00337           null       null           null           null             0     null         null         null 
+        2.52500   0.05000     0.04266         0.00348        -0.00320           null       null           null           null             0     null         null         null 
+        2.57500   0.05000     0.04261         0.00328        -0.00288           null       null           null           null             0     null         null         null 
+        2.62500   0.05000     0.04826         0.00321        -0.00308           null       null           null           null             0     null         null         null 
+        2.67500   0.05000     0.05058         0.00279        -0.00290           null       null           null           null             0     null         null         null 
+        2.72500   0.05000     0.04844         0.00304        -0.00316           null       null           null           null             0     null         null         null 
+        2.77500   0.05000     0.05314         0.00278        -0.00293           null       null           null           null             0     null         null         null 
+        2.82500   0.05000     0.05392         0.00276        -0.00293           null       null           null           null             0     null         null         null 
+        2.87500   0.05000     0.06084         0.00277        -0.00289           null       null           null           null             0     null         null         null 
+        2.92500   0.05000     0.06404         0.00278        -0.00285           null       null           null           null             0     null         null         null 
+        2.97500   0.05000     0.06578         0.00267        -0.00284           null       null           null           null             0     null         null         null 
+        3.02500   0.05000     0.07200         0.00280        -0.00271           null       null           null           null             0     null         null         null 
+        3.07500   0.05000     0.07409         0.00261        -0.00251           null       null           null           null             0     null         null         null 
+        3.12500   0.05000     0.08499         0.00245        -0.00236           null       null           null           null             0     null         null         null 
+        3.17500   0.05000     0.09079         0.00270        -0.00247           null       null           null           null             0     null         null         null 
+        3.22500   0.05000     0.09343         0.00244        -0.00230           null       null           null           null             0     null         null         null 
+        3.27500   0.05000     0.10447         0.00244        -0.00257           null       null           null           null             0     null         null         null 
+        3.32500   0.05000     0.11083         0.00252        -0.00238           null       null           null           null             0     null         null         null 
+        3.37500   0.05000     0.11594         0.00241        -0.00239           null       null           null           null             0     null         null         null 
+        3.42500   0.05000     0.12133         0.00265        -0.00270           null       null           null           null             0     null         null         null 
+        3.47500   0.05000     0.12913         0.00288        -0.00293           null       null           null           null             0     null         null         null 
+        3.52500   0.05000     0.13325         0.00271        -0.00286           null       null           null           null             0     null         null         null 
+        3.57500   0.05000     0.13862         0.00249        -0.00283           null       null           null           null             0     null         null         null 
+        3.62500   0.05000     0.14131         0.00297        -0.00286           null       null           null           null             0     null         null         null 
+        3.67500   0.05000     0.14803         0.00317        -0.00323           null       null           null           null             0     null         null         null 
+        3.72500   0.05000     0.15545         0.00275        -0.00256           null       null           null           null             0     null         null         null 
+        3.77500   0.05000     0.16332         0.00276        -0.00291           null       null           null           null             0     null         null         null 
+        3.82500   0.05000     0.16675         0.00291        -0.00257           null       null           null           null             0     null         null         null 
+        3.87500   0.05000     0.17838         0.00283        -0.00268           null       null           null           null             0     null         null         null 
+        3.92500   0.05000     0.17688         0.00279        -0.00245           null       null           null           null             0     null         null         null 
+        3.92500   0.05000     0.18451         0.00233        -0.00226           null       null           null           null             0     null         null         null 
+        3.97500   0.05000     0.18932         0.00214        -0.00211           null       null           null           null             0     null         null         null 
+        4.02500   0.05000     0.18732         0.00226        -0.00203           null       null           null           null             0     null         null         null 
+        4.07500   0.05000     0.18769         0.00212        -0.00207           null       null           null           null             0     null         null         null 
+        4.12500   0.05000     0.18683         0.00221        -0.00232           null       null           null           null             0     null         null         null 
+        4.17500   0.05000     0.18440         0.00225        -0.00227           null       null           null           null             0     null         null         null 
+        4.22500   0.05000     0.16289         0.00263        -0.00254           null       null           null           null             0     null         null         null 
+        4.27500   0.05000     0.14995         0.00231        -0.00222           null       null           null           null             0     null         null         null 
+        4.32500   0.05000     0.14306         0.00287        -0.00280           null       null           null           null             0     null         null         null 
+        4.37500   0.05000     0.15591         0.00296        -0.00305           null       null           null           null             0     null         null         null 
+        4.42500   0.05000     0.16149         0.00288        -0.00301           null       null           null           null             0     null         null         null 
+        4.47500   0.05000     0.16869         0.00293        -0.00290           null       null           null           null             0     null         null         null 
+        4.52500   0.05000     0.17015         0.00317        -0.00311           null       null           null           null             0     null         null         null 
+        4.57500   0.05000     0.18407         0.00317        -0.00317           null       null           null           null             0     null         null         null 
+        4.62500   0.05000     0.19082         0.00333        -0.00324           null       null           null           null             0     null         null         null 
+        4.67500   0.05000     0.20028         0.00358        -0.00331           null       null           null           null             0     null         null         null 
+        4.72500   0.05000     0.20563         0.00435        -0.00371           null       null           null           null             0     null         null         null 
+        4.77500   0.05000     0.20577         0.00429        -0.00352           null       null           null           null             0     null         null         null 
+        4.82500   0.05000     0.20360         0.00380        -0.00395           null       null           null           null             0     null         null         null 
+        4.87500   0.05000     0.20128         0.00381        -0.00361           null       null           null           null             0     null         null         null 
+        4.92500   0.05000     0.21608         0.00476        -0.00411           null       null           null           null             0     null         null         null 
+        4.97500   0.05000     0.21946         0.00513        -0.00464           null       null           null           null             0     null         null         null 

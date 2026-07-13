@@ -1,0 +1,38 @@
+\PL_NAME = GJ 436 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 6
+\INSTRUMENT = Mid-Infrared Instrument (MIRI) - LRS
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite
+\NOTE = all combined LRS spectra; tshirt Pipeline
+\REFERENCE = Mukherjee et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|    char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+        5.78748   0.28040     0.01321         0.01707        -0.01707           null       null           null           null             0     null         null         null 
+        6.02884   0.20610     0.00676         0.01028        -0.01028           null       null           null           null             0     null         null         null 
+        6.27639   0.28640     0.02164         0.01036        -0.01036           null       null           null           null             0     null         null         null 
+        6.52927   0.22210     0.03048         0.01132        -0.01132           null       null           null           null             0     null         null         null 
+        6.76593   0.25060     0.02705         0.00703        -0.00703           null       null           null           null             0     null         null         null 
+        7.00900   0.23620     0.02723         0.01102        -0.01102           null       null           null           null             0     null         null         null 
+        7.25751   0.26030     0.02627         0.00655        -0.00655           null       null           null           null             0     null         null         null 
+        7.51064   0.24640     0.02639         0.00884        -0.00884           null       null           null           null             0     null         null         null 
+        7.76763   0.26720     0.03820         0.00840        -0.00840           null       null           null           null             0     null         null         null 
+        8.02785   0.25380     0.03740         0.00761        -0.00761           null       null           null           null             0     null         null         null 
+        8.27561   0.24210     0.04423         0.00927        -0.00927           null       null           null           null             0     null         null         null 
+        8.51243   0.23180     0.04989         0.00707        -0.00707           null       null           null           null             0     null         null         null 
+        8.75341   0.24980     0.03784         0.00784        -0.00784           null       null           null           null             0     null         null         null 
+        9.01121   0.26550     0.04752         0.00972        -0.00972           null       null           null           null             0     null         null         null 
+        9.27086   0.25410     0.04597         0.01045        -0.01045           null       null           null           null             0     null         null         null 
+        9.51974   0.24390     0.04898         0.01205        -0.01205           null       null           null           null             0     null         null         null 
+        9.75896   0.23470     0.05789         0.01103        -0.01103           null       null           null           null             0     null         null         null 
+       10.01199   0.27070     0.06588         0.01256        -0.01256           null       null           null           null             0     null         null         null 
+       10.26630   0.23860     0.08067         0.01239        -0.01239           null       null           null           null             0     null         null         null 
+       10.51112   0.25090     0.07941         0.01314        -0.01314           null       null           null           null             0     null         null         null 
+       10.75739   0.24190     0.05668         0.01187        -0.01187           null       null           null           null             0     null         null         null 
+       11.00483   0.25280     0.09359         0.01567        -0.01567           null       null           null           null             0     null         null         null 
+       11.26254   0.26250     0.06281         0.01644        -0.01644           null       null           null           null             0     null         null         null 
+       11.51124   0.23540     0.06415         0.01862        -0.01862           null       null           null           null             0     null         null         null 
+       11.76044   0.26250     0.04917         0.01768        -0.01768           null       null           null           null             0     null         null         null 

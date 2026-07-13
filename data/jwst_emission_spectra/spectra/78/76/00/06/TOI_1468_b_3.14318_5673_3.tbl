@@ -1,0 +1,14 @@
+\PL_NAME = TOI-1468 b
+\SPEC_TYPE = Eclipse
+\SPEC_NUM = 3
+\INSTRUMENT = Mid-Infrared Instrument (MIRI)
+\FACILITY = NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission
+\NOTE = F1500W filter, Visit 3
+\REFERENCE = Meier Vald&eacute;s et al. 2025
+\
+\
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|      OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          long|    double|        double|        double|         long|          char|        char|        char|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |          days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|          null|        null|        null|
+       15.00000   2.92000     0.03570         0.00520        -0.00520              0       null           null           null             0 2460326.500000         null         null 

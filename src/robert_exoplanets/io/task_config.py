@@ -7,7 +7,14 @@ import os
 from typing import Annotated, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, PositiveFloat, PositiveInt, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveFloat,
+    PositiveInt,
+    model_validator,
+)
 
 
 class ConfigModel(BaseModel):
@@ -45,12 +52,22 @@ class BodiesConfig(ConfigModel):
     star: StarConfig
 
 
+class DatasetNuisanceConfig(ConfigModel):
+    """Calibration and uncertainty controls for one named dataset."""
+
+    offset_parameter: str | None = None
+    uncertainty_scale: PositiveFloat = 1.0
+    uncertainty_scale_parameter: str | None = None
+    jitter_parameter: str | None = None
+
+
 class ObservationsConfig(ConfigModel):
     loader: Literal["schlawin2024_wasp69b", "wiser2025_wasp80b"]
     path: Path
     datasets: tuple[str, ...] = Field(min_length=1)
     verify_checksum: bool = True
     miri_offset_parameter: str | None = None
+    dataset_options: dict[str, DatasetNuisanceConfig] = Field(default_factory=dict)
 
 
 class PressureConfig(ConfigModel):
@@ -85,10 +102,51 @@ class TabulatedTemperatureConfig(ConfigModel):
     extrapolation: Literal["raise", "clip"] = "raise"
 
 
+class MadhusudhanSeagerTemperatureConfig(ConfigModel):
+    model: Literal["madhusudhan_seager_2009"]
+    pressure_unit: str = "bar"
+    reference_pressure: PositiveFloat | None = None
+    p1_parameter: str = "P1"
+    p2_parameter: str = "P2"
+    p3_parameter: str = "P3"
+    t0_parameter: str = "T0"
+    alpha1_parameter: str = "alpha1"
+    alpha2_parameter: str = "alpha2"
+
+
+class SplineTemperatureConfig(ConfigModel):
+    model: Literal["spline"]
+    knot_pressure: tuple[PositiveFloat, ...] = Field(min_length=2)
+    knot_temperature_k: tuple[PositiveFloat, ...] | None = None
+    parameter_names: tuple[str, ...] | None = None
+    pressure_unit: str = "bar"
+    extrapolation: Literal["raise", "clip"] = "raise"
+
+    @model_validator(mode="after")
+    def validate_knots(self) -> "SplineTemperatureConfig":
+        count = len(self.knot_pressure)
+        if len(set(self.knot_pressure)) != count:
+            raise ValueError("spline knot_pressure values must be unique")
+        if (
+            self.knot_temperature_k is not None
+            and len(self.knot_temperature_k) != count
+        ):
+            raise ValueError("spline knot_temperature_k must match knot_pressure")
+        if self.parameter_names is not None and len(self.parameter_names) != count:
+            raise ValueError("spline parameter_names must match knot_pressure")
+        if self.knot_temperature_k is not None and self.parameter_names is not None:
+            raise ValueError(
+                "spline accepts fixed knot temperatures or parameter names, not both"
+            )
+        return self
+
+
 TemperatureConfig = Annotated[
     ParmentierGuillotTemperatureConfig
     | IsothermalTemperatureConfig
-    | TabulatedTemperatureConfig,
+    | TabulatedTemperatureConfig
+    | MadhusudhanSeagerTemperatureConfig
+    | SplineTemperatureConfig,
     Field(discriminator="model"),
 ]
 
@@ -98,12 +156,54 @@ class ChemistrySpeciesConfig(ConfigModel):
     fastchem_name: str = Field(min_length=1)
 
 
-class ChemistryConfig(ConfigModel):
+class FastChemConfig(ConfigModel):
     model: Literal["fastchem_equilibrium"]
     fastchem_path: Path
     species: tuple[ChemistrySpeciesConfig, ...] = Field(min_length=1)
     metallicity_parameter: str = "metallicity"
     carbon_to_oxygen_parameter: str = "CtoO"
+
+
+class FreeChemistryConfig(ConfigModel):
+    model: Literal["free"]
+    species: tuple[str, ...] = Field(min_length=1)
+    parameter_names: dict[str, str] = Field(default_factory=dict)
+    fixed_mixing_ratios: dict[str, float] = Field(default_factory=dict)
+    parameter_mode: Literal["linear", "log10"] = "log10"
+    background_species: tuple[str, ...] = ("H2", "He")
+    background_fractions: tuple[PositiveFloat, ...] | None = None
+    fill_background: bool = True
+    excess_policy: Literal["raise", "normalize"] = "raise"
+
+    @model_validator(mode="after")
+    def validate_species(self) -> "FreeChemistryConfig":
+        if len(set(self.species)) != len(self.species):
+            raise ValueError("free chemistry species must be unique")
+        unknown = (set(self.parameter_names) | set(self.fixed_mixing_ratios)) - set(
+            self.species
+        )
+        if unknown:
+            raise ValueError(
+                "free chemistry mappings contain unknown species: "
+                + ", ".join(sorted(unknown))
+            )
+        if self.background_fractions is not None and len(
+            self.background_fractions
+        ) != len(self.background_species):
+            raise ValueError("background_fractions must match background_species")
+        if self.fill_background and not self.background_species:
+            raise ValueError("fill_background requires background_species")
+        if set(self.species).intersection(self.background_species):
+            raise ValueError(
+                "free chemistry species must not overlap background_species"
+            )
+        return self
+
+
+ChemistryConfig = Annotated[
+    FastChemConfig | FreeChemistryConfig,
+    Field(discriminator="model"),
+]
 
 
 class AtmosphereConfig(ConfigModel):
@@ -137,13 +237,28 @@ class MieDirectNkCloudConfig(ConfigModel):
 
     model: Literal["mie_direct_nk"]
     refractive_index_wavelength_micron: tuple[PositiveFloat, ...] = (
-        2.4, 4.0, 5.5, 7.0, 9.0, 12.0,
+        2.4,
+        4.0,
+        5.5,
+        7.0,
+        9.0,
+        12.0,
     )
     real_index_parameter_names: tuple[str, ...] = (
-        "cloud_n_0", "cloud_n_1", "cloud_n_2", "cloud_n_3", "cloud_n_4", "cloud_n_5",
+        "cloud_n_0",
+        "cloud_n_1",
+        "cloud_n_2",
+        "cloud_n_3",
+        "cloud_n_4",
+        "cloud_n_5",
     )
     log10_imaginary_index_parameter_names: tuple[str, ...] = (
-        "cloud_logk_0", "cloud_logk_1", "cloud_logk_2", "cloud_logk_3", "cloud_logk_4", "cloud_logk_5",
+        "cloud_logk_0",
+        "cloud_logk_1",
+        "cloud_logk_2",
+        "cloud_logk_3",
+        "cloud_logk_4",
+        "cloud_logk_5",
     )
     particle_density_kg_m3: PositiveFloat = 3200.0
     geometric_stddev: PositiveFloat = 1.0
@@ -158,9 +273,13 @@ class MieDirectNkCloudConfig(ConfigModel):
     def validate_node_names(self) -> "MieDirectNkCloudConfig":
         count = len(self.refractive_index_wavelength_micron)
         if len(self.real_index_parameter_names) != count:
-            raise ValueError("real_index_parameter_names must match refractive-index nodes")
+            raise ValueError(
+                "real_index_parameter_names must match refractive-index nodes"
+            )
         if len(self.log10_imaginary_index_parameter_names) != count:
-            raise ValueError("log10_imaginary_index_parameter_names must match refractive-index nodes")
+            raise ValueError(
+                "log10_imaginary_index_parameter_names must match refractive-index nodes"
+            )
         return self
 
 
@@ -194,7 +313,9 @@ class RadiativeTransferConfig(ConfigModel):
     model: Literal["clear_emission"] = "clear_emission"
     geometry: GeometryConfig = GeometryConfig()
     include_rayleigh: bool = True
-    gas_combination: Literal["random_overlap", "equivalent_extinction"] = "random_overlap"
+    gas_combination: Literal["random_overlap", "equivalent_extinction"] = (
+        "random_overlap"
+    )
     thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
 
 
@@ -277,29 +398,88 @@ class TaskConfig(ConfigModel):
     @model_validator(mode="after")
     def validate_cross_references(self) -> "TaskConfig":
         opacity = self.opacity.species
-        chemistry = tuple(item.label for item in self.atmosphere.chemistry.species)
+        chemistry_config = self.atmosphere.chemistry
+        chemistry = (
+            tuple(item.label for item in chemistry_config.species)
+            if chemistry_config.model == "fastchem_equilibrium"
+            else chemistry_config.species + chemistry_config.background_species
+        )
         if len(set(opacity)) != len(opacity):
             raise ValueError("opacity.species contains duplicates")
         if len(set(chemistry)) != len(chemistry):
             raise ValueError("atmosphere.chemistry.species labels contain duplicates")
         missing = sorted(set(opacity) - set(chemistry))
         if missing:
-            raise ValueError("opacity species missing from chemistry labels: " + ", ".join(missing))
+            raise ValueError(
+                "opacity species missing from chemistry labels: " + ", ".join(missing)
+            )
         names = tuple(item.name for item in self.parameters)
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")
-        required = {
-            self.atmosphere.chemistry.metallicity_parameter,
-            self.atmosphere.chemistry.carbon_to_oxygen_parameter,
-        }
+        required: set[str] = set()
+        if chemistry_config.model == "fastchem_equilibrium":
+            required.update(
+                {
+                    chemistry_config.metallicity_parameter,
+                    chemistry_config.carbon_to_oxygen_parameter,
+                }
+            )
+        else:
+            required.update(
+                chemistry_config.parameter_names.get(species, species)
+                for species in chemistry_config.species
+                if species not in chemistry_config.fixed_mixing_ratios
+            )
         temperature = self.atmosphere.temperature
         if temperature.model == "parmentier_guillot_2014":
             required.update({"kappa_IR", "gamma1", "gamma2", "T_irr", "alpha"})
         elif temperature.model == "isothermal" and temperature.temperature_k is None:
             required.add(temperature.parameter_name)
+        elif temperature.model == "madhusudhan_seager_2009":
+            required.update(
+                {
+                    temperature.p1_parameter,
+                    temperature.p2_parameter,
+                    temperature.p3_parameter,
+                    temperature.t0_parameter,
+                    temperature.alpha1_parameter,
+                    temperature.alpha2_parameter,
+                }
+            )
+        elif temperature.model == "spline" and temperature.knot_temperature_k is None:
+            required.update(
+                temperature.parameter_names
+                or tuple(
+                    f"temperature_{index}"
+                    for index in range(len(temperature.knot_pressure))
+                )
+            )
+        unknown_options = sorted(
+            set(self.observations.dataset_options) - set(self.observations.datasets)
+        )
+        if unknown_options:
+            raise ValueError(
+                "dataset_options names are not selected observations: "
+                + ", ".join(unknown_options)
+            )
+        for option in self.observations.dataset_options.values():
+            required.update(
+                parameter
+                for parameter in (
+                    option.offset_parameter,
+                    option.uncertainty_scale_parameter,
+                    option.jitter_parameter,
+                )
+                if parameter is not None
+            )
+        if self.observations.miri_offset_parameter is not None:
+            required.add(self.observations.miri_offset_parameter)
         missing_parameters = sorted(required - set(names))
         if missing_parameters:
-            raise ValueError("required model parameters are missing: " + ", ".join(missing_parameters))
+            raise ValueError(
+                "required model parameters are missing: "
+                + ", ".join(missing_parameters)
+            )
         clouds = self.clouds
         if clouds.model != "none":
             cloud_parameters = {
@@ -354,7 +534,9 @@ def load_task_config(path: str | Path) -> TaskConfig:
             if not isinstance(section, dict) or keys[-1] not in section:
                 continue
             value = Path(section[keys[-1]]).expanduser()
-            section[keys[-1]] = str(value if value.is_absolute() else source.parent / value)
+            section[keys[-1]] = str(
+                value if value.is_absolute() else source.parent / value
+            )
     return TaskConfig.model_validate(raw)
 
 
@@ -368,7 +550,6 @@ def _apply_housekeeping_paths(raw: dict) -> None:
         raise ValueError("housekeeping must be a YAML mapping")
     mappings = (
         (("observations", "path"), "observations_directory"),
-        (("atmosphere", "chemistry", "fastchem_path"), "fastchem_directory"),
         (("opacity", "path"), "k_table_directory"),
         (("opacity", "cache_directory"), "opacity_cache_directory"),
         (("outputs", "directory"), "output_directory"),
@@ -385,13 +566,22 @@ def _apply_housekeeping_paths(raw: dict) -> None:
         if not isinstance(section, dict):
             raise ValueError("configuration sections must be YAML mappings")
         section.setdefault(keys[-1], housekeeping[source_key])
+    chemistry = raw.get("atmosphere", {}).get("chemistry", {})
+    if (
+        isinstance(chemistry, dict)
+        and chemistry.get("model") == "fastchem_equilibrium"
+        and "fastchem_directory" in housekeeping
+    ):
+        chemistry.setdefault("fastchem_path", housekeeping["fastchem_directory"])
     clouds = raw.get("clouds")
     if (
         isinstance(clouds, dict)
         and clouds.get("model") == "mie_catalog"
         and "optical_constants_directory" in housekeeping
     ):
-        clouds.setdefault("optical_constants_path", housekeeping["optical_constants_directory"])
+        clouds.setdefault(
+            "optical_constants_path", housekeeping["optical_constants_directory"]
+        )
 
 
 def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:
@@ -409,7 +599,11 @@ def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:
     if not isinstance(extends, str) or not extends.strip():
         raise ValueError("configuration extends must be a non-empty YAML path")
     parent = Path(extends).expanduser()
-    parent = (source.parent / parent).resolve() if not parent.is_absolute() else parent.resolve()
+    parent = (
+        (source.parent / parent).resolve()
+        if not parent.is_absolute()
+        else parent.resolve()
+    )
     if not parent.is_file():
         raise FileNotFoundError(parent)
     return _deep_merge(_load_yaml_mapping(parent, (*ancestors, source)), raw)

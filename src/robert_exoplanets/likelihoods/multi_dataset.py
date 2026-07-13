@@ -19,7 +19,9 @@ def _prediction_mapping(prediction: Any) -> Mapping[str, Spectrum]:
     else:
         spectra = getattr(prediction, "spectra", None)
     if not isinstance(spectra, Mapping):
-        raise RobertValidationError("multi-dataset prediction must be a spectrum mapping or expose spectra")
+        raise RobertValidationError(
+            "multi-dataset prediction must be a spectrum mapping or expose spectra"
+        )
     if any(not isinstance(value, Spectrum) for value in spectra.values()):
         raise RobertValidationError("every multi-dataset prediction must be a Spectrum")
     return spectra
@@ -43,13 +45,17 @@ class MultiDatasetGaussianLikelihood:
     ) -> float:
         spectra = _prediction_mapping(prediction)
         if set(spectra) != set(observations.names):
-            raise RobertValidationError("prediction dataset names must match observation collection")
+            raise RobertValidationError(
+                "prediction dataset names must match observation collection"
+            )
         total = 0.0
         for dataset in observations.datasets:
             likelihood = GaussianLikelihood(
                 include_normalization=self.include_normalization,
                 offset_parameter=dataset.offset_parameter,
                 jitter_parameter=dataset.jitter_parameter,
+                uncertainty_scale_parameter=dataset.uncertainty_scale_parameter,
+                uncertainty_scale=dataset.uncertainty_scale,
                 invalid_model_loglike=self.invalid_model_loglike,
                 coordinate_rtol=self.coordinate_rtol,
                 coordinate_atol=self.coordinate_atol,
@@ -74,13 +80,17 @@ class MultiDatasetGaussianLikelihood:
 
         spectra = _prediction_mapping(prediction)
         if set(spectra) != set(observations.names):
-            raise RobertValidationError("prediction dataset names must match observation collection")
+            raise RobertValidationError(
+                "prediction dataset names must match observation collection"
+            )
         output = {}
         for dataset in observations.datasets:
             likelihood = GaussianLikelihood(
                 include_normalization=self.include_normalization,
                 offset_parameter=dataset.offset_parameter,
                 jitter_parameter=dataset.jitter_parameter,
+                uncertainty_scale_parameter=dataset.uncertainty_scale_parameter,
+                uncertainty_scale=dataset.uncertainty_scale,
                 invalid_model_loglike=self.invalid_model_loglike,
                 coordinate_rtol=self.coordinate_rtol,
                 coordinate_atol=self.coordinate_atol,

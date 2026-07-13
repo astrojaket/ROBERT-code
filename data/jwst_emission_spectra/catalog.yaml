@@ -1,0 +1,44 @@
+schema_version: 1
+scope: transiting exoplanet thermal emission; direct imaging and transmission excluded
+searched_through: "2026-07-13"
+archive_query: "select * from spectra where spec_type='Eclipse' and facility like '%James Webb%'"
+
+publications:
+  - {target: 55 Cnc e, citation: Patel et al. 2024, bibcode: 2024A&A...690A.159P, instruments: [NIRCam], wavelength_micron: [2.12, 4.9186], archive_products: 15}
+  - {target: 55 Cnc e, citation: Hu et al. 2024, bibcode: 2024Natur.630..609H, instruments: [NIRCam, MIRI], wavelength_micron: [3.965, 11.4545], archive_products: 2}
+  - {target: GJ 1132 b, citation: Xue et al. 2024, bibcode: 2024ApJ...973L...8X, instruments: [MIRI/LRS], wavelength_micron: [5.25, 11.75], archive_products: 1}
+  - {target: GJ 1214 b, citation: Kempton et al. 2023, bibcode: 2023Natur.620...67K, instruments: [MIRI/LRS], wavelength_micron: [5.25, 11.75], archive_products: 1, measurement: phase-resolved}
+  - {target: GJ 3473 b, citation: Holmberg et al. 2026, bibcode: 2026AJ....171..251H, instruments: [MIRI/F1500W], wavelength_micron: [15.0, 15.0], archive_products: 1, measurement: photometry}
+  - {target: GJ 367 b, citation: Zhang et al. 2024, bibcode: 2024ApJ...961L..44Z, instruments: [MIRI/LRS], wavelength_micron: [5.364, 11.454], archive_products: 1}
+  - {target: GJ 436 b, citation: Mukherjee et al. 2025, bibcode: 2025ApJ...982L..39M, instruments: [NIRCam/F322W2, NIRCam/F444W, MIRI/LRS], wavelength_micron: [2.4299, 11.7604], archive_products: 6}
+  - {target: GJ 486 b, citation: Weiner Mansfield et al. 2024, bibcode: 2024ApJ...975L..22M, doi: 10.3847/2041-8213/ad8161, instruments: [MIRI/LRS], wavelength_micron: [5.21, 11.618], archive_products: 2}
+  - {target: HD 149026 b, citation: Bean et al. 2023, bibcode: 2023Natur.618...43B, instruments: [NIRCam], wavelength_micron: [2.36, 5.02], archive_products: 1}
+  - {target: HD 189733 b, citation: Inglis et al. 2024, bibcode: 2024ApJ...973L..41I, instruments: [MIRI/LRS], wavelength_micron: [5.125, 11.75], archive_products: 2}
+  - {target: HD 189733 b, citation: Zhang et al. 2025, bibcode: 2025AJ....169...38Z, instruments: [NIRCam], wavelength_micron: [2.425, 4.975], archive_products: 1}
+  - {target: HD 80606 b, citation: Sikora et al. 2025, bibcode: 2025AJ....170..105S, instruments: [NIRSpec/G395H], wavelength_micron: [2.7993, 5.1739], archive_products: 1}
+  - {target: LHS 1140 c, citation: Fortune et al. 2025, bibcode: 2025A&A...701A..25F, instruments: [MIRI/F1500W], wavelength_micron: [15.0, 15.0], archive_products: 1, measurement: photometry}
+  - {target: LTT 1445 A b, citation: Wachiraphan et al. 2025, bibcode: 2025AJ....169..311W, instruments: [MIRI/LRS], wavelength_micron: [5.2477, 11.8142], archive_products: 2}
+  - {target: LTT 3780 b, citation: Allen et al. 2025, bibcode: 2025AJ....170..240A, instruments: [MIRI/F1500W], wavelength_micron: [15.0, 15.0], archive_products: 6, measurement: photometry}
+  - {target: LTT 9779 b, citation: Coulombe et al. 2025, bibcode: 2025NatAs...9..512C, instruments: [NIRISS/SOSS], wavelength_micron: [0.6156, 2.7893], archive_products: 1}
+  - {target: TOI-1468 b, citation: Meier Valdés et al. 2025, bibcode: 2025A&A...698A..68M, instruments: [MIRI/F1500W], wavelength_micron: [15.0, 15.0], archive_products: 4, measurement: photometry}
+  - {target: TOI-1685 b, citation: Luque et al. 2025, bibcode: 2025AJ....170...49L, instruments: [NIRSpec/G395H], wavelength_micron: [2.931, 5.037], archive_products: 1}
+  - {target: TOI-561 b, citation: Teske et al. 2025, bibcode: 2025ApJ...995L..39T, instruments: [NIRSpec/G395H], wavelength_micron: [3.005, 4.908], archive_products: 3}
+  - {target: TRAPPIST-1 b, citation: Greene et al. 2023, bibcode: 2023Natur.618...39G, instruments: [MIRI/F1500W], wavelength_micron: [15.0, 15.0], archive_products: 1, measurement: photometry}
+  - {target: TRAPPIST-1 b, citation: Ducrot et al. 2025, bibcode: 2025NatAs...9..358D, instruments: [MIRI/F1280W, MIRI/F1500W], wavelength_micron: [12.8, 15.0], archive_products: 1, measurement: photometry}
+  - {target: TRAPPIST-1 c, citation: Zieba et al. 2023, bibcode: 2023Natur.620..746Z, instruments: [MIRI/F1500W], wavelength_micron: [15.0, 15.0], archive_products: 1, measurement: photometry}
+  - {target: WASP-17 b, citation: Valentine et al. 2024, bibcode: 2024AJ....168..123V, instruments: [MIRI/LRS], wavelength_micron: [5.125, 11.875], archive_products: 2}
+  - {target: WASP-17 b, citation: Gressier et al. 2025, bibcode: 2025AJ....169...57G, instruments: [NIRISS/SOSS], wavelength_micron: [0.604, 2.8154], archive_products: 2}
+  - {target: WASP-18 b, citation: Coulombe et al. 2023, bibcode: 2023Natur.620..292C, instruments: [NIRISS/SOSS], wavelength_micron: [0.8543, 2.8412], archive_products: 4}
+  - {target: WASP-43 b, citation: Bell et al. 2024, bibcode: 2024NatAs...8..879B, instruments: [MIRI/LRS], wavelength_micron: [5.25, 11.75], archive_products: 5, measurement: phase-resolved}
+  - {target: WASP-69 b, citation: Schlawin et al. 2024, bibcode: 2024AJ....168..104S, instruments: [NIRCam/F322W2, NIRCam/F444W, MIRI/LRS], wavelength_micron: [2.095, 11.875], archive_products: 3, local_robert_data: ../wasp69b_schlawin2024}
+  - {target: WASP-77 A b, citation: August et al. 2023, bibcode: 2023ApJ...953L..24A, instruments: [NIRSpec/G395H], wavelength_micron: [2.811, 5.164], archive_products: 1}
+  - {target: WASP-80 b, citation: Bell et al. 2023, bibcode: 2023Natur.623..709B, instruments: [NIRCam/F322W2], wavelength_micron: [2.4218, 4.0555], archive_products: 1}
+  - {target: WASP-80 b, citation: Morel et al. 2025, bibcode: 2025AJ....169..277M, instruments: [NIRISS/SOSS], wavelength_micron: [0.7169, 2.7708], archive_products: 1}
+
+  # Refereed spectra found in the literature cross-check but absent from the
+  # archive query above on the search date.
+  - {target: WASP-80 b, citation: Wiser et al. 2025, doi: 10.1073/pnas.2504085122, data_doi: 10.5281/zenodo.13146949, instruments: [NIRCam/F322W2, NIRCam/F444W, MIRI/LRS], wavelength_micron: [2.4575, 11.75], archive_products: 0, local_robert_data: ../wasp80b_wiser2025}
+  - {target: WASP-121 b, citation: Evans-Soma et al. 2025, doi: 10.1038/s41550-025-02513-x, data_doi: 10.5281/zenodo.14728976, instruments: [NIRSpec/G395H], wavelength_micron: [2.73, 5.17], archive_products: 0, measurement: phase-resolved}
+  - {target: WASP-17 b, citation: Lustig-Yaeger et al. 2025, bibcode: 2025ApJ...994L...4L, doi: 10.3847/2041-8213/ae17ae, instruments: [NIRSpec/G395H], wavelength_micron: [2.8, 5.2], archive_products: 0, measurement: derived-nightside}
+  - {target: WASP-18 b, citation: Challener et al. 2025, doi: 10.1038/s41550-025-02666-9, instruments: [NIRISS/SOSS], wavelength_micron: [0.85, 2.85], archive_products: 0, measurement: spectroscopic-eclipse-map, note: reanalysis of Coulombe et al. data}
+  - {target: LHS 3844 b, citation: Zieba et al. 2026, doi: 10.1038/s41550-026-02860-3, mast_program: 1846, instruments: [MIRI/LRS], wavelength_micron: [5.0, 12.0], archive_products: 0}

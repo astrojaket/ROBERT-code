@@ -14,10 +14,14 @@ import numpy as np
 import yaml
 
 from robert_exoplanets.atmosphere import (
+    BackgroundGasMixture,
     CompositionMeanMolecularWeight,
     FastChemEquilibriumChemistry,
+    FreeChemistry,
     IsothermalTemperatureProfile,
+    MadhusudhanSeager2009TemperatureProfile,
     ParmentierGuillot2014TemperatureProfile,
+    SplineTemperatureProfile,
     TabulatedTemperatureProfile,
 )
 from robert_exoplanets.bodies import Planet, Star
@@ -74,7 +78,9 @@ def mpi_rank() -> int:
 
 def mpi_processes(config: TaskConfig) -> int:
     configured = config.runtime.mpi_processes
-    return int(os.environ.get("SLURM_NTASKS", "1")) if configured == "auto" else configured
+    return (
+        int(os.environ.get("SLURM_NTASKS", "1")) if configured == "auto" else configured
+    )
 
 
 def describe_config(config: TaskConfig) -> str:
@@ -113,8 +119,21 @@ def load_observations(config: TaskConfig) -> ObservationCollection:
         raise ValueError(
             f"unknown observation datasets {missing}; available: {sorted(available)}"
         )
+    datasets = []
+    for name in requested:
+        dataset = available[name]
+        option = config.observations.dataset_options.get(name)
+        if option is not None:
+            dataset = replace(
+                dataset,
+                offset_parameter=option.offset_parameter,
+                jitter_parameter=option.jitter_parameter,
+                uncertainty_scale_parameter=option.uncertainty_scale_parameter,
+                uncertainty_scale=option.uncertainty_scale,
+            )
+        datasets.append(dataset)
     return ObservationCollection(
-        datasets=tuple(available[name] for name in requested),
+        datasets=tuple(datasets),
         name=f"{published.name} (configured selection)",
         metadata={**dict(published.metadata), "selection": ",".join(requested)},
     )
@@ -146,9 +165,12 @@ def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> 
             target = cache / f"{dataset.name}_{species}.npz"
             if target.exists():
                 with np.load(target, allow_pickle=False) as saved:
-                    current = {"opacity_resolution", "binning_num"}.issubset(saved.files) and (
+                    current = {"opacity_resolution", "binning_num"}.issubset(
+                        saved.files
+                    ) and (
                         str(saved["source_sha256"]) == source_sha
-                        and str(saved["opacity_resolution"]) == config.opacity.resolution
+                        and str(saved["opacity_resolution"])
+                        == config.opacity.resolution
                         and int(saved["binning_num"]) == binning.num
                     )
                 if current:
@@ -178,7 +200,9 @@ def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> 
             )
 
 
-def _load_cached_table(config: TaskConfig, dataset: str, species: str) -> CorrelatedKTable:
+def _load_cached_table(
+    config: TaskConfig, dataset: str, species: str
+) -> CorrelatedKTable:
     path = cache_directory(config) / f"{dataset}_{species}.npz"
     if not path.is_file():
         raise FileNotFoundError(
@@ -277,7 +301,7 @@ def build_problem(
             temperature=temperature_item.temperature_k,
             parameter_name=temperature_item.parameter_name,
         )
-    else:
+    elif temperature_item.model == "tabulated":
         temperature = TabulatedTemperatureProfile.from_csv(
             temperature_item.profile_path,
             pressure_column=temperature_item.pressure_column,
@@ -285,15 +309,66 @@ def build_problem(
             pressure_unit=temperature_item.pressure_unit,
             extrapolation=temperature_item.extrapolation,
         )
+    elif temperature_item.model == "madhusudhan_seager_2009":
+        temperature = MadhusudhanSeager2009TemperatureProfile(
+            pressure_unit=temperature_item.pressure_unit,
+            reference_pressure=temperature_item.reference_pressure,
+            p1_parameter_name=temperature_item.p1_parameter,
+            p2_parameter_name=temperature_item.p2_parameter,
+            p3_parameter_name=temperature_item.p3_parameter,
+            t0_parameter_name=temperature_item.t0_parameter,
+            alpha1_parameter_name=temperature_item.alpha1_parameter,
+            alpha2_parameter_name=temperature_item.alpha2_parameter,
+        )
+    else:
+        temperature = SplineTemperatureProfile(
+            knot_pressure=np.asarray(temperature_item.knot_pressure, dtype=float),
+            knot_temperature=(
+                None
+                if temperature_item.knot_temperature_k is None
+                else np.asarray(temperature_item.knot_temperature_k, dtype=float)
+            ),
+            parameter_names=temperature_item.parameter_names,
+            pressure_unit=temperature_item.pressure_unit,
+            extrapolation=temperature_item.extrapolation,
+        )
     chemistry_item = config.atmosphere.chemistry
-    chemistry = FastChemEquilibriumChemistry(
-        fastchem_path=chemistry_item.fastchem_path,
-        fastchem_species=tuple(item.fastchem_name for item in chemistry_item.species),
-        labels=tuple(item.label for item in chemistry_item.species),
-        metallicity_parameter_name=chemistry_item.metallicity_parameter,
-        carbon_to_oxygen_parameter_name=chemistry_item.carbon_to_oxygen_parameter,
-    )
-    mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
+    if chemistry_item.model == "fastchem_equilibrium":
+        chemistry = FastChemEquilibriumChemistry(
+            fastchem_path=chemistry_item.fastchem_path,
+            fastchem_species=tuple(
+                item.fastchem_name for item in chemistry_item.species
+            ),
+            labels=tuple(item.label for item in chemistry_item.species),
+            metallicity_parameter_name=chemistry_item.metallicity_parameter,
+            carbon_to_oxygen_parameter_name=chemistry_item.carbon_to_oxygen_parameter,
+        )
+        mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
+    else:
+        if chemistry_item.fill_background:
+            fractions = chemistry_item.background_fractions
+            if fractions is None:
+                background = BackgroundGasMixture(
+                    {name: 1.0 for name in chemistry_item.background_species}
+                )
+            else:
+                background = BackgroundGasMixture(
+                    dict(zip(chemistry_item.background_species, fractions, strict=True))
+                )
+        else:
+            background = None
+        chemistry = FreeChemistry(
+            active_species=chemistry_item.species,
+            background=background,
+            fixed_mixing_ratios=chemistry_item.fixed_mixing_ratios,
+            parameter_names=chemistry_item.parameter_names,
+            parameter_mode=chemistry_item.parameter_mode,
+            fill_background=chemistry_item.fill_background,
+            excess_policy=chemistry_item.excess_policy,
+        )
+        mean_molecular_weight = CompositionMeanMolecularWeight(
+            normalization="require" if chemistry_item.fill_background else "normalize"
+        )
     geometry_item = config.radiative_transfer.geometry
     geometry = (
         normal_emission_geometry()
@@ -354,9 +429,13 @@ def build_problem(
         }
         reference = next(iter(tables.values()))
         for species, table in tuple(tables.items()):
-            if not np.allclose(table.g_samples, reference.g_samples, rtol=0.0, atol=1.0e-8):
+            if not np.allclose(
+                table.g_samples, reference.g_samples, rtol=0.0, atol=1.0e-8
+            ):
                 raise ValueError(f"{species} uses a different correlated-k g grid")
-            if not np.allclose(table.g_weights, reference.g_weights, rtol=0.0, atol=1.0e-8):
+            if not np.allclose(
+                table.g_weights, reference.g_weights, rtol=0.0, atol=1.0e-8
+            ):
                 raise ValueError(f"{species} uses different correlated-k weights")
             tables[species] = replace(
                 table, g_samples=reference.g_samples, g_weights=reference.g_weights
@@ -387,19 +466,23 @@ def build_problem(
                 factory,
                 spectral_grid=dataset.observation.spectral_grid,
             )
-            cloud_models[dataset.name] = ParameterizedRefractiveIndexCloudEmissionForwardModel(
-                planet=clear.planet,
-                star=clear.star,
-                spectral_grid=clear.spectral_grid,
-                atmosphere_builder=clear.atmosphere_builder,
-                opacity_provider=clear.opacity_provider,
-                config=clear.config,
-                cia_table=clear.cia_table,
-                geometry=clear.geometry,
-                cloud=cloud,
+            cloud_models[dataset.name] = (
+                ParameterizedRefractiveIndexCloudEmissionForwardModel(
+                    planet=clear.planet,
+                    star=clear.star,
+                    spectral_grid=clear.spectral_grid,
+                    atmosphere_builder=clear.atmosphere_builder,
+                    opacity_provider=clear.opacity_provider,
+                    config=clear.config,
+                    cia_table=clear.cia_table,
+                    geometry=clear.geometry,
+                    cloud=cloud,
+                )
             )
     if cloud is None:
-        forward_model = build_multi_dataset_emission_model(configs, spectral_grids=spectral_grids)
+        forward_model = build_multi_dataset_emission_model(
+            configs, spectral_grids=spectral_grids
+        )
         opacity_ids = {
             f"{dataset}:{key}": value
             for dataset, model in forward_model.models.items()
@@ -437,7 +520,9 @@ def smoke_evaluation(problem: MultiDatasetRetrievalProblem) -> dict[str, float]:
     value = problem.log_likelihood_from_vector(theta)
     elapsed = time.perf_counter() - started
     if not np.isfinite(value) or value <= problem.invalid_loglike:
-        raise RuntimeError("prior-midpoint smoke evaluation returned an invalid likelihood")
+        raise RuntimeError(
+            "prior-midpoint smoke evaluation returned an invalid likelihood"
+        )
     return {"elapsed_seconds": elapsed, "log_likelihood": float(value)}
 
 
@@ -498,14 +583,21 @@ def run_forward_task(config: TaskConfig, source: Path) -> Path:
     observations = load_observations(config)
     problem = build_problem(config, observations)
     values = {}
-    for configured, parameter in zip(config.parameters, problem.parameters.parameters, strict=True):
-        values[parameter.name] = parameter.midpoint if configured.value is None else configured.value
+    for configured, parameter in zip(
+        config.parameters, problem.parameters.parameters, strict=True
+    ):
+        values[parameter.name] = (
+            parameter.midpoint if configured.value is None else configured.value
+        )
     spectra = problem.model_spectra(values)
     write_config_snapshot(config, source)
     target = config.outputs.directory / "forward_model.npz"
     np.savez_compressed(
         target,
-        **{f"{name}_wavelength_micron": spectrum.spectral_grid.values for name, spectrum in spectra.items()},
+        **{
+            f"{name}_wavelength_micron": spectrum.spectral_grid.values
+            for name, spectrum in spectra.items()
+        },
         **{f"{name}_model": spectrum.values for name, spectrum in spectra.items()},
         **{f"parameter_{name}": value for name, value in values.items()},
     )
@@ -513,6 +605,12 @@ def run_forward_task(config: TaskConfig, source: Path) -> Path:
 
 
 __all__ = [
-    "build_problem", "describe_config", "load_observations", "prepare_opacity",
-    "run_forward_task", "run_retrieval_task", "run_smoke_task", "smoke_evaluation",
+    "build_problem",
+    "describe_config",
+    "load_observations",
+    "prepare_opacity",
+    "run_forward_task",
+    "run_retrieval_task",
+    "run_smoke_task",
+    "smoke_evaluation",
 ]

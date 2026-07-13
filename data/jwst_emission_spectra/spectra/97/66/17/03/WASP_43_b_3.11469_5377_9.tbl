@@ -1,0 +1,24 @@
+\PL_NAME='WASP-43 b'
+\SPEC_TYPE='Eclipse'
+\INSTRUMENT='Mid-Infrared Instrument (MIRI)'
+\FACILITY='NASA 6.5m James Webb Space Telescope (JWST) Satellite Mission'
+\NOTE='Fiducial Combined'
+\REFERENCE='Bell et al. 2024'
+|CENTRALWAVELNG|BANDWIDTH|ESPECLIPDEP|ESPECLIPDEPERR1|ESPECLIPDEPERR2|ESPECLIPDEPLIM|ESPBRITEMP|ESPBRITEMPERR1|ESPBRITEMPERR2|ESPBRITEMPLIM|OBS_DATE|OBS_DATEERR1|OBS_DATEERR2|
+|        double|   double|     double|         double|         double|          char|    double|        double|        double|         long|    char|      double|      double|
+|       microns|  microns|          %|               |               |              |         K|              |              |             |    days|        days|        days|
+|          null|     null|       null|           null|           null|          null|      null|          null|          null|         null|    null|        null|        null|
+           5.25       0.5     0.48444         0.00434        -0.00434           null       null           null           null             0     null         null         null 
+           5.75       0.5     0.52156          0.0045         -0.0045           null       null           null           null             0     null         null         null 
+           6.25       0.5     0.54528         0.00428        -0.00428           null       null           null           null             0     null         null         null 
+           6.75       0.5     0.51414          0.0048         -0.0048           null       null           null           null             0     null         null         null 
+           7.25       0.5     0.55057         0.00547        -0.00547           null       null           null           null             0     null         null         null 
+           7.75       0.5     0.60228         0.00561        -0.00561           null       null           null           null             0     null         null         null 
+           8.25       0.5     0.62651         0.00702        -0.00702           null       null           null           null             0     null         null         null 
+           8.75       0.5     0.63879         0.00738        -0.00738           null       null           null           null             0     null         null         null 
+           9.25       0.5     0.72393         0.00835        -0.00835           null       null           null           null             0     null         null         null 
+           9.75       0.5      0.7508         0.01083        -0.01083           null       null           null           null             0     null         null         null 
+          10.25       0.5     0.72615         0.01186        -0.01186           null       null           null           null             0     null         null         null 
+          10.75       0.5     0.75428         0.01644        -0.01644           null       null           null           null             0     null         null         null 
+          11.25       0.5     0.76794         0.02478        -0.02478           null       null           null           null             0     null         null         null 
+          11.75       0.5     0.74304         0.02872        -0.02872           null       null           null           null             0     null         null         null 
