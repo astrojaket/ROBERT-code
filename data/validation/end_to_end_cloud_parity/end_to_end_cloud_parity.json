@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "benchmark": "independent_end_to_end_MgSiO3_cloud_emission_parity",
+  "scope": {
+    "shared": [
+      "pressure_temperature_and_gas_mass_fraction_state",
+      "analytic_validation_opacity_specification_not_optical_depth",
+      "measured_MgSiO3_refractive_index_values",
+      "discrete_lognormal_particle_population",
+      "vertical_condensate_mass_fraction_profile",
+      "gravity_geometry_and_body_parameters"
+    ],
+    "independent": [
+      "gas_optical_depth_assembly",
+      "Mie_efficiency_solution",
+      "particle_population_integration",
+      "cloud_layer_optical_depth",
+      "SH4_thermal_radiative_transfer"
+    ],
+    "gas_opacity_warning": "analytic validation fixture; not retrieval or science opacity",
+    "matched_phase_closure": "four_term_Henyey_Greenstein_without_delta_M"
+  },
+  "provenance": {
+    "optical_constants": "data/optical_constants/exo_skryer/MgSiO3.txt",
+    "optical_constants_sha256": "0faef18dbd1ae853ef25be2f2766f499f9cb37d0732e0f401ca86e999c30c731",
+    "external_metadata": {
+      "cloud_mie_solver": "virga.calc_mie.calc_new_mieff_PyMieScatt",
+      "delta_m": "false",
+      "gas_opacity": "analytic_validation_contract_v1_not_science_opacity",
+      "phase_function": "Henyey_Greenstein_from_Virga_asymmetry",
+      "picaso_version": "3.2.2",
+      "thermal_solver": "picaso.fluxes.get_thermal_SH_stream4",
+      "virga_version": "0.4"
+    },
+    "robert_mie_solver": "robert_exoplanets.mie_efficiencies",
+    "robert_rt_solver": "robert_exoplanets.rt.sh4.solve_thermal_sh4"
+  },
+  "resolution": {
+    "n_layers": 72,
+    "n_wavelength": 96,
+    "n_particle_radius_bins": 36,
+    "n_mie_subradii_per_bin": 6,
+    "n_emission_angles": 6
+  },
+  "physical_contract": {
+    "wavelength_micron": [
+      1.0,
+      12.0
+    ],
+    "pressure_bar": [
+      1e-05,
+      10.0
+    ],
+    "temperature_k": [
+      780.0,
+      1600.0
+    ],
+    "gravity_m_s2": 8.42,
+    "particle_density_kg_m3": 3200.0,
+    "particle_effective_radius_micron": 0.29999999972381275,
+    "particle_geometric_stddev": 1.6,
+    "peak_condensate_mass_fraction": 1.1999423312588717e-05,
+    "gas_species": [
+      "H2O",
+      "CO",
+      "CO2",
+      "CH4"
+    ]
+  },
+  "metrics": {
+    "mie_qext": {
+      "max_abs_relative_difference": 0.0026709279585237188,
+      "rms_relative_difference": 0.0002565055807822182,
+      "median_relative_difference": -6.491009695902653e-16
+    },
+    "mie_qsca": {
+      "max_abs_relative_difference": 0.0011082821400891492,
+      "rms_relative_difference": 8.546729125353401e-05,
+      "median_relative_difference": 2.205117745535098e-15
+    },
+    "mie_g_qsca": {
+      "max_abs_difference": 2.500132234573016e-08,
+      "rms_difference": 4.901350240151855e-10,
+      "median_difference": 4.2500725161431774e-17
+    },
+    "mass_extinction": {
+      "max_abs_relative_difference": 8.222815017483024e-06,
+      "rms_relative_difference": 1.6012814665974036e-06,
+      "median_relative_difference": 2.6075841124033624e-14
+    },
+    "single_scattering_albedo": {
+      "max_abs_difference": 3.2868050730411325e-07,
+      "rms_difference": 5.205376954499341e-08,
+      "median_difference": -2.3037127760971998e-14
+    },
+    "asymmetry_factor": {
+      "max_abs_difference": 1.1856362794326891e-08,
+      "rms_difference": 1.819863773783775e-09,
+      "median_difference": 8.548717289613705e-15
+    },
+    "gas_tau": {
+      "max_abs_relative_difference": 2.488668963259975e-15,
+      "rms_relative_difference": 6.004721054501868e-16,
+      "median_relative_difference": 0.0
+    },
+    "cloud_tau": {
+      "max_abs_relative_difference": 8.222815017606266e-06,
+      "rms_relative_difference": 1.6012814665969894e-06,
+      "median_relative_difference": 2.6047555557109082e-14
+    },
+    "matched_hg_cloudy_disk_spectrum": {
+      "max_abs_relative_difference": 3.517459870606598e-06,
+      "rms_relative_difference": 1.6607284675578517e-06,
+      "median_relative_difference": 1.082917388625143e-06
+    },
+    "matched_hg_clear_disk_spectrum": {
+      "max_abs_relative_difference": 3.3380718034606082e-06,
+      "rms_relative_difference": 1.623547181026211e-06,
+      "median_relative_difference": 1.0758451422651027e-06
+    },
+    "matched_hg_cloudy_eclipse_depth_ppm": {
+      "max_abs_difference": 0.001756935414050531,
+      "rms_difference": 0.001134649142265892,
+      "median_difference": 0.001031971218480976
+    },
+    "native_exact_mie_delta_m_vs_picaso_hg": {
+      "max_abs_relative_difference": 0.0007501445405991541,
+      "rms_relative_difference": 0.00039740421497985875,
+      "median_relative_difference": -0.00039739291903239505
+    },
+    "cloud_effect_eclipse_depth_ppm": {
+      "robert_max_abs": 472.11261279846235,
+      "picaso_virga_max_abs": 472.1122083644119,
+      "max_abs_difference": 0.0011427096794704994,
+      "rms_difference": 0.0002778009221477247,
+      "median_difference": -7.756487135068824e-05
+    },
+    "acceptance": {
+      "gas_tau_max_relative_lt_1e-12": true,
+      "mass_extinction_rms_relative_lt_0p02": true,
+      "cloudy_disk_rms_relative_lt_0p01": true,
+      "cloud_effect_max_abs_difference_lt_10ppm": true,
+      "all_pass": true
+    }
+  }
+}

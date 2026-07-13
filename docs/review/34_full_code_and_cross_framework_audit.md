@@ -14,12 +14,12 @@ MgSiO3/Mie/SH4 retrieval path is internally consistent and runs in about one
 second per four-dataset call on the audit laptop.
 
 The package is ready for validation retrievals. It is not yet a production
-science model for arbitrary clouds. The principal remaining scientific gap is
-an independently generated, end-to-end cloudy spectrum in which ROBERT and
-PICASO/Virga or another high-stream solver start from the same physical cloud
-population rather than from identical precomputed optical depths. Cloudy
-transmission also lacks an independent scattering reference. These boundaries
-must remain explicit in release claims.
+science model for arbitrary clouds. A subsequent benchmark now independently
+reproduces an end-to-end cloudy spectrum from one physical MgSiO3 contract in
+ROBERT and PICASO/Virga; see review 35. Its gas opacity is an analytic
+validation fixture, so an independent science molecular-opacity comparison and
+a cloudy-transmission scattering reference remain open. These boundaries must
+remain explicit in release claims.
 
 ## Audited baseline and environment
 
@@ -204,9 +204,10 @@ The Taylor et al. 2021/NEMESIS benchmark remains qualitative: its Figure 1
 median differences range from roughly -0.8% to -9.3%, but it uses a fitted
 -4 dex mapping between NEMESIS cloud opacity and ROBERT mass extinction. It is
 useful for shape and solver checks, not strict cloud-microphysics parity.
-Likewise, the current PICASO/Virga interchange benchmark defaults to synthetic
-cloud optical properties and an internal solver comparison. It must not be
-counted as an independently generated Virga spectral validation.
+The older PICASO/Virga interchange benchmark defaults to synthetic cloud
+optical properties and an internal solver comparison. Review 35 supersedes
+that limitation with separately evaluated ROBERT and Virga Mie optics, vertical
+cloud optical depth, gas validation optical depth, and final SH4 spectra.
 
 No PICASO cloudy-transmission comparison currently exists. The independent
 transmission reference is pRT, and the implemented solver is explicitly
@@ -252,10 +253,9 @@ spectra and likelihoods between the independent and shared-atmosphere paths.
    stable pRT 3 emission and transmission cases and the matched PICASO SH4
    cases. Run small fixtures in normal CI and the complete external matrix in
    scheduled or release CI.
-2. Build an end-to-end cloud benchmark with the same particle distribution,
-   refractive index, vertical condensate profile, gas state, and spectral grid
-   independently evaluated by ROBERT and PICASO/Virga or a high-stream
-   reference. Compare cloud optical properties before comparing spectra.
+2. Extend the completed physical-contract PICASO/Virga cloud benchmark to the
+   official PICASO science molecular-opacity database, comparing molecular and
+   cloud optical depths separately before the final spectrum.
 3. Implement and validate cloudy transmission, including slant scattering or
    an explicitly justified approximation, against an independent reference.
 4. Close configured-task integration and error-path coverage. A 22%-covered
@@ -298,9 +298,10 @@ spectra and likelihoods between the independent and shared-atmosphere paths.
 
 ROBERT can be described as suitable for clear-atmosphere emission and
 absorption-dominated transmission validation retrievals, and for controlled
-cloudy-emission experiments using SH4. Claims of production-complete cloud
-physics, scattering transmission, or framework-independent end-to-end cloudy
-spectra should wait for the Priority 0 benchmarks. Preserve both shared-input
+cloudy-emission experiments using SH4. The independently evaluated MgSiO3
+validation-opacity spectrum supports end-to-end cloud-optics parity, but claims
+of production-complete molecular-plus-cloud physics or scattering transmission
+should wait for the remaining Priority 0 benchmarks. Preserve both shared-input
 solver tests and independent end-to-end tests: the former localize numerical
 errors, while the latter expose opacity and microphysics convention errors
 that a matched-optical-depth benchmark intentionally removes.
