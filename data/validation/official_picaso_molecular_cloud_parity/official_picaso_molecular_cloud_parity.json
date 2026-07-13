@@ -27,7 +27,25 @@
     "he_vmr_range": [
       0.15878053560913757,
       0.15903901140924634
-    ]
+    ],
+    "radius_pressure_mapping": {
+      "reference_pressure_bar": 10.0,
+      "reference_radius_m": 75567044.0,
+      "gravity_mode": "inverse_square_from_reference_radius",
+      "robert_bottom_radius_m": 75567044.0,
+      "robert_top_radius_m": 83659371.92741016,
+      "picaso": {
+        "bottom_pressure_bar": 10.0,
+        "bottom_radius_m": 75567044.0,
+        "gravity_mode": "PICASO_inverse_square_from_planet_mass",
+        "input_reference_radius_m": 75567044.0,
+        "radius_at_resolved_reference_m": 75567044.0,
+        "requested_reference_pressure_bar": 10.0,
+        "resolved_reference_pressure_bar": 10.0,
+        "top_pressure_bar": 1e-05,
+        "top_radius_m": 83660138.49288508
+      }
+    }
   },
   "provenance": {
     "picaso_database": {
@@ -84,14 +102,14 @@
     "picaso_native_samples": 37273,
     "effective_opacity_sampling_R": 15000.0,
     "comparison_output_R_approx": 96.58310505164272,
-    "robert_seconds": 19.24070229101926,
+    "robert_seconds": 17.722100708051585,
     "picaso_timing_seconds": {
-      "clear_thermal": 8.067849458020646,
-      "clear_transmission": 0.916895458009094,
-      "cloudy_thermal": 8.83494079200318,
-      "cloudy_transmission": 2.010081041022204,
-      "mie": 4.754644708998967,
-      "opacity_connection": 1.6408892080071382
+      "clear_thermal": 7.801294207980391,
+      "clear_transmission": 0.893062540970277,
+      "cloudy_thermal": 7.481044707994442,
+      "cloudy_transmission": 2.059118250035681,
+      "mie": 4.687998416018672,
+      "opacity_connection": 1.69395004195394
     }
   },
   "metrics": {
@@ -102,60 +120,60 @@
     },
     "molecular_column_tau_by_species": {
       "H2O": {
-        "rms_log10_tau_difference_dex": 0.01903130059074451,
-        "median_log10_tau_ratio_dex": -0.0038756651646356666,
-        "max_abs_log10_tau_difference_dex": 0.0838462263598303
+        "rms_log10_tau_difference_dex": 0.01823916866432126,
+        "median_log10_tau_ratio_dex": 0.003215119864757865,
+        "max_abs_log10_tau_difference_dex": 0.08954955411395815
       },
       "CO": {
-        "rms_log10_tau_difference_dex": 1.789115041198167,
-        "median_log10_tau_ratio_dex": 0.006883841423140691,
-        "max_abs_log10_tau_difference_dex": 14.992698169888468
+        "rms_log10_tau_difference_dex": 1.7886365583579031,
+        "median_log10_tau_ratio_dex": 0.010738893197750787,
+        "max_abs_log10_tau_difference_dex": 14.989583752777547
       },
       "CO2": {
-        "rms_log10_tau_difference_dex": 0.28061292348679384,
-        "median_log10_tau_ratio_dex": -0.02803761061095522,
-        "max_abs_log10_tau_difference_dex": 1.206896243632686
+        "rms_log10_tau_difference_dex": 0.2777608796820475,
+        "median_log10_tau_ratio_dex": -0.020595280585920306,
+        "max_abs_log10_tau_difference_dex": 1.2000118003766809
       },
       "CH4": {
-        "rms_log10_tau_difference_dex": 0.1748527822149811,
-        "median_log10_tau_ratio_dex": 0.10641703690231202,
-        "max_abs_log10_tau_difference_dex": 0.5481142963288375
+        "rms_log10_tau_difference_dex": 0.1807611436461671,
+        "median_log10_tau_ratio_dex": 0.11395322931187607,
+        "max_abs_log10_tau_difference_dex": 0.55517174006853
       }
     },
     "clear_emission_difference_ppm": {
-      "rms": 23.17119846269338,
-      "median": -0.47372496378416473,
-      "minimum": -74.9688419934163,
-      "maximum": 90.01947444526063,
-      "max_abs": 90.01947444526063
+      "rms": 30.94699602236081,
+      "median": -9.066774333333697,
+      "minimum": -96.00628495122238,
+      "maximum": 72.43760559522984,
+      "max_abs": 96.00628495122238
     },
     "cloudy_emission_difference_ppm": {
-      "rms": 21.429936436403146,
-      "median": -0.4912312786610048,
-      "minimum": -75.01679641800513,
-      "maximum": 87.91795161073429,
-      "max_abs": 87.91795161073429
+      "rms": 27.438486778638165,
+      "median": -3.0951404495567667,
+      "minimum": -95.80763393840812,
+      "maximum": 70.96026510022337,
+      "max_abs": 95.80763393840812
     },
     "clear_transmission_difference_ppm": {
-      "rms": 205.85523682702635,
-      "median": -187.72588347330117,
-      "minimum": -409.50907078975837,
-      "maximum": -69.44470089447971,
-      "max_abs": 409.50907078975837
+      "rms": 49.14284800026941,
+      "median": 27.858226437620786,
+      "minimum": -118.69296243858726,
+      "maximum": 144.57783649419673,
+      "max_abs": 144.57783649419673
     },
     "cloudy_transmission_difference_ppm": {
-      "rms": 228.8447124483373,
-      "median": -217.76201098014369,
-      "minimum": -409.3301201863256,
-      "maximum": -107.96168427556346,
-      "max_abs": 409.3301201863256
+      "rms": 40.599613999869824,
+      "median": 12.938526453913981,
+      "minimum": -117.97745228025319,
+      "maximum": 131.40689733301056,
+      "max_abs": 131.40689733301056
     },
     "robert_emission_cloud_effect_ppm": {
-      "rms": 87.07677853196519,
-      "median": -35.597152282016836,
-      "minimum": -262.3771782697243,
-      "maximum": -0.3954752172980608,
-      "max_abs": 262.3771782697243
+      "rms": 82.67722514535386,
+      "median": -33.4283861267688,
+      "minimum": -249.98158715702226,
+      "maximum": -0.3289769527014229,
+      "max_abs": 249.98158715702226
     },
     "picaso_emission_cloud_effect_ppm": {
       "rms": 88.80952386768901,
@@ -165,18 +183,18 @@
       "max_abs": 259.01491374704756
     },
     "emission_cloud_effect_disagreement_ppm": {
-      "rms": 5.038288940590198,
-      "median": -0.11799119120550072,
-      "minimum": -17.58487812099932,
-      "maximum": 17.51911199028524,
-      "max_abs": 17.58487812099932
+      "rms": 7.888838421199105,
+      "median": 1.1518942083718429,
+      "minimum": -9.61961678134577,
+      "maximum": 27.211856972454456,
+      "max_abs": 27.211856972454456
     },
     "robert_transmission_cloud_effect_ppm": {
-      "rms": 350.088385091312,
-      "median": 124.03118711990825,
-      "minimum": 0.10116129266560248,
-      "maximum": 1269.2380260831485,
-      "max_abs": 1269.2380260831485
+      "rms": 386.4824039266925,
+      "median": 130.33594074297883,
+      "minimum": 0.09821701264095539,
+      "maximum": 1409.3521867996374,
+      "max_abs": 1409.3521867996374
     },
     "picaso_transmission_cloud_effect_ppm": {
       "rms": 394.98717010896314,
@@ -186,11 +204,11 @@
       "max_abs": 1414.743212259255
     },
     "transmission_cloud_effect_disagreement_ppm": {
-      "rms": 46.83005084250649,
-      "median": -13.770454671841613,
-      "minimum": -148.29961330734704,
-      "maximum": 21.945502614091623,
-      "max_abs": 148.29961330734704
+      "rms": 17.840105622621454,
+      "median": -4.095305105885837,
+      "minimum": -78.8837207577227,
+      "maximum": 46.32524102204937,
+      "max_abs": 78.8837207577227
     },
     "acceptance": {
       "official_database_verified": true,

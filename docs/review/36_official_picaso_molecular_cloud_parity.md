@@ -16,8 +16,8 @@ At the paper output resolution (240 logarithmic bins from 1-12 micron, R about
 
 | Observable | Clear RMS | Cloudy RMS | Cloud-effect disagreement RMS |
 | --- | ---: | ---: | ---: |
-| Eclipse depth | 23.17 ppm | 21.43 ppm | 5.04 ppm |
-| Transit depth | 205.86 ppm | 228.84 ppm | 46.83 ppm |
+| Eclipse depth | 30.95 ppm | 27.44 ppm | 7.89 ppm |
+| Transit depth | 49.14 ppm | 40.60 ppm | 17.84 ppm |
 
 The independently calculated cloud mass extinction still agrees to
 **1.58e-6 RMS relative difference** (maximum `8.22e-6`). This reproduces the
@@ -58,7 +58,8 @@ The shared inputs are the same cloud experiment used in the analytic-opacity
 parity benchmark:
 
 - 72 layers from `1e-5` to 10 bar and 780-1600 K;
-- gravity 8.42 m s-2;
+- reference gravity 8.42 m s-2 at the 10-bar reference radius, with
+  inverse-square gravity above it;
 - H2O, CO, CO2, and CH4 volume-mixing-ratio profiles;
 - H2 volume mixing ratio 0.84 with He filling the remaining abundance;
 - measured Dorschner et al. MgSiO3 refractive indices;
@@ -69,6 +70,30 @@ parity benchmark:
 
 Only state and material inputs are shared. Molecular opacity, CIA opacity, Mie
 efficiencies, gas optical depth, cloud optical depth, and spectra are not.
+
+## Reference-radius audit
+
+The original transmission comparison contained a nearly systematic offset:
+ROBERT minus PICASO averaged about -195 ppm in the clear case and -224 ppm in
+the cloudy case. Both codes were confirmed to place the supplied
+75,567,044 m radius at exactly 10 bar, so the reference pressure itself was not
+misassigned.
+
+The mismatch was in the pressure-radius mapping above that anchor. PICASO uses
+inverse-square gravity derived from the supplied mass and radius, giving an
+8,093.094 km column between 10 bar and `1e-5` bar. The initial ROBERT benchmark
+held gravity fixed at 8.42 m s-2 and produced only 7,287.205 km. The corrected
+ROBERT benchmark independently integrates the same inverse-square physical
+convention for both gas column densities and spherical path geometry. Its top
+radius is 83,659,371.93 m versus PICASO's 83,660,138.49 m, a 0.767 km difference
+over the full six-decade pressure column. Both bottom radii remain exactly
+75,567,044 m at 10 bar.
+
+After this correction, the clear and cloudy transit-depth RMS residuals fall
+to 49.14 and 40.60 ppm. Their medians are +27.86 and +12.94 ppm, respectively,
+so the former one-sided systematic offset is removed; the remaining residuals
+change sign with wavelength and track independent opacity, CIA/Rayleigh, and
+slant-integration differences.
 
 ROBERT evaluates ExoMolOP tables for POKAZATEL H2O, Li2015 CO, UCL-4000 CO2,
 and YT34to10 CH4, plus the vendored NemesisPy/HITRAN-2012 CIA table. PICASO
@@ -83,10 +108,10 @@ The species-resolved, vertically integrated optical depths differ as follows:
 
 | Species | RMS log10 tau difference | Median log10 ratio | Maximum absolute |
 | --- | ---: | ---: | ---: |
-| H2O | 0.0190 dex | -0.00388 dex | 0.0838 dex |
-| CO | 1.789 dex | +0.00688 dex | 14.99 dex |
-| CO2 | 0.2806 dex | -0.0280 dex | 1.207 dex |
-| CH4 | 0.1749 dex | +0.1064 dex | 0.548 dex |
+| H2O | 0.0182 dex | +0.00322 dex | 0.0895 dex |
+| CO | 1.789 dex | +0.0107 dex | 14.99 dex |
+| CO2 | 0.2778 dex | -0.0206 dex | 1.200 dex |
+| CH4 | 0.1808 dex | +0.1140 dex | 0.555 dex |
 
 H2O agrees remarkably well after R~97 integration. CH4 and CO2 show
 scientifically material band differences. The CO RMS is dominated by a few
@@ -97,18 +122,17 @@ not be summarized as a global abundance-scale offset.
 
 ## Cloud effect with independent gas backgrounds
 
-The cloud changes ROBERT emission by 87.08 ppm RMS and PICASO emission by
-88.81 ppm RMS. Their cloud-effect spectra differ by 5.04 ppm RMS and 17.66 ppm
+The cloud changes ROBERT emission by 82.68 ppm RMS and PICASO emission by
+88.81 ppm RMS. Their cloud-effect spectra differ by 7.89 ppm RMS and 27.21 ppm
 maximum. This is larger than the 0.001 ppm matched-opacity cloud-parity result
 because different gas optical depths move the thermal photosphere relative to
 the same cloud deck.
 
-For transmission, the cloud effect is 350.09 ppm RMS in ROBERT and 394.99 ppm
-RMS in PICASO. The cloud-effect disagreement is 46.83 ppm RMS and 148.30 ppm
-maximum. Transmission amplifies differences in opacity, hydrostatic radius
-mapping, CIA/Rayleigh treatment, and spherical slant integration. The clear
-transmission offset is already 205.86 ppm RMS, confirming that the final cloudy
-offset is not a cloud-Mie discrepancy.
+For transmission, the cloud effect is 386.48 ppm RMS in ROBERT and 394.99 ppm
+RMS in PICASO. The cloud-effect disagreement is 17.84 ppm RMS and 78.88 ppm
+maximum. With the hydrostatic pressure-radius mapping aligned, the remaining
+cloud-effect residual is spectrally structured rather than a reference-radius
+offset.
 
 ## Opacity-sampling convergence
 
@@ -120,8 +144,8 @@ RMS differences relative to the full native calculation are:
 
 | Stride | Effective opacity R | ROBERT cloudy emission | PICASO cloudy emission | ROBERT cloudy transmission | PICASO cloudy transmission |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2 | 7,500 | 16.54 ppm | 15.95 ppm | 20.23 ppm | 22.39 ppm |
-| 5 | 3,000 | 31.16 ppm | 31.76 ppm | 39.89 ppm | 48.41 ppm |
+| 2 | 7,500 | 16.80 ppm | 15.95 ppm | 24.25 ppm | 22.39 ppm |
+| 5 | 3,000 | 31.71 ppm | 31.76 ppm | 47.87 ppm | 48.41 ppm |
 
 This is a key negative result: simply retaining an apparently high effective
 opacity resolution is not sufficient for ppm-level R~100 spectra when samples
@@ -162,6 +186,6 @@ conda run -p /Users/jaketaylor/miniforge3/envs/robert-exoplanets \
   --opacity-stride 1
 ```
 
-The full native intermediates remain under `examples/outputs/`. Only the
-compact R~97 arrays, provenance report, convergence report, diagnostic figure,
-and checksums are versioned.
+Native contract and PICASO arrays are held in a temporary directory during the
+run. Only the compact R~97 arrays, provenance report, convergence report,
+diagnostic figure, and checksums are versioned.

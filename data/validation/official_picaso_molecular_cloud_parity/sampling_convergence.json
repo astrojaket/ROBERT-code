@@ -7,10 +7,10 @@
     "2": {
       "effective_opacity_sampling_R": 7500,
       "robert": {
-        "clear_emission_rms_ppm": 17.5839826913488,
-        "cloudy_emission_rms_ppm": 16.537471092206673,
-        "clear_transmission_rms_ppm": 26.48081553744334,
-        "cloudy_transmission_rms_ppm": 20.22502733787811
+        "clear_emission_rms_ppm": 17.82138507900867,
+        "cloudy_emission_rms_ppm": 16.80445028954854,
+        "clear_transmission_rms_ppm": 31.05008421172519,
+        "cloudy_transmission_rms_ppm": 24.253666743656687
       },
       "picaso": {
         "clear_emission_rms_ppm": 16.994195413636813,
@@ -22,10 +22,10 @@
     "5": {
       "effective_opacity_sampling_R": 3000,
       "robert": {
-        "clear_emission_rms_ppm": 34.47125792282858,
-        "cloudy_emission_rms_ppm": 31.159783593910447,
-        "clear_transmission_rms_ppm": 51.809904676243065,
-        "cloudy_transmission_rms_ppm": 39.88674370772924
+        "clear_emission_rms_ppm": 34.89135967929004,
+        "cloudy_emission_rms_ppm": 31.712466340749852,
+        "clear_transmission_rms_ppm": 60.82702195908694,
+        "cloudy_transmission_rms_ppm": 47.86962129505656
       },
       "picaso": {
         "clear_emission_rms_ppm": 34.081764296377415,
@@ -35,5 +35,5 @@
       }
     }
   },
-  "conclusion": "Use the full native R=15000 opacity sampling for paper spectra. Even stride 2 changes R~97 binned spectra by 16-29 ppm RMS."
+  "conclusion": "Use the full native R=15000 opacity sampling for paper spectra. Even stride 2 changes R~97 binned spectra by 16-31 ppm RMS."
 }

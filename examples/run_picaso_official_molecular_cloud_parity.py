@@ -84,6 +84,12 @@ def evaluate(contract_path: Path, output_path: Path, opacity_db: Path, resample:
     )
     cloudy_thermal_seconds = perf_counter() - started
     atmosphere = cloudy["full_output"]
+    level_pressure_bar = np.asarray(atmosphere.level["pressure"], dtype=float) / 1.0e6
+    level_radius_m = np.asarray(atmosphere.level["z"], dtype=float) * 1.0e-2
+    requested_reference_pressure = float(contract["reference_pressure_bar"])
+    reference_index = int(
+        np.argmin(np.abs(np.log(level_pressure_bar / requested_reference_pressure)))
+    )
     contributions = compute_opacity(
         atmosphere,
         opacity,
@@ -158,6 +164,17 @@ def evaluate(contract_path: Path, output_path: Path, opacity_db: Path, resample:
         "thermal_solver": "PICASO SH4",
         "transmission_solver": "PICASO spherical extinction",
         "phase_closure": "Henyey-Greenstein, delta-M disabled",
+        "radius_pressure_mapping": {
+            "requested_reference_pressure_bar": requested_reference_pressure,
+            "resolved_reference_pressure_bar": float(level_pressure_bar[reference_index]),
+            "input_reference_radius_m": float(contract["planet_radius_m"]),
+            "radius_at_resolved_reference_m": float(level_radius_m[reference_index]),
+            "bottom_pressure_bar": float(level_pressure_bar[-1]),
+            "bottom_radius_m": float(level_radius_m[-1]),
+            "top_pressure_bar": float(level_pressure_bar[0]),
+            "top_radius_m": float(level_radius_m[0]),
+            "gravity_mode": "PICASO_inverse_square_from_planet_mass",
+        },
         "timing_seconds": {
             "mie": mie_seconds,
             "opacity_connection": opacity_seconds,
@@ -254,7 +271,7 @@ def _build_case(jdi, u, pd, contract, mie, *, cloudy: bool):
         delta_eddington=False,
         raman="none",
         query="interp",
-        p_reference=float(pressure_edges[-1]),
+        p_reference=float(contract["reference_pressure_bar"]),
         w_single_rayleigh="off",
         w_multi_rayleigh="off",
         psingle_rayleigh="off",
