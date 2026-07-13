@@ -10,13 +10,13 @@ more complicated immediately.
 
 - `CloudOpticalProperties` stores layer-by-wavelength extinction optical depth,
   single-scattering albedo, and asymmetry factor.
-- Clouds can be passed directly to `solve_clear_sky_emission(...)` or split into
+- Clouds can be passed directly to `solve_emission(...)` or split into
   absorption and scattering `LayerOpticalDepth` contributors.
 - `grey_cloud_deck(...)` and `power_law_haze(...)` provide small retrieval-ready
   parameterizations for early tests.
 - `multiple_scattering_backend="two_stream"` activates the first conservative
   two-stream effective-extinction closure.
-- `ClearSkyEmissionResult.extinction_optical_depth` preserves physical
+- `EmissionResult.extinction_optical_depth` preserves physical
   extinction tau when `total_optical_depth` records the solver's effective tau.
 - `load_cloud_optical_properties_npz(...)` and
   `load_cloud_optical_properties_csv(...)` read dense-array and long-table
@@ -99,7 +99,7 @@ PICASO/Virga-style pipeline naturally produces: `tau_ext`, `omega0`, and `g`.
 
 Run identical one-dimensional atmospheres through ROBERT and PICASO:
 
-- clear atmosphere baseline;
+- cloud-free atmosphere baseline;
 - Rayleigh-only atmosphere;
 - grey absorbing deck;
 - grey scattering deck;

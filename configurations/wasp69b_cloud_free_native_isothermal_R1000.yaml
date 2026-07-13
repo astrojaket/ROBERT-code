@@ -1,0 +1,20 @@
+extends: wasp69b_cloud_free_R1000.yaml
+
+run:
+  name: wasp69b-cloud-free-native-isothermal-R1000
+  description: Cloud-free equilibrium chemistry with one retrieved isothermal temperature.
+
+atmosphere:
+  temperature:
+    model: isothermal
+    parameter_name: temperature
+
+parameters:
+  - {name: metallicity, label: log10(Z/Z_sun), unit: dex, prior: {type: uniform, lower: -1.0, upper: 2.0}, value: 0.5}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.0, upper: 1.0}, value: 0.5}
+  - {name: temperature, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_cloud_free_native_isothermal_R1000
+runtime:
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_cloud_free_native_isothermal_R1000

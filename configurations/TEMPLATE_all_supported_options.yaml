@@ -164,7 +164,7 @@ opacity:
   # path and cache_directory are populated from housekeeping.
 
 radiative_transfer:
-  model: clear_emission
+  model: emission
   geometry:
     model: normal_emission    # Alternative: gauss_legendre_disk
     points: 4                 # Used by gauss_legendre_disk only.
@@ -266,7 +266,7 @@ runtime:
 # =============================================================================
 housekeeping:
   observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp69b_schlawin2024
-  fastchem_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/examples/data/hat_p_32b/fastchem
+  fastchem_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/chemistry/fastchem
   k_table_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
   optical_constants_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/optical_constants/exo_skryer
   opacity_cache_directory: opacity_cache

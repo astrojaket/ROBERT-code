@@ -13,7 +13,7 @@ from robert_exoplanets import (
     assemble_gas_optical_depth,
     hydrostatic_path_geometry,
     normal_emission_geometry,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 
 BOLTZMANN_CONSTANT_J_K = 1.380649e-23
@@ -72,7 +72,7 @@ def test_hydrostatic_path_geometry_returns_spherical_shell_path_factors() -> Non
     np.testing.assert_allclose(factors[1], expected)
 
 
-def test_clear_sky_emission_with_normal_spherical_path_matches_plane_parallel() -> None:
+def test_emission_with_normal_spherical_path_matches_plane_parallel() -> None:
     atmosphere = _isothermal_atmosphere()
     spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")
     opacity = _evaluated_opacity(
@@ -88,12 +88,12 @@ def test_clear_sky_emission_with_normal_spherical_path_matches_plane_parallel() 
         reference_pressure=1.0e-2,
     )
 
-    plane = solve_clear_sky_emission(
+    plane = solve_emission(
         gas_tau,
         geometry=normal_emission_geometry(),
         bottom_boundary="blackbody",
     )
-    spherical = solve_clear_sky_emission(
+    spherical = solve_emission(
         gas_tau,
         geometry=normal_emission_geometry(),
         bottom_boundary="blackbody",

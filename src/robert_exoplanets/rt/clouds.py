@@ -22,7 +22,7 @@ class CloudOpticalProperties:
 
     The object stores extinction optical depth together with single-scattering
     albedo and asymmetry factor. It can be passed directly to
-    ``solve_clear_sky_emission`` as an additional optical-depth contributor, or
+    ``solve_emission`` as an additional optical-depth contributor, or
     split into absorption and scattering ``LayerOpticalDepth`` objects for
     explicit diagnostics.
     """

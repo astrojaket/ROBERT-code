@@ -1,3 +1,4 @@
 # Preserve third-party FastChem databases byte-for-byte and do not apply text
 # normalization or whitespace checks to their upstream formatting.
-examples/data/hat_p_32b/fastchem/** binary
+data/chemistry/fastchem/** binary
+examples/Depreciated_Benchmarks/HAT_P_32b/data/hat_p_32b/fastchem/** binary

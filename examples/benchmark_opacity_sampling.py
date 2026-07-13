@@ -20,7 +20,7 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     gauss_legendre_disk_geometry,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -264,7 +264,7 @@ def _time_solver(atmosphere, opacity, combination, geometry):
         gas_tau = assemble_gas_optical_depth(
             atmosphere, opacity, gravity_m_s2=15.0, gas_combination=combination
         )
-        return solve_clear_sky_emission(
+        return solve_emission(
             gas_tau,
             geometry=geometry,
             bottom_boundary="blackbody",

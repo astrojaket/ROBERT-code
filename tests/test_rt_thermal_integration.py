@@ -15,7 +15,7 @@ from robert_exoplanets import (
     assemble_gas_optical_depth,
     integrate_thermal_emission,
     integrate_thermal_emission_spectrum,
-    solve_clear_sky_emission,
+    solve_emission,
     thermal_integration_backend_name,
 )
 from robert_exoplanets.core import RobertValidationError
@@ -183,12 +183,12 @@ def test_emission_solver_numpy_and_auto_thermal_backends_match() -> None:
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
     )
 
-    reference = solve_clear_sky_emission(
+    reference = solve_emission(
         gas_tau,
         bottom_boundary="none",
         thermal_integration_backend="numpy",
     )
-    accelerated = solve_clear_sky_emission(
+    accelerated = solve_emission(
         gas_tau,
         bottom_boundary="none",
         thermal_integration_backend="auto",

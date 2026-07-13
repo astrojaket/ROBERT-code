@@ -22,12 +22,12 @@ from robert_exoplanets import (
     PressureGrid,
     StratifiedSamplingObservationResponse,
     TopHatObservationResponse,
-    build_parameterized_clear_sky_emission_model,
+    build_parameterized_emission_model,
     load_schlawin2024_wasp69b,
 )
 
 from benchmark_wasp69b_multi_instrument import _canonicalize_g, _config
-from retrieve_wasp69b_nircam_clear import (
+from retrieve_wasp69b_nircam_cloud_free import (
     DATA,
     SPECIES,
     _cia_tables,
@@ -80,7 +80,7 @@ def main() -> dict[str, object]:
     reference_grid = sampling_provider.native_spectral_grid(
         wavelength_bounds_micron=(lower - 0.01, upper + 0.01)
     )
-    reference_model = build_parameterized_clear_sky_emission_model(
+    reference_model = build_parameterized_emission_model(
         _config(sampling_provider, pressure, cia),
         spectral_grid=reference_grid,
     )
@@ -181,7 +181,7 @@ def _build_correlated_k(datasets, pressure, cia):
             name=f"WASP-69b-{dataset.name}-observation-bins",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        model = build_parameterized_clear_sky_emission_model(
+        model = build_parameterized_emission_model(
             _config(provider, pressure, cia),
             spectral_grid=dataset.observation.spectral_grid,
         )
@@ -208,7 +208,7 @@ def _build_sampled(
         response = StratifiedSamplingObservationResponse(
             samples_per_bin=samples_per_bin
         ).prepare(dataset.observation, source_grid)
-        model = build_parameterized_clear_sky_emission_model(
+        model = build_parameterized_emission_model(
             _config(provider, pressure, cia),
             spectral_grid=response.spectral_grid,
         )

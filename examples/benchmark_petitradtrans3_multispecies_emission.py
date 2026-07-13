@@ -27,9 +27,14 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     gauss_legendre_disk_geometry,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 from robert_exoplanets.rt.random_overlap import random_overlap_species_tau
+from robert_exoplanets.diagnostics.benchmark_style import (
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "petitradtrans3_stable"
@@ -128,7 +133,7 @@ def main() -> dict[str, object]:
                     "vertical_tau_source": "petitRADTRANS3_species_cumulative_tau",
                 },
             )
-        return solve_clear_sky_emission(
+        return solve_emission(
             gas_tau,
             geometry=geometry,
             bottom_boundary="blackbody",
@@ -285,14 +290,14 @@ def _plot(
 ) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
     spectrum, residual, p_rt_map, robert_map = axes.flat
-    spectrum.loglog(wavelength, p_rt_flux, color="#222222", lw=1.2, label="pRT 3.3.3")
+    spectrum.loglog(wavelength, p_rt_flux, color=REFERENCE_COLOR, lw=1.2, label="pRT 3.3.3")
     spectrum.loglog(
-        wavelength, robert_flux, color="#e45756", lw=0.8, alpha=0.7, label="ROBERT evaluated opacity"
+        wavelength, robert_flux, color=ROBERT_COLOR, lw=0.8, alpha=0.7, label="ROBERT evaluated opacity"
     )
     spectrum.loglog(
         wavelength,
         strict_flux,
-        color="#4c78a8",
+        color="darkorchid",
         lw=0.9,
         ls="--",
         label="ROBERT shared vertical tau",
@@ -303,16 +308,16 @@ def _plot(
     )
     spectrum.legend(frameon=False)
     residual.semilogx(
-        wavelength, relative * 100.0, color="#e45756", lw=0.7, label="Evaluated opacity"
+        wavelength, relative * 100.0, color=ROBERT_COLOR, lw=0.7, label="Evaluated opacity"
     )
     residual.semilogx(
         wavelength,
         strict_relative * 100.0,
-        color="#4c78a8",
+        color=RESIDUAL_COLOR,
         lw=0.8,
         label="Shared vertical tau",
     )
-    residual.axhline(0.0, color="#222222", lw=0.7)
+    residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.7)
     residual.set(ylabel="(ROBERT - pRT3) / pRT3 [%]", title="Emission residual")
     residual.legend(frameon=False)
     positive = wavelength >= 1.0

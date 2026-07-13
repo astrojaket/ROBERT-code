@@ -32,11 +32,18 @@ from robert_exoplanets import (
     load_cloud_optical_properties_csv,
     load_cloud_optical_properties_npz,
     load_picaso_cloud_optical_properties,
-    solve_clear_sky_emission,
+    solve_emission,
     time_callable,
     write_cloud_optical_properties_npz,
 )
 from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_DARK,
+    PURPLE_LIGHT,
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
+)
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "cloud_scattering_benchmark"
 
@@ -50,27 +57,27 @@ def main() -> dict[str, Any]:
     gas_tau = _zero_gas_tau(cloud)
     geometry = gauss_legendre_disk_geometry(4)
 
-    clear = solve_clear_sky_emission(
+    clear = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
         thermal_integration_backend="auto",
     )
-    extinction_numpy = solve_clear_sky_emission(
+    extinction_numpy = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
         additional_optical_depths=[cloud],
         thermal_integration_backend="numpy",
     )
-    extinction_auto = solve_clear_sky_emission(
+    extinction_auto = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
         additional_optical_depths=[cloud],
         thermal_integration_backend="auto",
     )
-    two_stream_auto = solve_clear_sky_emission(
+    two_stream_auto = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
@@ -181,7 +188,7 @@ def _timings(
             metadata={"path": str(cloud_path)},
         ),
         time_callable(
-            lambda: solve_clear_sky_emission(
+            lambda: solve_emission(
                 gas_tau,
                 geometry=geometry,
                 bottom_boundary="blackbody",
@@ -193,7 +200,7 @@ def _timings(
             warmup=1,
         ),
         time_callable(
-            lambda: solve_clear_sky_emission(
+            lambda: solve_emission(
                 gas_tau,
                 geometry=geometry,
                 bottom_boundary="blackbody",
@@ -205,7 +212,7 @@ def _timings(
             warmup=1,
         ),
         time_callable(
-            lambda: solve_clear_sky_emission(
+            lambda: solve_emission(
                 gas_tau,
                 geometry=geometry,
                 bottom_boundary="blackbody",
@@ -248,15 +255,15 @@ def _report(
         },
         "cloud_property_comparison": comparison.as_dict(),
         "rt": {
-            "clear_backend": clear.metadata["thermal_integration_backend"],
+            "cloud_free_backend": clear.metadata["thermal_integration_backend"],
             "extinction_numpy_backend": extinction_numpy.metadata["thermal_integration_backend"],
             "extinction_auto_backend": extinction_auto.metadata["thermal_integration_backend"],
             "two_stream_backend": two_stream_auto.metadata["thermal_integration_backend"],
             "max_abs_numpy_auto_radiance_difference": float(
                 np.max(np.abs(extinction_numpy.radiance.values - extinction_auto.radiance.values))
             ),
-            "median_cloudy_clear_ratio": float(np.median(extinction_auto.radiance.values / clear.radiance.values)),
-            "median_two_stream_clear_ratio": float(np.median(two_stream_auto.radiance.values / clear.radiance.values)),
+            "median_cloudy_cloud_free_ratio": float(np.median(extinction_auto.radiance.values / clear.radiance.values)),
+            "median_two_stream_cloud_free_ratio": float(np.median(two_stream_auto.radiance.values / clear.radiance.values)),
         },
         "timings": timings,
     }
@@ -291,7 +298,7 @@ def _plot(
     wavelength = spectral_grid_values_in_unit(clear.radiance.spectral_grid, "micron")
     wavelength_order = np.argsort(wavelength)
     wavelength = wavelength[wavelength_order]
-    clear_radiance = clear.radiance.values[wavelength_order]
+    cloud_free_radiance = clear.radiance.values[wavelength_order]
     ratio_extinction = (extinction.radiance.values / clear.radiance.values)[wavelength_order]
     ratio_two_stream = (two_stream.radiance.values / clear.radiance.values)[wavelength_order]
     physical_tau = np.sum(extinction.extinction_optical_depth, axis=0)[:, 0][wavelength_order]
@@ -300,21 +307,21 @@ def _plot(
     fig, axes = plt.subplots(2, 3, figsize=(17.0, 9.0), constrained_layout=True)
     ax_ratio, ax_tau, ax_layer_tau, ax_contribution, ax_optical, ax_timing = axes.ravel()
 
-    ax_ratio.plot(wavelength, ratio_extinction, color="#4c78a8", linewidth=1.8, label="Extinction only")
-    ax_ratio.plot(wavelength, ratio_two_stream, color="#f58518", linewidth=1.8, label="Two-stream")
+    ax_ratio.plot(wavelength, ratio_extinction, color=PURPLE_DARK, linewidth=1.8, label="Extinction only")
+    ax_ratio.plot(wavelength, ratio_two_stream, color=ROBERT_COLOR, linewidth=1.8, label="Two-stream")
     if external_spectrum is not None:
         external_wavelength, external_values = external_spectrum
         ax_ratio.plot(
             external_wavelength,
-            external_values / np.interp(external_wavelength, wavelength, clear_radiance),
-            color="#111111",
+            external_values / np.interp(external_wavelength, wavelength, cloud_free_radiance),
+            color=REFERENCE_COLOR,
             linewidth=1.0,
             alpha=0.7,
-            label="External cloudy/clear",
+            label="External cloudy/cloud-free",
         )
     ax_ratio.set_xscale("log")
     ax_ratio.set_xlabel("Wavelength [micron]")
-    ax_ratio.set_ylabel("Cloudy / clear radiance")
+    ax_ratio.set_ylabel("Cloudy / cloud-free radiance")
     ax_ratio.set_title("Spectrum Benchmark")
     ax_ratio.grid(alpha=0.25, which="both")
     ax_ratio.legend(frameon=False)
@@ -322,14 +329,14 @@ def _plot(
     ax_tau.plot(
         wavelength,
         _positive_for_log(physical_tau),
-        color="#4c78a8",
+        color=PURPLE_DARK,
         linewidth=1.8,
         label="Physical extinction tau",
     )
     ax_tau.plot(
         wavelength,
         _positive_for_log(effective_tau),
-        color="#f58518",
+        color=ROBERT_COLOR,
         linewidth=1.8,
         label="Two-stream effective tau",
     )
@@ -386,8 +393,8 @@ def _plot(
 
     mean_ssa = np.mean(cloud.single_scattering_albedo, axis=0)[wavelength_order]
     mean_g = np.mean(cloud.asymmetry_factor, axis=0)[wavelength_order]
-    ax_optical.plot(wavelength, mean_ssa, color="#54a24b", linewidth=1.8, label="Mean omega0")
-    ax_optical.plot(wavelength, mean_g, color="#b279a2", linewidth=1.8, label="Mean g")
+    ax_optical.plot(wavelength, mean_ssa, color=RESIDUAL_COLOR, linewidth=1.8, label="Mean omega0")
+    ax_optical.plot(wavelength, mean_g, color=PURPLE_LIGHT, linewidth=1.8, label="Mean g")
     ax_optical.set_xscale("log")
     ax_optical.set_xlabel("Wavelength [micron]")
     ax_optical.set_ylabel("Layer mean")
@@ -398,7 +405,7 @@ def _plot(
 
     names = [str(item["name"]) for item in timings]
     medians_ms = [float(item["median_s"]) * 1.0e3 for item in timings]
-    ax_timing.barh(names, medians_ms, color=["#79706e", "#4c78a8", "#f58518", "#e45756"])
+    ax_timing.barh(names, medians_ms, color=[PURPLE_LIGHT, PURPLE_DARK, ROBERT_COLOR, RESIDUAL_COLOR])
     ax_timing.set_xlabel("Median time [ms]")
     ax_timing.set_title("Timing Smoke Benchmark")
     ax_timing.grid(alpha=0.25, axis="x")

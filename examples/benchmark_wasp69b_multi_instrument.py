@@ -43,12 +43,12 @@ from robert_exoplanets import (
     FastChemEquilibriumChemistry,
     NativeSpectrumMultiDatasetForwardModel,
     MultiDatasetGaussianLikelihood,
-    ParameterizedClearSkyEmissionFactoryConfig,
-    ParameterizedClearSkyEmissionModelConfig,
+    ParameterizedEmissionFactoryConfig,
+    ParameterizedEmissionModelConfig,
     ParmentierGuillot2014TemperatureProfile,
     PressureGrid,
     MultiDatasetEmissionForwardModel,
-    build_parameterized_clear_sky_emission_model,
+    build_parameterized_emission_model,
     load_schlawin2024_wasp69b,
 )
 from robert_exoplanets.core import SpectralGrid, Spectrum
@@ -59,7 +59,7 @@ except ModuleNotFoundError:  # Direct execution from the examples directory.
     from wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
 
 if __package__:
-    from .retrieve_wasp69b_nircam_clear import (
+    from .retrieve_wasp69b_nircam_cloud_free import (
         CACHE,
         DATA,
         FASTCHEM,
@@ -68,7 +68,7 @@ if __package__:
         _load_table,
     )
 else:
-    from retrieve_wasp69b_nircam_clear import (
+    from retrieve_wasp69b_nircam_cloud_free import (
         CACHE,
         DATA,
         FASTCHEM,
@@ -152,8 +152,8 @@ def _canonicalize_g(
 
 def _config(
     provider: CorrelatedKOpacityProvider, pressure: PressureGrid, cia
-) -> ParameterizedClearSkyEmissionFactoryConfig:
-    return ParameterizedClearSkyEmissionFactoryConfig(
+) -> ParameterizedEmissionFactoryConfig:
+    return ParameterizedEmissionFactoryConfig(
         planet=PLANET,
         star=STAR,
         temperature_profile=ParmentierGuillot2014TemperatureProfile(
@@ -169,7 +169,7 @@ def _config(
         cia_table=cia,
         opacity_source=provider,
         opacity_binning=None,
-        model=ParameterizedClearSkyEmissionModelConfig(
+        model=ParameterizedEmissionModelConfig(
             opacity_species=SPECIES,
             include_rayleigh=True,
             gas_combination="random_overlap",
@@ -239,7 +239,7 @@ def run(
         name="petitRADTRANS native R1000 WASP-69b slab",
         role="model",
     )
-    native_model = build_parameterized_clear_sky_emission_model(
+    native_model = build_parameterized_emission_model(
         _config(native_provider, pressure, cia), spectral_grid=native_grid
     )
     one_native = NativeSpectrumMultiDatasetForwardModel(
@@ -259,7 +259,7 @@ def run(
             name=f"WASP-69b-{dataset.name}-observation-bins",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        model = build_parameterized_clear_sky_emission_model(
+        model = build_parameterized_emission_model(
             _config(provider, pressure, cia),
             spectral_grid=dataset.observation.spectral_grid,
         )

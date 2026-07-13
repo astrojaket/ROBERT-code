@@ -117,7 +117,7 @@ def test_versioned_official_picaso_reference_passes_acceptance() -> None:
         < 2.0e-6
     )
     assert report["metrics"]["cloudy_emission_difference_ppm"]["rms"] < 35.0
-    assert report["metrics"]["clear_transmission_difference_ppm"]["rms"] < 60.0
+    assert report["metrics"]["cloud_free_transmission_difference_ppm"]["rms"] < 60.0
     assert report["metrics"]["cloudy_transmission_difference_ppm"]["rms"] < 50.0
 
 

@@ -40,6 +40,12 @@ from robert_exoplanets import (
     planck_radiance_wavelength,
 )
 from robert_exoplanets.rt.sh4 import solve_thermal_sh4
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_DARK,
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -352,10 +358,10 @@ def _evaluate_robert(contract: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         source_quadrature_order=8,
     )
     cloudy_point = np.asarray(cloudy.point_radiance[:, :, 0])
-    clear_point = np.asarray(clear.point_radiance[:, :, 0])
+    cloud_free_point = np.asarray(clear.point_radiance[:, :, 0])
     native_point = np.asarray(native.point_radiance[:, :, 0])
     cloudy_disk = np.tensordot(contract["emission_weights"], cloudy_point, axes=(0, 0))
-    clear_disk = np.tensordot(contract["emission_weights"], clear_point, axes=(0, 0))
+    cloud_free_disk = np.tensordot(contract["emission_weights"], cloud_free_point, axes=(0, 0))
     native_disk = np.tensordot(contract["emission_weights"], native_point, axes=(0, 0))
     stellar = planck_radiance_wavelength(
         wavelength, float(contract["star_temperature_k"])
@@ -376,13 +382,13 @@ def _evaluate_robert(contract: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         "cloud_tau": cloud_tau,
         "total_tau": total_tau,
         "cloudy_point_radiance_w_m2_m_sr": cloudy_point,
-        "clear_point_radiance_w_m2_m_sr": clear_point,
+        "cloud_free_point_radiance_w_m2_m_sr": cloud_free_point,
         "native_point_radiance_w_m2_m_sr": native_point,
         "cloudy_disk_radiance_w_m2_m_sr": cloudy_disk,
-        "clear_disk_radiance_w_m2_m_sr": clear_disk,
+        "cloud_free_disk_radiance_w_m2_m_sr": cloud_free_disk,
         "native_disk_radiance_w_m2_m_sr": native_disk,
         "cloudy_eclipse_depth": cloudy_disk / stellar * area_ratio,
-        "clear_eclipse_depth": clear_disk / stellar * area_ratio,
+        "cloud_free_eclipse_depth": cloud_free_disk / stellar * area_ratio,
         "native_eclipse_depth": native_disk / stellar * area_ratio,
     }
 
@@ -487,9 +493,9 @@ def _metrics(
             robert["cloudy_disk_radiance_w_m2_m_sr"],
             external["cloudy_disk_radiance_w_m2_m_sr"],
         ),
-        "matched_hg_clear_disk_spectrum": _relative_metrics(
-            robert["clear_disk_radiance_w_m2_m_sr"],
-            external["clear_disk_radiance_w_m2_m_sr"],
+        "matched_hg_cloud_free_disk_spectrum": _relative_metrics(
+            robert["cloud_free_disk_radiance_w_m2_m_sr"],
+            external["cloud_free_disk_radiance_w_m2_m_sr"],
         ),
         "matched_hg_cloudy_eclipse_depth_ppm": _absolute_metrics(
             robert["cloudy_eclipse_depth"] * 1.0e6,
@@ -500,9 +506,9 @@ def _metrics(
             external["cloudy_disk_radiance_w_m2_m_sr"],
         ),
     }
-    cloud_effect_robert = robert["cloudy_eclipse_depth"] - robert["clear_eclipse_depth"]
+    cloud_effect_robert = robert["cloudy_eclipse_depth"] - robert["cloud_free_eclipse_depth"]
     cloud_effect_picaso = (
-        external["cloudy_eclipse_depth"] - external["clear_eclipse_depth"]
+        external["cloudy_eclipse_depth"] - external["cloud_free_eclipse_depth"]
     )
     metrics["cloud_effect_eclipse_depth_ppm"] = {
         "robert_max_abs": float(np.max(np.abs(cloud_effect_robert)) * 1.0e6),
@@ -590,10 +596,17 @@ def _plot(
     fig, axes = plt.subplots(2, 2, figsize=(13.2, 8.8), constrained_layout=True)
     ax_mie, ax_tau, ax_spectrum, ax_residual = axes.flat
 
-    ax_mie.plot(wavelength, robert["mass_extinction_m2_kg"], label="ROBERT", lw=2)
+    ax_mie.plot(
+        wavelength,
+        robert["mass_extinction_m2_kg"],
+        color=ROBERT_COLOR,
+        label="ROBERT",
+        lw=2,
+    )
     ax_mie.plot(
         wavelength,
         external["mass_extinction_m2_kg"],
+        color=REFERENCE_COLOR,
         label="Virga/PyMieScatt",
         lw=1.5,
         ls="--",
@@ -606,10 +619,17 @@ def _plot(
     )
     ax_mie.legend(frameon=False)
 
-    ax_tau.plot(wavelength, np.sum(robert["cloud_tau"], axis=0), label="ROBERT", lw=2)
+    ax_tau.plot(
+        wavelength,
+        np.sum(robert["cloud_tau"], axis=0),
+        color=ROBERT_COLOR,
+        label="ROBERT",
+        lw=2,
+    )
     ax_tau.plot(
         wavelength,
         np.sum(external["cloud_tau"], axis=0),
+        color=REFERENCE_COLOR,
         label="Virga",
         lw=1.5,
         ls="--",
@@ -622,11 +642,16 @@ def _plot(
     )
 
     ax_spectrum.plot(
-        wavelength, robert["cloudy_eclipse_depth"] * 1.0e6, label="ROBERT HG-SH4", lw=2
+        wavelength,
+        robert["cloudy_eclipse_depth"] * 1.0e6,
+        color=ROBERT_COLOR,
+        label="ROBERT HG-SH4",
+        lw=2,
     )
     ax_spectrum.plot(
         wavelength,
         external["cloudy_eclipse_depth"] * 1.0e6,
+        color=REFERENCE_COLOR,
         label="PICASO/Virga HG-SH4",
         lw=1.5,
         ls="--",
@@ -634,6 +659,7 @@ def _plot(
     ax_spectrum.plot(
         wavelength,
         robert["native_eclipse_depth"] * 1.0e6,
+        color=PURPLE_DARK,
         label="ROBERT exact-Mie + delta-M",
         lw=1.2,
         alpha=0.8,
@@ -647,8 +673,8 @@ def _plot(
         robert["cloudy_disk_radiance_w_m2_m_sr"]
         - external["cloudy_disk_radiance_w_m2_m_sr"]
     ) / external["cloudy_disk_radiance_w_m2_m_sr"]
-    ax_residual.plot(wavelength, residual * 100.0, lw=1.6)
-    ax_residual.axhline(0.0, color="0.25", lw=0.8)
+    ax_residual.plot(wavelength, residual * 100.0, color=RESIDUAL_COLOR, lw=1.6)
+    ax_residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.8)
     rms = metrics["matched_hg_cloudy_disk_spectrum"]["rms_relative_difference"] * 100.0
     ax_residual.text(
         0.03, 0.94, f"RMS = {rms:.6f}%", transform=ax_residual.transAxes, va="top"

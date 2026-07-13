@@ -28,7 +28,7 @@ from robert_exoplanets.rt.jax_random_overlap import (
     jax_random_overlap_species_tau,
 )
 from robert_exoplanets.rt.random_overlap import random_overlap_species_tau
-from retrieve_wasp69b_nircam_clear import SPECIES, _load_table
+from retrieve_wasp69b_nircam_cloud_free import SPECIES, _load_table
 
 
 def _median_seconds(call, repeats: int) -> float:

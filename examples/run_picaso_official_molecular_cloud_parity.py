@@ -102,26 +102,26 @@ def evaluate(contract_path: Path, output_path: Path, opacity_db: Path, resample:
     gas_tau = np.asarray(atmosphere.taugas[:, :, 0], dtype=float)
     cloud_tau = np.asarray(atmosphere.taucld[:, :, 0], dtype=float)
 
-    clear_case = _build_case(jdi, u, pd, contract, mie, cloudy=False)
+    cloud_free_case = _build_case(jdi, u, pd, contract, mie, cloudy=False)
     started = perf_counter()
-    clear = clear_case.spectrum(opacity, calculation="thermal", full_output=False)
-    clear_thermal_seconds = perf_counter() - started
+    clear = cloud_free_case.spectrum(opacity, calculation="thermal", full_output=False)
+    cloud_free_thermal_seconds = perf_counter() - started
 
     star_radius_cm = float(contract["star_radius_m"]) * 100.0
     cloudy_case.inputs["star"]["radius"] = star_radius_cm
     cloudy_case.inputs["star"]["radius_unit"] = "cm"
-    clear_case.inputs["star"]["radius"] = star_radius_cm
-    clear_case.inputs["star"]["radius_unit"] = "cm"
+    cloud_free_case.inputs["star"]["radius"] = star_radius_cm
+    cloud_free_case.inputs["star"]["radius_unit"] = "cm"
     started = perf_counter()
     cloudy_transmission = cloudy_case.spectrum(
         opacity, calculation="transmission", full_output=False
     )
     cloudy_transmission_seconds = perf_counter() - started
     started = perf_counter()
-    clear_transmission = clear_case.spectrum(
+    cloud_free_transmission = cloud_free_case.spectrum(
         opacity, calculation="transmission", full_output=False
     )
-    clear_transmission_seconds = perf_counter() - started
+    cloud_free_transmission_seconds = perf_counter() - started
 
     wavelength = 1.0e4 / np.asarray(cloudy["wavenumber"], dtype=float)
     order = np.argsort(wavelength)
@@ -179,9 +179,9 @@ def evaluate(contract_path: Path, output_path: Path, opacity_db: Path, resample:
             "mie": mie_seconds,
             "opacity_connection": opacity_seconds,
             "cloudy_thermal": cloudy_thermal_seconds,
-            "clear_thermal": clear_thermal_seconds,
+            "cloud_free_thermal": cloud_free_thermal_seconds,
             "cloudy_transmission": cloudy_transmission_seconds,
-            "clear_transmission": clear_transmission_seconds,
+            "cloud_free_transmission": cloud_free_transmission_seconds,
         },
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -200,11 +200,11 @@ def evaluate(contract_path: Path, output_path: Path, opacity_db: Path, resample:
         continuum_tau=continuum_tau,
         cloud_tau=cloud_tau[:, order],
         cloudy_thermal_flux_cgs=thermal_cloudy,
-        clear_thermal_flux_cgs=thermal_clear,
+        cloud_free_thermal_flux_cgs=thermal_clear,
         cloudy_eclipse_depth=thermal_cloudy / stellar_flux * area_ratio,
-        clear_eclipse_depth=thermal_clear / stellar_flux * area_ratio,
+        cloud_free_eclipse_depth=thermal_clear / stellar_flux * area_ratio,
         cloudy_transit_depth=np.asarray(cloudy_transmission["transit_depth"], dtype=float)[order],
-        clear_transit_depth=np.asarray(clear_transmission["transit_depth"], dtype=float)[order],
+        cloud_free_transit_depth=np.asarray(cloud_free_transmission["transit_depth"], dtype=float)[order],
         metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
     )
 

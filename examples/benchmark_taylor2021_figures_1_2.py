@@ -44,7 +44,7 @@ from robert_exoplanets import (
     cia_optical_depth,
     gauss_legendre_disk_geometry,
     grey_cloud_from_mass_extinction,
-    solve_clear_sky_emission,
+    solve_emission,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -329,7 +329,7 @@ def run_profile_cases(
             single_scattering_albedo=ssa,
             asymmetry_factor=0.0,
         )
-        result = solve_clear_sky_emission(
+        result = solve_emission(
             gas_tau,
             geometry=geometry,
             bottom_boundary="blackbody",

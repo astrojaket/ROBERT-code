@@ -30,10 +30,10 @@ from robert_exoplanets.opacity import (
 from robert_exoplanets.rt import CiaTable, DiscGeometry
 
 from .emission import (
-    ClearSkyEmissionForwardModel,
-    ClearSkyEmissionModelConfig,
-    ParameterizedClearSkyEmissionForwardModel,
-    ParameterizedClearSkyEmissionModelConfig,
+    EmissionForwardModel,
+    EmissionModelConfig,
+    ParameterizedEmissionForwardModel,
+    ParameterizedEmissionModelConfig,
 )
 from .multi_dataset import MultiDatasetEmissionForwardModel, PreparedSpectrumResponse
 
@@ -221,8 +221,8 @@ class ExoKTableBinning:
 
 
 @dataclass(frozen=True)
-class ClearSkyEmissionFactoryConfig:
-    """Complete typed Python configuration for a clear-sky emission model.
+class EmissionFactoryConfig:
+    """Complete typed Python configuration for a cloud-free emission model.
 
     ``pressure_grid=None`` selects the native pressure centers of the first
     configured opacity species. Set ``opacity_binning=None`` only when a
@@ -233,7 +233,7 @@ class ClearSkyEmissionFactoryConfig:
     star: Star
     temperature_profile: TemperatureProfile
     opacity_source: ExoKOpacitySource | ExoMolOpacitySamplingSource | OpacityProvider
-    model: ClearSkyEmissionModelConfig
+    model: EmissionModelConfig
     pressure_grid: PressureGrid | None = None
     temperature_parameters: Mapping[str, float] = field(default_factory=dict)
     opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
@@ -286,7 +286,7 @@ class ClearSkyEmissionFactoryConfig:
 
 
 @dataclass(frozen=True)
-class ParameterizedClearSkyEmissionFactoryConfig:
+class ParameterizedEmissionFactoryConfig:
     """Python configuration for runtime P–T and chemistry parameterizations."""
 
     planet: Planet
@@ -294,7 +294,7 @@ class ParameterizedClearSkyEmissionFactoryConfig:
     temperature_profile: TemperatureProfile
     chemistry_model: ChemistryModel
     opacity_source: ExoKOpacitySource | ExoMolOpacitySamplingSource | OpacityProvider
-    model: ParameterizedClearSkyEmissionModelConfig
+    model: ParameterizedEmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     pressure_grid: PressureGrid | None = None
     mean_molecular_weight: float = 2.3
@@ -359,15 +359,15 @@ def _uses_exok_binning(config: object) -> bool:
     )
 
 
-def build_clear_sky_emission_model(
-    config: ClearSkyEmissionFactoryConfig,
+def build_emission_model(
+    config: EmissionFactoryConfig,
     *,
     spectral_grid: SpectralGrid,
-) -> ClearSkyEmissionForwardModel:
-    """Construct and prepare a clear-sky emission model from Python config."""
+) -> EmissionForwardModel:
+    """Construct and prepare a cloud-free emission model from Python config."""
 
-    if not isinstance(config, ClearSkyEmissionFactoryConfig):
-        raise RobertConfigError("config must be a ClearSkyEmissionFactoryConfig")
+    if not isinstance(config, EmissionFactoryConfig):
+        raise RobertConfigError("config must be a EmissionFactoryConfig")
     native_provider = (
         config.opacity_source.load()
         if isinstance(config.opacity_source, (ExoKOpacitySource, ExoMolOpacitySamplingSource))
@@ -389,7 +389,7 @@ def build_clear_sky_emission_model(
             **_factory_manifest_metadata(config),
         },
     )
-    return ClearSkyEmissionForwardModel(
+    return EmissionForwardModel(
         planet=config.planet,
         star=config.star,
         spectral_grid=spectral_grid,
@@ -401,16 +401,16 @@ def build_clear_sky_emission_model(
     )
 
 
-def build_parameterized_clear_sky_emission_model(
-    config: ParameterizedClearSkyEmissionFactoryConfig,
+def build_parameterized_emission_model(
+    config: ParameterizedEmissionFactoryConfig,
     *,
     spectral_grid: SpectralGrid,
-) -> ParameterizedClearSkyEmissionForwardModel:
+) -> ParameterizedEmissionForwardModel:
     """Construct a prepared model with runtime P–T and chemistry evaluation."""
 
-    if not isinstance(config, ParameterizedClearSkyEmissionFactoryConfig):
+    if not isinstance(config, ParameterizedEmissionFactoryConfig):
         raise RobertConfigError(
-            "config must be a ParameterizedClearSkyEmissionFactoryConfig"
+            "config must be a ParameterizedEmissionFactoryConfig"
         )
     native_provider = (
         config.opacity_source.load()
@@ -436,7 +436,7 @@ def build_parameterized_clear_sky_emission_model(
             **_parameterized_factory_manifest_metadata(config),
         },
     )
-    return ParameterizedClearSkyEmissionForwardModel(
+    return ParameterizedEmissionForwardModel(
         planet=config.planet,
         star=config.star,
         spectral_grid=spectral_grid,
@@ -449,7 +449,7 @@ def build_parameterized_clear_sky_emission_model(
 
 
 def build_multi_dataset_emission_model(
-    configs: Mapping[str, ParameterizedClearSkyEmissionFactoryConfig],
+    configs: Mapping[str, ParameterizedEmissionFactoryConfig],
     *,
     spectral_grids: Mapping[str, SpectralGrid],
     responses: Mapping[str, PreparedSpectrumResponse] | None = None,
@@ -474,10 +474,10 @@ def build_multi_dataset_emission_model(
     for name, config in named_configs.items():
         _validate_shared_atmosphere_config(reference, config, name=name)
 
-    models: dict[str, ParameterizedClearSkyEmissionForwardModel] = {}
+    models: dict[str, ParameterizedEmissionForwardModel] = {}
     shared_builder = None
     for name, config in named_configs.items():
-        model = build_parameterized_clear_sky_emission_model(
+        model = build_parameterized_emission_model(
             config,
             spectral_grid=named_grids[name],
         )
@@ -493,8 +493,8 @@ def build_multi_dataset_emission_model(
 
 
 def _validate_shared_atmosphere_config(
-    reference: ParameterizedClearSkyEmissionFactoryConfig,
-    candidate: ParameterizedClearSkyEmissionFactoryConfig,
+    reference: ParameterizedEmissionFactoryConfig,
+    candidate: ParameterizedEmissionFactoryConfig,
     *,
     name: str,
 ) -> None:
@@ -534,7 +534,7 @@ def _validate_shared_atmosphere_config(
         )
 
 
-def _factory_manifest_metadata(config: ClearSkyEmissionFactoryConfig) -> dict[str, str]:
+def _factory_manifest_metadata(config: EmissionFactoryConfig) -> dict[str, str]:
     profile_name = getattr(config.temperature_profile, "name", "")
     metadata = {
         "factory_configuration_interface": "typed_python",
@@ -600,7 +600,7 @@ def _factory_manifest_metadata(config: ClearSkyEmissionFactoryConfig) -> dict[st
 
 
 def _parameterized_factory_manifest_metadata(
-    config: ParameterizedClearSkyEmissionFactoryConfig,
+    config: ParameterizedEmissionFactoryConfig,
 ) -> dict[str, str]:
     metadata = {
         "factory_configuration_interface": "typed_python",
@@ -686,13 +686,24 @@ def pressure_grid_from_opacity(
     )
 
 
+# Backward-compatible aliases for callers using the original cloud-free names.
+ClearSkyEmissionFactoryConfig = EmissionFactoryConfig
+ParameterizedClearSkyEmissionFactoryConfig = ParameterizedEmissionFactoryConfig
+build_clear_sky_emission_model = build_emission_model
+build_parameterized_clear_sky_emission_model = build_parameterized_emission_model
+
+
 __all__ = [
     "ClearSkyEmissionFactoryConfig",
+    "EmissionFactoryConfig",
     "ExoKOpacitySource",
     "ExoKTableBinning",
+    "ParameterizedEmissionFactoryConfig",
     "ParameterizedClearSkyEmissionFactoryConfig",
     "build_clear_sky_emission_model",
+    "build_emission_model",
     "build_multi_dataset_emission_model",
+    "build_parameterized_emission_model",
     "build_parameterized_clear_sky_emission_model",
     "pressure_grid_from_opacity",
 ]

@@ -98,7 +98,7 @@ def main() -> None:
         total_asymmetry,
         emission_mu,
     )
-    clear_point = _solve_picaso_sh4(
+    cloud_free_point = _solve_picaso_sh4(
         get_thermal_SH,
         wavelength,
         pressure_edges,
@@ -109,7 +109,7 @@ def main() -> None:
         emission_mu,
     )
     cloudy_disk = np.tensordot(emission_weights, cloudy_point, axes=(0, 0))
-    clear_disk = np.tensordot(emission_weights, clear_point, axes=(0, 0))
+    cloud_free_disk = np.tensordot(emission_weights, cloud_free_point, axes=(0, 0))
     stellar = _planck_radiance(wavelength, star_temperature_k)
     area_ratio = (planet_radius_m / star_radius_m) ** 2
 
@@ -137,11 +137,11 @@ def main() -> None:
         cloud_tau=cloud_tau,
         total_tau=total_tau,
         cloudy_point_radiance_w_m2_m_sr=cloudy_point,
-        clear_point_radiance_w_m2_m_sr=clear_point,
+        cloud_free_point_radiance_w_m2_m_sr=cloud_free_point,
         cloudy_disk_radiance_w_m2_m_sr=cloudy_disk,
-        clear_disk_radiance_w_m2_m_sr=clear_disk,
+        cloud_free_disk_radiance_w_m2_m_sr=cloud_free_disk,
         cloudy_eclipse_depth=cloudy_disk / stellar * area_ratio,
-        clear_eclipse_depth=clear_disk / stellar * area_ratio,
+        cloud_free_eclipse_depth=cloud_free_disk / stellar * area_ratio,
         metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
     )
 

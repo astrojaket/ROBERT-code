@@ -19,7 +19,7 @@ from robert_exoplanets.io.task_config import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE = ROOT / "configurations" / "wasp69b_clear_R1000.yaml"
+EXAMPLE = ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
 TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 

@@ -1,4 +1,4 @@
-"""Tests for clear-sky thermal-emission reference solver."""
+"""Tests for cloud-free thermal-emission reference solver."""
 
 from __future__ import annotations
 
@@ -18,13 +18,13 @@ from robert_exoplanets import (
     gauss_legendre_disk_geometry,
     geometry_from_emission_angles,
     planck_radiance_wavelength,
-    solve_clear_sky_emission,
-    solve_clear_sky_emission_spectrum,
+    solve_emission,
+    solve_emission_spectrum,
 )
 from robert_exoplanets.core import RobertValidationError
 
 
-def test_isothermal_clear_sky_with_blackbody_bottom_recovers_planck_radiance() -> None:
+def test_isothermal_cloud_free_with_blackbody_bottom_recovers_planck_radiance() -> None:
     temperature = 1400.0
     gas_tau = _gas_tau(
         temperature=[temperature, temperature],
@@ -32,7 +32,7 @@ def test_isothermal_clear_sky_with_blackbody_bottom_recovers_planck_radiance() -
     )
     mu, weights = disk_average_quadrature(4)
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         emission_angle_cosines=mu,
         emission_angle_weights=weights,
@@ -54,12 +54,12 @@ def test_spectrum_only_solver_matches_diagnostic_solver() -> None:
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
     )
     geometry = gauss_legendre_disk_geometry(4)
-    diagnostic = solve_clear_sky_emission(
+    diagnostic = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
     )
-    spectrum = solve_clear_sky_emission_spectrum(
+    spectrum = solve_emission_spectrum(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
@@ -91,7 +91,7 @@ def test_single_layer_without_bottom_matches_absorbing_slab_solution() -> None:
     )
     gas_tau = assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=10.0)
 
-    result = solve_clear_sky_emission(gas_tau, bottom_boundary="none")
+    result = solve_emission(gas_tau, bottom_boundary="none")
 
     source = planck_radiance_wavelength([2.0], temperature)
     expected = source * (-np.expm1(-gas_tau.total_tau[0, :, 0]))
@@ -99,7 +99,7 @@ def test_single_layer_without_bottom_matches_absorbing_slab_solution() -> None:
     np.testing.assert_allclose(result.bottom_contribution_radiance, 0.0)
 
 
-def test_clear_emission_uses_edge_temperatures_for_exact_linear_source() -> None:
+def test_emission_uses_edge_temperatures_for_exact_linear_source() -> None:
     pressure_grid = PressureGrid(
         edges=np.array([1.0e-5, 1.0e-3]),
         centers=np.array([1.0e-4]),
@@ -121,7 +121,7 @@ def test_clear_emission_uses_edge_temperatures_for_exact_linear_source() -> None
     )
     gas_tau = assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=10.0)
 
-    result = solve_clear_sky_emission(gas_tau, bottom_boundary="blackbody")
+    result = solve_emission(gas_tau, bottom_boundary="blackbody")
 
     tau = float(gas_tau.total_tau[0, 0, 0])
     top = float(planck_radiance_wavelength([2.0], 800.0)[0])
@@ -136,7 +136,7 @@ def test_clear_emission_uses_edge_temperatures_for_exact_linear_source() -> None
     )
 
 
-def test_clear_sky_emission_accepts_additional_layer_extinction() -> None:
+def test_emission_accepts_additional_layer_extinction() -> None:
     pressure_grid = PressureGrid(
         edges=np.array([1.0e-5, 1.0e-3]),
         centers=np.array([1.0e-4]),
@@ -164,7 +164,7 @@ def test_clear_sky_emission_accepts_additional_layer_extinction() -> None:
         pressure_grid=gas_tau.pressure_grid,
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         bottom_boundary="none",
         additional_optical_depths=[continuum],
@@ -178,7 +178,7 @@ def test_clear_sky_emission_accepts_additional_layer_extinction() -> None:
     assert "test continuum" in result.metadata["opacity_sources"]
 
 
-def test_clear_sky_emission_returns_blackbody_eclipse_depth_when_star_is_blackbody() -> None:
+def test_emission_returns_blackbody_eclipse_depth_when_star_is_blackbody() -> None:
     planet_temperature = 1250.0
     star_temperature = 6000.0
     planet_radius = 1.4e8
@@ -188,7 +188,7 @@ def test_clear_sky_emission_returns_blackbody_eclipse_depth_when_star_is_blackbo
         kcoeff=np.array([[[[1.0e-22, 2.0e-22]], [[3.0e-22, 4.0e-22]]]]),
     )
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         planet_radius_m=planet_radius,
         star_radius_m=star_radius,
@@ -211,7 +211,7 @@ def test_normalized_layer_contribution_sums_to_one_for_nonzero_contribution() ->
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
     )
 
-    result = solve_clear_sky_emission(gas_tau, bottom_boundary="none")
+    result = solve_emission(gas_tau, bottom_boundary="none")
 
     normalized = result.normalized_layer_contribution()
     np.testing.assert_allclose(np.sum(normalized, axis=0), np.ones(result.radiance.spectral_grid.size))
@@ -226,7 +226,7 @@ def test_disk_average_quadrature_weights_sum_to_one() -> None:
     np.testing.assert_allclose(np.sum(weights), 1.0)
 
 
-def test_clear_sky_emission_geometry_matches_legacy_quadrature_inputs() -> None:
+def test_emission_geometry_matches_legacy_quadrature_inputs() -> None:
     gas_tau = _gas_tau(
         temperature=[900.0, 1200.0],
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
@@ -234,13 +234,13 @@ def test_clear_sky_emission_geometry_matches_legacy_quadrature_inputs() -> None:
     mu, weights = disk_average_quadrature(3)
     geometry = geometry_from_emission_angles(mu, weights, name="test_disc")
 
-    legacy = solve_clear_sky_emission(
+    legacy = solve_emission(
         gas_tau,
         emission_angle_cosines=mu,
         emission_angle_weights=weights,
         bottom_boundary="none",
     )
-    with_geometry = solve_clear_sky_emission(
+    with_geometry = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="none",
@@ -261,7 +261,7 @@ def test_clear_sky_emission_geometry_matches_legacy_quadrature_inputs() -> None:
     assert with_geometry.metadata["geometry"] == "test_disc"
 
 
-def test_clear_sky_emission_accepts_disk_geometry_object() -> None:
+def test_emission_accepts_disk_geometry_object() -> None:
     temperature = 1400.0
     gas_tau = _gas_tau(
         temperature=[temperature, temperature],
@@ -269,7 +269,7 @@ def test_clear_sky_emission_accepts_disk_geometry_object() -> None:
     )
     geometry = gauss_legendre_disk_geometry(4)
 
-    result = solve_clear_sky_emission(
+    result = solve_emission(
         gas_tau,
         geometry=geometry,
         bottom_boundary="blackbody",
@@ -282,7 +282,7 @@ def test_clear_sky_emission_accepts_disk_geometry_object() -> None:
     assert result.metadata["geometry_quadrature"] == "gauss_legendre_mu"
 
 
-def test_clear_sky_emission_rejects_geometry_combined_with_legacy_angles() -> None:
+def test_emission_rejects_geometry_combined_with_legacy_angles() -> None:
     gas_tau = _gas_tau(
         temperature=[1000.0, 1000.0],
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
@@ -290,7 +290,7 @@ def test_clear_sky_emission_rejects_geometry_combined_with_legacy_angles() -> No
     geometry = gauss_legendre_disk_geometry(2)
 
     with pytest.raises(RobertValidationError, match="geometry cannot be combined"):
-        solve_clear_sky_emission(
+        solve_emission(
             gas_tau,
             geometry=geometry,
             emission_angle_cosines=[1.0],
@@ -298,14 +298,14 @@ def test_clear_sky_emission_rejects_geometry_combined_with_legacy_angles() -> No
         )
 
 
-def test_clear_sky_emission_rejects_partial_eclipse_depth_inputs() -> None:
+def test_emission_rejects_partial_eclipse_depth_inputs() -> None:
     gas_tau = _gas_tau(
         temperature=[1000.0, 1000.0],
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
     )
 
     with pytest.raises(RobertValidationError, match="all required for eclipse depth"):
-        solve_clear_sky_emission(gas_tau, planet_radius_m=1.0)
+        solve_emission(gas_tau, planet_radius_m=1.0)
 
 
 def _gas_tau(
@@ -343,7 +343,7 @@ def _evaluated_opacity(
         species=("H2O",),
         g_samples=np.array([0.25, 0.75]) if kcoeff.shape[-1] == 2 else np.array([0.5]),
         g_weights=np.array([0.4, 0.6]) if kcoeff.shape[-1] == 2 else np.array([1.0]),
-        cache_key="test-clear-sky-cache-key",
+        cache_key="test-cloud-free-cache-key",
     )
     return EvaluatedCorrelatedKOpacity(
         prepared=prepared,

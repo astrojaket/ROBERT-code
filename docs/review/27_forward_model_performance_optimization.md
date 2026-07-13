@@ -140,7 +140,7 @@ output.
 
 The first WASP-69b retrieval wrapper shared parameter values but constructed a
 complete atmosphere independently for every instrument mode. ROBERT now
-exposes `ParameterizedClearSkyEmissionForwardModel.evaluate_atmosphere` and a
+exposes `ParameterizedEmissionForwardModel.evaluate_atmosphere` and a
 typed `MultiDatasetEmissionForwardModel`. The latter validates that
 all mode models use the exact same `AtmosphereBuilder`, evaluates temperature,
 FastChem equilibrium chemistry, mean molecular weight, and the atmospheric

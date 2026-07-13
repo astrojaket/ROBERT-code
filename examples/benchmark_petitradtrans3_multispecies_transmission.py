@@ -30,6 +30,13 @@ from robert_exoplanets import (
     rayleigh_scattering_optical_depth,
     solve_absorption_transmission,
 )
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_DARK,
+    PURPLE_LIGHT,
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "petitradtrans3_stable"
@@ -184,7 +191,7 @@ def main() -> dict[str, object]:
         )
 
     start = perf_counter()
-    clear_result, strict_result, native_result, strict_rayleigh, native_rayleigh = solve_cases()
+    cloud_free_result, strict_result, native_result, strict_rayleigh, native_rayleigh = solve_cases()
     first_s = perf_counter() - start
     durations = []
     for _ in range(3):
@@ -201,10 +208,10 @@ def main() -> dict[str, object]:
         solve_native_case()
         native_durations.append(perf_counter() - start)
     native_steady_s = float(np.median(native_durations))
-    robert_clear = np.asarray(clear_result.transit_depth.values)
+    robert_clear = np.asarray(cloud_free_result.transit_depth.values)
     robert_strict = np.asarray(strict_result.transit_depth.values)
     robert_native = np.asarray(native_result.transit_depth.values)
-    residual_clear_ppm = (robert_clear - p_rt_clear) * 1.0e6
+    residual_cloud_free_ppm = (robert_clear - p_rt_clear) * 1.0e6
     residual_strict_ppm = (robert_strict - p_rt_rayleigh) * 1.0e6
     residual_native_ppm = (robert_native - p_rt_rayleigh) * 1.0e6
     p_rt_rayleigh_effect_ppm = (p_rt_rayleigh - p_rt_clear) * 1.0e6
@@ -226,7 +233,7 @@ def main() -> dict[str, object]:
         },
         "metrics_by_band": _metrics_by_band(
             wavelength,
-            residual_clear_ppm,
+            residual_cloud_free_ppm,
             residual_strict_ppm,
             residual_native_ppm,
             p_rt_rayleigh_effect_ppm,
@@ -263,7 +270,7 @@ def main() -> dict[str, object]:
         p_rt_clear,
         p_rt_rayleigh,
         robert_strict,
-        residual_clear_ppm,
+        residual_cloud_free_ppm,
         residual_strict_ppm,
         residual_native_ppm,
         p_rt_rayleigh_effect_ppm,
@@ -286,8 +293,8 @@ def _metrics_by_band(
     for name, (lower, upper) in bands.items():
         selected = (wavelength >= lower) & (wavelength <= upper)
         output[name] = {
-            "clear_rms_difference_ppm": float(np.sqrt(np.mean(clear[selected] ** 2))),
-            "clear_max_abs_difference_ppm": float(np.max(np.abs(clear[selected]))),
+            "cloud_free_rms_difference_ppm": float(np.sqrt(np.mean(clear[selected] ** 2))),
+            "cloud_free_max_abs_difference_ppm": float(np.max(np.abs(clear[selected]))),
             "shared_rayleigh_rms_difference_ppm": float(np.sqrt(np.mean(strict[selected] ** 2))),
             "shared_rayleigh_max_abs_difference_ppm": float(np.max(np.abs(strict[selected]))),
             "native_rayleigh_rms_difference_ppm": float(np.sqrt(np.mean(native[selected] ** 2))),
@@ -312,24 +319,24 @@ def _plot(
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
     spectrum, residual, effect, optical = axes.flat
     spectrum.semilogx(wavelength, p_rt_clear * 1.0e6, color="#999999", lw=1.0, label="pRT3 no Rayleigh")
-    spectrum.semilogx(wavelength, p_rt_rayleigh * 1.0e6, color="#222222", lw=1.2, label="pRT3 + Rayleigh")
-    spectrum.semilogx(wavelength, robert_strict * 1.0e6, color="#e45756", lw=1.0, ls="--", label="ROBERT shared Rayleigh")
+    spectrum.semilogx(wavelength, p_rt_rayleigh * 1.0e6, color=REFERENCE_COLOR, lw=1.2, label="pRT3 + Rayleigh")
+    spectrum.semilogx(wavelength, robert_strict * 1.0e6, color=ROBERT_COLOR, lw=1.0, ls="--", label="ROBERT shared Rayleigh")
     spectrum.set(ylabel="Transit depth [ppm]", title="Six molecules + CIA + H$_2$/He Rayleigh")
     spectrum.legend(frameon=False)
     residual.semilogx(wavelength, residual_clear, color="#777777", lw=0.8, label="No Rayleigh")
-    residual.semilogx(wavelength, residual_strict, color="#4c78a8", lw=0.9, label="Shared pRT Rayleigh")
-    residual.semilogx(wavelength, residual_native, color="#f58518", lw=0.8, alpha=0.8, label="ROBERT native Rayleigh")
-    residual.axhline(0.0, color="#222222", lw=0.8)
+    residual.semilogx(wavelength, residual_strict, color=RESIDUAL_COLOR, lw=0.9, label="Shared pRT Rayleigh")
+    residual.semilogx(wavelength, residual_native, color=PURPLE_LIGHT, lw=0.8, alpha=0.8, label="ROBERT native Rayleigh")
+    residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.8)
     residual.set(ylabel="ROBERT - pRT3 [ppm]", title="Transmission residual")
     residual.legend(frameon=False)
-    effect.semilogx(wavelength, p_rt_effect, color="#222222", lw=1.2, label="pRT3")
-    effect.semilogx(wavelength, strict_effect, color="#4c78a8", lw=0.9, ls="--", label="ROBERT, pRT opacity")
-    effect.semilogx(wavelength, native_effect, color="#54a24b", lw=0.9, label="ROBERT native formula")
+    effect.semilogx(wavelength, p_rt_effect, color=REFERENCE_COLOR, lw=1.2, label="pRT3")
+    effect.semilogx(wavelength, strict_effect, color=ROBERT_COLOR, lw=0.9, ls="--", label="ROBERT, pRT opacity")
+    effect.semilogx(wavelength, native_effect, color=PURPLE_DARK, lw=0.9, label="ROBERT native formula")
     effect.set(ylabel="Rayleigh transit-depth effect [ppm]", title="Rayleigh extinction isolation")
     effect.legend(frameon=False)
     selected = wavelength <= 1.0
-    optical.plot(wavelength[selected], p_rt_effect[selected], color="#222222", lw=1.2, label="pRT3")
-    optical.plot(wavelength[selected], native_effect[selected], color="#54a24b", lw=1.0, label="ROBERT native")
+    optical.plot(wavelength[selected], p_rt_effect[selected], color=REFERENCE_COLOR, lw=1.2, label="pRT3")
+    optical.plot(wavelength[selected], native_effect[selected], color=ROBERT_COLOR, lw=1.0, label="ROBERT native")
     optical.set(ylabel="Rayleigh effect [ppm]", title="Optical Rayleigh slope")
     for axis in axes.flat:
         axis.set_xlabel("Wavelength [micron]")

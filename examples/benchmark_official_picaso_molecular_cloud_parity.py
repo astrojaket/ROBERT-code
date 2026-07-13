@@ -42,6 +42,11 @@ from robert_exoplanets import (
     solve_absorption_transmission,
 )
 from robert_exoplanets.rt.sh4 import solve_thermal_sh4_spectrum
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_PALETTE,
+    REFERENCE_COLOR,
+    ROBERT_COLOR,
+)
 
 try:
     from examples.benchmark_end_to_end_cloud_parity import (
@@ -413,11 +418,11 @@ def _evaluate_robert(contract, opacity_stride: int):
     )
     rayleigh_tau = np.asarray(rayleigh.tau)
     absorption_tau = gas.total_tau[:, :, 0] + np.asarray(cia.tau)
-    clear_tau = absorption_tau + rayleigh_tau
-    clear_omega = np.divide(
-        rayleigh_tau, clear_tau, out=np.zeros_like(clear_tau), where=clear_tau > 0.0
+    cloud_free_tau = absorption_tau + rayleigh_tau
+    cloud_free_omega = np.divide(
+        rayleigh_tau, cloud_free_tau, out=np.zeros_like(cloud_free_tau), where=cloud_free_tau > 0.0
     )
-    cloudy_tau = clear_tau + cloud_tau
+    cloudy_tau = cloud_free_tau + cloud_tau
     scattering_tau = rayleigh_tau + cloud_scattering
     cloudy_omega = np.divide(
         scattering_tau,
@@ -447,9 +452,9 @@ def _evaluate_robert(contract, opacity_stride: int):
         backend="numba",
     )
     clear = solve_thermal_sh4_spectrum(
-        clear_tau[:, :, None],
-        clear_omega[:, :, None],
-        np.zeros_like(clear_tau[:, :, None]),
+        cloud_free_tau[:, :, None],
+        cloud_free_omega[:, :, None],
+        np.zeros_like(cloud_free_tau[:, :, None]),
         level_planck,
         **common,
     )
@@ -480,7 +485,7 @@ def _evaluate_robert(contract, opacity_stride: int):
         reference_pressure=float(contract["reference_pressure_bar"]),
         reference_pressure_unit="bar",
     )
-    clear_transmission = solve_absorption_transmission(
+    cloud_free_transmission = solve_absorption_transmission(
         gas,
         geometry,
         star_radius_m=float(contract["star_radius_m"]),
@@ -506,9 +511,9 @@ def _evaluate_robert(contract, opacity_stride: int):
         "continuum_tau": np.asarray(cia.tau),
         "gas_tau": absorption_tau,
         "cloud_tau": cloud_tau,
-        "clear_eclipse_depth": clear.radiance / stellar * area_ratio,
+        "cloud_free_eclipse_depth": clear.radiance / stellar * area_ratio,
         "cloudy_eclipse_depth": cloudy.radiance / stellar * area_ratio,
-        "clear_transit_depth": np.asarray(clear_transmission.transit_depth.values),
+        "cloud_free_transit_depth": np.asarray(cloud_free_transmission.transit_depth.values),
         "cloudy_transit_depth": np.asarray(cloudy_transmission.transit_depth.values),
         "bottom_radius_m": np.array(geometry.bottom_radius_m),
         "top_radius_m": np.array(geometry.top_radius_m),
@@ -612,11 +617,11 @@ def _compact_outputs(edges, wavelength, robert, picaso, contract):
         stellar_flux = planck_radiance_wavelength(
             native, float(contract["star_temperature_k"])
         )
-        for name in ("clear_eclipse_depth", "cloudy_eclipse_depth"):
+        for name in ("cloud_free_eclipse_depth", "cloudy_eclipse_depth"):
             compact[f"{framework}_{name}"] = _bin_ratio(
                 native, values[name] * stellar_flux, stellar_flux, edges
             )
-        for name in ("clear_transit_depth", "cloudy_transit_depth"):
+        for name in ("cloud_free_transit_depth", "cloudy_transit_depth"):
             compact[f"{framework}_{name}"] = _bin_mean(native, values[name], edges)
         total_molecular = np.sum(values["molecular_tau_by_species"], axis=(0, 1))
         compact[f"{framework}_molecular_column_tau"] = _bin_mean(
@@ -661,9 +666,9 @@ def _bin_ratio(x, numerator, denominator, edges):
 
 
 def _metrics(robert, picaso, compact, metadata):
-    clear_eclipse_difference = (
-        compact["robert_clear_eclipse_depth"]
-        - compact["picaso_clear_eclipse_depth"]
+    cloud_free_eclipse_difference = (
+        compact["robert_cloud_free_eclipse_depth"]
+        - compact["picaso_cloud_free_eclipse_depth"]
     ) * 1.0e6
     eclipse_difference = (
         compact["robert_cloudy_eclipse_depth"]
@@ -673,25 +678,25 @@ def _metrics(robert, picaso, compact, metadata):
         compact["robert_cloudy_transit_depth"]
         - compact["picaso_cloudy_transit_depth"]
     ) * 1.0e6
-    clear_transit_difference = (
-        compact["robert_clear_transit_depth"]
-        - compact["picaso_clear_transit_depth"]
+    cloud_free_transit_difference = (
+        compact["robert_cloud_free_transit_depth"]
+        - compact["picaso_cloud_free_transit_depth"]
     ) * 1.0e6
     robert_cloud_effect = (
         compact["robert_cloudy_eclipse_depth"]
-        - compact["robert_clear_eclipse_depth"]
+        - compact["robert_cloud_free_eclipse_depth"]
     ) * 1.0e6
     picaso_cloud_effect = (
         compact["picaso_cloudy_eclipse_depth"]
-        - compact["picaso_clear_eclipse_depth"]
+        - compact["picaso_cloud_free_eclipse_depth"]
     ) * 1.0e6
     robert_transit_cloud = (
         compact["robert_cloudy_transit_depth"]
-        - compact["robert_clear_transit_depth"]
+        - compact["robert_cloud_free_transit_depth"]
     ) * 1.0e6
     picaso_transit_cloud = (
         compact["picaso_cloudy_transit_depth"]
-        - compact["picaso_clear_transit_depth"]
+        - compact["picaso_cloud_free_transit_depth"]
     ) * 1.0e6
     species = {}
     for name in SPECIES:
@@ -716,9 +721,11 @@ def _metrics(robert, picaso, compact, metadata):
     return {
         "cloud_mass_extinction": cloud_mie,
         "molecular_column_tau_by_species": species,
-        "clear_emission_difference_ppm": _summary(clear_eclipse_difference),
+        "cloud_free_emission_difference_ppm": _summary(
+            cloud_free_eclipse_difference
+        ),
         "cloudy_emission_difference_ppm": _summary(eclipse_difference),
-        "clear_transmission_difference_ppm": _summary(clear_transit_difference),
+        "cloud_free_transmission_difference_ppm": _summary(cloud_free_transit_difference),
         "cloudy_transmission_difference_ppm": _summary(transit_difference),
         "robert_emission_cloud_effect_ppm": _summary(robert_cloud_effect),
         "picaso_emission_cloud_effect_ppm": _summary(picaso_cloud_effect),
@@ -759,24 +766,46 @@ def _summary(values):
 
 def _plot(path, wavelength, data):
     fig, axes = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-    axes[0].plot(wavelength, data["robert_cloudy_eclipse_depth"] * 1e6, label="ROBERT")
-    axes[0].plot(wavelength, data["picaso_cloudy_eclipse_depth"] * 1e6, label="PICASO")
+    axes[0].plot(
+        wavelength,
+        data["robert_cloudy_eclipse_depth"] * 1e6,
+        color=ROBERT_COLOR,
+        label="ROBERT",
+    )
+    axes[0].plot(
+        wavelength,
+        data["picaso_cloudy_eclipse_depth"] * 1e6,
+        color=REFERENCE_COLOR,
+        linestyle="--",
+        label="PICASO",
+    )
     axes[0].set_ylabel("Eclipse depth (ppm)")
     axes[0].legend()
-    axes[1].plot(wavelength, data["robert_cloudy_transit_depth"] * 1e6, label="ROBERT")
-    axes[1].plot(wavelength, data["picaso_cloudy_transit_depth"] * 1e6, label="PICASO")
+    axes[1].plot(
+        wavelength,
+        data["robert_cloudy_transit_depth"] * 1e6,
+        color=ROBERT_COLOR,
+        label="ROBERT",
+    )
+    axes[1].plot(
+        wavelength,
+        data["picaso_cloudy_transit_depth"] * 1e6,
+        color=REFERENCE_COLOR,
+        linestyle="--",
+        label="PICASO",
+    )
     axes[1].set_ylabel("Transit depth (ppm)")
     for index, name in enumerate(SPECIES):
         axes[2].plot(
             wavelength,
             np.log10(np.maximum(data[f"robert_{name}_column_tau"], 1e-300)),
             label=f"ROBERT {name}",
-            color=f"C{index}",
+            color=PURPLE_PALETTE[index],
         )
         axes[2].plot(
             wavelength,
             np.log10(np.maximum(data[f"picaso_{name}_column_tau"], 1e-300)),
-            color=f"C{index}",
+            color=PURPLE_PALETTE[index],
             linestyle="--",
             label=f"PICASO {name}",
         )

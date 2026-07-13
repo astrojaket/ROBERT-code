@@ -29,7 +29,13 @@ from robert_exoplanets import (
     gauss_legendre_disk_geometry,
     hydrostatic_path_geometry,
     solve_absorption_transmission,
-    solve_clear_sky_emission,
+    solve_emission,
+)
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_LIGHT,
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,7 +136,7 @@ def main() -> dict[str, object]:
                 "vertical_tau_source": "petitRADTRANS3_cumulative_tau",
             },
         )
-        return solve_clear_sky_emission(
+        return solve_emission(
             optical_depth,
             geometry=geometry,
             bottom_boundary="blackbody",
@@ -309,24 +315,24 @@ def _plot(
 ) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
     emission, residual, transmission, timing = axes.flat
-    emission.loglog(wavelength, p_rt_flux, color="#222222", lw=1.3, label="pRT 3.3.3")
-    emission.loglog(wavelength, robert_flux, color="#e45756", lw=1.0, ls="--", label="ROBERT")
+    emission.loglog(wavelength, p_rt_flux, color=REFERENCE_COLOR, lw=1.3, label="pRT 3.3.3")
+    emission.loglog(wavelength, robert_flux, color=ROBERT_COLOR, lw=1.0, ls="--", label="ROBERT")
     emission.set(ylabel=r"Planet flux $F_\lambda$ [W m$^{-2}$ m$^{-1}$]", title="H$_2$O + H$_2$ CIA emission")
-    residual.semilogx(wavelength, emission_relative * 100.0, color="#4c78a8", lw=1.0)
-    residual.axhline(0.0, color="#222222", lw=0.8)
+    residual.semilogx(wavelength, emission_relative * 100.0, color=RESIDUAL_COLOR, lw=1.0)
+    residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.8)
     residual.set(ylabel="(ROBERT - pRT3) / pRT3 [%]", title="Shared-opacity emission residual")
-    transmission.semilogx(wavelength, p_rt_transit * 1.0e6, color="#222222", lw=1.2, label="pRT 3.3.3")
-    transmission.semilogx(wavelength, robert_transit * 1.0e6, color="#54a24b", lw=1.0, ls="--", label="ROBERT")
+    transmission.semilogx(wavelength, p_rt_transit * 1.0e6, color=REFERENCE_COLOR, lw=1.2, label="pRT 3.3.3")
+    transmission.semilogx(wavelength, robert_transit * 1.0e6, color=ROBERT_COLOR, lw=1.0, ls="--", label="ROBERT")
     twin = transmission.twinx()
-    twin.semilogx(wavelength, transmission_difference_ppm, color="#f58518", alpha=0.55, lw=0.8)
+    twin.semilogx(wavelength, transmission_difference_ppm, color=PURPLE_LIGHT, alpha=0.55, lw=0.8)
     transmission.set(ylabel="Transit depth [ppm]", title="Shared-opacity transmission")
-    twin.set_ylabel("ROBERT - pRT3 [ppm]", color="#f58518")
+    twin.set_ylabel("ROBERT - pRT3 [ppm]", color=PURPLE_LIGHT)
     labels = ["pRT3 emission", "ROBERT emission", "pRT3 transit", "ROBERT transit"]
     first = [timings["petitradtrans3_emission_first_s"], timings["robert_emission_first_s"], timings["petitradtrans3_transmission_first_s"], timings["robert_transmission_first_s"]]
     steady = [timings["petitradtrans3_emission_steady_median_s"], timings["robert_emission_steady_median_s"], timings["petitradtrans3_transmission_steady_median_s"], timings["robert_transmission_steady_median_s"]]
     x = np.arange(4)
     timing.bar(x - 0.18, first, 0.36, color="#b9b9b9", label="First")
-    timing.bar(x + 0.18, steady, 0.36, color="#4c78a8", label="Steady")
+    timing.bar(x + 0.18, steady, 0.36, color=ROBERT_COLOR, label="Steady")
     timing.set_yscale("log")
     timing.set_xticks(x, labels, rotation=18, ha="right")
     timing.set(ylabel="Wall time [s]", title="0.3--12 micron timings")

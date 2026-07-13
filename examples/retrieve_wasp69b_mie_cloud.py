@@ -40,8 +40,8 @@ from robert_exoplanets import (
     MultiDatasetGaussianLikelihood,
     MultiDatasetRetrievalProblem,
     OpticalConstantsCatalog,
-    ParameterizedClearSkyEmissionFactoryConfig,
-    ParameterizedClearSkyEmissionModelConfig,
+    ParameterizedEmissionFactoryConfig,
+    ParameterizedEmissionModelConfig,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     ParmentierGuillot2014TemperatureProfile,
     PressureGrid,
@@ -49,12 +49,12 @@ from robert_exoplanets import (
     RetrievalParameter,
     RetrievalParameterSet,
     UniformPrior,
-    build_parameterized_clear_sky_emission_model,
+    build_parameterized_emission_model,
     run_ultranest,
 )
 from robert_exoplanets.core import Spectrum
 
-from retrieve_wasp69b_nircam_clear import (
+from retrieve_wasp69b_nircam_cloud_free import (
     FASTCHEM,
     DEFAULT_OPACITY_RESOLUTION,
     OPACITY_RESOLUTIONS,
@@ -210,7 +210,7 @@ def build_problem(
             ),
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        factory = ParameterizedClearSkyEmissionFactoryConfig(
+        factory = ParameterizedEmissionFactoryConfig(
             planet=PLANET,
             star=STAR,
             temperature_profile=ParmentierGuillot2014TemperatureProfile(
@@ -228,7 +228,7 @@ def build_problem(
             cia_table=cia,
             opacity_source=provider,
             opacity_binning=None,
-            model=ParameterizedClearSkyEmissionModelConfig(
+            model=ParameterizedEmissionModelConfig(
                 opacity_species=SPECIES,
                 include_rayleigh=True,
                 gas_combination="random_overlap",
@@ -240,7 +240,7 @@ def build_problem(
                 },
             ),
         )
-        clear = build_parameterized_clear_sky_emission_model(
+        clear = build_parameterized_emission_model(
             factory,
             spectral_grid=dataset.observation.spectral_grid,
         )

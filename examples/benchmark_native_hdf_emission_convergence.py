@@ -30,7 +30,12 @@ from robert_exoplanets import (
     assemble_gas_optical_depth,
     cia_optical_depth,
     gauss_legendre_disk_geometry,
-    solve_clear_sky_emission,
+    solve_emission,
+)
+from robert_exoplanets.diagnostics.benchmark_style import (
+    PURPLE_PALETTE,
+    REFERENCE_COLOR,
+    ROBERT_COLOR,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,7 +169,7 @@ def main() -> dict[str, object]:
                 )
                 for table in (h2_h2, h2_he)
             ]
-            return solve_clear_sky_emission(
+            return solve_emission(
                 gas_tau,
                 geometry=geometry,
                 bottom_boundary="blackbody",
@@ -296,11 +301,11 @@ def _plot(
 ) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
     spectrum, residual, convergence, timing = axes.flat
-    spectrum.loglog(wavelength, references[80][1], color="#222222", lw=1.2, label="pRT3, 81 nodes")
-    spectrum.loglog(wavelength, fluxes[80], color="#e45756", lw=0.9, ls="--", label="ROBERT, 80 cells")
+    spectrum.loglog(wavelength, references[80][1], color=REFERENCE_COLOR, lw=1.2, label="pRT3, 81 nodes")
+    spectrum.loglog(wavelength, fluxes[80], color=ROBERT_COLOR, lw=0.9, ls="--", label="ROBERT, 80 cells")
     spectrum.set(ylabel=r"Planet flux $F_\lambda$ [W m$^{-2}$ m$^{-1}$]", title="Native HDF emission")
     spectrum.legend(frameon=False)
-    colors = {40: "#9ecae9", 80: "#4c78a8", 160: "#17365d"}
+    colors = dict(zip(RESOLUTIONS, PURPLE_PALETTE[: len(RESOLUTIONS)], strict=True))
     for n in RESOLUTIONS:
         residual.semilogx(
             wavelength,
@@ -309,7 +314,7 @@ def _plot(
             lw=0.8,
             label=f"{n} cells / {n + 1} nodes",
         )
-    residual.axhline(0.0, color="#222222", lw=0.7)
+    residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.7)
     residual.set(ylabel="ROBERT - pRT3 [%]", title="Matched-boundary residual")
     residual.legend(frameon=False)
     pairs = ("40_to_80", "80_to_160")
@@ -317,8 +322,8 @@ def _plot(
     robert_values = [report["robert_self_convergence"][key]["rms_relative_difference"] * 100 for key in pairs]
     p_rt_keys = ("41_to_81_nodes", "81_to_161_nodes")
     p_rt_values = [report["petitradtrans3_self_convergence"][key]["rms_relative_difference"] * 100 for key in p_rt_keys]
-    convergence.bar(x - 0.18, robert_values, 0.36, color="#e45756", label="ROBERT")
-    convergence.bar(x + 0.18, p_rt_values, 0.36, color="#4c78a8", label="pRT3")
+    convergence.bar(x - 0.18, robert_values, 0.36, color=ROBERT_COLOR, label="ROBERT")
+    convergence.bar(x + 0.18, p_rt_values, 0.36, color=REFERENCE_COLOR, label="pRT3")
     convergence.set_xticks(x, ("40/80", "80/160"))
     convergence.set(ylabel="RMS spectral change [%]", title="Pressure-grid self-convergence")
     convergence.legend(frameon=False)

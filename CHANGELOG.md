@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Generalized the active emission API from the legacy `ClearSky*` and
+  `solve_clear_sky_emission*` names to `Emission*` and `solve_emission*`.
+  Backward-compatible aliases remain for historical scripts.
+- Designated PICASO and petitRADTRANS as the maintained gold-standard
+  forward-model benchmarks and standardized their plots on a shared purple
+  palette with `mediumpurple` for ROBERT model spectra.
+- Archived the pre-YAML HAT-P-32b checks under
+  `examples/Depreciated_Benchmarks/`; they are no longer part of active CI or
+  the maintained benchmark workflow.
+
 ## v0.3.0 - Minimal Forward Model Foundation
 
 - Added an independent optional float64 JAX/XLA implementation of conservative
@@ -28,9 +40,9 @@
   HAT-P-32b-like H2O/CO2/NH3 RT case with explicit synthetic bins, seeded
   noise, convergence gating, recovery tolerances, and versioned reports.
 - Promoted the validated retrieval physics into a reusable typed
-  `ClearSkyEmissionForwardModel`; HAT-P-32b scripts now only assemble target
+  `EmissionForwardModel`; HAT-P-32b scripts now only assemble target
   inputs, opacity, priors, and outputs around the public package model.
-- Added a Python-first `ClearSkyEmissionFactoryConfig`, typed ExoMol/exo_k
+- Added a Python-first `EmissionFactoryConfig`, typed ExoMol/exo_k
   opacity-source and binning configuration, opacity-derived pressure grids,
   factory provenance, and a standalone HAT-P-32b target configuration.
 - Added Python-first complete retrieval-run configuration for optimal
@@ -165,10 +177,10 @@
   cumulative tau, transmission, and layer weighting diagnostics for future
   RT contribution plots.
 - Added a synthetic tau and transmission-weighting plotting example.
-- Added a NumPy clear-sky thermal-emission reference solver with Planck
+- Added a NumPy cloud-free thermal-emission reference solver with Planck
   source-function integration, optional disk averaging, eclipse-depth output,
   and layer contribution diagnostics.
-- Added a local HAT-P-32b clear-sky emission benchmark script that compares the
+- Added a local HAT-P-32b cloud-free emission benchmark script that compares the
   current gas-only ROBERT spectrum against an external benchmark and records
   remaining benchmark physics gaps explicitly.
 - Added CIA/Rayleigh layer optical-depth helpers, random-overlap gas mixing,

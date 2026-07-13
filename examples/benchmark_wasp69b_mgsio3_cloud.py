@@ -1,6 +1,6 @@
-"""Benchmark six-gas clear and MgSiO3/Mie/SH4 emission forward models.
+"""Benchmark six-gas cloud-free and MgSiO3/Mie/SH4 emission forward models.
 
-The comparison reuses the WASP-69b full-band cloud workflow so that the clear
+The comparison reuses the WASP-69b full-band cloud workflow so that the cloud-free
 and cloudy cases have identical atmosphere, opacity, CIA, Rayleigh, geometry,
 pressure, spectral, and correlated-k settings.  The only additional cloudy
 work is the MgSiO3 particle optics, cloud optical-depth construction, and SH4
@@ -31,7 +31,7 @@ import numba
 import numpy as np
 import scipy
 
-from robert_exoplanets import ParameterizedClearSkyEmissionForwardModel
+from robert_exoplanets import ParameterizedEmissionForwardModel
 from robert_exoplanets.core import Spectrum
 
 from retrieve_wasp69b_mie_cloud import SPECIES, build_problem
@@ -63,10 +63,10 @@ class NamedModels:
         return {name: model(parameters) for name, model in self.models.items()}
 
 
-def _clear_counterpart(cloudy) -> ParameterizedClearSkyEmissionForwardModel:
-    """Build a clear model from the exact prepared inputs of a cloudy model."""
+def _cloud_free_counterpart(cloudy) -> ParameterizedEmissionForwardModel:
+    """Build a cloud-free model from the exact prepared inputs of a cloudy model."""
 
-    return ParameterizedClearSkyEmissionForwardModel(
+    return ParameterizedEmissionForwardModel(
         planet=cloudy.planet,
         star=cloudy.star,
         spectral_grid=cloudy.spectral_grid,
@@ -104,7 +104,7 @@ def run(
     repeats: int,
     warmups: int,
     *,
-    clear_profile: Path | None = None,
+    cloud_free_profile: Path | None = None,
     cloudy_profile: Path | None = None,
 ) -> dict[str, object]:
     """Build, warm, time, profile, and validate the matched forward models."""
@@ -122,36 +122,36 @@ def run(
     cloudy = problem.forward_model
     clear = NamedModels(
         {
-            name: _clear_counterpart(model)
+            name: _cloud_free_counterpart(model)
             for name, model in problem.forward_model.models.items()
         }
     )
 
-    def clear_call():
+    def cloud_free_call():
         return clear(PARAMETERS)
 
     def cloudy_call():
         return cloudy(PARAMETERS)
 
     for _ in range(warmups):
-        clear_call()
+        cloud_free_call()
         cloudy_call()
 
     # Alternate which case runs first to reduce slow drift as a source of bias.
-    clear_elapsed: list[float] = []
+    cloud_free_elapsed: list[float] = []
     cloudy_elapsed: list[float] = []
     for repeat in range(repeats):
         ordered = (
-            ((clear_call, clear_elapsed), (cloudy_call, cloudy_elapsed))
+            ((cloud_free_call, cloud_free_elapsed), (cloudy_call, cloudy_elapsed))
             if repeat % 2 == 0
-            else ((cloudy_call, cloudy_elapsed), (clear_call, clear_elapsed))
+            else ((cloudy_call, cloudy_elapsed), (cloud_free_call, cloud_free_elapsed))
         )
         for call, elapsed in ordered:
             started = perf_counter()
             call()
             elapsed.append(perf_counter() - started)
 
-    clear_spectra = clear_call()
+    cloud_free_spectra = cloud_free_call()
     cloudy_spectra = cloudy_call()
     diagnostic_cloudy_spectra = {
         name: replace(
@@ -160,23 +160,23 @@ def run(
         )(PARAMETERS)
         for name, model in problem.forward_model.models.items()
     }
-    if clear_spectra.keys() != cloudy_spectra.keys():
-        raise RuntimeError("clear and cloudy benchmark dataset names differ")
+    if cloud_free_spectra.keys() != cloudy_spectra.keys():
+        raise RuntimeError("cloud-free and cloudy benchmark dataset names differ")
     finite = all(
         np.all(np.isfinite(spectrum.values))
-        for spectra in (clear_spectra, cloudy_spectra)
+        for spectra in (cloud_free_spectra, cloudy_spectra)
         for spectrum in spectra.values()
     )
     same_grids = all(
         np.array_equal(
-            clear_spectra[name].spectral_grid.values,
+            cloud_free_spectra[name].spectral_grid.values,
             cloudy_spectra[name].spectral_grid.values,
         )
-        for name in clear_spectra
+        for name in cloud_free_spectra
     )
     maximum_spectral_difference = max(
-        float(np.max(np.abs(cloudy_spectra[name].values - clear_spectra[name].values)))
-        for name in clear_spectra
+        float(np.max(np.abs(cloudy_spectra[name].values - cloud_free_spectra[name].values)))
+        for name in cloud_free_spectra
     )
     fast_reference_max_abs_difference = max(
         float(
@@ -212,23 +212,23 @@ def run(
         for name in cloudy_spectra
     )
     if not finite or not same_grids or maximum_spectral_difference == 0.0:
-        raise RuntimeError("clear/cloudy benchmark output validation failed")
+        raise RuntimeError("cloud-free/cloudy benchmark output validation failed")
     if not fast_matches_reference:
         raise RuntimeError(
             "spectrum-only cloudy output differs from diagnostic reference"
         )
 
-    _profile(clear_call, clear_profile)
+    _profile(cloud_free_call, cloud_free_profile)
     _profile(cloudy_call, cloudy_profile)
 
-    clear_result = _summary(clear_elapsed)
+    cloud_free_result = _summary(cloud_free_elapsed)
     cloudy_result = _summary(cloudy_elapsed)
-    clear_median = float(clear_result["median_seconds"])
+    cloud_free_median = float(cloud_free_result["median_seconds"])
     cloudy_median = float(cloudy_result["median_seconds"])
     models = problem.forward_model.models
     first_model = next(iter(models.values()))
     return {
-        "benchmark": "WASP-69b six-gas clear versus MgSiO3 Mie SH4 emission",
+        "benchmark": "WASP-69b six-gas cloud-free versus MgSiO3 Mie SH4 emission",
         "environment": {
             "python": sys.version.split()[0],
             "numpy": np.__version__,
@@ -260,11 +260,11 @@ def run(
             "warmups": warmups,
         },
         "cloudy_problem_setup_seconds": setup_seconds,
-        "clear_emission": clear_result,
+        "emission": cloud_free_result,
         "mgsio3_mie_sh4_emission": cloudy_result,
-        "cloudy_over_clear_median_time": cloudy_median / clear_median,
-        "clear_over_cloudy_throughput": cloudy_median / clear_median,
-        "additional_cloudy_median_seconds": cloudy_median - clear_median,
+        "cloudy_over_cloud_free_median_time": cloudy_median / cloud_free_median,
+        "cloud_free_over_cloudy_throughput": cloudy_median / cloud_free_median,
+        "additional_cloudy_median_seconds": cloudy_median - cloud_free_median,
         "validation": {
             "all_outputs_finite": finite,
             "spectral_grids_equal": same_grids,
@@ -278,7 +278,7 @@ def run(
             ),
         },
         "profiles": {
-            "clear": None if clear_profile is None else str(clear_profile),
+            "clear": None if cloud_free_profile is None else str(cloud_free_profile),
             "cloudy": None if cloudy_profile is None else str(cloudy_profile),
         },
     }
@@ -289,7 +289,7 @@ def main() -> None:
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile-clear", type=Path)
+    parser.add_argument("--profile-cloud-free", type=Path)
     parser.add_argument("--profile-cloudy", type=Path)
     args = parser.parse_args()
     if args.repeats < 1 or args.warmups < 0:
@@ -297,7 +297,7 @@ def main() -> None:
     result = run(
         args.repeats,
         args.warmups,
-        clear_profile=args.profile_clear,
+        cloud_free_profile=args.profile_clear,
         cloudy_profile=args.profile_cloudy,
     )
     rendered = json.dumps(result, indent=2)

@@ -36,7 +36,13 @@ from robert_exoplanets import (  # noqa: E402
     gauss_legendre_disk_geometry,
     hydrostatic_path_geometry,
     solve_absorption_transmission,
-    solve_clear_sky_emission,
+    solve_emission,
+)
+from robert_exoplanets.diagnostics.benchmark_style import (  # noqa: E402
+    PURPLE_LIGHT,
+    REFERENCE_COLOR,
+    RESIDUAL_COLOR,
+    ROBERT_COLOR,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -162,7 +168,7 @@ def main() -> dict[str, object]:
                 "vertical_tau_source": "petitRADTRANS4_cumulative_optical_depth_difference",
             },
         )
-        return solve_clear_sky_emission(
+        return solve_emission(
             optical_depth,
             geometry=geometry,
             bottom_boundary="blackbody",
@@ -452,19 +458,19 @@ def _plot(
 ) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(13.5, 9.0), constrained_layout=True)
     emission, emission_residual, transmission, timing = axes.flat
-    emission.plot(wavelength, p_rt_flux, color="#222222", lw=1.5, label="petitRADTRANS 4")
-    emission.plot(wavelength, robert_flux, color="#e45756", lw=1.1, ls="--", label="ROBERT")
+    emission.plot(wavelength, p_rt_flux, color=REFERENCE_COLOR, lw=1.5, label="petitRADTRANS 4")
+    emission.plot(wavelength, robert_flux, color=ROBERT_COLOR, lw=1.1, ls="--", label="ROBERT")
     emission.set(ylabel=r"Planet flux $F_\lambda$ [W m$^{-2}$ m$^{-1}$]", title="Shared ExoMol POKAZATEL H$_2$O emission")
     emission.legend(frameon=False)
-    emission_residual.plot(wavelength, emission_relative * 100.0, color="#4c78a8")
-    emission_residual.axhline(0.0, color="#222222", lw=0.8)
+    emission_residual.plot(wavelength, emission_relative * 100.0, color=RESIDUAL_COLOR)
+    emission_residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.8)
     emission_residual.set(ylabel="(ROBERT - pRT4) / pRT4 [%]", title="Emission residual")
-    transmission.plot(wavelength, p_rt_transit * 1.0e6, color="#222222", lw=1.5, label="petitRADTRANS 4")
-    transmission.plot(wavelength, robert_transit * 1.0e6, color="#54a24b", lw=1.1, ls="--", label="ROBERT")
+    transmission.plot(wavelength, p_rt_transit * 1.0e6, color=REFERENCE_COLOR, lw=1.5, label="petitRADTRANS 4")
+    transmission.plot(wavelength, robert_transit * 1.0e6, color=ROBERT_COLOR, lw=1.1, ls="--", label="ROBERT")
     transmission_twin = transmission.twinx()
-    transmission_twin.plot(wavelength, transmission_difference_ppm, color="#f58518", alpha=0.55, lw=0.9)
+    transmission_twin.plot(wavelength, transmission_difference_ppm, color=PURPLE_LIGHT, alpha=0.55, lw=0.9)
     transmission.set(ylabel="Transit depth [ppm]", title="Shared-opacity transmission")
-    transmission_twin.set_ylabel("ROBERT - pRT4 [ppm]", color="#f58518")
+    transmission_twin.set_ylabel("ROBERT - pRT4 [ppm]", color=PURPLE_LIGHT)
     transmission.legend(frameon=False)
 
     labels = ["pRT4 emission", "ROBERT emission", "pRT4 transit", "ROBERT transit"]
@@ -482,7 +488,7 @@ def _plot(
     ]
     x = np.arange(len(labels))
     timing.bar(x - 0.18, first, width=0.36, color="#b9b9b9", label="First call")
-    timing.bar(x + 0.18, steady, width=0.36, color="#4c78a8", label="Steady median")
+    timing.bar(x + 0.18, steady, width=0.36, color=ROBERT_COLOR, label="Steady median")
     timing.set_yscale("log")
     timing.set_xticks(x, labels, rotation=18, ha="right")
     timing.set(ylabel="Wall time [s]", title="Synchronized CPU timings")

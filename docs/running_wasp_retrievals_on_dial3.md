@@ -44,7 +44,7 @@ cd /scratch/dp448/dc-tayl1/ROBERT-code
 source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"
 conda activate robert-exoplanets
 mkdir -p /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check
-cp configurations/wasp69b_clear_R1000.yaml \
+cp configurations/wasp69b_cloud_free_R1000.yaml \
   /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml
 nano /scratch/dp448/dc-tayl1/1_CPU_Terminal_Check/configuration.yaml
 ```
@@ -106,14 +106,14 @@ UltraNest HDF5 checkpoint. Its only run input is the YAML path.
 
 ```bash
 cd /scratch/dp448/dc-tayl1/ROBERT-code
-sbatch slurm/wasp69b_clear_native_modes.sbatch
+sbatch slurm/wasp69b_cloud_free_native_modes.sbatch
 ```
 
 Choose any project-specific copied YAML without editing the Slurm script:
 
 ```bash
 sbatch --export=ALL,ROBERT_CONFIG=/scratch/dp448/dc-tayl1/my_project/configuration.yaml \
-  slurm/wasp69b_clear_native_modes.sbatch
+  slurm/wasp69b_cloud_free_native_modes.sbatch
 ```
 
 Use `squeue -u "$USER"` to monitor jobs and `scancel JOB_ID` to cancel one.
