@@ -2,6 +2,16 @@
 
 from .data import load_emission_observation_npz
 from robert_exoplanets.instruments import Observation
+from .hybrid import (
+    NestedSamplingOEResult,
+    OENestedSamplingResult,
+    load_nested_sampler_result,
+    nested_posterior_oe_prior,
+    refine_priors_from_optimal_estimation,
+    run_nested_sampling_then_oe,
+    run_oe_then_nested_sampling,
+    run_optimal_estimation_from_nested_result,
+)
 from .manifest import RunManifest
 from .optimal_estimation import OptimalEstimationResult, run_optimal_estimation
 from .priors import LogUniformPrior, RetrievalParameter, RetrievalParameterSet, UniformPrior
@@ -24,9 +34,11 @@ __all__ = [
     "LogUniformPrior",
     "InferenceRunConfig",
     "NestedSamplerResult",
+    "NestedSamplingOEResult",
     "MultiDatasetRetrievalProblem",
     "Observation",
     "OptimalEstimationResult",
+    "OENestedSamplingResult",
     "OptimalEstimationRunConfig",
     "RetrievalParameter",
     "RetrievalParameterSet",
@@ -38,8 +50,14 @@ __all__ = [
     "UltraNestRunConfig",
     "build_retrieval_problem",
     "load_emission_observation_npz",
+    "load_nested_sampler_result",
     "load_retrieval_status",
     "run_optimal_estimation",
+    "nested_posterior_oe_prior",
+    "refine_priors_from_optimal_estimation",
+    "run_nested_sampling_then_oe",
+    "run_oe_then_nested_sampling",
+    "run_optimal_estimation_from_nested_result",
     "run_retrieval",
     "run_configured_retrieval",
     "run_ultranest",
