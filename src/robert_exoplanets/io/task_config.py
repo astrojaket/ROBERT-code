@@ -244,6 +244,18 @@ class RuntimeConfig(ConfigModel):
     scratch_directory: Path
 
 
+class HousekeepingConfig(ConfigModel):
+    """Machine- and project-specific locations for a user-facing YAML file."""
+
+    observations_directory: Path
+    fastchem_directory: Path
+    k_table_directory: Path
+    opacity_cache_directory: Path
+    output_directory: Path
+    scratch_directory: Path
+    optical_constants_directory: Path | None = None
+
+
 class TaskConfig(ConfigModel):
     """Complete schema-versioned retrieval/forward-model configuration."""
 
@@ -260,6 +272,7 @@ class TaskConfig(ConfigModel):
     sampler: SamplerConfig = SamplerConfig()
     outputs: OutputsConfig
     runtime: RuntimeConfig
+    housekeeping: HousekeepingConfig | None = None
 
     @model_validator(mode="after")
     def validate_cross_references(self) -> "TaskConfig":
@@ -314,6 +327,7 @@ def load_task_config(path: str | Path) -> TaskConfig:
     if not source.is_file():
         raise FileNotFoundError(source)
     raw = _load_yaml_mapping(source)
+    _apply_housekeeping_paths(raw)
     for keys in (
         ("observations", "path"),
         ("atmosphere", "chemistry", "fastchem_path"),
@@ -321,6 +335,13 @@ def load_task_config(path: str | Path) -> TaskConfig:
         ("opacity", "path"),
         ("opacity", "cache_directory"),
         ("clouds", "optical_constants_path"),
+        ("housekeeping", "observations_directory"),
+        ("housekeeping", "fastchem_directory"),
+        ("housekeeping", "k_table_directory"),
+        ("housekeeping", "opacity_cache_directory"),
+        ("housekeeping", "output_directory"),
+        ("housekeeping", "scratch_directory"),
+        ("housekeeping", "optical_constants_directory"),
         ("outputs", "directory"),
         ("runtime", "scratch_directory"),
     ):
@@ -335,6 +356,42 @@ def load_task_config(path: str | Path) -> TaskConfig:
             value = Path(section[keys[-1]]).expanduser()
             section[keys[-1]] = str(value if value.is_absolute() else source.parent / value)
     return TaskConfig.model_validate(raw)
+
+
+def _apply_housekeeping_paths(raw: dict) -> None:
+    """Fill internal path fields from one readable user-facing path block."""
+
+    housekeeping = raw.get("housekeeping")
+    if housekeeping is None:
+        return
+    if not isinstance(housekeeping, dict):
+        raise ValueError("housekeeping must be a YAML mapping")
+    mappings = (
+        (("observations", "path"), "observations_directory"),
+        (("atmosphere", "chemistry", "fastchem_path"), "fastchem_directory"),
+        (("opacity", "path"), "k_table_directory"),
+        (("opacity", "cache_directory"), "opacity_cache_directory"),
+        (("outputs", "directory"), "output_directory"),
+        (("runtime", "scratch_directory"), "scratch_directory"),
+    )
+    for keys, source_key in mappings:
+        if source_key not in housekeeping:
+            continue
+        section = raw
+        for key in keys[:-1]:
+            if not isinstance(section, dict):
+                raise ValueError("configuration sections must be YAML mappings")
+            section = section.setdefault(key, {})
+        if not isinstance(section, dict):
+            raise ValueError("configuration sections must be YAML mappings")
+        section.setdefault(keys[-1], housekeeping[source_key])
+    clouds = raw.get("clouds")
+    if (
+        isinstance(clouds, dict)
+        and clouds.get("model") == "mie_catalog"
+        and "optical_constants_directory" in housekeeping
+    ):
+        clouds.setdefault("optical_constants_path", housekeeping["optical_constants_directory"])
 
 
 def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:

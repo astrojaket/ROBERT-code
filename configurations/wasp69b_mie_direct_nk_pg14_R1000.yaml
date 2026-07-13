@@ -19,7 +19,6 @@ parameters:
   - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
   - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
   - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
-  - {name: miri_offset, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}}
   - {name: cloud_n_0, prior: {type: uniform, lower: 1.0, upper: 3.0}}
   - {name: cloud_n_1, prior: {type: uniform, lower: 1.0, upper: 3.0}}
   - {name: cloud_n_2, prior: {type: uniform, lower: 1.0, upper: 3.0}}

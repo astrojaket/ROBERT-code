@@ -9,7 +9,7 @@ prepared opacity caches.
 | Target | Scenario | Default YAML |
 | --- | --- | --- |
 | WASP-69b | Clear, native F322W2/F444W/LRS, PG14 | `wasp69b_clear_native_pg14_R1000.yaml` |
-| WASP-69b | Clear, NIRCam including overlap average, PG14 | `wasp69b_clear_nircam_pg14_R1000.yaml` |
+| WASP-69b | Clear, NIRCam F322W2/F444W, PG14 | `wasp69b_clear_nircam_pg14_R1000.yaml` |
 | WASP-69b | Clear, native modes, retrieved isothermal T-P | `wasp69b_clear_native_isothermal_R1000.yaml` |
 | WASP-69b | Fixed MgSiO3 catalogue Mie cloud, PG14 | `wasp69b_mie_catalog_pg14_R1000.yaml` |
 | WASP-69b | Retrieved Mie n/k cloud, PG14 | `wasp69b_mie_direct_nk_pg14_R1000.yaml` |
@@ -30,3 +30,13 @@ WASP-69b clear-native baseline that the named WASP-69b defaults extend.
 The Mie configurations are higher-dimensional tests. Begin with the clear and
 fixed-catalogue cloud cases; use the direct-n/k cases after the opacity cache,
 MPI launch, and fixed-material baseline have been checked.
+
+All defaults use only independent likelihood terms: the WASP-69b overlap
+average is excluded when its two parent modes are fitted. MIRI offsets are
+also disabled in the baseline configurations; enable one only as a separate
+calibration-sensitivity test.
+
+For new projects, start from `TEMPLATE_all_supported_options.yaml`. It groups
+the editable inputs into system, data, atmosphere, cloud, opacity/RT, priors,
+sampler, and housekeeping sections. The active block is a valid clear retrieval;
+commented alternatives show the currently supported optional modes and priors.
