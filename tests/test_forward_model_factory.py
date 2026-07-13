@@ -372,8 +372,11 @@ def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> No
 
     assert cloudy.required_parameters == ("T_iso", "log_h2o", "log_kappa_cloud")
     assert cloudy.manifest_metadata["cloud_multiple_scattering_backend"] == "sh4"
+    assert cloudy.manifest_metadata["cloud_spectrum_only"] == "true"
+    assert cloudy.manifest_metadata["cloud_sh4_spectrum_backend"] == "numpy"
     assert cloudy.manifest_metadata["planet_name"] == "Generic b"
     assert spectrum.observable == "eclipse_depth"
+    assert spectrum.metadata["rt_solver"] == "sh4_spectrum_only"
     assert np.all(np.isfinite(spectrum.values))
 
 
@@ -444,6 +447,8 @@ def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles(
     assert cloudy.manifest_metadata["cloud_phase_function_closure"] == (
         "exact_mie_legendre_moments_through_l4"
     )
+    assert cloudy.manifest_metadata["cloud_spectrum_only"] == "true"
+    assert cloudy.manifest_metadata["cloud_sh4_spectrum_backend"] == "numpy"
     assert spectrum.observable == "eclipse_depth"
     assert np.all(np.isfinite(spectrum.values))
 
