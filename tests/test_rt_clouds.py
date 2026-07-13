@@ -18,6 +18,7 @@ from robert_exoplanets import (
     planck_radiance_wavelength,
     power_law_haze,
     solve_clear_sky_emission,
+    solve_clear_sky_emission_spectrum,
     two_stream_scattering_diagnostics,
 )
 from robert_exoplanets.core import RobertValidationError
@@ -99,12 +100,7 @@ def test_grey_mass_extinction_uses_hydrostatic_bulk_mass_column() -> None:
         asymmetry_factor=0.0,
     )
 
-    expected = (
-        2.0
-        * 0.1
-        * gas_tau.layer_pressure_thickness_pa
-        / gas_tau.gravity_m_s2
-    )
+    expected = 2.0 * 0.1 * gas_tau.layer_pressure_thickness_pa / gas_tau.gravity_m_s2
     np.testing.assert_allclose(
         cloud.extinction_tau,
         np.repeat(expected[:, None], spectral_grid.size, axis=1),
@@ -153,7 +149,10 @@ def test_emission_solver_accepts_cloud_optical_properties() -> None:
     np.testing.assert_allclose(result.radiance.values, expected)
     np.testing.assert_allclose(result.extinction_optical_depth[0, :, 0], [0.5])
     np.testing.assert_allclose(result.total_optical_depth[0, :, 0], [0.5])
-    assert result.metadata["scattering_treatment"] == "extinction_only_no_scattering_source"
+    assert (
+        result.metadata["scattering_treatment"]
+        == "extinction_only_no_scattering_source"
+    )
     assert result.metadata["total_optical_depth_role"] == "extinction"
 
 
@@ -212,10 +211,15 @@ def test_two_stream_backend_solves_coupled_mixed_absorption_scattering() -> None
     np.testing.assert_allclose(result.extinction_optical_depth[0, :, 0], [0.5])
     assert np.all(result.radiance.values > 0.0)
     assert np.all(result.radiance.values < extinction_only.radiance.values)
-    assert result.metadata["scattering_treatment"] == "toon_hemispheric_mean_thermal_two_stream"
+    assert (
+        result.metadata["scattering_treatment"]
+        == "toon_hemispheric_mean_thermal_two_stream"
+    )
     assert result.metadata["multiple_scattering_applied"] == "true"
     assert result.metadata["total_optical_depth_role"] == "extinction"
-    assert result.metadata["thermal_integration_backend"] == "numpy_toon_hemispheric_mean"
+    assert (
+        result.metadata["thermal_integration_backend"] == "numpy_toon_hemispheric_mean"
+    )
 
 
 def test_two_stream_one_layer_preserves_physical_tau_and_contributions() -> None:
@@ -240,7 +244,8 @@ def test_two_stream_one_layer_preserves_physical_tau_and_contributions() -> None
     np.testing.assert_allclose(result.total_optical_depth[0, 0, 0], 0.8)
     np.testing.assert_allclose(
         result.radiance.values,
-        np.sum(result.layer_contribution_radiance, axis=0) + result.bottom_contribution_radiance,
+        np.sum(result.layer_contribution_radiance, axis=0)
+        + result.bottom_contribution_radiance,
     )
 
 
@@ -264,7 +269,10 @@ def test_sh4_backend_uses_higher_order_multiple_scattering() -> None:
     )
 
     assert np.all(result.radiance.values > 0.0)
-    assert result.metadata["multiple_scattering_backend"] == "sh4_henyey_greenstein_delta_m"
+    assert (
+        result.metadata["multiple_scattering_backend"]
+        == "sh4_henyey_greenstein_delta_m"
+    )
     assert result.metadata["scattering_treatment"] == (
         "rooney_p3_sh4_mixed_phase_moments_delta_m"
     )
@@ -276,6 +284,37 @@ def test_sh4_backend_uses_higher_order_multiple_scattering() -> None:
         np.sum(result.layer_contribution_radiance, axis=0)
         + result.bottom_contribution_radiance,
     )
+
+
+def test_sh4_spectrum_only_backend_matches_diagnostic_solver() -> None:
+    spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")
+    gas_tau = _zero_gas_tau(spectral_grid=spectral_grid, temperature=1000.0)
+    cloud = CloudOpticalProperties(
+        name="spectrum-only cloud",
+        extinction_tau=np.array([[0.8]]),
+        spectral_grid=spectral_grid,
+        pressure_grid=gas_tau.pressure_grid,
+        single_scattering_albedo=0.9,
+        asymmetry_factor=0.7,
+    )
+    reference = solve_clear_sky_emission(
+        gas_tau,
+        bottom_boundary="blackbody",
+        additional_optical_depths=[cloud],
+        multiple_scattering_backend="sh4",
+    )
+    spectrum = solve_clear_sky_emission_spectrum(
+        gas_tau,
+        bottom_boundary="blackbody",
+        additional_optical_depths=[cloud],
+        multiple_scattering_backend="sh4",
+        thermal_integration_backend="numpy",
+    )
+
+    np.testing.assert_allclose(spectrum.values, reference.radiance.values, rtol=2.0e-13)
+    assert spectrum.metadata["rt_solver"] == "sh4_spectrum_only"
+    assert spectrum.metadata["diagnostics"] == "disabled"
+    assert spectrum.metadata["multiple_scattering_applied"] == "true"
 
 
 def test_sh4_uses_supplied_non_hg_phase_moments() -> None:
@@ -313,7 +352,9 @@ def test_sh4_uses_supplied_non_hg_phase_moments() -> None:
         multiple_scattering_backend="sh4",
     )
 
-    assert not np.allclose(exact_result.radiance.values, hg_result.radiance.values, rtol=1.0e-5)
+    assert not np.allclose(
+        exact_result.radiance.values, hg_result.radiance.values, rtol=1.0e-5
+    )
 
 
 def test_cloud_split_preserves_phase_moments_for_sh4() -> None:
@@ -341,7 +382,9 @@ def test_cloud_split_preserves_phase_moments_for_sh4() -> None:
         multiple_scattering_backend="sh4",
     )
 
-    np.testing.assert_allclose(split.radiance.values, direct.radiance.values, rtol=2.0e-13)
+    np.testing.assert_allclose(
+        split.radiance.values, direct.radiance.values, rtol=2.0e-13
+    )
 
 
 def test_two_stream_two_layer_uses_explicit_level_temperatures() -> None:
@@ -378,7 +421,8 @@ def test_two_stream_two_layer_uses_explicit_level_temperatures() -> None:
     assert np.all(result.layer_contribution_radiance >= 0.0)
     np.testing.assert_allclose(
         result.radiance.values,
-        np.sum(result.layer_contribution_radiance, axis=0) + result.bottom_contribution_radiance,
+        np.sum(result.layer_contribution_radiance, axis=0)
+        + result.bottom_contribution_radiance,
     )
 
 
@@ -388,7 +432,9 @@ def test_two_stream_diagnostics_preserve_no_scattering_limit() -> None:
 
     np.testing.assert_allclose(diagnostics.effective_tau, total)
     np.testing.assert_allclose(diagnostics.single_scattering_albedo, 0.0)
-    assert diagnostics.metadata["closure"] == "two_stream_effective_extinction_reference"
+    assert (
+        diagnostics.metadata["closure"] == "two_stream_effective_extinction_reference"
+    )
 
 
 def test_emission_solver_rejects_unknown_multiple_scattering_backend() -> None:

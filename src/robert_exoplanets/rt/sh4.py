@@ -17,6 +17,14 @@ from scipy.linalg import solve_banded
 
 from robert_exoplanets.core import RobertValidationError
 
+try:  # pragma: no cover - availability depends on the local environment.
+    from numba import njit, prange
+except Exception:  # pragma: no cover - dependency availability is environment-specific.
+    njit = None
+    prange = range
+
+_NUMBA_AVAILABLE = njit is not None
+
 
 _HALF_RANGE_MOMENTS = np.pi * np.array(
     [
@@ -41,6 +49,44 @@ class ThermalSH4Result:
     scaled_extinction_tau: NDArray[np.float64]
     scaled_single_scattering_albedo: NDArray[np.float64]
     delta_m_applied: bool
+
+
+@dataclass(frozen=True)
+class ThermalSH4SpectrumResult:
+    """Disk-integrated SH4 radiance without contribution diagnostics."""
+
+    radiance: NDArray[np.float64]
+    backend: str
+
+    def __post_init__(self) -> None:
+        radiance = _finite_array(self.radiance, "radiance", ndim=1)
+        if np.any(radiance < 0.0):
+            raise RobertValidationError("SH4 spectrum radiance must be non-negative")
+        if self.backend not in {"numpy", "numba"}:
+            raise RobertValidationError(
+                "SH4 spectrum backend must be 'numpy' or 'numba'"
+            )
+        radiance.setflags(write=False)
+        object.__setattr__(self, "radiance", radiance)
+
+
+def sh4_spectrum_backend_name(value: str) -> str:
+    """Normalize and validate a spectrum-only SH4 reconstruction backend."""
+
+    normalized = str(value).strip().lower().replace("-", "_")
+    if normalized == "auto":
+        return "numba" if _NUMBA_AVAILABLE else "numpy"
+    if normalized == "numpy":
+        return "numpy"
+    if normalized == "numba":
+        if not _NUMBA_AVAILABLE:
+            raise RobertValidationError(
+                "SH4 spectrum backend 'numba' requires the optional numba package"
+            )
+        return "numba"
+    raise RobertValidationError(
+        "SH4 spectrum backend must be 'auto', 'numpy', or 'numba'"
+    )
 
 
 def henyey_greenstein_moments(
@@ -82,6 +128,218 @@ def solve_thermal_sh4(
     convention ``P(mu,mu') = sum chi_l P_l(mu) P_l(mu')``.  When omitted, a
     Henyey--Greenstein phase function is constructed explicitly from ``g``.
     """
+
+    (
+        tau,
+        planck,
+        bottom_planck,
+        mu,
+        scaled_tau,
+        scaled_omega,
+        scaled_moments,
+    ) = _prepare_thermal_sh4_inputs(
+        extinction_tau,
+        single_scattering_albedo,
+        asymmetry_factor,
+        level_planck_radiance,
+        emission_angle_cosines,
+        bottom_planck_radiance=bottom_planck_radiance,
+        phase_function_moments=phase_function_moments,
+        delta_m_forward_fraction=delta_m_forward_fraction,
+        delta_m=delta_m,
+        source_quadrature_order=source_quadrature_order,
+    )
+    coefficients, eigen_top, eigen_bottom, particular_top, particular_bottom = (
+        _layer_solution(
+            scaled_tau,
+            scaled_omega,
+            scaled_moments,
+            planck,
+            bottom_planck,
+        )
+    )
+    moment_levels = _moment_levels(
+        coefficients,
+        eigen_top,
+        eigen_bottom,
+        particular_top,
+        particular_bottom,
+    )
+    moment_levels = moment_levels.reshape(
+        tau.shape[0] + 1, tau.shape[1], tau.shape[2], 4
+    )
+    point_layer, point_bottom = _reconstruct_sources(
+        coefficients,
+        scaled_tau,
+        scaled_omega,
+        scaled_moments,
+        planck,
+        bottom_planck,
+        mu,
+        source_quadrature_order,
+    )
+    point_radiance = np.sum(point_layer, axis=1) + point_bottom
+    if np.any(point_radiance < -1.0e-10 * np.maximum(np.max(point_radiance), 1.0)):
+        raise RobertValidationError(
+            "SH4 reconstructed a materially negative emergent intensity"
+        )
+    point_radiance = np.maximum(point_radiance, 0.0)
+    for array in (
+        moment_levels,
+        point_radiance,
+        point_layer,
+        point_bottom,
+        scaled_moments,
+        scaled_tau,
+        scaled_omega,
+    ):
+        array.setflags(write=False)
+    return ThermalSH4Result(
+        moment_levels=moment_levels,
+        point_radiance=point_radiance,
+        point_layer_contribution_radiance=point_layer,
+        point_bottom_contribution_radiance=point_bottom,
+        phase_function_moments=scaled_moments,
+        scaled_extinction_tau=scaled_tau,
+        scaled_single_scattering_albedo=scaled_omega,
+        delta_m_applied=delta_m,
+    )
+
+
+def solve_thermal_sh4_spectrum(
+    extinction_tau: ArrayLike,
+    single_scattering_albedo: ArrayLike,
+    asymmetry_factor: ArrayLike,
+    level_planck_radiance: ArrayLike,
+    emission_angle_cosines: ArrayLike,
+    emission_angle_weights: ArrayLike,
+    g_weights: ArrayLike,
+    *,
+    bottom_planck_radiance: ArrayLike,
+    phase_function_moments: ArrayLike | None = None,
+    delta_m_forward_fraction: ArrayLike | None = None,
+    delta_m: bool = True,
+    source_quadrature_order: int = 6,
+    backend: str = "auto",
+) -> ThermalSH4SpectrumResult:
+    """Return only disk- and g-integrated SH4 radiance.
+
+    The boundary-value system is identical to :func:`solve_thermal_sh4` and is
+    solved by the SciPy reference path. The optional Numba backend compiles
+    only source reconstruction and directly accumulates the final spectrum,
+    avoiding moment-level and contribution-function output arrays.
+    """
+
+    (
+        _tau,
+        planck,
+        bottom_planck,
+        mu,
+        scaled_tau,
+        scaled_omega,
+        scaled_moments,
+    ) = _prepare_thermal_sh4_inputs(
+        extinction_tau,
+        single_scattering_albedo,
+        asymmetry_factor,
+        level_planck_radiance,
+        emission_angle_cosines,
+        bottom_planck_radiance=bottom_planck_radiance,
+        phase_function_moments=phase_function_moments,
+        delta_m_forward_fraction=delta_m_forward_fraction,
+        delta_m=delta_m,
+        source_quadrature_order=source_quadrature_order,
+    )
+    angle_weights = _normalized_weights(
+        emission_angle_weights,
+        mu.size,
+        "emission_angle_weights",
+    )
+    quadrature_weights = _normalized_weights(
+        g_weights,
+        scaled_tau.shape[2],
+        "g_weights",
+    )
+    coefficients, _, _, _, _ = _layer_solution(
+        scaled_tau,
+        scaled_omega,
+        scaled_moments,
+        planck,
+        bottom_planck,
+    )
+    selected_backend = sh4_spectrum_backend_name(backend)
+    nodes, node_weights = np.polynomial.legendre.leggauss(source_quadrature_order)
+    nodes = 0.5 * (nodes + 1.0)
+    node_weights = 0.5 * node_weights
+    if selected_backend == "numba":
+        radiance = _numba_reconstruct_spectrum(
+            coefficients,
+            scaled_tau,
+            scaled_omega,
+            scaled_moments,
+            planck,
+            bottom_planck,
+            mu,
+            angle_weights,
+            quadrature_weights,
+            nodes,
+            node_weights,
+        )
+    else:
+        point_layer, point_bottom = _reconstruct_sources(
+            coefficients,
+            scaled_tau,
+            scaled_omega,
+            scaled_moments,
+            planck,
+            bottom_planck,
+            mu,
+            source_quadrature_order,
+        )
+        point_radiance = np.sum(point_layer, axis=1) + point_bottom
+        radiance = np.einsum(
+            "a,asg,g->s",
+            angle_weights,
+            point_radiance,
+            quadrature_weights,
+        )
+    if not np.all(np.isfinite(radiance)):
+        raise RobertValidationError(
+            "SH4 spectrum reconstruction produced non-finite values"
+        )
+    negative_limit = -1.0e-10 * max(float(np.max(radiance)), 1.0)
+    if np.any(radiance < negative_limit):
+        raise RobertValidationError(
+            "SH4 spectrum reconstructed a materially negative emergent intensity"
+        )
+    return ThermalSH4SpectrumResult(
+        radiance=np.maximum(radiance, 0.0),
+        backend=selected_backend,
+    )
+
+
+def _prepare_thermal_sh4_inputs(
+    extinction_tau: ArrayLike,
+    single_scattering_albedo: ArrayLike,
+    asymmetry_factor: ArrayLike,
+    level_planck_radiance: ArrayLike,
+    emission_angle_cosines: ArrayLike,
+    *,
+    bottom_planck_radiance: ArrayLike,
+    phase_function_moments: ArrayLike | None,
+    delta_m_forward_fraction: ArrayLike | None,
+    delta_m: bool,
+    source_quadrature_order: int,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+]:
+    """Validate common SH4 inputs and apply the shared delta-M transform."""
 
     tau = _finite_array(extinction_tau, "extinction_tau", ndim=3)
     omega = _finite_array(
@@ -150,60 +408,14 @@ def solve_thermal_sh4(
         moments_from_hg=moments_from_hg,
         supplied_forward_fraction=supplied_forward_fraction,
     )
-    coefficients, eigen_top, eigen_bottom, particular_top, particular_bottom = (
-        _layer_solution(
-            scaled_tau,
-            scaled_omega,
-            scaled_moments,
-            planck,
-            bottom_planck,
-        )
-    )
-    moment_levels = _moment_levels(
-        coefficients,
-        eigen_top,
-        eigen_bottom,
-        particular_top,
-        particular_bottom,
-    )
-    moment_levels = moment_levels.reshape(
-        tau.shape[0] + 1, tau.shape[1], tau.shape[2], 4
-    )
-    point_layer, point_bottom = _reconstruct_sources(
-        coefficients,
-        scaled_tau,
-        scaled_omega,
-        scaled_moments,
+    return (
+        tau,
         planck,
         bottom_planck,
         mu,
-        source_quadrature_order,
-    )
-    point_radiance = np.sum(point_layer, axis=1) + point_bottom
-    if np.any(point_radiance < -1.0e-10 * np.maximum(np.max(point_radiance), 1.0)):
-        raise RobertValidationError(
-            "SH4 reconstructed a materially negative emergent intensity"
-        )
-    point_radiance = np.maximum(point_radiance, 0.0)
-    for array in (
-        moment_levels,
-        point_radiance,
-        point_layer,
-        point_bottom,
-        scaled_moments,
         scaled_tau,
         scaled_omega,
-    ):
-        array.setflags(write=False)
-    return ThermalSH4Result(
-        moment_levels=moment_levels,
-        point_radiance=point_radiance,
-        point_layer_contribution_radiance=point_layer,
-        point_bottom_contribution_radiance=point_bottom,
-        phase_function_moments=scaled_moments,
-        scaled_extinction_tau=scaled_tau,
-        scaled_single_scattering_albedo=scaled_omega,
-        delta_m_applied=delta_m,
+        scaled_moments,
     )
 
 
@@ -598,6 +810,251 @@ def _reconstruct_sources(
             "SH4 source reconstruction produced non-finite values"
         )
     return point_layer, point_bottom
+
+
+def _normalized_weights(
+    value: ArrayLike,
+    size: int,
+    name: str,
+) -> NDArray[np.float64]:
+    weights = _finite_array(value, name, shape=(size,))
+    if np.any(weights < 0.0):
+        raise RobertValidationError(f"{name} must be non-negative")
+    total = float(np.sum(weights))
+    if not np.isfinite(total) or total <= 0.0:
+        raise RobertValidationError(f"{name} must have a finite positive sum")
+    return np.asarray(weights / total, dtype=float)
+
+
+def _numba_reconstruct_spectrum(
+    coefficients: NDArray[np.float64],
+    tau: NDArray[np.float64],
+    omega: NDArray[np.float64],
+    moments: NDArray[np.float64],
+    planck: NDArray[np.float64],
+    bottom_planck: NDArray[np.float64],
+    mu: NDArray[np.float64],
+    angle_weights: NDArray[np.float64],
+    g_weights: NDArray[np.float64],
+    nodes: NDArray[np.float64],
+    node_weights: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    if not _NUMBA_AVAILABLE:
+        raise RobertValidationError(
+            "SH4 spectrum backend 'numba' requires the optional numba package"
+        )
+    return _numba_reconstruct_spectrum_kernel(
+        coefficients,
+        tau,
+        omega,
+        moments,
+        planck,
+        bottom_planck,
+        mu,
+        angle_weights,
+        g_weights,
+        nodes,
+        node_weights,
+    )
+
+
+if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_reconstruct_spectrum_kernel(
+        coefficients,
+        tau,
+        omega,
+        moments,
+        planck,
+        bottom_planck,
+        mu,
+        angle_weights,
+        g_weights,
+        nodes,
+        node_weights,
+    ):
+        nlayer, nspectral, ng = tau.shape
+        radiance = np.zeros(nspectral, dtype=np.float64)
+        for spectral_index in prange(nspectral):
+            spectral_radiance = 0.0
+            for g_index in range(ng):
+                column = spectral_index * ng + g_index
+                local_moment0 = np.empty((nodes.size, nlayer), dtype=np.float64)
+                local_moment1 = np.empty((nodes.size, nlayer), dtype=np.float64)
+                local_moment2 = np.empty((nodes.size, nlayer), dtype=np.float64)
+                local_moment3 = np.empty((nodes.size, nlayer), dtype=np.float64)
+                local_plancks = np.empty((nodes.size, nlayer), dtype=np.float64)
+                total_tau = 0.0
+                for layer_index in range(nlayer):
+                    total_tau += tau[layer_index, spectral_index, g_index]
+
+                for node_index in range(nodes.size):
+                    node = nodes[node_index]
+                    for layer_index in range(nlayer):
+                        layer_tau = tau[layer_index, spectral_index, g_index]
+                        layer_omega = omega[layer_index, spectral_index, g_index]
+                        a0 = (
+                            1.0
+                            - layer_omega
+                            * moments[0, layer_index, spectral_index, g_index]
+                        )
+                        a1 = (
+                            3.0
+                            - layer_omega
+                            * moments[1, layer_index, spectral_index, g_index]
+                        )
+                        a2 = (
+                            5.0
+                            - layer_omega
+                            * moments[2, layer_index, spectral_index, g_index]
+                        )
+                        a3 = (
+                            7.0
+                            - layer_omega
+                            * moments[3, layer_index, spectral_index, g_index]
+                        )
+                        slope = 0.0
+                        if layer_tau > 0.0:
+                            slope = (
+                                planck[layer_index + 1, spectral_index]
+                                - planck[layer_index, spectral_index]
+                            ) / layer_tau
+                        local_planck = (
+                            planck[layer_index, spectral_index]
+                            + node * slope * layer_tau
+                        )
+                        thermal_factor = 0.0
+                        if a0 > 0.0:
+                            thermal_factor = (1.0 - layer_omega) / a0
+
+                        c0 = coefficients[layer_index, column, 0]
+                        c1 = coefficients[layer_index, column, 1]
+                        c2 = coefficients[layer_index, column, 2]
+                        c3 = coefficients[layer_index, column, 3]
+                        moment0 = thermal_factor * local_planck
+                        moment1 = thermal_factor * slope / a1
+                        moment2 = 0.0
+                        moment3 = 0.0
+                        if a0 == 0.0:
+                            conservative_lambda = np.sqrt(a2 * a3) / 3.0
+                            decay = np.exp(
+                                -min(conservative_lambda * layer_tau * node, 700.0)
+                            )
+                            growth = np.exp(
+                                -min(
+                                    conservative_lambda * layer_tau * (1.0 - node),
+                                    700.0,
+                                )
+                            )
+                            moment0 += (
+                                c0
+                                + a1 * layer_tau * node * c1
+                                - 2.0 * decay * c2
+                                - 2.0 * growth * c3
+                            )
+                            moment1 += c1
+                            moment2 += decay * c2 + growth * c3
+                            moment3 += (
+                                -3.0 * conservative_lambda / a3 * decay * c2
+                                + 3.0 * conservative_lambda / a3 * growth * c3
+                            )
+                        else:
+                            beta = a0 * a1 + a2 * a3 / 9.0 + 4.0 * a0 * a3 / 9.0
+                            gamma = a0 * a1 * a2 * a3 / 9.0
+                            root = np.sqrt(max(beta * beta - 4.0 * gamma, 0.0))
+                            lambda1 = np.sqrt(0.5 * (beta + root))
+                            lambda2 = np.sqrt(0.5 * (beta - root))
+                            for pair in range(2):
+                                eigenvalue = lambda1 if pair == 0 else lambda2
+                                r_value = -a0 / eigenvalue
+                                q_value = 0.5 * (
+                                    a0 * a1 / (eigenvalue * eigenvalue) - 1.0
+                                )
+                                s_value = (
+                                    -1.5 / a3 * (a0 * a1 / eigenvalue - eigenvalue)
+                                )
+                                positive_attenuation = np.exp(
+                                    -min(eigenvalue * layer_tau * node, 700.0)
+                                )
+                                negative_attenuation = np.exp(
+                                    -min(
+                                        eigenvalue * layer_tau * (1.0 - node),
+                                        700.0,
+                                    )
+                                )
+                                positive_coefficient = c0 if pair == 0 else c2
+                                negative_coefficient = c1 if pair == 0 else c3
+                                positive = positive_attenuation * positive_coefficient
+                                negative = negative_attenuation * negative_coefficient
+                                moment0 += positive + negative
+                                moment1 += r_value * (positive - negative)
+                                moment2 += q_value * (positive + negative)
+                                moment3 += s_value * (positive - negative)
+
+                        local_moment0[node_index, layer_index] = moment0
+                        local_moment1[node_index, layer_index] = moment1
+                        local_moment2[node_index, layer_index] = moment2
+                        local_moment3[node_index, layer_index] = moment3
+                        local_plancks[node_index, layer_index] = local_planck
+
+                for angle_index in range(mu.size):
+                    mu_value = mu[angle_index]
+                    legendre1 = mu_value
+                    legendre2 = 0.5 * (3.0 * mu_value * mu_value - 1.0)
+                    legendre3 = 0.5 * (
+                        5.0 * mu_value * mu_value * mu_value - 3.0 * mu_value
+                    )
+                    point_radiance = bottom_planck[spectral_index] * np.exp(
+                        -total_tau / mu_value
+                    )
+                    cumulative_tau = 0.0
+                    for layer_index in range(nlayer):
+                        layer_tau = tau[layer_index, spectral_index, g_index]
+                        layer_omega = omega[layer_index, spectral_index, g_index]
+                        for node_index in range(nodes.size):
+                            node = nodes[node_index]
+                            scattering_source = layer_omega * (
+                                local_moment0[node_index, layer_index]
+                                * moments[0, layer_index, spectral_index, g_index]
+                                + local_moment1[node_index, layer_index]
+                                * moments[1, layer_index, spectral_index, g_index]
+                                * legendre1
+                                + local_moment2[node_index, layer_index]
+                                * moments[2, layer_index, spectral_index, g_index]
+                                * legendre2
+                                + local_moment3[node_index, layer_index]
+                                * moments[3, layer_index, spectral_index, g_index]
+                                * legendre3
+                            )
+                            source = (
+                                scattering_source
+                                + (1.0 - layer_omega)
+                                * local_plancks[node_index, layer_index]
+                            )
+                            attenuation = np.exp(
+                                -(cumulative_tau + node * layer_tau) / mu_value
+                            )
+                            point_radiance += (
+                                node_weights[node_index]
+                                * source
+                                * attenuation
+                                * layer_tau
+                                / mu_value
+                            )
+                        cumulative_tau += layer_tau
+                    spectral_radiance += (
+                        g_weights[g_index] * angle_weights[angle_index] * point_radiance
+                    )
+            radiance[spectral_index] = spectral_radiance
+        return radiance
+
+else:
+
+    def _numba_reconstruct_spectrum_kernel(*args):
+        raise RobertValidationError(
+            "SH4 spectrum backend 'numba' requires the optional numba package"
+        )
 
 
 def _finite_array(
