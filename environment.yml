@@ -9,6 +9,8 @@ dependencies:
   - cmake>=3.26
   - ninja
   - numpy=2.2.6
+  - pydantic>=2.7
+  - pyyaml>=6.0
   - scipy>=1.14
   - numba=0.61.2
   - matplotlib=3.10.3

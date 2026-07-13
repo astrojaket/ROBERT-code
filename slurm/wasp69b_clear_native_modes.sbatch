@@ -15,11 +15,6 @@ source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"
 conda activate "${ROBERT_CONDA_ENV:-robert-exoplanets}"
 export OMP_NUM_THREADS=1
 export NUMBA_NUM_THREADS=1
-export NUMBA_CACHE_DIR="${SLURM_TMPDIR:-/tmp}/robert-numba-${SLURM_JOB_ID}"
-mkdir -p "${NUMBA_CACHE_DIR}"
 
-srun --ntasks="${SLURM_NTASKS}" python -u examples/retrieve_wasp69b_clear_native_modes.py \
-  --kta-path /scratch/dp448/dc-tayl1/ktables_exomol \
-  --opacity-resolution R1000 \
-  --mpi-processes "${SLURM_NTASKS}" \
-  --output "${ROBERT_OUTPUT_DIR:-/scratch/dp448/dc-tayl1/retrieval_runs/wasp69b_clear_R1000}"
+srun --ntasks="${SLURM_NTASKS}" python -u run_retrieval.py \
+  --config "${ROBERT_CONFIG:-configurations/wasp69b_clear_R1000.yaml}"
