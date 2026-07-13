@@ -99,9 +99,14 @@ runner itself does not need target- or machine-specific edits.
 
 For 64 MPI processes on DiRAC, validate and prepare opacity on the login node,
 then submit `slurm/wasp69b_clear_native_modes.sbatch`. Set `ROBERT_CONFIG` when
-submitting to select a copied configuration:
+submitting to select a copied configuration. The batch script uses Conda
+OpenMPI's `mpirun`, not `srun`; ROBERT checks that `MPI.COMM_WORLD` really has
+64 processes before UltraNest opens a checkpoint.
 
 ```bash
 ROBERT_CONFIG=/scratch/dp448/dc-tayl1/configs/my_run.yaml \
   sbatch slurm/wasp69b_clear_native_modes.sbatch
 ```
+
+After any failed multi-writer launch, select a new `outputs.directory` in YAML.
+An HDF5 checkpoint touched by independent writers must not be resumed.

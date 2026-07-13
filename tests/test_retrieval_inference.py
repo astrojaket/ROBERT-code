@@ -20,7 +20,10 @@ from robert_exoplanets import (
 from robert_exoplanets.core import RobertDataError
 from robert_exoplanets.retrieval.manifest import build_run_manifest
 from robert_exoplanets.retrieval.results import build_retrieval_result
-from robert_exoplanets.retrieval.samplers.ultranest import _result_from_ultranest
+from robert_exoplanets.retrieval.samplers.ultranest import (
+    _result_from_ultranest,
+    _validate_mpi_world_size,
+)
 
 
 def test_parameter_set_transforms_unit_cube_and_log_prior() -> None:
@@ -220,6 +223,17 @@ def test_ultranest_result_adapter_extracts_best_fit() -> None:
 
     assert stable_result.metadata["mpi_nprocs"] == "3"
     assert stable_result.metadata["ncall"] == "500"
+
+
+def test_ultranest_rejects_requested_mpi_size_that_is_not_present() -> None:
+    from robert_exoplanets.core import RobertConfigError
+
+    with pytest.raises(RobertConfigError, match="MPI communicator size mismatch"):
+        _validate_mpi_world_size(2)
+
+
+def test_ultranest_accepts_the_actual_single_process_communicator() -> None:
+    _validate_mpi_world_size(1)
 
 
 def load_emission_observation_npz_from_arrays():

@@ -38,7 +38,7 @@ def test_dial3_scripts_are_valid_bash_and_use_expected_cases() -> None:
             assert "--mpi-processes \"${SLURM_NTASKS}\"" in text
             assert "/scratch/dp448/dc-tayl1/retrieval_runs/" in text
         assert 'source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"' in text
-        assert 'srun --ntasks="${SLURM_NTASKS}" python -u' in text
+        assert 'mpirun -np "${SLURM_NTASKS}" python -u' in text
 
 
 def test_wasp_entry_points_reach_their_command_line_parser() -> None:
