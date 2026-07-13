@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-cd /scratch/dp448/dc-tayl1/ROBERT-code
+cd "${ROBERT_CODE_DIR:-${SLURM_SUBMIT_DIR:?submit from the ROBERT-code directory or set ROBERT_CODE_DIR}}"
 source "${ROBERT_CONDA_ROOT:-${HOME}/miniconda3}/etc/profile.d/conda.sh"
 conda activate "${ROBERT_CONDA_ENV:-robert-exoplanets}"
 export OMP_NUM_THREADS=1

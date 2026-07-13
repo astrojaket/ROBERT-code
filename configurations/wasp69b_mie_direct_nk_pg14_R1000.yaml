@@ -1,0 +1,39 @@
+extends: wasp69b_mie_catalog_pg14_R1000.yaml
+
+run:
+  name: wasp69b-mie-direct-nk-pg14-R1000
+  description: One-region Mie cloud with retrieved refractive-index nodes and PG14 temperature profile.
+
+clouds:
+  model: mie_direct_nk
+
+parameters:
+  - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.05, upper: 1.5}}
+  - {name: kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}}
+  - {name: gamma1, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: gamma2, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: T_irr, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}}
+  - {name: alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+  - {name: log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}}
+  - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
+  - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
+  - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
+  - {name: miri_offset, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}}
+  - {name: cloud_n_0, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_1, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_2, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_3, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_4, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_5, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_logk_0, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_1, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_2, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_3, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_4, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_5, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_direct_nk_pg14_R1000
+runtime:
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_mie_direct_nk_pg14_R1000

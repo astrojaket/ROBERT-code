@@ -25,11 +25,11 @@ _SBATCH = """#!/bin/bash -l
 #SBATCH --time=48:00:00
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
+#SBATCH --chdir={run_directory}
 
 set -euo pipefail
 
-RUN_DIRECTORY="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-cd "${{RUN_DIRECTORY}}"
+cd "{run_directory}"
 source "${{ROBERT_CONDA_ROOT:-${{HOME}}/miniconda3}}/etc/profile.d/conda.sh"
 conda activate "${{ROBERT_CONDA_ENV:-robert-exoplanets}}"
 export OMP_NUM_THREADS=1
@@ -118,7 +118,7 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     load_task_config(execution_config)
 
     (run_directory / "submit.sbatch").write_text(
-        _SBATCH.format(run_name=run_name), encoding="utf-8"
+        _SBATCH.format(run_name=run_name, run_directory=run_directory), encoding="utf-8"
     )
     (run_directory / "README.md").write_text(
         _README.format(run_name=run_name), encoding="utf-8"

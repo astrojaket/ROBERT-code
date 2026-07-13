@@ -1,0 +1,45 @@
+extends: wasp69b_clear_R1000.yaml
+
+run:
+  name: wasp69b-mie-catalog-pg14-R1000
+  description: One-region MgSiO3 Mie cloud with fixed catalogue optical constants and PG14 temperature profile.
+
+observations:
+  datasets: [f322w2, avg, f444w, lrs]
+  miri_offset_parameter: miri_offset
+
+clouds:
+  model: mie_catalog
+  optical_constants_path: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/optical_constants/exo_skryer
+  material: MgSiO3
+  particle_density_kg_m3: 3200.0
+  geometric_stddev: 1.0
+  quadrature_points: 1
+  multiple_scattering_backend: sh4
+
+parameters:
+  - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.05, upper: 1.5}}
+  - {name: kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}}
+  - {name: gamma1, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: gamma2, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: T_irr, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}}
+  - {name: alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+  - {name: log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}}
+  - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
+  - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
+  - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
+  - {name: miri_offset, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}}
+
+sampler:
+  live_points: 200
+  max_calls: 100000
+  dlogz: 0.5
+  resume: resume
+  show_status: false
+  seed: 20260712
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_catalog_pg14_R1000
+runtime:
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_mie_catalog_pg14_R1000

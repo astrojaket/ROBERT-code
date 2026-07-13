@@ -1,0 +1,10 @@
+extends: wasp69b_clear_R1000.yaml
+
+run:
+  name: wasp69b-clear-native-pg14-R1000
+  description: Cloud-free PG14 equilibrium chemistry; independent NIRCam and MIRI modes.
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_clear_native_pg14_R1000
+runtime:
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_clear_native_pg14_R1000

@@ -17,6 +17,7 @@ from robert_exoplanets.io.task_config import (
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "configurations" / "wasp69b_clear_R1000.yaml"
+DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 
 
 def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
@@ -90,3 +91,20 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
 
     assert parsed.atmosphere.temperature.model == "tabulated"
     assert parsed.atmosphere.temperature.profile_path == Path("inputs/pt.csv")
+
+
+def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
+    assert len(DEFAULTS) == 11
+    for path in DEFAULTS:
+        config = load_task_config(path)
+        assert config.run.name.startswith(("wasp69b-", "wasp80b-"))
+        assert config.opacity.resolution == "R1000"
+
+
+def test_direct_nk_default_replaces_catalogue_cloud_fields() -> None:
+    config = load_task_config(
+        ROOT / "configurations" / "wasp69b_mie_direct_nk_pg14_R1000.yaml"
+    )
+
+    assert config.clouds.model == "mie_direct_nk"
+    assert len(config.clouds.real_index_parameter_names) == 6
