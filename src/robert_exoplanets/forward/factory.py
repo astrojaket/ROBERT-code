@@ -50,6 +50,7 @@ class ExoKOpacitySource:
     species: tuple[str, ...]
     directory: str | Path | None = None
     paths: Mapping[str, str | Path] = field(default_factory=dict)
+    resolution: str | int | None = None
     filename_pattern: str = "*.kta"
     name: str = "exomol-correlated-k"
     interpolation: str = "log_pressure_temperature_log_k"
@@ -80,6 +81,20 @@ class ExoKOpacitySource:
             raise RobertConfigError("opacity path keys must match configured species")
         if any(not key for key in paths):
             raise RobertConfigError("opacity path species names must not be empty")
+        resolution = None
+        if self.resolution is not None:
+            value = str(self.resolution).strip().upper()
+            if value.startswith("R"):
+                value = value[1:]
+            if not value.isdigit() or int(value) <= 0:
+                raise RobertConfigError(
+                    "opacity resolution must be a positive integer or 'R<integer>'"
+                )
+            resolution = f"R{int(value)}"
+        if resolution is not None and directory is None:
+            raise RobertConfigError(
+                "opacity resolution is only valid with an opacity directory"
+            )
         if not str(self.filename_pattern).strip():
             raise RobertConfigError("opacity filename_pattern must not be empty")
         if not str(self.name).strip():
@@ -98,6 +113,7 @@ class ExoKOpacitySource:
         object.__setattr__(self, "species", species)
         object.__setattr__(self, "directory", directory)
         object.__setattr__(self, "paths", immutable_mapping(paths))
+        object.__setattr__(self, "resolution", resolution)
         object.__setattr__(self, "nonfinite_fill_value", fill_value)
         object.__setattr__(self, "zero_deltalog_min_value", zero_delta)
 
@@ -108,6 +124,7 @@ class ExoKOpacitySource:
             return CorrelatedKOpacityProvider.from_exomol_kta_directory(
                 self.directory,
                 species=self.species,
+                resolution=self.resolution,
                 filename_pattern=self.filename_pattern,
                 name=self.name,
                 interpolation=self.interpolation,
@@ -550,6 +567,9 @@ def _factory_manifest_metadata(config: ClearSkyEmissionFactoryConfig) -> dict[st
         metadata["factory_opacity_filename_pattern"] = (
             config.opacity_source.filename_pattern
         )
+        metadata["factory_opacity_resolution"] = (
+            "" if config.opacity_source.resolution is None else config.opacity_source.resolution
+        )
     elif isinstance(config.opacity_source, ExoMolOpacitySamplingSource):
         metadata["factory_opacity_source_type"] = "exomol_opacity_sampling"
         metadata["factory_opacity_paths"] = ",".join(
@@ -606,6 +626,9 @@ def _parameterized_factory_manifest_metadata(
         )
         metadata["factory_opacity_filename_pattern"] = (
             config.opacity_source.filename_pattern
+        )
+        metadata["factory_opacity_resolution"] = (
+            "" if config.opacity_source.resolution is None else config.opacity_source.resolution
         )
     elif isinstance(config.opacity_source, ExoMolOpacitySamplingSource):
         metadata["factory_opacity_source_type"] = "exomol_opacity_sampling"

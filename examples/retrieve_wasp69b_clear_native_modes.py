@@ -43,7 +43,6 @@ RETAINED_MODES = ("f322w2", "f444w", "lrs")
 LIVE_POINTS = 50
 DLOGZ = 2.5
 CALLS_PER_ATTEMPT = 10_000
-MPI_PROCESSES = 3
 SEED = 20260712
 
 
@@ -69,10 +68,17 @@ def native_mode_observations() -> ObservationCollection:
     return observations
 
 
-def build_native_mode_problem(observations: ObservationCollection):
+def build_native_mode_problem(
+    observations: ObservationCollection,
+    *,
+    opacity_resolution: str = workflow.DEFAULT_OPACITY_RESOLUTION,
+):
     """Build the optimized retrieval problem with v2 prior provenance."""
 
-    problem = workflow.build_problem(observations)
+    problem = workflow.build_problem(
+        observations,
+        opacity_resolution=opacity_resolution,
+    )
     return replace(
         problem,
         name=f"{workflow.TARGET_SLUG}-clear-native-modes-optimized-priors-v2",
@@ -82,6 +88,7 @@ def build_native_mode_problem(observations: ObservationCollection):
             "dataset_selection": "F322W2,F444W,LRS",
             "overlap_average": "excluded",
             "dataset_manipulation": "none",
+            "opacity_resolution": opacity_resolution,
             "metallicity_prior": "uniform_log10_Z_over_Zsun_-1_to_2",
             "carbon_to_oxygen_prior": "uniform_linear_0_to_1",
             "performance_path": (
@@ -97,6 +104,9 @@ def _configuration(
     max_ncalls: int,
     dlogz: float,
     fast_stop: bool,
+    mpi_processes: int,
+    kta_path: Path,
+    opacity_resolution: str,
     smoke: dict[str, float],
 ) -> dict[str, object]:
     return {
@@ -104,6 +114,15 @@ def _configuration(
         "problem": problem.name,
         "datasets": list(problem.observations.names),
         "n_observations": problem.observations.n_points,
+        "opacity": {
+            "kta_path": str(kta_path.expanduser().resolve()),
+            "resolution": opacity_resolution,
+            "cache_directory": str(
+                workflow.opacity_cache_directory(opacity_resolution).resolve()
+            ),
+            "species": list(workflow.SPECIES),
+        },
+        "opacity_identifiers": dict(problem.opacity_identifiers),
         "parameters": [
             {
                 "name": parameter.name,
@@ -126,7 +145,7 @@ def _configuration(
             "Lepsilon": 100.0 if fast_stop else 0.001,
             "max_num_improvement_loops": 0 if fast_stop else -1,
             "resume": "resume",
-            "mpi_processes": MPI_PROCESSES,
+            "mpi_processes": mpi_processes,
             "seed": SEED,
         },
         "smoke_evaluation": smoke,
@@ -178,6 +197,21 @@ def _next_cumulative_call_limit(output: Path) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    configured_kta_path = os.environ.get("ROBERT_KTABLE_PATH")
+    parser.add_argument(
+        "--kta-path",
+        type=Path,
+        default=configured_kta_path,
+        required=configured_kta_path is None,
+        help="KTA root containing R1000/R15000, or the selected resolution directory",
+    )
+    parser.add_argument(
+        "--opacity-resolution",
+        choices=workflow.OPACITY_RESOLUTIONS,
+        default=os.environ.get(
+            "ROBERT_OPACITY_RESOLUTION", workflow.DEFAULT_OPACITY_RESOLUTION
+        ),
+    )
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--output", type=Path, default=OUTPUT)
@@ -197,16 +231,31 @@ def main() -> None:
         action="store_true",
         help="exploratory early stop with relaxed remaining-integral, ESS, and KL targets",
     )
+    parser.add_argument(
+        "--mpi-processes",
+        type=int,
+        default=int(os.environ.get("SLURM_NTASKS", "1")),
+        help="MPI process count recorded in run metadata",
+    )
     args = parser.parse_args()
     if not np.isfinite(args.dlogz) or args.dlogz <= 0.0:
         parser.error("--dlogz must be finite and positive")
+    if args.mpi_processes < 1:
+        parser.error("--mpi-processes must be positive")
 
     observations = native_mode_observations()
     if args.prepare_only:
-        workflow.prepare_opacity_cache(observations)
+        workflow.prepare_opacity_cache(
+            observations,
+            kta_path=args.kta_path,
+            resolution=args.opacity_resolution,
+        )
         return
 
-    problem = build_native_mode_problem(observations)
+    problem = build_native_mode_problem(
+        observations,
+        opacity_resolution=args.opacity_resolution,
+    )
     smoke = smoke_evaluation(problem)
     max_ncalls = (
         _next_cumulative_call_limit(args.output)
@@ -230,6 +279,9 @@ def main() -> None:
             max_ncalls=max_ncalls,
             dlogz=args.dlogz,
             fast_stop=args.fast_stop,
+            mpi_processes=args.mpi_processes,
+            kta_path=args.kta_path,
+            opacity_resolution=args.opacity_resolution,
             smoke=smoke,
         )
         args.output.mkdir(parents=True, exist_ok=True)
@@ -260,7 +312,7 @@ def main() -> None:
         dlogz=args.dlogz,
         resume="resume",
         show_status=True,
-        mpi_nprocs=MPI_PROCESSES,
+        mpi_nprocs=args.mpi_processes,
         seed=SEED,
         **fast_stop_options,
     )
@@ -271,7 +323,7 @@ def main() -> None:
             args.output,
             live_points=LIVE_POINTS,
             max_ncalls=max_ncalls,
-            mpi_processes=MPI_PROCESSES,
+            mpi_processes=args.mpi_processes,
         )
         if args.fast_stop:
             summary_path = args.output / "summary.json"
