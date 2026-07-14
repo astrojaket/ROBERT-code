@@ -46,6 +46,9 @@ class StarConfig(ConfigModel):
     name: str = Field(min_length=1)
     radius_m: PositiveFloat
     effective_temperature_k: PositiveFloat
+    log_g_cgs: float
+    metallicity_dex: float
+    spectrum_model: Literal["phoenix", "blackbody"] = "phoenix"
 
 
 class BodiesConfig(ConfigModel):
@@ -440,7 +443,7 @@ class HousekeepingConfig(ConfigModel):
 class TaskConfig(ConfigModel):
     """Complete schema-versioned retrieval/forward-model configuration."""
 
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     run: RunConfig
     bodies: BodiesConfig
     observations: ObservationsConfig

@@ -172,6 +172,12 @@ from .retrieval import (
     run_ultranest,
     save_emission_observation_npz,
 )
+from .stellar import (
+    BlackbodyStellarSpectrumModel,
+    PhoenixStellarSpectrumModel,
+    StellarSpectrumModel,
+    prepare_stellar_spectrum,
+)
 from .rt import (
     AbsorptionTransmissionResult,
     ClearSkyEmissionResult,
@@ -259,6 +265,7 @@ __all__ = [
     "AbsorptionTransmissionResult",
     "AtmosphereModelSetup",
     "AtmosphereState",
+    "BlackbodyStellarSpectrumModel",
     "BackgroundGasMixture",
     "ChemistryModel",
     "CloudOpticalProperties",
@@ -347,6 +354,7 @@ __all__ = [
     "TwoRegionEmissionModel",
     "ParameterizedEmissionModelConfig",
     "Planet",
+    "PhoenixStellarSpectrumModel",
     "PressureGrid",
     "PreparedObservationResponse",
     "PreparedStratifiedSamplingObservationResponse",
@@ -369,6 +377,7 @@ __all__ = [
     "SpectralGrid",
     "Spectrum",
     "Star",
+    "StellarSpectrumModel",
     "TabulatedTemperatureProfile",
     "TemperatureProfile",
     "ThermalEmissionIntegrationResult",
@@ -446,6 +455,7 @@ __all__ = [
     "normal_emission_geometry",
     "power_law_haze",
     "posterior_summary",
+    "prepare_stellar_spectrum",
     "postprocess_forward_output",
     "postprocess_retrieval_output",
     "pressure_grid_from_opacity",

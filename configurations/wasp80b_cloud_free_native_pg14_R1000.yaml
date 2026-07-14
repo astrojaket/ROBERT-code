@@ -13,6 +13,9 @@ bodies:
     name: WASP-80
     radius_m: 407680200.0
     effective_temperature_k: 4145.0
+    log_g_cgs: 4.66
+    metallicity_dex: -0.14
+    spectrum_model: phoenix
 
 observations:
   loader: wiser2025_wasp80b

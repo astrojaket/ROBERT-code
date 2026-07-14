@@ -6,7 +6,7 @@
 # ROBERT rejects unknown active keys deliberately, so a typo cannot change the
 # science model silently.
 
-schema_version: 1
+schema_version: 2
 
 # =============================================================================
 # RUN IDENTITY
@@ -30,6 +30,9 @@ bodies:
     name: WASP-69
     radius_m: 565568100.0
     effective_temperature_k: 4750.0
+    log_g_cgs: 4.5
+    metallicity_dex: 0.15
+    spectrum_model: phoenix    # Alternative: blackbody
 
 # =============================================================================
 # DATA PROPERTIES

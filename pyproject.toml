@@ -25,10 +25,13 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Astronomy"
 ]
 dependencies = [
+  "astropy>=6.0",
   "numpy>=1.24",
   "pydantic>=2.7",
   "PyYAML>=6.0",
-  "scipy>=1.10"
+  "scipy>=1.10",
+  "synphot>=1.6",
+  "stsynphot>=1.4"
 ]
 
 [project.scripts]

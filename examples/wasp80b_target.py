@@ -33,6 +33,8 @@ STAR = Star(
     name="WASP-80",
     radius_m=0.586 * SOLAR_RADIUS_M,
     effective_temperature_k=4145.0,
+    log_g_cgs=4.66,
+    metallicity_dex=-0.14,
     metadata={"source": "Zenodo Stage-5 Rs; NASA Exoplanet Archive Teff solution"},
 )
 PLANET_GRAVITY_M_S2 = (

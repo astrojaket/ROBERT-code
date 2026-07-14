@@ -5,6 +5,11 @@ science choices; the Python runners contain no target-specific settings. Start
 by copying `configurations/wasp69b_cloud_free_R1000.yaml` to a new filename and
 editing the copy.
 
+Schema version 2 adds explicit stellar `log_g_cgs`, `metallicity_dex`, and
+`spectrum_model` fields and makes PHOENIX the default. To migrate a version-1
+file, add those three fields under `bodies.star` and set `schema_version: 2`;
+use `spectrum_model: blackbody` to reproduce the version-1 stellar treatment.
+
 The available WASP-69b/WASP-80b cloud-free, Mie-cloud, and temperature-profile
 defaults are catalogued in [configurations/README.md](../configurations/README.md).
 
@@ -70,6 +75,36 @@ The major sections are intentionally explicit:
 - `outputs`: a project directory outside the source checkout; and
 - `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise,
   while `scratch_directory` controls runtime caches.
+
+## Stellar spectra
+
+Configured emission models use the STScI PHOENIX atmosphere grid by default.
+Set the Synphot reference-data root before preparing a forward model; the path
+must be the directory above `grid/`, not the `grid/phoenix` directory itself:
+
+```bash
+export PYSYN_CDBS=/Users/jaketaylor/Dropbox/NemesisPy-Docker/grp/redcat/trds
+```
+
+The stellar block records all three PHOENIX interpolation coordinates:
+
+```yaml
+bodies:
+  star:
+    name: WASP-69
+    radius_m: 565568100.0
+    effective_temperature_k: 4750.0
+    log_g_cgs: 4.5
+    metallicity_dex: 0.15
+    spectrum_model: phoenix
+```
+
+Use `spectrum_model: blackbody` for the former Planck-spectrum behavior. The
+PHOENIX atlas is loaded and flux-conservingly averaged onto every model's
+spectral bins during model construction, so no stellar file I/O occurs during
+likelihood evaluation. ROBERT converts the tabulated surface flux to radiance
+as `F_lambda / pi` and normalizes the finite atlas integral to
+`sigma * T_eff**4`; both choices are recorded in spectrum and run metadata.
 
 Unknown fields and inconsistent molecule/parameter references are errors. To
 inspect the resolved choices without loading data or opacity, run:

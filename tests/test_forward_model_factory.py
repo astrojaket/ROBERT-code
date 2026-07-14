@@ -80,6 +80,7 @@ def _factory_config() -> EmissionFactoryConfig:
             log_vmr_parameters={"H2O": "log_h2o"},
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
         ),
     )
 
@@ -235,6 +236,7 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
         ),
     )
     model = build_parameterized_emission_model(
@@ -270,6 +272,7 @@ def test_shared_atmosphere_multi_dataset_model_matches_independent_models(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
         ),
     )
     first = build_parameterized_emission_model(
@@ -329,6 +332,7 @@ def test_shared_atmosphere_multi_dataset_model_rejects_distinct_builders() -> No
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
         ),
     )
     first = build_parameterized_emission_model(
@@ -360,6 +364,7 @@ def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> No
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
         ),
     )
     clear = build_parameterized_emission_model(
@@ -411,6 +416,7 @@ def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles(
             opacity_species=("H2O",),
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
         ),
     )
     clear = build_parameterized_emission_model(

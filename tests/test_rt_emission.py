@@ -13,6 +13,7 @@ from robert_exoplanets import (
     PreparedCorrelatedKOpacity,
     PressureGrid,
     SpectralGrid,
+    Spectrum,
     assemble_gas_optical_depth,
     disk_average_quadrature,
     gauss_legendre_disk_geometry,
@@ -205,6 +206,39 @@ def test_emission_returns_blackbody_eclipse_depth_when_star_is_blackbody() -> No
     np.testing.assert_allclose(result.eclipse_depth.values, expected, rtol=1.0e-12)
 
 
+def test_emission_accepts_prepared_stellar_radiance_for_eclipse_depth() -> None:
+    planet_radius = 1.4e8
+    star_radius = 9.2e8
+    gas_tau = _gas_tau(
+        temperature=[1250.0, 1250.0],
+        kcoeff=np.array([[[[1.0e-22, 2.0e-22]], [[3.0e-22, 4.0e-22]]]]),
+    )
+    stellar_radiance = 2.5e11
+    stellar = Spectrum(
+        spectral_grid=SpectralGrid.from_array([2.0], unit="micron"),
+        values=np.array([stellar_radiance]),
+        unit="W m^-3 sr^-1",
+        observable="stellar_spectral_radiance",
+        metadata={"stellar_model": "phoenix"},
+    )
+
+    result = solve_emission(
+        gas_tau,
+        planet_radius_m=planet_radius,
+        star_radius_m=star_radius,
+        stellar_spectrum=stellar,
+    )
+
+    assert result.eclipse_depth is not None
+    expected = (
+        result.radiance.values
+        / stellar_radiance
+        * (planet_radius / star_radius) ** 2
+    )
+    np.testing.assert_allclose(result.eclipse_depth.values, expected)
+    assert result.eclipse_depth.metadata["stellar_model"] == "phoenix"
+
+
 def test_normalized_layer_contribution_sums_to_one_for_nonzero_contribution() -> None:
     gas_tau = _gas_tau(
         temperature=[900.0, 1200.0],
@@ -304,7 +338,7 @@ def test_emission_rejects_partial_eclipse_depth_inputs() -> None:
         kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
     )
 
-    with pytest.raises(RobertValidationError, match="all required for eclipse depth"):
+    with pytest.raises(RobertValidationError, match="required for eclipse depth"):
         solve_emission(gas_tau, planet_radius_m=1.0)
 
 

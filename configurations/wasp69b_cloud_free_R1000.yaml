@@ -1,6 +1,6 @@
 # ROBERT cloud-free emission retrieval: WASP-69b NIRCam + MIRI native modes.
 # Paths below are explicit DiRAC paths. Copy this file for each science run.
-schema_version: 1
+schema_version: 2
 
 run:
   name: wasp69b-cloud-free-native-modes-R1000
@@ -15,6 +15,9 @@ bodies:
     name: WASP-69
     radius_m: 565568100.0      # 0.813 R_Sun
     effective_temperature_k: 4750.0
+    log_g_cgs: 4.5
+    metallicity_dex: 0.15
+    spectrum_model: phoenix    # Alternative: blackbody
 
 observations:
   loader: schlawin2024_wasp69b

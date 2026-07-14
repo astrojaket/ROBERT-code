@@ -8,6 +8,10 @@
 - Changed configured UltraNest runs to converge without a likelihood-call cap
   by default and report call-limit finalization explicitly when an optional
   finite cap is used.
+- Made STScI PHOENIX stellar-atmosphere spectra the default emission
+  denominator, with explicit temperature/metallicity/log(g) interpolation,
+  bolometric normalization, flux-conserving binning, immutable provenance, a
+  blackbody option, and a Sun-like G-star benchmark.
 - Added general retrieval and forward-model post-processing with fit
   statistics, residual and posterior/OE plots, a WASP-69b sampler benchmark
   comparison, editable colour/style controls, and an optional YAML automatic
