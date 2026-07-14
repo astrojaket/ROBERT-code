@@ -192,6 +192,12 @@ def run_benchmark(
         gas_only,
         gas_cia,
     )
+    _plot_paper_validation(
+        output / "jupiter_nemesis_paper_validation.png",
+        wavenumber,
+        nemesis_radiance,
+        robert_radiance,
+    )
     return report
 
 
@@ -388,6 +394,7 @@ def _metrics(reference: np.ndarray, candidate: np.ndarray) -> dict[str, float]:
     fractional = np.abs(residual[bright] / reference[bright])
     return {
         "rmse_w_cm-2_sr-1_cm": float(np.sqrt(np.mean(residual**2))),
+        "rms_fraction_bright": float(np.sqrt(np.mean(fractional**2))),
         "median_absolute_fraction_bright": float(np.median(fractional)),
         "p95_absolute_fraction_bright": float(np.percentile(fractional, 95.0)),
         "maximum_absolute_fraction_bright": float(np.max(fractional)),
@@ -443,6 +450,50 @@ def _plot(
     for axis in (ax, residual_ax):
         axis.grid(alpha=0.15)
     fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
+def _plot_paper_validation(
+    path: Path,
+    wn: np.ndarray,
+    nemesis: np.ndarray,
+    robert: np.ndarray,
+) -> None:
+    scale = 1.0e9
+    fig, (spectrum_ax, residual_ax) = plt.subplots(
+        2,
+        1,
+        figsize=(12, 6.5),
+        sharex=True,
+        gridspec_kw={"height_ratios": [3, 1]},
+        constrained_layout=True,
+    )
+    spectrum_ax.plot(
+        wn,
+        nemesis * scale,
+        color="#17131f",
+        lw=1.5,
+        label="NEMESIS CIRSdrv_wave",
+    )
+    spectrum_ax.plot(
+        wn,
+        robert * scale,
+        color="#7251b5",
+        lw=1.1,
+        label="ROBERT",
+    )
+    spectrum_ax.set_yscale("log")
+    spectrum_ax.set_ylabel(r"Radiance (nW cm$^{-2}$ sr$^{-1}$ (cm$^{-1}$)$^{-1}$)")
+    spectrum_ax.legend(frameon=False)
+
+    residual = 100.0 * (robert - nemesis) / nemesis
+    residual_ax.axhline(0.0, color="#17131f", lw=0.8)
+    residual_ax.plot(wn, residual, color="#7251b5", lw=0.9)
+    residual_ax.set_xlabel(r"Wavenumber (cm$^{-1}$)")
+    residual_ax.set_ylabel("Residual (%)")
+    for axis in (spectrum_ax, residual_ax):
+        axis.grid(alpha=0.15)
+    fig.savefig(path, dpi=220)
     plt.close(fig)
 
 
