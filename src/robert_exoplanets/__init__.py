@@ -132,6 +132,7 @@ from .opacity import (
 from .retrieval import (
     LogUniformPrior,
     MultiDatasetRetrievalProblem,
+    MultiNestRunConfig,
     NestedSamplerResult,
     NestedSamplingOEResult,
     OENestedSamplingResult,
@@ -159,6 +160,7 @@ from .retrieval import (
     run_optimal_estimation_from_nested_result,
     run_retrieval,
     run_configured_retrieval,
+    run_multinest,
     run_ultranest,
     save_emission_observation_npz,
 )
@@ -301,6 +303,7 @@ __all__ = [
     "NativeSpectrumMultiDatasetForwardModel",
     "NativeSpectrumMultiDatasetPrediction",
     "MultiDatasetRetrievalProblem",
+    "MultiNestRunConfig",
     "NestedSamplerResult",
     "NestedSamplingOEResult",
     "KtaHeader",
@@ -453,6 +456,7 @@ __all__ = [
     "run_optimal_estimation_from_nested_result",
     "run_retrieval",
     "run_configured_retrieval",
+    "run_multinest",
     "run_ultranest",
     "solve_emission",
     "solve_emission_spectrum",
