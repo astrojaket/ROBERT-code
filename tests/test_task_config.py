@@ -36,6 +36,7 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.runtime.mpi_processes == "auto"
     assert config.runtime.scratch_directory.is_absolute()
     assert config.outputs.directory.is_absolute()
+    assert config.plotting.enabled is False
 
 
 def test_unknown_configuration_field_is_rejected() -> None:
@@ -130,6 +131,8 @@ def test_wasp69b_inference_benchmarks_only_change_run_controls(
     )
 
     assert benchmark.sampler.engine == engine
+    assert baseline.plotting.enabled is True
+    assert benchmark.plotting.enabled is True
     for section in (
         "bodies",
         "observations",
@@ -166,6 +169,8 @@ def test_complete_template_uses_housekeeping_for_internal_paths() -> None:
     assert config.opacity.cache_directory == config.housekeeping.opacity_cache_directory
     assert config.outputs.directory == config.housekeeping.output_directory
     assert config.runtime.scratch_directory == config.housekeeping.scratch_directory
+    assert config.plotting.enabled is False
+    assert config.plotting.dataset_colors["f322w2"] == "#20639b"
 
 
 def test_yaml_supports_named_dataset_offsets_and_uncertainty_inflation() -> None:

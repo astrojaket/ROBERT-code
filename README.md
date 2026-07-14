@@ -66,7 +66,18 @@ python run_retrieval.py \
 
 See [Configuring and running ROBERT](docs/configuration.md) for portable paths,
 directory initialization, opacity preparation, forward modelling, retrievals,
-and 64-rank Slurm submission.
+128-rank nested-sampler Slurm submission, and automatic or manual plotting.
+
+Completed configured runs can be post-processed without rerunning inference:
+
+```bash
+python postprocess_retrieval.py --config configuration.yaml
+python postprocess_forward.py --config configuration.yaml
+python postprocess_wasp69b_sampler_benchmark.py --project-dir /path/to/my_project
+```
+
+See [Post-processing and plotting](docs/postprocessing.md) for fit statistics,
+plot products, YAML automation, and colour/style overrides.
 
 The maintained [forward-model benchmark suite](examples/BENCHMARKS.md) uses
 PICASO and petitRADTRANS as independent gold-standard comparisons. Superseded
@@ -96,6 +107,9 @@ ignored by git.
 - Versioned run manifests and portable result products containing the inputs,
   opacity identifiers, code and runtime provenance, settings, seeds, spectra,
   and inference outputs.
+- General retrieval and forward-model post-processing with fit statistics,
+  residuals, posterior/OE diagnostics, sampler comparisons, and optional
+  automatic plotting controlled by YAML.
 - Unit, integration, regression, injection-recovery, and scientific benchmark
   tests, including independent forward-model comparisons with pRT and PICASO.
 

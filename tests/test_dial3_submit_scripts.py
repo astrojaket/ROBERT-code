@@ -62,7 +62,12 @@ def test_wasp_entry_points_reach_their_command_line_parser() -> None:
 
 
 def test_configured_entry_points_reach_their_command_line_parser() -> None:
-    for name in ("run_retrieval.py", "run_forward.py"):
+    for name in (
+        "run_retrieval.py",
+        "run_forward.py",
+        "postprocess_retrieval.py",
+        "postprocess_forward.py",
+    ):
         completed = subprocess.run(
             [sys.executable, str(ROOT / name), "--help"],
             check=False,
@@ -71,3 +76,16 @@ def test_configured_entry_points_reach_their_command_line_parser() -> None:
         )
         assert completed.returncode == 0, completed.stderr
         assert "--config" in completed.stdout
+
+    benchmark = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "postprocess_wasp69b_sampler_benchmark.py"),
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert benchmark.returncode == 0, benchmark.stderr
+    assert "--project-dir" in benchmark.stdout

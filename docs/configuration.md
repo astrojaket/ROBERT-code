@@ -65,6 +65,8 @@ The major sections are intentionally explicit:
 - `sampler`: inference engine (OE, UltraNest, MultiNest, or OE followed by
   either nested sampler), convergence/iteration controls, resume policy, and
   seed;
+- `plotting`: optional automatic retrieval/forward post-processing, image
+  format, Matplotlib style, sampling display limit, colours, and labels;
 - `outputs`: a project directory outside the source checkout; and
 - `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise,
   while `scratch_directory` controls runtime caches.
@@ -106,6 +108,11 @@ midpoint.
 python run_forward.py --config configurations/wasp69b_cloud_free_R1000.yaml
 ```
 
+Set `plotting.enabled: true` to generate fit statistics and figures on rank 0
+after a successful retrieval or forward run. Plotting is disabled by default;
+it can always be run later with `postprocess_retrieval.py` or
+`postprocess_forward.py`. See [Post-processing and plotting](postprocessing.md).
+
 Every executed task copies the input YAML and writes a fully resolved YAML to
 the output directory. A retrieval's UltraNest checkpoints live in the
 `ultranest/` subdirectory. Do not reuse one output directory after changing
@@ -130,15 +137,15 @@ as a photochemistry emulator should be added as another validated
 `atmosphere.chemistry.model` variant with its own explicit input paths; the
 runner itself does not need target- or machine-specific edits.
 
-For 64 MPI processes on DiRAC, validate and prepare opacity on the login node,
-then submit `slurm/wasp69b_cloud_free_native_modes.sbatch`. Set `ROBERT_CONFIG` when
-submitting to select a copied configuration. The batch script uses Conda
-the Conda MPICH `mpirun`, not `srun`; ROBERT checks that `MPI.COMM_WORLD` really has
-64 processes before UltraNest opens a checkpoint.
+For DiRAC, create an isolated project directory and submit its generated
+`submit.sbatch`. OE-only scripts request one rank; UltraNest, MultiNest, and
+hybrid scripts request 128 ranks across two nodes. The script uses Conda MPICH
+`mpirun`, not `srun`, and ROBERT verifies the MPI world before a sampler opens
+shared output files.
 
 ```bash
-ROBERT_CONFIG=/scratch/dp448/dc-tayl1/configs/my_run.yaml \
-  sbatch slurm/wasp69b_cloud_free_native_modes.sbatch
+cd /scratch/dp448/dc-tayl1/my_project/<run.name>
+sbatch submit.sbatch
 ```
 
 After any failed multi-writer launch, select a new `outputs.directory` in YAML.
