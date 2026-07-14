@@ -20,11 +20,14 @@ _SBATCH = """#!/bin/bash -l
 #SBATCH --job-name={run_name}
 #SBATCH --account=dp448
 #SBATCH --partition=slurm
-#SBATCH --nodes=1
-#SBATCH --ntasks=64
+#SBATCH --nodes={nodes}
+#SBATCH --ntasks={ntasks}
+#SBATCH --ntasks-per-node={ntasks_per_node}
 #SBATCH --time=48:00:00
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
+#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk
+#SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --chdir={run_directory}
 
 set -euo pipefail
@@ -53,6 +56,9 @@ writable paths are deliberately local to this directory:
 The input data, FastChem, and K-table paths remain the values selected in the
 source configuration. `source_configuration.yaml` is the unmodified copy for
 comparison.
+
+`submit.sbatch` requests {ntasks} MPI rank(s) across {nodes} node(s) and sends
+BEGIN, END, and FAIL notifications to `jake.taylor@physics.ox.ac.uk`.
 
 ```bash
 python run_retrieval.py --config configuration.yaml --validate-only
@@ -123,11 +129,22 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     # Validate the generated file before declaring the directory ready.
     load_task_config(execution_config)
 
+    is_oe_only = config.sampler.engine == "optimal_estimation"
+    nodes = 1 if is_oe_only else 2
+    ntasks = 1 if is_oe_only else 128
+    ntasks_per_node = 1 if is_oe_only else 64
     (run_directory / "submit.sbatch").write_text(
-        _SBATCH.format(run_name=run_name, run_directory=run_directory), encoding="utf-8"
+        _SBATCH.format(
+            run_name=run_name,
+            run_directory=run_directory,
+            nodes=nodes,
+            ntasks=ntasks,
+            ntasks_per_node=ntasks_per_node,
+        ),
+        encoding="utf-8",
     )
     (run_directory / "README.md").write_text(
-        _README.format(run_name=run_name), encoding="utf-8"
+        _README.format(run_name=run_name, nodes=nodes, ntasks=ntasks), encoding="utf-8"
     )
     return run_directory
 
