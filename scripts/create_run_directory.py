@@ -44,7 +44,8 @@ mpirun -np "${{SLURM_NTASKS}}" python -u run_retrieval.py --config configuration
 _README = """# {run_name}
 
 This directory is one isolated ROBERT run. It contains the exact source YAML,
-the generated execution YAML, the two runners, and the Slurm submission script.
+the generated execution YAML, retrieval/forward runners, general post-processing
+scripts, and the Slurm submission script.
 
 `configuration.yaml` is the file to edit before preparation or submission. Its
 writable paths are deliberately local to this directory:
@@ -66,6 +67,8 @@ python run_retrieval.py --config configuration.yaml --initialize
 python run_retrieval.py --config configuration.yaml --prepare-opacity
 python run_retrieval.py --config configuration.yaml --smoke-only
 sbatch submit.sbatch
+python postprocess_retrieval.py --config configuration.yaml
+python postprocess_forward.py --config configuration.yaml
 ```
 
 Do not reuse this directory for a different model, prior set, data selection,
@@ -109,7 +112,12 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     run_directory.mkdir(parents=True)
 
     shutil.copy2(source, run_directory / "source_configuration.yaml")
-    for filename in ("run_retrieval.py", "run_forward.py"):
+    for filename in (
+        "run_retrieval.py",
+        "run_forward.py",
+        "postprocess_retrieval.py",
+        "postprocess_forward.py",
+    ):
         shutil.copy2(ROOT / filename, run_directory / filename)
 
     generated = config.model_dump(mode="json")

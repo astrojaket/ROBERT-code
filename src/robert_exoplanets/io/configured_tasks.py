@@ -97,6 +97,11 @@ def describe_config(config: TaskConfig) -> str:
             f"Geometry: {config.radiative_transfer.geometry.model}",
             f"Parameters: {', '.join(item.name for item in config.parameters)}",
             _sampler_description(config),
+            (
+                "Plotting: automatic"
+                if config.plotting.enabled
+                else "Plotting: manual/disabled"
+            ),
             f"MPI processes: {mpi_processes(config)}",
             f"Output: {config.outputs.directory}",
         ]
@@ -554,32 +559,36 @@ def run_retrieval_task(config: TaskConfig, source: Path):
     sampler = config.sampler
     engine = sampler.engine
     if engine == "optimal_estimation":
-        return run_retrieval(
+        result = run_retrieval(
             problem,
             method="optimal_estimation",
             output_dir=config.outputs.directory / "optimal_estimation",
             **_optimal_estimation_kwargs(config),
         )
-    if engine in {"ultranest", "multinest"}:
-        return run_retrieval(
+    elif engine in {"ultranest", "multinest"}:
+        result = run_retrieval(
             problem,
             method=engine,
             output_dir=config.outputs.directory / engine,
             seed=sampler.seed,
             **_nested_sampler_kwargs(config, engine),
         )
-    nested_method = "multinest" if engine.endswith("multinest") else "ultranest"
-    return run_oe_then_nested_sampling(
-        problem,
-        output_dir=config.outputs.directory,
-        prior_sigma=sampler.prior_sigma,
-        minimum_prior_fraction=sampler.minimum_prior_fraction,
-        require_oe_convergence=sampler.require_oe_convergence,
-        oe_kwargs=_optimal_estimation_kwargs(config),
-        nested_kwargs=_nested_sampler_kwargs(config, nested_method),
-        nested_method=nested_method,
-        seed=sampler.seed,
-    )
+    else:
+        nested_method = "multinest" if engine.endswith("multinest") else "ultranest"
+        result = run_oe_then_nested_sampling(
+            problem,
+            output_dir=config.outputs.directory,
+            prior_sigma=sampler.prior_sigma,
+            minimum_prior_fraction=sampler.minimum_prior_fraction,
+            require_oe_convergence=sampler.require_oe_convergence,
+            oe_kwargs=_optimal_estimation_kwargs(config),
+            nested_kwargs=_nested_sampler_kwargs(config, nested_method),
+            nested_method=nested_method,
+            seed=sampler.seed,
+        )
+    if mpi_rank() == 0 and config.plotting.enabled and config.plotting.retrieval:
+        _postprocess_retrieval_outputs(config, problem)
+    return result
 
 
 def _optimal_estimation_kwargs(config: TaskConfig) -> dict[str, object]:
@@ -670,7 +679,57 @@ def run_forward_task(config: TaskConfig, source: Path) -> Path:
         **{f"{name}_model": spectrum.values for name, spectrum in spectra.items()},
         **{f"parameter_{name}": value for name, value in values.items()},
     )
+    if mpi_rank() == 0 and config.plotting.enabled and config.plotting.forward:
+        from robert_exoplanets.postprocessing import postprocess_forward_output
+
+        postprocess_forward_output(
+            problem,
+            target,
+            plot_dir=config.outputs.directory / "plots" / "forward",
+            dataset_colors=config.plotting.dataset_colors,
+            style=config.plotting.style,
+            image_format=config.plotting.image_format,
+            dpi=config.plotting.dpi,
+        )
+        print(
+            f"Forward plots written to {config.outputs.directory / 'plots' / 'forward'}",
+            flush=True,
+        )
     return target
+
+
+def _postprocess_retrieval_outputs(
+    config: TaskConfig,
+    problem: MultiDatasetRetrievalProblem,
+) -> None:
+    from robert_exoplanets.postprocessing import (
+        discover_retrieval_result_directories,
+        postprocess_retrieval_output,
+    )
+
+    plot_root = config.outputs.directory / "plots"
+    parameter_labels = {
+        parameter.name: parameter.label
+        for parameter in config.parameters
+        if parameter.label is not None
+    }
+    parameter_labels.update(config.plotting.parameter_labels)
+    for result_dir in discover_retrieval_result_directories(config.outputs.directory):
+        postprocess_retrieval_output(
+            problem,
+            result_dir,
+            plot_dir=plot_root / result_dir.name,
+            parameter_labels=parameter_labels,
+            dataset_colors=config.plotting.dataset_colors,
+            style=config.plotting.style,
+            image_format=config.plotting.image_format,
+            dpi=config.plotting.dpi,
+            max_posterior_samples=config.plotting.max_posterior_samples,
+        )
+        print(
+            f"Retrieval plots written to {plot_root / result_dir.name}",
+            flush=True,
+        )
 
 
 __all__ = [
