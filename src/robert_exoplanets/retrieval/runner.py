@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import time
 from typing import IO
 
 from robert_exoplanets.core import RobertConfigError, RobertDataError
@@ -20,7 +22,7 @@ from .manifest import (
 from .optimal_estimation import run_optimal_estimation
 from .problem import RetrievalProblem
 from .results import RetrievalResult, build_retrieval_result, write_retrieval_result
-from .samplers import run_ultranest
+from .samplers import run_multinest, run_ultranest
 
 def run_retrieval(
     problem: RetrievalProblem,
@@ -37,6 +39,8 @@ def run_retrieval(
         normalized = "optimal_estimation"
     elif normalized in {"ultranest", "nested", "nested_sampling"}:
         normalized = "ultranest"
+    elif normalized in {"multinest", "multi_nest", "pymultinest"}:
+        normalized = "multinest"
     else:
         raise ValueError(f"unsupported retrieval method: {method}")
     if output_dir is None:
@@ -44,13 +48,13 @@ def run_retrieval(
 
     output_path = Path(output_dir).expanduser()
     settings = {"method": normalized, **kwargs}
-    if normalized == "ultranest":
+    if normalized in {"ultranest", "multinest"}:
         settings["seed"] = seed
     current_manifest = build_run_manifest(
         problem,
         method=normalized,
         settings=settings,
-        random_seed=seed if normalized == "ultranest" else None,
+        random_seed=seed if normalized in {"ultranest", "multinest"} else None,
     )
     rank, communicator = _mpi_context()
     lock: IO[str] | None = None
@@ -73,8 +77,8 @@ def run_retrieval(
                 manifest = _prepare_manifest(
                     current_manifest,
                     output_path,
-                    resume=str(kwargs.get("resume", "overwrite")),
-                    is_ultranest=normalized == "ultranest",
+                    resume=kwargs.get("resume", "overwrite"),
+                    is_nested=normalized in {"ultranest", "multinest"},
                 )
             except (RobertConfigError, RobertDataError, OSError) as exc:
                 manifest_error = str(exc)
@@ -85,11 +89,24 @@ def run_retrieval(
         if communicator is not None:
             communicator.Barrier()
 
+        inference_started = time.monotonic()
         if normalized == "optimal_estimation":
             inference_result = run_optimal_estimation(problem, **kwargs)
-        else:
+        elif normalized == "ultranest":
             inference_result = run_ultranest(problem, output_dir=output_path, seed=seed, **kwargs)
-        result = build_retrieval_result(inference_result, manifest=manifest, output_dir=output_path)
+        else:
+            inference_result = run_multinest(problem, output_dir=output_path, seed=seed, **kwargs)
+        inference_elapsed = max(time.monotonic() - inference_started, 0.0)
+        result = build_retrieval_result(
+            inference_result, manifest=manifest, output_dir=output_path
+        )
+        result = replace(
+            result,
+            metadata={
+                **dict(result.metadata),
+                "inference_elapsed_seconds": f"{inference_elapsed:.6f}",
+            },
+        )
         if rank == 0:
             write_retrieval_result(result)
         if communicator is not None:
@@ -104,13 +121,15 @@ def _prepare_manifest(
     current: RunManifest,
     output_path: Path,
     *,
-    resume: str,
-    is_ultranest: bool,
+    resume: object,
+    is_nested: bool,
 ) -> RunManifest:
     """Preserve the original manifest and journal subsequent attempts."""
 
     manifest_path = output_path / RUN_MANIFEST_FILENAME
-    resume_existing = is_ultranest and resume in {"resume", "resume-similar"}
+    resume_existing = is_nested and (
+        resume is True or str(resume).strip().lower() in {"resume", "resume-similar", "true"}
+    )
     if resume_existing and manifest_path.exists():
         original = read_run_manifest(manifest_path)
         _validate_resume_compatibility(original, current)

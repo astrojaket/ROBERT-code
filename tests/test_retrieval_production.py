@@ -88,13 +88,13 @@ def test_resume_preserves_manifest_but_records_changed_call_budget(tmp_path) -> 
         _manifest(problem, max_ncalls=500),
         tmp_path,
         resume="resume",
-        is_ultranest=True,
+        is_nested=True,
     )
     resumed = _prepare_manifest(
         _manifest(problem, max_ncalls=1000),
         tmp_path,
         resume="resume",
-        is_ultranest=True,
+        is_nested=True,
     )
 
     saved = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
@@ -113,7 +113,7 @@ def test_resume_rejects_changed_scientific_definition(tmp_path) -> None:
         _manifest(problem, max_ncalls=500),
         tmp_path,
         resume="resume",
-        is_ultranest=True,
+        is_nested=True,
     )
 
     with pytest.raises(RobertConfigError, match="invalid_loglike_floor"):
@@ -121,7 +121,7 @@ def test_resume_rejects_changed_scientific_definition(tmp_path) -> None:
             _manifest(problem, max_ncalls=1000, floor=-1.0e90),
             tmp_path,
             resume="resume",
-            is_ultranest=True,
+            is_nested=True,
         )
 
 

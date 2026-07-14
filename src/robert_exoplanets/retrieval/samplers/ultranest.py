@@ -15,31 +15,10 @@ from robert_exoplanets.core import RobertConfigError
 
 from ..problem import RetrievalProblem
 from ..status import append_retrieval_attempt_event, write_retrieval_status
-from .base import NestedSamplerResult
-
-
-def _validate_mpi_world_size(expected: int | None) -> None:
-    """Reject launcher failures before multiple writers open one checkpoint."""
-
-    if expected is None:
-        return
-    if isinstance(expected, bool) or int(expected) < 1:
-        raise RobertConfigError("mpi_nprocs must be a positive integer when provided")
-    requested = int(expected)
-    try:
-        from mpi4py import MPI
-
-        actual = int(MPI.COMM_WORLD.Get_size())
-    except ImportError:
-        actual = 1
-    if actual != requested:
-        raise RobertConfigError(
-            "MPI communicator size mismatch: "
-            f"requested mpi_nprocs={requested}, but MPI.COMM_WORLD has size {actual}. "
-            "The processes are not in one MPI communicator. On DIaL3 launch the "
-            "Conda OpenMPI environment with `mpirun -np ${SLURM_NTASKS} python ...`; "
-            "do not continue or reuse a checkpoint created by independent writers."
-        )
+from .base import (
+    NestedSamplerResult,
+    validate_mpi_world_size as _validate_mpi_world_size,
+)
 
 
 def run_ultranest(

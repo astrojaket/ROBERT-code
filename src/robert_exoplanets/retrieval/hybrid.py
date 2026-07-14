@@ -61,6 +61,7 @@ def run_oe_then_nested_sampling(
     require_oe_convergence: bool = True,
     oe_kwargs: Mapping[str, object] | None = None,
     nested_kwargs: Mapping[str, object] | None = None,
+    nested_method: str = "ultranest",
     seed: int | None = None,
 ) -> OENestedSamplingResult:
     """Use OE location and covariance to define bounded nested-sampling priors.
@@ -72,6 +73,7 @@ def run_oe_then_nested_sampling(
     """
 
     root = Path(output_dir).expanduser()
+    method = _nested_method(nested_method)
     oe_settings = _phase_kwargs(oe_kwargs, phase="optimal estimation")
     nested_settings = _phase_kwargs(nested_kwargs, phase="nested sampling")
     oe_result = run_retrieval(
@@ -105,7 +107,7 @@ def run_oe_then_nested_sampling(
     )
     nested_result = run_retrieval(
         refined_problem,
-        method="ultranest",
+        method=method,
         output_dir=root / "nested_sampling",
         seed=seed,
         **nested_settings,
@@ -115,6 +117,7 @@ def run_oe_then_nested_sampling(
         root,
         {
             "workflow": "optimal_estimation_then_nested_sampling",
+            "nested_method": method,
             "oe_converged": oe_result.converged,
             "oe_state": dict(oe_result.best_fit_parameters),
             "original_prior_bounds": _bounds_mapping(problem.parameters),
@@ -362,7 +365,7 @@ def load_nested_sampler_result(output_dir: str | Path) -> NestedSamplerResult:
             weights = np.array(arrays["weights"], copy=True) if "weights" in arrays.files else None
     except (OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
         raise RobertDataError(f"failed to load nested-sampling result from {root}") from exc
-    if summary.get("method") not in {"ultranest", "nested_sampling"}:
+    if summary.get("method") not in {"ultranest", "multinest", "nested_sampling"}:
         raise RobertDataError(f"result under {root} is not a nested-sampling result")
     return NestedSamplerResult(
         method=str(summary["method"]),
@@ -410,6 +413,22 @@ def _phase_kwargs(settings: Mapping[str, object] | None, *, phase: str) -> dict[
     if reserved:
         raise RobertConfigError(f"{phase} kwargs contain reserved settings: " + ", ".join(sorted(reserved)))
     return values
+
+
+def _nested_method(method: str) -> str:
+    normalized = str(method).strip().lower().replace("-", "_")
+    aliases = {
+        "ultranest": "ultranest",
+        "multinest": "multinest",
+        "multi_nest": "multinest",
+        "pymultinest": "multinest",
+    }
+    try:
+        return aliases[normalized]
+    except KeyError as exc:
+        raise RobertConfigError(
+            "nested_method must be 'ultranest' or 'multinest'"
+        ) from exc
 
 
 def _bounds_mapping(parameters: RetrievalParameterSet) -> dict[str, tuple[float, float]]:

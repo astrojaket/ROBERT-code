@@ -19,6 +19,17 @@ prepared opacity caches.
 | WASP-80b | Fixed MgSiO3 catalogue Mie cloud, PG14 | `wasp80b_mie_catalog_pg14_R1000.yaml` |
 | WASP-80b | Retrieved Mie n/k cloud, PG14 | `wasp80b_mie_direct_nk_pg14_R1000.yaml` |
 
+The WASP-69b cloud-free native-mode and fixed-catalogue Mie cases also ship as
+an inference benchmark matrix. Each file extends the corresponding science
+configuration, so only the inference engine and run/output identity change:
+
+| Workflow | Cloud-free YAML | Mie-catalogue YAML |
+| --- | --- | --- |
+| MultiNest | `wasp69b_cloud_free_native_pg14_R1000_multinest.yaml` | `wasp69b_mie_catalog_pg14_R1000_multinest.yaml` |
+| Optimal estimation | `wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml` | `wasp69b_mie_catalog_pg14_R1000_optimal_estimation.yaml` |
+| OE to UltraNest | `wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_ultranest.yaml` | `wasp69b_mie_catalog_pg14_R1000_optimal_estimation_to_ultranest.yaml` |
+| OE to MultiNest | `wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml` | `wasp69b_mie_catalog_pg14_R1000_optimal_estimation_to_multinest.yaml` |
+
 The short scenario files use `extends` to inherit the common target physics,
 opacity, source-data paths, and sampler defaults. ROBERT resolves and validates
 the complete configuration before a run; `create_run_directory.py` writes that
