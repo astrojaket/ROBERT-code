@@ -12,6 +12,16 @@ from robert_exoplanets.io.task_config import load_task_config
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_CONFIG = ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
+OE_CONFIG = (
+    ROOT
+    / "configurations"
+    / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml"
+)
+NESTED_CONFIGS = (
+    "wasp69b_cloud_free_native_pg14_R1000_multinest.yaml",
+    "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_ultranest.yaml",
+    "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml",
+)
 TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
 
 
@@ -34,8 +44,46 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
     assert f"#SBATCH --chdir={run_directory}" in submission
     assert f'cd "{run_directory}"' in submission
+    assert "#SBATCH --nodes=2" in submission
+    assert "#SBATCH --ntasks=128" in submission
+    assert "#SBATCH --ntasks-per-node=64" in submission
+    assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
+    assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
     assert 'mpirun -np "${SLURM_NTASKS}"' in submission
     assert "--config configuration.yaml" in submission
+
+
+def test_create_run_directory_uses_one_rank_for_optimal_estimation(tmp_path: Path) -> None:
+    run_directory = create_run_directory(
+        project_dir=tmp_path / "my_project",
+        source_config=OE_CONFIG,
+    )
+
+    submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
+    assert "#SBATCH --nodes=1" in submission
+    assert "#SBATCH --ntasks=1" in submission
+    assert "#SBATCH --ntasks-per-node=1" in submission
+    assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
+    assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
+    assert 'mpirun -np "${SLURM_NTASKS}"' in submission
+
+
+@pytest.mark.parametrize("config_name", NESTED_CONFIGS)
+def test_create_run_directory_uses_128_ranks_for_nested_workflows(
+    tmp_path: Path,
+    config_name: str,
+) -> None:
+    run_directory = create_run_directory(
+        project_dir=tmp_path / "my_project",
+        source_config=ROOT / "configurations" / config_name,
+    )
+
+    submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
+    assert "#SBATCH --nodes=2" in submission
+    assert "#SBATCH --ntasks=128" in submission
+    assert "#SBATCH --ntasks-per-node=64" in submission
+    assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
+    assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
 
 
 def test_create_run_directory_refuses_to_mix_runs(tmp_path: Path) -> None:
