@@ -22,8 +22,12 @@ python run_retrieval.py --config configuration.yaml --validate-only
 
 For DiRAC runs, create one directory per run beneath a project directory. The
 creator uses `run.name` as the directory name, preserves the original YAML,
-copies both runners and a 64-rank `submit.sbatch`, and sets the generated
+copies both runners and a minimal `submit.sbatch`, and sets the generated
 configuration's output, opacity-cache, and scratch paths inside that directory.
+The generated script requests one rank on one node for an OE-only run and 128
+ranks across two nodes for UltraNest, MultiNest, and either OE-to-nested
+workflow. It emails `jake.taylor@physics.ox.ac.uk` when the job begins, ends,
+or fails.
 
 ```bash
 cd /scratch/dp448/dc-tayl1/ROBERT-code
