@@ -65,6 +65,7 @@ def _model() -> EmissionForwardModel:
             log_vmr_parameters={"H2O": "log_h2o", "CO": "log_co"},
             include_rayleigh=False,
             thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
             metadata={"fixture": "two-gas"},
         ),
     )

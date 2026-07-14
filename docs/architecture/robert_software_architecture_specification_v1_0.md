@@ -127,9 +127,10 @@ Target package tree:
 robert_exoplanets/
   __init__.py
   cli/
-  core/
-  bodies/
-  atmosphere/
+    core/
+    bodies/
+    stellar/
+    atmosphere/
   parameterizations/
   chemistry/
   clouds/
@@ -180,6 +181,21 @@ Does not belong here:
 - Stellar contamination likelihoods.
 - Instrument response functions.
 - Retrieval priors.
+
+### 4.2a `stellar`
+
+Belongs here:
+
+- Stellar photosphere spectrum protocols and built-in models.
+- Preparation of PHOENIX or blackbody spectra on forward-model grids.
+- Surface-flux/radiance conventions and stellar-grid coverage validation.
+- Reusable photosphere components for future TLSE models.
+
+Does not belong here:
+
+- Transit geometry or contamination likelihoods.
+- Instrument throughput.
+- File access from inside likelihood evaluation.
 
 ### 4.3 `atmosphere`
 

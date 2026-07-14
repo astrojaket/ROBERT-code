@@ -43,6 +43,7 @@ from robert_exoplanets.rt import (
     sh4_spectrum_backend_name,
     thermal_integration_backend_name,
 )
+from robert_exoplanets.stellar import prepare_stellar_spectrum
 
 GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 
@@ -66,6 +67,7 @@ class EmissionModelConfig:
     include_rayleigh: bool = True
     gas_combination: str = "random_overlap"
     thermal_integration_backend: str = "auto"
+    stellar_spectrum_model: str = "phoenix"
     compute_diagnostics: bool = False
     metadata: Mapping[str, str] = field(default_factory=dict)
 
@@ -134,6 +136,11 @@ class EmissionModelConfig:
                 "gas_combination must be 'sum_by_g' or 'random_overlap'"
             )
         backend = thermal_integration_backend_name(self.thermal_integration_backend)
+        stellar_model = self.stellar_spectrum_model.strip().lower()
+        if stellar_model not in {"phoenix", "blackbody"}:
+            raise RobertValidationError(
+                "stellar_spectrum_model must be 'phoenix' or 'blackbody'"
+            )
         if not isinstance(self.compute_diagnostics, bool):
             raise RobertValidationError("compute_diagnostics must be a boolean")
         object.__setattr__(self, "opacity_species", species)
@@ -142,6 +149,7 @@ class EmissionModelConfig:
         object.__setattr__(self, "hydrogen_fraction_of_background", h2_fraction)
         object.__setattr__(self, "helium_fraction_of_background", he_fraction)
         object.__setattr__(self, "thermal_integration_backend", backend)
+        object.__setattr__(self, "stellar_spectrum_model", stellar_model)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
@@ -170,6 +178,7 @@ class ParameterizedEmissionModelConfig:
     cia_spectral_extrapolation: str = "zero"
     gas_combination: str = "random_overlap"
     thermal_integration_backend: str = "auto"
+    stellar_spectrum_model: str = "phoenix"
     compute_diagnostics: bool = False
     metadata: Mapping[str, str] = field(default_factory=dict)
 
@@ -200,6 +209,11 @@ class ParameterizedEmissionModelConfig:
             )
         if not isinstance(self.compute_diagnostics, bool):
             raise RobertValidationError("compute_diagnostics must be a boolean")
+        stellar_model = self.stellar_spectrum_model.strip().lower()
+        if stellar_model not in {"phoenix", "blackbody"}:
+            raise RobertValidationError(
+                "stellar_spectrum_model must be 'phoenix' or 'blackbody'"
+            )
         object.__setattr__(self, "opacity_species", species)
         object.__setattr__(self, "radius_scale_parameter", radius_parameter)
         object.__setattr__(
@@ -207,6 +221,7 @@ class ParameterizedEmissionModelConfig:
             "thermal_integration_backend",
             thermal_integration_backend_name(self.thermal_integration_backend),
         )
+        object.__setattr__(self, "stellar_spectrum_model", stellar_model)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
 
@@ -228,6 +243,7 @@ class EmissionForwardModel:
     config: EmissionModelConfig
     geometry: DiscGeometry | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
+    prepared_stellar_spectrum: Spectrum = field(init=False, repr=False)
     gravity_m_s2: float = field(init=False)
 
     def __post_init__(self) -> None:
@@ -262,11 +278,17 @@ class EmissionForwardModel:
             self.pressure_grid,
             species=self.config.opacity_species,
         )
+        stellar_spectrum = prepare_stellar_spectrum(
+            self.star,
+            self.spectral_grid,
+            model=self.config.stellar_spectrum_model,
+        )
         temperature.setflags(write=False)
         object.__setattr__(self, "base_temperature_K", temperature)
         object.__setattr__(self, "gravity_m_s2", gravity)
         object.__setattr__(self, "geometry", geometry)
         object.__setattr__(self, "prepared_opacity", prepared)
+        object.__setattr__(self, "prepared_stellar_spectrum", stellar_spectrum)
 
     @property
     def required_parameters(self) -> tuple[str, ...]:
@@ -305,6 +327,25 @@ class EmissionForwardModel:
                 "star_name": self.star.name,
                 "star_radius_m": f"{self.star.radius_m:.17g}",
                 "star_effective_temperature_k": f"{self.star.effective_temperature_k:.17g}",
+                "star_log_g_cgs": ""
+                if self.star.log_g_cgs is None
+                else f"{self.star.log_g_cgs:.17g}",
+                "star_metallicity_dex": ""
+                if self.star.metallicity_dex is None
+                else f"{self.star.metallicity_dex:.17g}",
+                "stellar_spectrum_model": self.config.stellar_spectrum_model,
+                "stellar_spectrum_sha256": _array_signature(
+                    self.prepared_stellar_spectrum.values,
+                    labels=(self.prepared_stellar_spectrum.unit,),
+                ),
+                "stellar_spectrum_bolometric_normalization": str(
+                    self.prepared_stellar_spectrum.metadata.get(
+                        "bolometric_normalization", ""
+                    )
+                ),
+                "stellar_spectrum_reference_data": str(
+                    self.prepared_stellar_spectrum.metadata.get("pysyn_cdbs", "")
+                ),
                 "opacity_species": ",".join(self.config.opacity_species),
                 "log_vmr_parameters": ",".join(
                     f"{species}:{self.config.log_vmr_parameters[species]}"
@@ -439,7 +480,7 @@ class EmissionForwardModel:
                 additional_optical_depths=additional_optical_depths,
                 planet_radius_m=self.planet.radius_m * radius_scale,
                 star_radius_m=self.star.radius_m,
-                star_temperature_k=self.star.effective_temperature_k,
+                stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
         result = solve_emission(
@@ -448,7 +489,7 @@ class EmissionForwardModel:
             additional_optical_depths=additional_optical_depths,
             planet_radius_m=self.planet.radius_m * radius_scale,
             star_radius_m=self.star.radius_m,
-            star_temperature_k=self.star.effective_temperature_k,
+            stellar_spectrum=self.prepared_stellar_spectrum,
             thermal_integration_backend=self.config.thermal_integration_backend,
         )
         if result.eclipse_depth is None:
@@ -484,6 +525,7 @@ class ParameterizedEmissionForwardModel:
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     geometry: DiscGeometry | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
+    prepared_stellar_spectrum: Spectrum = field(init=False, repr=False)
     gravity_m_s2: float = field(init=False)
 
     def __post_init__(self) -> None:
@@ -527,9 +569,15 @@ class ParameterizedEmissionForwardModel:
             self.pressure_grid,
             species=self.config.opacity_species,
         )
+        stellar_spectrum = prepare_stellar_spectrum(
+            self.star,
+            self.spectral_grid,
+            model=self.config.stellar_spectrum_model,
+        )
         object.__setattr__(self, "gravity_m_s2", gravity)
         object.__setattr__(self, "geometry", geometry)
         object.__setattr__(self, "prepared_opacity", prepared)
+        object.__setattr__(self, "prepared_stellar_spectrum", stellar_spectrum)
 
     @property
     def pressure_grid(self) -> PressureGrid:
@@ -583,6 +631,25 @@ class ParameterizedEmissionForwardModel:
                 "star_name": self.star.name,
                 "star_radius_m": f"{self.star.radius_m:.17g}",
                 "star_effective_temperature_k": f"{self.star.effective_temperature_k:.17g}",
+                "star_log_g_cgs": ""
+                if self.star.log_g_cgs is None
+                else f"{self.star.log_g_cgs:.17g}",
+                "star_metallicity_dex": ""
+                if self.star.metallicity_dex is None
+                else f"{self.star.metallicity_dex:.17g}",
+                "stellar_spectrum_model": self.config.stellar_spectrum_model,
+                "stellar_spectrum_sha256": _array_signature(
+                    self.prepared_stellar_spectrum.values,
+                    labels=(self.prepared_stellar_spectrum.unit,),
+                ),
+                "stellar_spectrum_bolometric_normalization": str(
+                    self.prepared_stellar_spectrum.metadata.get(
+                        "bolometric_normalization", ""
+                    )
+                ),
+                "stellar_spectrum_reference_data": str(
+                    self.prepared_stellar_spectrum.metadata.get("pysyn_cdbs", "")
+                ),
                 "opacity_species": ",".join(self.config.opacity_species),
                 "opacity_provider": self.opacity_provider.name,
                 "opacity_cache_key": self.prepared_opacity.cache_key,
@@ -734,7 +801,7 @@ class ParameterizedEmissionForwardModel:
                 additional_optical_depths=additional_optical_depths,
                 planet_radius_m=self.planet.radius_m * radius_scale,
                 star_radius_m=self.star.radius_m,
-                star_temperature_k=self.star.effective_temperature_k,
+                stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
         result = solve_emission(
@@ -743,7 +810,7 @@ class ParameterizedEmissionForwardModel:
             additional_optical_depths=additional_optical_depths,
             planet_radius_m=self.planet.radius_m * radius_scale,
             star_radius_m=self.star.radius_m,
-            star_temperature_k=self.star.effective_temperature_k,
+            stellar_spectrum=self.prepared_stellar_spectrum,
             thermal_integration_backend=self.config.thermal_integration_backend,
         )
         if result.eclipse_depth is None:
@@ -904,7 +971,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
                 multiple_scattering_backend=self.cloud.multiple_scattering_backend,
                 planet_radius_m=self.planet.radius_m * radius_scale,
                 star_radius_m=self.star.radius_m,
-                star_temperature_k=self.star.effective_temperature_k,
+                stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
         result = solve_emission(
@@ -914,7 +981,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
             multiple_scattering_backend=self.cloud.multiple_scattering_backend,
             planet_radius_m=self.planet.radius_m * radius_scale,
             star_radius_m=self.star.radius_m,
-            star_temperature_k=self.star.effective_temperature_k,
+            stellar_spectrum=self.prepared_stellar_spectrum,
             thermal_integration_backend=self.config.thermal_integration_backend,
         )
         if result.eclipse_depth is None:
@@ -1289,7 +1356,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                 multiple_scattering_backend=self.cloud.multiple_scattering_backend,
                 planet_radius_m=self.planet.radius_m * radius_scale,
                 star_radius_m=self.star.radius_m,
-                star_temperature_k=self.star.effective_temperature_k,
+                stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
             )
         result = solve_emission(
@@ -1299,7 +1366,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
             multiple_scattering_backend=self.cloud.multiple_scattering_backend,
             planet_radius_m=self.planet.radius_m * radius_scale,
             star_radius_m=self.star.radius_m,
-            star_temperature_k=self.star.effective_temperature_k,
+            stellar_spectrum=self.prepared_stellar_spectrum,
             thermal_integration_backend=self.config.thermal_integration_backend,
         )
         if result.eclipse_depth is None:

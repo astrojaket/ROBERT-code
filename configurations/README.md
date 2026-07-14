@@ -6,6 +6,12 @@ selected file, change `opacity.resolution: R15000`, give it a new `run.name`,
 and create a new run directory. Do not mix R1000 and R15000 checkpoints or
 prepared opacity caches.
 
+The target defaults use PHOENIX stellar-atmosphere spectra selected by
+`effective_temperature_k`, `log_g_cgs`, and `metallicity_dex`. Set
+`PYSYN_CDBS` to the STScI Synphot reference-data root before building a forward
+model. Change `bodies.star.spectrum_model` to `blackbody` only for an explicit
+Planck-spectrum comparison.
+
 | Target | Scenario | Default YAML |
 | --- | --- | --- |
 | WASP-69b | Cloud-free, native F322W2/F444W/LRS, PG14 | `wasp69b_cloud_free_native_pg14_R1000.yaml` |

@@ -156,6 +156,7 @@ def make_model_config(
             include_rayleigh=include_rayleigh,
             gas_combination="random_overlap",
             thermal_integration_backend="auto",
+            stellar_spectrum_model="blackbody",
             metadata={
                 "target": "HAT-P-32b",
                 "comparison_reference": str(RESULTS_DIR),

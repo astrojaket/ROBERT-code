@@ -191,6 +191,7 @@ ROBERT uses a layered architecture:
 ```text
 core
   bodies
+  stellar
   atmosphere
   parameterizations / chemistry / clouds
   opacity
@@ -223,6 +224,7 @@ The following component families require stable protocols:
 
 - Radiative-transfer engines.
 - Chemistry engines.
+- Stellar-spectrum models.
 - Opacity providers.
 - Cloud models.
 - Samplers.

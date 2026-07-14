@@ -27,7 +27,7 @@ DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     config = load_task_config(EXAMPLE)
 
-    assert config.schema_version == 1
+    assert config.schema_version == 2
     assert config.observations.datasets == ("f322w2", "f444w", "lrs")
     assert config.opacity.resolution == "R1000"
     assert config.opacity.species == ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
@@ -37,6 +37,19 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.runtime.scratch_directory.is_absolute()
     assert config.outputs.directory.is_absolute()
     assert config.plotting.enabled is False
+    assert config.bodies.star.spectrum_model == "phoenix"
+    assert config.bodies.star.log_g_cgs == 4.5
+    assert config.bodies.star.metallicity_dex == 0.15
+
+
+def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["bodies"]["star"]["spectrum_model"] = "blackbody"
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.bodies.star.spectrum_model == "blackbody"
 
 
 def test_unknown_configuration_field_is_rejected() -> None:
