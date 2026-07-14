@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Mapping, Protocol
 
 import numpy as np
-from numpy.typing import NDArray
+from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import PressureGrid, RobertConfigError, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
@@ -703,3 +703,160 @@ class FreeChemistry:
                 )
 
         return profiles
+
+
+@dataclass(frozen=True)
+class SplineFreeChemistry:
+    """Pressure-resolved free chemistry for OE profile sounding.
+
+    Each active gas is specified at common pressure knots and interpolated
+    linearly in log-pressure.  The default ``parameter_mode="ln"`` matches
+    the positive, natural-log state convention used by NEMESIS and by
+    :class:`~robert_exoplanets.retrieval.VerticalProfileParameterization`.
+    Knot pressures may equal the atmosphere layer pressures for a true
+    layer-by-layer fit, or may be sparser for implicit smoothing.
+    """
+
+    active_species: tuple[str, ...]
+    knot_pressure: NDArray[np.float64]
+    parameter_names: Mapping[str, tuple[str, ...]]
+    pressure_unit: str = "bar"
+    parameter_mode: str = "ln"
+    background: BackgroundGasMixture | None = field(default_factory=BackgroundGasMixture)
+    fill_background: bool = True
+    excess_policy: str = "raise"
+    name: str = "spline-free-chemistry"
+    convention: str = "volume_mixing_ratio"
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise RobertValidationError("chemistry name must not be empty")
+        if self.convention != "volume_mixing_ratio":
+            raise RobertValidationError("SplineFreeChemistry requires volume_mixing_ratio")
+        if self.parameter_mode not in {"linear", "log10", "ln"}:
+            raise RobertValidationError("parameter_mode must be 'linear', 'log10', or 'ln'")
+        if self.excess_policy not in {"raise", "normalize"}:
+            raise RobertValidationError("excess_policy must be 'raise' or 'normalize'")
+        if not self.pressure_unit:
+            raise RobertValidationError("pressure_unit must not be empty")
+        active_species = tuple(_validate_species_name(item) for item in self.active_species)
+        if not active_species or len(set(active_species)) != len(active_species):
+            raise RobertValidationError("active_species must be non-empty and unique")
+
+        pressure = np.array(self.knot_pressure, dtype=float, copy=True)
+        if pressure.ndim != 1 or pressure.size < 2:
+            raise RobertValidationError("knot_pressure must contain at least two levels")
+        if not np.all(np.isfinite(pressure)) or np.any(pressure <= 0.0):
+            raise RobertValidationError("knot_pressure must be finite and positive")
+        if np.unique(pressure).size != pressure.size:
+            raise RobertValidationError("knot_pressure levels must be unique")
+        order = np.argsort(pressure)
+        pressure = pressure[order]
+
+        names: dict[str, tuple[str, ...]] = {}
+        all_names: list[str] = []
+        if set(self.parameter_names) != set(active_species):
+            raise RobertValidationError("parameter_names keys must match active_species")
+        for species in active_species:
+            input_names = tuple(str(item) for item in self.parameter_names[species])
+            if len(input_names) != pressure.size or any(not item for item in input_names):
+                raise RobertValidationError("each chemistry parameter-name sequence must match knot_pressure")
+            sorted_names = tuple(input_names[int(index)] for index in order)
+            names[species] = sorted_names
+            all_names.extend(sorted_names)
+        if len(set(all_names)) != len(all_names):
+            raise RobertValidationError("spline chemistry parameter names must be globally unique")
+
+        background = self.background
+        if background is not None and not isinstance(background, BackgroundGasMixture):
+            background = BackgroundGasMixture(background)
+        if self.fill_background and background is None:
+            raise RobertValidationError("fill_background=True requires a background mixture")
+        if background is not None and set(active_species).intersection(background.species):
+            raise RobertValidationError("active and background chemistry species must not overlap")
+
+        pressure.setflags(write=False)
+        object.__setattr__(self, "active_species", active_species)
+        object.__setattr__(self, "knot_pressure", pressure)
+        object.__setattr__(self, "parameter_names", immutable_mapping(names))
+        object.__setattr__(self, "background", background)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+    @property
+    def species(self) -> tuple[str, ...]:
+        if self.fill_background and self.background is not None:
+            return self.active_species + self.background.species
+        return self.active_species
+
+    def required_parameters(self) -> tuple[str, ...]:
+        return tuple(name for species in self.active_species for name in self.parameter_names[species])
+
+    def evaluate(
+        self,
+        parameters: Mapping[str, float],
+        pressure_grid: PressureGrid,
+        temperature: NDArray[np.float64],
+    ) -> dict[str, NDArray[np.float64]]:
+        """Return pressure-resolved VMR profiles including background fill."""
+
+        _validate_temperature_layers(temperature, pressure_grid)
+        source_pressure = _pressure_values_in_bar(self.knot_pressure, self.pressure_unit)
+        target_pressure = _pressure_values_in_bar(pressure_grid.centers, pressure_grid.unit)
+        log_source = np.log(source_pressure)
+        log_target = np.log(np.clip(target_pressure, source_pressure[0], source_pressure[-1]))
+
+        profiles: dict[str, NDArray[np.float64]] = {}
+        active_total = np.zeros(pressure_grid.n_layers, dtype=float)
+        for species in self.active_species:
+            state = np.array(
+                [
+                    _parameter_value(parameters, name, context="spline free chemistry")
+                    for name in self.parameter_names[species]
+                ],
+                dtype=float,
+            )
+            interpolated = np.interp(log_target, log_source, state)
+            if self.parameter_mode == "ln":
+                profile = np.exp(interpolated)
+            elif self.parameter_mode == "log10":
+                profile = np.power(10.0, interpolated)
+            else:
+                profile = interpolated
+            if not np.all(np.isfinite(profile)) or np.any(profile < 0.0):
+                raise RobertValidationError("spline chemistry VMRs must be finite and non-negative")
+            profiles[species] = profile
+            active_total += profile
+
+        if np.any(active_total > 1.0 + 1.0e-12):
+            if self.excess_policy == "raise":
+                raise RobertValidationError("spline chemistry active VMRs exceed one in a layer")
+            safe_total = np.maximum(active_total, 1.0)
+            for species in self.active_species:
+                profiles[species] = profiles[species] / safe_total
+            active_total = np.minimum(active_total, 1.0)
+
+        if self.fill_background and self.background is not None:
+            remainder = np.maximum(0.0, 1.0 - active_total)
+            for species, fraction in self.background.fractions.items():
+                profiles[species] = remainder * fraction
+
+        for profile in profiles.values():
+            profile.setflags(write=False)
+        return profiles
+
+
+def _pressure_values_in_bar(values: ArrayLike, unit: str) -> NDArray[np.float64]:
+    array = np.asarray(values, dtype=float)
+    normalized = unit.strip().lower()
+    if normalized in {"bar", "bars"}:
+        scale = 1.0
+    elif normalized in {"pa", "pascal", "pascals"}:
+        scale = 1.0e-5
+    elif normalized in {"mbar", "millibar", "millibars"}:
+        scale = 1.0e-3
+    elif normalized in {"atm", "atmosphere", "atmospheres"}:
+        scale = 1.01325
+    else:
+        raise RobertValidationError(f"unsupported pressure unit: {unit}")
+    return np.asarray(array * scale, dtype=float)

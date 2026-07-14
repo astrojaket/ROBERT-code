@@ -58,6 +58,25 @@ state and covariance. Every run records the resolved configuration, opacity
 identifiers, runtime and code provenance, settings, random seed, timings,
 spectra, and inference products.
 
+## Pressure-resolved optimal estimation
+
+`VerticalProfileParameterization` defines a temperature, VMR, aerosol, or
+cloud-fraction state block on explicit pressure levels. Temperature normally
+uses linear coordinates; positive profiles use natural-log coordinates. A
+NEMESIS-style exponential prior covariance correlates adjacent pressure levels
+over a configurable number of scale heights. `LayerByLayerStateVector` combines
+multiple blocks without hiding their parameter names or transforms.
+
+The OE result includes the gain matrix, averaging kernel, measurement-error
+covariance, smoothing-error covariance, and finite-difference Jacobian. Use the
+averaging kernels and `degrees_of_freedom_for_signal` to decide how much
+vertical structure is actually measured. The number of state levels is only a
+calculation grid and must not be reported as the vertical resolution.
+
+The HAT-P-32b injection/recovery benchmark and the current NEMESIS comparison
+status are documented in
+[NEMESIS-informed vertical-profile OE](../review/37_nemesis_vertical_profile_oe.md).
+
 See [Configuring and running ROBERT](../configuration.md) for the complete YAML
 schema, directory setup, opacity preparation, and MPI/Slurm workflow. The
 superseded pre-YAML HAT-P-32b examples are retained only in

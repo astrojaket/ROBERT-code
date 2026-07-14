@@ -9,6 +9,7 @@ from .chemistry import (
     FastChemEquilibriumChemistry,
     FixedMeanMolecularWeight,
     FreeChemistry,
+    SplineFreeChemistry,
     MeanMolecularWeightModel,
 )
 from .state import AtmosphereState
@@ -31,6 +32,7 @@ __all__ = [
     "FastChemEquilibriumChemistry",
     "FixedMeanMolecularWeight",
     "FreeChemistry",
+    "SplineFreeChemistry",
     "MeanMolecularWeightModel",
     "IsothermalTemperatureProfile",
     "MadhusudhanSeager2009TemperatureProfile",

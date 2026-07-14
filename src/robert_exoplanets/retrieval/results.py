@@ -169,6 +169,15 @@ def write_retrieval_result(result: RetrievalResult) -> tuple[Path, Path]:
             "covariance": result.inference_result.covariance,
             "averaging_kernel": result.inference_result.averaging_kernel,
         }
+        for name in (
+            "jacobian",
+            "gain_matrix",
+            "measurement_error_covariance",
+            "smoothing_error_covariance",
+        ):
+            value = getattr(result.inference_result, name)
+            if value is not None:
+                arrays[name] = value
     else:
         arrays = {
             "samples": result.inference_result.samples,

@@ -41,9 +41,15 @@ from .run_config import (
 )
 from .samplers import NestedSamplerResult, run_multinest, run_ultranest
 from .status import load_retrieval_status
+from .vertical_profiles import (
+    LayerByLayerStateVector,
+    VerticalProfileParameterization,
+    pressure_correlated_covariance,
+)
 
 __all__ = [
     "LogUniformPrior",
+    "LayerByLayerStateVector",
     "InferenceRunConfig",
     "NestedSamplerResult",
     "NestedSamplingOEResult",
@@ -61,6 +67,7 @@ __all__ = [
     "RunManifest",
     "UniformPrior",
     "UltraNestRunConfig",
+    "VerticalProfileParameterization",
     "build_retrieval_problem",
     "load_emission_observation_npz",
     "load_emission_observation_table",
@@ -71,6 +78,7 @@ __all__ = [
     "load_retrieval_status",
     "run_optimal_estimation",
     "nested_posterior_oe_prior",
+    "pressure_correlated_covariance",
     "refine_priors_from_optimal_estimation",
     "run_nested_sampling_then_oe",
     "run_oe_then_nested_sampling",
