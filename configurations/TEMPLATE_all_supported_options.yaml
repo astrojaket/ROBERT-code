@@ -280,6 +280,23 @@ sampler:
   minimum_prior_fraction: 0.05
   require_oe_convergence: true
 
+# =============================================================================
+# PLOTTING AND POST-PROCESSING
+# =============================================================================
+plotting:
+  enabled: false                 # Automatically plot after successful inference/forward modelling.
+  retrieval: true
+  forward: true
+  style: default                 # Matplotlib style name or path to a .mplstyle file.
+  image_format: png              # png, pdf, or svg.
+  dpi: 180
+  max_posterior_samples: 20000   # Plotting limit; statistics always use all samples.
+  dataset_colors:                # Optional dataset-name overrides.
+    f322w2: "#20639b"
+    f444w: "#ef5675"
+    lrs: "#2ca25f"
+  parameter_labels: {}           # Optional parameter-name to display-label mapping.
+
 runtime:
   mpi_processes: auto
 

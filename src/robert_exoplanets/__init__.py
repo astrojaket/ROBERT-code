@@ -129,6 +129,14 @@ from .opacity import (
     write_robert_npy_directory,
     write_robert_npz_archive,
 )
+from .postprocessing import (
+    calculate_fit_statistics,
+    discover_retrieval_result_directories,
+    posterior_summary,
+    postprocess_forward_output,
+    postprocess_retrieval_output,
+    weighted_quantile,
+)
 from .retrieval import (
     LogUniformPrior,
     MultiDatasetRetrievalProblem,
@@ -377,6 +385,7 @@ __all__ = [
     "SpectralCoverage",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
+    "calculate_fit_statistics",
     "build_emission_model",
     "build_clear_sky_emission_model",
     "build_multi_dataset_emission_model",
@@ -392,6 +401,7 @@ __all__ = [
     "convert_kta_to_robert_archive",
     "cia_optical_depth",
     "disk_average_quadrature",
+    "discover_retrieval_result_directories",
     "evaluate_injection_recovery",
     "gauss_legendre_disk_geometry",
     "geometry_from_emission_angles",
@@ -435,6 +445,9 @@ __all__ = [
     "kta_product_from_header",
     "normal_emission_geometry",
     "power_law_haze",
+    "posterior_summary",
+    "postprocess_forward_output",
+    "postprocess_retrieval_output",
     "pressure_grid_from_opacity",
     "planck_radiance_wavelength",
     "random_overlap_species_tau",
@@ -475,4 +488,5 @@ __all__ = [
     "write_injection_recovery_report",
     "write_robert_npy_directory",
     "write_robert_npz_archive",
+    "weighted_quantile",
 ]

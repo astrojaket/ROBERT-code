@@ -38,6 +38,8 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert (run_directory / "source_configuration.yaml").is_file()
     assert (run_directory / "run_retrieval.py").is_file()
     assert (run_directory / "run_forward.py").is_file()
+    assert (run_directory / "postprocess_retrieval.py").is_file()
+    assert (run_directory / "postprocess_forward.py").is_file()
     assert config.outputs.directory == run_directory / "outputs"
     assert config.opacity.cache_directory == run_directory / "opacity_cache"
     assert config.runtime.scratch_directory == run_directory / "scratch"
