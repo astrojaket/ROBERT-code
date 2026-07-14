@@ -237,6 +237,82 @@ def test_correlated_k_clip_policy_matches_nemesispy_boundary_clamping() -> None:
     np.testing.assert_allclose(evaluated.kcoeff[0, 0, 0, 0], expected, rtol=1.0e-12)
 
 
+def test_correlated_k_linear_k_mode_matches_nemesis_interpolation() -> None:
+    table = _interpolation_table("H2O")
+    provider = CorrelatedKOpacityProvider(
+        {"H2O": table},
+        interpolation="log_pressure_temperature_linear_k_clip",
+    )
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-4, 1.0e-2]),
+        centers=np.array([1.0e-3]),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array([2000.0], unit="cm^-1", role="opacity")
+    atmosphere = _atmosphere(pressure_grid, temperature=[1000.0])
+    prepared = provider.prepare(spectral_grid, pressure_grid, species=("H2O",))
+
+    evaluated = provider.evaluate(atmosphere, prepared)
+
+    pressure_weight = (np.log10(1.0e-3) - np.log10(table.pressure_bar[0])) / (
+        np.log10(table.pressure_bar[1]) - np.log10(table.pressure_bar[0])
+    )
+    temperature_weight = 0.5
+    corners = table.kcoeff[:, :, 0, 0]
+    expected = (
+        (1.0 - pressure_weight) * (1.0 - temperature_weight) * corners[0, 0]
+        + pressure_weight * (1.0 - temperature_weight) * corners[1, 0]
+        + (1.0 - pressure_weight) * temperature_weight * corners[0, 1]
+        + pressure_weight * temperature_weight * corners[1, 1]
+    )
+    np.testing.assert_allclose(evaluated.kcoeff[0, 0, 0, 0], expected, rtol=1.0e-12)
+    assert (
+        evaluated.metadata["interpolation"] == "log_pressure_temperature_linear_k_clip"
+    )
+
+
+def test_correlated_k_nemesis_mode_switches_to_linear_when_first_g_is_zero() -> None:
+    source = _interpolation_table("H2O")
+    kcoeff = np.repeat(source.kcoeff, 2, axis=-1)
+    kcoeff[0, 0, 0, 0] = 0.0
+    kcoeff[..., 1] *= 10.0
+    table = CorrelatedKTable(
+        species="H2O",
+        pressure_bar=source.pressure_bar,
+        temperature_K=source.temperature_K,
+        wavenumber_cm_inverse=source.wavenumber_cm_inverse,
+        g_samples=[0.25, 0.75],
+        g_weights=[0.5, 0.5],
+        kcoeff=kcoeff,
+    )
+    provider = CorrelatedKOpacityProvider(
+        {"H2O": table},
+        interpolation="log_pressure_temperature_nemesis_k_clip",
+    )
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-4, 1.0e-2]),
+        centers=np.array([1.0e-3]),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array([2000.0], unit="cm^-1", role="opacity")
+    atmosphere = _atmosphere(pressure_grid, temperature=[1000.0])
+
+    evaluated = provider.evaluate(
+        atmosphere,
+        provider.prepare(spectral_grid, pressure_grid, species=("H2O",)),
+    )
+
+    wp = 0.4
+    wt = 0.5
+    expected = (
+        (1.0 - wp) * (1.0 - wt) * kcoeff[0, 0, 0]
+        + wp * (1.0 - wt) * kcoeff[1, 0, 0]
+        + (1.0 - wp) * wt * kcoeff[0, 1, 0]
+        + wp * wt * kcoeff[1, 1, 0]
+    )
+    np.testing.assert_allclose(evaluated.kcoeff[0, 0, 0], expected)
+
+
 def test_correlated_k_cache_key_includes_interpolation_policy() -> None:
     table = _tiny_table("H2O")
     pressure_grid = _pressure_grid()

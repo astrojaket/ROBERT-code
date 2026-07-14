@@ -20,7 +20,7 @@ from robert_exoplanets.core import (
 from robert_exoplanets.core._immutability import immutable_mapping
 
 from .archive import load_robert_npy_directory, load_robert_npz_archive
-from .kta import KtaTable, read_kta
+from .kta import KtaSpectralCoordinate, KtaTable, read_kta
 from .metadata import pressure_values_in_unit, spectral_grid_values_in_unit
 
 
@@ -389,10 +389,14 @@ class CorrelatedKOpacityProvider:
             "exact",
             "log_pressure_temperature_log_k",
             "log_pressure_temperature_log_k_clip",
+            "log_pressure_temperature_linear_k",
+            "log_pressure_temperature_linear_k_clip",
+            "log_pressure_temperature_nemesis_k",
+            "log_pressure_temperature_nemesis_k_clip",
         }:
             raise RobertValidationError(
-                "interpolation must be 'exact', 'log_pressure_temperature_log_k', "
-                "or 'log_pressure_temperature_log_k_clip'"
+                "interpolation must be 'exact' or a supported log-pressure, "
+                "temperature interpolation mode"
             )
         tables = {str(species): table for species, table in self.tables.items()}
         if not tables:
@@ -408,7 +412,9 @@ class CorrelatedKOpacityProvider:
             raise RobertValidationError("cache_log_kcoeff must be a boolean")
         _validate_common_g_grid(tuple(tables.values()))
         log_kcoeff: dict[str, NDArray[np.float64]] = {}
-        if self.cache_log_kcoeff and self.interpolation != "exact":
+        if self.cache_log_kcoeff and (
+            "_log_k" in self.interpolation or "_nemesis_k" in self.interpolation
+        ):
             for species, table in tables.items():
                 values = np.log(np.maximum(table.kcoeff, 1.0e-300))
                 values.setflags(write=False)
@@ -426,6 +432,7 @@ class CorrelatedKOpacityProvider:
         nonfinite_policy: str = "raise",
         nonfinite_fill_value: float = 1.0e-300,
         cache_log_kcoeff: bool = True,
+        spectral_coordinate: KtaSpectralCoordinate = "wavelength_micron",
     ) -> "CorrelatedKOpacityProvider":
         """Build a provider from species-to-`.kta` file paths."""
 
@@ -437,6 +444,7 @@ class CorrelatedKOpacityProvider:
                     checksum=True,
                     nonfinite_policy=nonfinite_policy,
                     nonfinite_fill_value=nonfinite_fill_value,
+                    spectral_coordinate=spectral_coordinate,
                 ),
             )
             for species, path in paths.items()
@@ -678,7 +686,11 @@ class CorrelatedKOpacityProvider:
                     table.pressure_bar,
                     "pressure",
                 )
-            elif self.interpolation == "log_pressure_temperature_log_k":
+            elif self.interpolation in {
+                "log_pressure_temperature_log_k",
+                "log_pressure_temperature_linear_k",
+                "log_pressure_temperature_nemesis_k",
+            }:
                 _validate_within_grid(
                     pressure_values_in_unit(
                         pressure_grid.centers, pressure_grid.unit, "bar"
@@ -802,11 +814,13 @@ class CorrelatedKOpacityProvider:
                     :,
                 ]
             else:
-                values[species_index] = _interpolate_pressure_temperature_log_k(
+                values[species_index] = _interpolate_pressure_temperature_k(
                     atmosphere,
                     prepared.spectral_grid,
                     table,
                     clip=interpolation.endswith("_clip"),
+                    logarithmic_k="_log_k" in interpolation,
+                    nemesis_hybrid_k="_nemesis_k" in interpolation,
                     log_kcoeff=self._log_kcoeff.get(species_name),
                     spectral_index=prepared.spectral_indices.get(species_name),
                 )
@@ -879,13 +893,15 @@ def _validate_interpolation_coverage(
         _exact_spectral_indices(spectral_grid, table)
 
 
-def _interpolate_pressure_temperature_log_k(
+def _interpolate_pressure_temperature_k(
     atmosphere: AtmosphereState,
     spectral_grid: SpectralGrid,
     table: CorrelatedKTable,
     *,
     k_floor: float = 1.0e-300,
     clip: bool = False,
+    logarithmic_k: bool = True,
+    nemesis_hybrid_k: bool = False,
     log_kcoeff: NDArray[np.float64] | None = None,
     spectral_index: NDArray[np.int64] | None = None,
 ) -> NDArray[np.float64]:
@@ -915,9 +931,13 @@ def _interpolate_pressure_temperature_log_k(
         "temperature",
         clip=clip,
     )
-    log_k = (
-        np.log(np.maximum(table.kcoeff, k_floor)) if log_kcoeff is None else log_kcoeff
-    )
+    coefficients = table.kcoeff
+    if logarithmic_k or nemesis_hybrid_k:
+        coefficients = (
+            np.log(np.maximum(table.kcoeff, k_floor))
+            if log_kcoeff is None
+            else log_kcoeff
+        )
     output = np.empty(
         (atmosphere.n_layers, spectral_index.size, table.g_weights.size), dtype=float
     )
@@ -928,13 +948,37 @@ def _interpolate_pressure_temperature_log_k(
         p1 = pressure_upper[layer_index]
         t0 = temperature_lower[layer_index]
         t1 = temperature_upper[layer_index]
-        values = (
-            (1.0 - wp) * (1.0 - wt) * log_k[p0, t0, spectral_index, :]
-            + wp * (1.0 - wt) * log_k[p1, t0, spectral_index, :]
-            + (1.0 - wp) * wt * log_k[p0, t1, spectral_index, :]
-            + wp * wt * log_k[p1, t1, spectral_index, :]
+        weights = (
+            (1.0 - wp) * (1.0 - wt),
+            wp * (1.0 - wt),
+            (1.0 - wp) * wt,
+            wp * wt,
         )
-        output[layer_index] = np.exp(values)
+        corner_indices = ((p0, t0), (p1, t0), (p0, t1), (p1, t1))
+        values = sum(
+            weight * coefficients[p_index, t_index, spectral_index, :]
+            for weight, (p_index, t_index) in zip(weights, corner_indices, strict=True)
+        )
+        if logarithmic_k:
+            output[layer_index] = np.exp(values)
+        elif nemesis_hybrid_k:
+            linear_values = sum(
+                weight * table.kcoeff[p_index, t_index, spectral_index, :]
+                for weight, (p_index, t_index) in zip(
+                    weights, corner_indices, strict=True
+                )
+            )
+            positive_first_g = np.logical_and.reduce(
+                [
+                    table.kcoeff[p_index, t_index, spectral_index, 0] > 0.0
+                    for p_index, t_index in corner_indices
+                ]
+            )
+            output[layer_index] = np.where(
+                positive_first_g[:, None], np.exp(values), linear_values
+            )
+        else:
+            output[layer_index] = values
     return output
 
 

@@ -26,6 +26,7 @@ from .inspectors import (
     inspect_kta_file,
 )
 from .kta import (
+    KtaSpectralCoordinate,
     KtaHeader,
     KtaTable,
     convert_kta_to_robert_archive,
@@ -72,6 +73,7 @@ __all__ = [
     "EvaluatedOpacitySamplingMixture",
     "GridCoverage",
     "KtaHeader",
+    "KtaSpectralCoordinate",
     "KtaTable",
     "OpacityCoverageReport",
     "OpacityDatabase",

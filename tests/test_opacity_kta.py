@@ -34,7 +34,9 @@ def test_read_kta_header_reads_dimensions_and_coverage(tmp_path: Path) -> None:
     assert header.checksum_sha256
     np.testing.assert_allclose(header.pressure_bar, [1.0e-5, 1.0])
     np.testing.assert_allclose(header.temperature_K, [500.0, 1000.0, 1500.0])
-    np.testing.assert_allclose(header.wavenumber_cm_inverse, [1000.0, 2000.0, 3000.0, 4000.0])
+    np.testing.assert_allclose(
+        header.wavenumber_cm_inverse, [1000.0, 2000.0, 3000.0, 4000.0]
+    )
     assert header.spectral_coverage.min_value == 1000.0
     assert header.spectral_coverage.max_value == 4000.0
     assert header.grid_coverage.temperature_max == 1500.0
@@ -48,6 +50,22 @@ def test_read_kta_round_trips_kcoefficients(tmp_path: Path) -> None:
     np.testing.assert_allclose(table.kcoeff, expected)
     assert table.unit == "cm^2/molecule"
     assert table.header.molecule_id == 1
+
+
+def test_read_kta_supports_padded_regular_nemesis_wavenumber_grid(
+    tmp_path: Path,
+) -> None:
+    path, expected = _write_synthetic_nemesis_kta(tmp_path / "NH3_legacy_nemesis.kta")
+
+    table = read_kta(path, spectral_coordinate="wavenumber_cm_inverse")
+
+    np.testing.assert_allclose(table.header.wavenumber_cm_inverse, [5.0, 6.0, 7.0, 8.0])
+    np.testing.assert_allclose(
+        table.header.wavelength_micron, 10000.0 / np.arange(5.0, 9.0)
+    )
+    np.testing.assert_allclose(table.kcoeff, expected)
+    assert table.header.metadata["header_padding_records"] == "7"
+    assert table.header.metadata["spectral_axis_reversed"] == "false"
 
 
 def test_read_kta_rejects_nonfinite_kcoefficients_by_default(tmp_path: Path) -> None:
@@ -91,7 +109,9 @@ def test_convert_kta_to_robert_archive_writes_native_directory(tmp_path: Path) -
     )
 
     assert database.products[0].source == OpacityDataSource.ROBERT_ARCHIVE
-    assert database.products[0].storage_format == OpacityStorageFormat.ROBERT_NPY_DIRECTORY
+    assert (
+        database.products[0].storage_format == OpacityStorageFormat.ROBERT_NPY_DIRECTORY
+    )
     inspected = inspect_robert_npy_directory(archive_path)
     assert inspected.products[0].species == ("CH4",)
     loaded = load_robert_npy_directory(archive_path)
@@ -99,7 +119,9 @@ def test_convert_kta_to_robert_archive_writes_native_directory(tmp_path: Path) -
     np.testing.assert_allclose(loaded.arrays["g_weights"], [0.4, 0.6])
 
 
-def test_convert_kta_to_robert_archive_preserves_floor_policy_metadata(tmp_path: Path) -> None:
+def test_convert_kta_to_robert_archive_preserves_floor_policy_metadata(
+    tmp_path: Path,
+) -> None:
     missing_index = (0, 1, 2, 1)
     path, expected = _write_synthetic_kta(
         tmp_path / "NH3_incomplete_test.kta",
@@ -186,7 +208,9 @@ def test_exok_replaces_zero_coefficients_before_correlated_k_binning(
     assert float(table.metadata["exo_k_zero_floor"]) > 0.0
 
 
-def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(tmp_path: Path) -> None:
+def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(
+    tmp_path: Path,
+) -> None:
     _write_synthetic_kta(tmp_path / "TiO_custom_resolution.kta")
     _write_synthetic_kta(tmp_path / "VO_custom_resolution.kta")
 
@@ -196,10 +220,16 @@ def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(tmp_path
     )
 
     assert provider.species == ("TiO", "VO")
-    assert provider.tables["TiO"].metadata["source_path"].endswith("TiO_custom_resolution.kta")
+    assert (
+        provider.tables["TiO"]
+        .metadata["source_path"]
+        .endswith("TiO_custom_resolution.kta")
+    )
 
 
-def test_provider_requires_explicit_selection_for_duplicate_species_files(tmp_path: Path) -> None:
+def test_provider_requires_explicit_selection_for_duplicate_species_files(
+    tmp_path: Path,
+) -> None:
     _write_synthetic_kta(tmp_path / "H2O_R100.kta")
     _write_synthetic_kta(tmp_path / "H2O_R1000.kta")
 
@@ -221,8 +251,8 @@ def test_provider_selects_resolution_subdirectory_and_filename(tmp_path: Path) -
         resolution="R1000",
     )
 
-    assert provider.tables["H2O"].metadata["source_path"].endswith(
-        "R1000/H2O_R1000.kta"
+    assert (
+        provider.tables["H2O"].metadata["source_path"].endswith("R1000/H2O_R1000.kta")
     )
 
 
@@ -326,4 +356,37 @@ def _write_synthetic_kta(
         handle.write(wavelength[::-1].astype(np.float32).tobytes())
         stored_kcoeff = kcoeff[:, :, ::-1, :].transpose(2, 0, 1, 3) * 1.0e20
         handle.write(stored_kcoeff.astype(np.float32).tobytes())
+    return path, kcoeff
+
+
+def _write_synthetic_nemesis_kta(path: Path) -> tuple[Path, np.ndarray]:
+    pressure = np.array([1.0e-5, 1.0], dtype=np.float32)
+    temperature = np.array([100.0, 200.0, 300.0], dtype=np.float32)
+    g_samples = np.array([0.25, 0.75], dtype=np.float32)
+    g_weights = np.array([0.4, 0.6], dtype=np.float32)
+    kcoeff = (
+        1.0e-30 + np.arange(2 * 3 * 4 * 2, dtype=float).reshape(2, 3, 4, 2) * 1.0e-32
+    )
+    padding_records = 7
+    n_pressure, n_temperature, n_wavenumber, n_g = kcoeff.shape
+    irec0 = 11 + 2 * n_g + 2 + n_pressure + n_temperature + padding_records
+    with path.open("wb") as handle:
+        handle.write(np.int32(irec0).tobytes())
+        handle.write(np.int32(n_wavenumber).tobytes())
+        handle.write(np.float32(5.0).tobytes())
+        handle.write(np.float32(1.0).tobytes())
+        handle.write(np.float32(2.5).tobytes())
+        handle.write(np.int32(n_pressure).tobytes())
+        handle.write(np.int32(n_temperature).tobytes())
+        handle.write(np.int32(n_g).tobytes())
+        handle.write(np.int32(11).tobytes())
+        handle.write(np.int32(0).tobytes())
+        handle.write(g_samples.tobytes())
+        handle.write(g_weights.tobytes())
+        handle.write(np.zeros(2, dtype=np.float32).tobytes())
+        handle.write(pressure.tobytes())
+        handle.write(temperature.tobytes())
+        handle.write(np.zeros(padding_records, dtype=np.float32).tobytes())
+        stored = kcoeff.transpose(2, 0, 1, 3) * 1.0e20
+        handle.write(stored.astype(np.float32).tobytes())
     return path, kcoeff

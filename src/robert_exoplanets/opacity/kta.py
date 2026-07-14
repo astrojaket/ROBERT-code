@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from hashlib import sha256
 from pathlib import Path
-from typing import Mapping
+from typing import Literal, Mapping
 
 import numpy as np
 from numpy.typing import NDArray
@@ -35,6 +35,7 @@ _FLOAT_DTYPE = np.dtype("<f4")
 _FLOAT64 = np.float64
 _KDATA_SCALE = 1.0e-20
 _DEFAULT_NONFINITE_FILL_VALUE = 1.0e-300
+KtaSpectralCoordinate = Literal["wavelength_micron", "wavenumber_cm_inverse"]
 
 
 @dataclass(frozen=True)
@@ -91,12 +92,16 @@ class KtaHeader:
             raise RobertValidationError("pressure_bar values must be positive")
         if np.any(self.temperature_K <= 0.0):
             raise RobertValidationError("temperature_K values must be positive")
-        if np.any(self.wavelength_micron <= 0.0) or np.any(self.wavenumber_cm_inverse <= 0.0):
+        if np.any(self.wavelength_micron <= 0.0) or np.any(
+            self.wavenumber_cm_inverse <= 0.0
+        ):
             raise RobertValidationError("spectral coordinates must be positive")
         if self.data_offset_bytes < 1:
             raise RobertValidationError("data_offset_bytes must be positive")
         if self.file_size_bytes < self.expected_file_size_bytes:
-            raise RobertDataError("`.kta` file is smaller than expected from its header")
+            raise RobertDataError(
+                "`.kta` file is smaller than expected from its header"
+            )
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
@@ -162,7 +167,9 @@ class KtaTable:
     def __post_init__(self) -> None:
         kcoeff = np.array(self.kcoeff, dtype=float, copy=True)
         if kcoeff.shape != self.header.native_shape:
-            raise RobertValidationError("kcoeff shape must be pressure x temperature x wavelength x g")
+            raise RobertValidationError(
+                "kcoeff shape must be pressure x temperature x wavelength x g"
+            )
         if not np.all(np.isfinite(kcoeff)) or np.any(kcoeff < 0.0):
             raise RobertValidationError("kcoeff values must be finite and non-negative")
         if not self.unit:
@@ -176,8 +183,15 @@ def read_kta_header(
     path: str | Path,
     *,
     checksum: bool = False,
+    spectral_coordinate: KtaSpectralCoordinate = "wavelength_micron",
 ) -> KtaHeader:
-    """Read metadata from a `.kta` file without loading k-coefficients."""
+    """Read metadata from a `.kta` file without loading k-coefficients.
+
+    Legacy NEMESIS headers do not store whether their spectral coordinate is
+    wavelength or wavenumber. The default preserves the exo_k convention used
+    by ROBERT's existing tables; callers loading NEMESIS wavenumber tables must
+    select ``spectral_coordinate="wavenumber_cm_inverse"`` explicitly.
+    """
 
     file_path = Path(path).expanduser()
     _require_kta_file(file_path)
@@ -193,7 +207,9 @@ def read_kta_header(
         ints = np.frombuffer(handle.read(5 * _INT_DTYPE.itemsize), dtype=_INT_DTYPE)
         if ints.size != 5:
             raise RobertDataError("`.kta` file ended before grid dimensions")
-        n_pressure, n_temperature, n_g, molecule_id, isotopologue_id = (int(item) for item in ints)
+        n_pressure, n_temperature, n_g, molecule_id, isotopologue_id = (
+            int(item) for item in ints
+        )
         _validate_header_dimensions(
             irec0=irec0,
             n_wavelength=n_wavelength,
@@ -209,16 +225,33 @@ def read_kta_header(
         temperature_K = _read_float32(handle, n_temperature, "`.kta` temperature grid")
 
         base_records = 12 + 2 * n_g + n_pressure + n_temperature
-        wavelength_records = irec0 - 1 - base_records
-        if wavelength_records == n_wavelength:
-            stored_wavelength = _read_float32(handle, n_wavelength, "`.kta` wavelength grid")
-        elif wavelength_records == 0 and float(dwl) >= 0.0:
-            stored_wavelength = float(wl_min) + np.arange(n_wavelength, dtype=float) * float(dwl)
+        spectral_records = irec0 - 1 - base_records
+        if spectral_records < 0:
+            raise RobertDataError("`.kta` data offset overlaps its header")
+        if float(dwl) <= 0.0:
+            if spectral_records < n_wavelength:
+                raise RobertDataError(
+                    "`.kta` header does not contain its explicit spectral grid"
+                )
+            stored_spectral = _read_float32(
+                handle, n_wavelength, "`.kta` spectral grid"
+            )
+            padding_records = spectral_records - n_wavelength
         else:
-            raise RobertDataError("`.kta` header record count is inconsistent with wavelength grid")
+            stored_spectral = float(wl_min) + np.arange(
+                n_wavelength, dtype=float
+            ) * float(dwl)
+            padding_records = spectral_records
 
-    wavelength_micron = np.array(stored_wavelength[::-1], dtype=float, copy=True)
-    wavenumber = 10000.0 / wavelength_micron
+    coordinate = _normalize_spectral_coordinate(spectral_coordinate)
+    reverse_axis = coordinate == "wavelength_micron"
+    native_spectral = stored_spectral[::-1] if reverse_axis else stored_spectral
+    if coordinate == "wavelength_micron":
+        wavelength_micron = np.array(native_spectral, dtype=float, copy=True)
+        wavenumber = 10000.0 / wavelength_micron
+    else:
+        wavenumber = np.array(native_spectral, dtype=float, copy=True)
+        wavelength_micron = 10000.0 / wavenumber
     data_offset_bytes = (irec0 - 1) * _FLOAT_DTYPE.itemsize
     return KtaHeader(
         path=str(file_path),
@@ -248,6 +281,9 @@ def read_kta_header(
             "temperature_unit": "K",
             "wavelength_unit": "micron",
             "wavenumber_unit": "cm^-1",
+            "stored_spectral_coordinate": coordinate,
+            "spectral_axis_reversed": str(reverse_axis).lower(),
+            "header_padding_records": str(padding_records),
             "byte_order": "little-endian",
         },
     )
@@ -259,6 +295,7 @@ def read_kta(
     checksum: bool = False,
     nonfinite_policy: str = "raise",
     nonfinite_fill_value: float = _DEFAULT_NONFINITE_FILL_VALUE,
+    spectral_coordinate: KtaSpectralCoordinate = "wavelength_micron",
 ) -> KtaTable:
     """Read a `.kta` file into ROBERT's native axis order.
 
@@ -269,7 +306,11 @@ def read_kta(
     recorded in the returned table metadata.
     """
 
-    header = read_kta_header(path, checksum=checksum)
+    header = read_kta_header(
+        path,
+        checksum=checksum,
+        spectral_coordinate=spectral_coordinate,
+    )
     stored = np.fromfile(
         header.path,
         dtype=_FLOAT_DTYPE,
@@ -277,15 +318,24 @@ def read_kta(
         offset=header.data_offset_bytes,
     )
     if stored.size != header.n_kcoefficients:
-        raise RobertDataError("`.kta` file ended before all k-coefficients could be read")
-    kcoeff = stored.reshape(header.stored_shape)[::-1].transpose(1, 2, 0, 3).astype(_FLOAT64)
+        raise RobertDataError(
+            "`.kta` file ended before all k-coefficients could be read"
+        )
+    stored_grid = stored.reshape(header.stored_shape)
+    if header.metadata["spectral_axis_reversed"] == "true":
+        stored_grid = stored_grid[::-1]
+    kcoeff = stored_grid.transpose(1, 2, 0, 3).astype(_FLOAT64)
     kcoeff *= _KDATA_SCALE
     kcoeff, metadata = _apply_nonfinite_policy(
         kcoeff,
         policy=nonfinite_policy,
         fill_value=nonfinite_fill_value,
     )
-    return KtaTable(header=header, kcoeff=kcoeff, metadata=metadata)
+    return KtaTable(
+        header=header,
+        kcoeff=kcoeff,
+        metadata={**dict(header.metadata), **metadata},
+    )
 
 
 def kta_product_from_header(
@@ -329,6 +379,7 @@ def convert_kta_to_robert_archive(
     overwrite: bool = False,
     nonfinite_policy: str = "raise",
     nonfinite_fill_value: float = _DEFAULT_NONFINITE_FILL_VALUE,
+    spectral_coordinate: KtaSpectralCoordinate = "wavelength_micron",
 ) -> OpacityDatabase:
     """Convert a `.kta` file into a ROBERT-native opacity archive."""
 
@@ -337,10 +388,13 @@ def convert_kta_to_robert_archive(
         checksum=True,
         nonfinite_policy=nonfinite_policy,
         nonfinite_fill_value=nonfinite_fill_value,
+        spectral_coordinate=spectral_coordinate,
     )
     species_name = species or _species_from_filename(Path(path))
     product = kta_product_from_header(table.header, species=species_name, source=source)
-    product = replace(product, metadata={**dict(product.metadata), **dict(table.metadata)})
+    product = replace(
+        product, metadata={**dict(product.metadata), **dict(table.metadata)}
+    )
     database = OpacityDatabase(
         products=(product,),
         name=f"{species_name}-kta-import",
@@ -384,6 +438,23 @@ def _read_float32(handle: object, count: int, name: str) -> NDArray[np.float64]:
     if values.size != count:
         raise RobertDataError(f"{name} ended early")
     return values.astype(float)
+
+
+def _normalize_spectral_coordinate(value: str) -> KtaSpectralCoordinate:
+    normalized = str(value).strip().lower()
+    aliases = {
+        "wavelength": "wavelength_micron",
+        "micron": "wavelength_micron",
+        "wavenumber": "wavenumber_cm_inverse",
+        "cm^-1": "wavenumber_cm_inverse",
+        "cm-1": "wavenumber_cm_inverse",
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized not in {"wavelength_micron", "wavenumber_cm_inverse"}:
+        raise RobertValidationError(
+            "spectral_coordinate must be 'wavelength_micron' or 'wavenumber_cm_inverse'"
+        )
+    return normalized  # type: ignore[return-value]
 
 
 def _apply_nonfinite_policy(
@@ -454,7 +525,9 @@ def _validate_header_dimensions(
 def _species_from_filename(path: Path) -> str:
     token = path.name.split(".")[0].split("_")[0].strip()
     if not token:
-        raise RobertValidationError(f"could not infer species from filename: {path.name}")
+        raise RobertValidationError(
+            f"could not infer species from filename: {path.name}"
+        )
     return token
 
 

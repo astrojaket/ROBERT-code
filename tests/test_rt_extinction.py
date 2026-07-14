@@ -24,14 +24,21 @@ from robert_exoplanets import (
 from robert_exoplanets.core import RobertCoverageError, RobertValidationError
 
 
-def test_rayleigh_scattering_optical_depth_is_positive_and_larger_at_short_wavelengths() -> None:
-    gas_tau = _gas_tau(SpectralGrid.from_array([0.5, 1.0, 2.0], unit="micron", role="opacity"))
+def test_rayleigh_scattering_optical_depth_is_positive_and_larger_at_short_wavelengths() -> (
+    None
+):
+    gas_tau = _gas_tau(
+        SpectralGrid.from_array([0.5, 1.0, 2.0], unit="micron", role="opacity")
+    )
 
     rayleigh = rayleigh_scattering_optical_depth(gas_tau)
 
     assert isinstance(rayleigh, LayerOpticalDepth)
     assert rayleigh.kind == "scattering_extinction"
-    assert rayleigh.tau.shape == (gas_tau.atmosphere.n_layers, gas_tau.spectral_grid.size)
+    assert rayleigh.tau.shape == (
+        gas_tau.atmosphere.n_layers,
+        gas_tau.spectral_grid.size,
+    )
     assert np.all(rayleigh.tau > 0.0)
     assert np.all(rayleigh.tau[:, 0] > rayleigh.tau[:, 1])
     assert np.all(rayleigh.tau[:, 1] > rayleigh.tau[:, 2])
@@ -118,6 +125,27 @@ def test_cia_optical_depth_uses_h2_h2_and_h2_he_pairs() -> None:
     assert "H2-He_normal" in cia.metadata["active_pairs"]
 
 
+def test_cia_optical_depth_accepts_explicit_layer_path_lengths() -> None:
+    spectral_grid = SpectralGrid.from_array([10.0], unit="micron", role="opacity")
+    gas_tau = _gas_tau(spectral_grid)
+    table = CiaTable(
+        wavenumber_cm_inverse=[0.0, 1000.0],
+        temperature_K=[500.0, 1500.0],
+        k_cia=np.ones((4, 2, 2)),
+        pair_order=("eq_h2", "eq_he", "H2-H2_normal", "H2-He_normal"),
+    )
+
+    short = cia_optical_depth(gas_tau, table, path_length_cm=[1.0e5, 2.0e5])
+    long = cia_optical_depth(gas_tau, table, path_length_cm=[2.0e5, 4.0e5])
+
+    # At fixed layer column, CIA optical depth is inversely proportional to path.
+    np.testing.assert_allclose(long.tau, 0.5 * short.tau)
+    assert long.metadata["path_model"] == "explicit_layer_path_length_cm"
+
+    with pytest.raises(RobertValidationError, match="one value per atmospheric layer"):
+        cia_optical_depth(gas_tau, table, path_length_cm=[1.0e5])
+
+
 def test_petitradtrans_cia_hdf_loader_and_log_interpolation(tmp_path) -> None:
     h5py = pytest.importorskip("h5py")
     path = tmp_path / "h2-h2.ciatable.petitRADTRANS.h5"
@@ -130,7 +158,9 @@ def test_petitradtrans_cia_hdf_loader_and_log_interpolation(tmp_path) -> None:
         handle.create_dataset("mol_mass", data=[2.01588, 2.01588])
         handle.create_dataset("DOI", data=[b"10.0000/example"])
     table = CiaTable.from_petitradtrans_hdf(path, collision_pair="H2-H2")
-    gas_tau = _gas_tau(SpectralGrid.from_array([10.0, 5.0], unit="micron", role="opacity"))
+    gas_tau = _gas_tau(
+        SpectralGrid.from_array([10.0, 5.0], unit="micron", role="opacity")
+    )
 
     cia = cia_optical_depth(
         gas_tau,

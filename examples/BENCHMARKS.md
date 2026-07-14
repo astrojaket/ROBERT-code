@@ -26,5 +26,12 @@ tones for contrast.
 - `benchmark_native_hdf_emission_convergence.py`: native-grid emission
   convergence.
 
+## NEMESIS
+
+- `benchmark_jupiter_nemesis.py`: like-for-like reproduction of the official
+  71-layer Jupiter CIRS nadir thermal-emission example. It reads NEMESIS's
+  legacy KTA and CIA tables, explicit layer paths, gas columns, and Docker
+  forward output without vendoring the large reference dataset.
+
 The archived HAT-P-32b checks under `Depreciated_Benchmarks/` predate ROBERT's
 YAML task workflow and are not maintained or run in CI.
