@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a conda-provided PyMultiNest/MultiNest backend, strict YAML selection
+  for MultiNest and optimal estimation, and OE-to-UltraNest or OE-to-MultiNest
+  benchmark workflows with common manifests, results, status, and timings.
 - Generalized the active emission API from the legacy `ClearSky*` and
   `solve_clear_sky_emission*` names to `Emission*` and `solve_emission*`.
   Backward-compatible aliases remain for historical scripts.

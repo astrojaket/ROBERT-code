@@ -3,7 +3,7 @@
 ROBERT is a JWST exoplanet emission retrieval code with typed core domain
 objects, modular atmosphere and chemistry components, opacity import/archive
 helpers, RT-facing optical-depth objects, cloud-free and cloudy emission solvers,
-optimal estimation, and an optional UltraNest adapter. The physical forward
+optimal estimation, and optional UltraNest and MultiNest adapters. The physical forward
 model is ready for controlled science analyses within the validated cloud-free
 and benchmarked cloudy-emission regimes described below. It is not yet a
 general-purpose production retrieval: calibrated pipeline-product ingestion,
@@ -39,11 +39,14 @@ For an already-created environment, refresh the editable install with:
 python -m pip install -e ".[dev]"
 ```
 
-Install all optional runtime integrations without Conda with:
+Install pip-provided optional runtime integrations without Conda with:
 
 ```bash
 python -m pip install -e ".[complete]"
 ```
+
+MultiNest is supplied by the full Conda environment because its compiled
+library is installed from conda-forge rather than built locally.
 
 For the runnable Jupyter examples, include the notebook environment:
 
@@ -88,8 +91,8 @@ ignored by git.
   SH4 multiple-scattering solvers.
 - Shared-atmosphere, multi-instrument forward modelling with instrument-aware
   binning and Gaussian likelihood support for masks, offsets, and jitter.
-- Optimal-estimation and optional UltraNest inference through a common
-  retrieval interface, with MPI-compatible execution for larger runs.
+- Optimal-estimation, UltraNest, MultiNest, and OE-to-nested inference through
+  a common retrieval interface, with MPI-compatible execution for larger runs.
 - Versioned run manifests and portable result products containing the inputs,
   opacity identifiers, code and runtime provenance, settings, seeds, spectra,
   and inference outputs.

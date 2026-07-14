@@ -51,10 +51,12 @@ Multi-instrument runs evaluate temperature and chemistry once per likelihood
 call, while retaining independent opacity preparation and radiative transfer
 for each instrument mode.
 
-Optimal estimation and UltraNest consume the same `RetrievalProblem`
-interface. Every run records the resolved configuration, opacity identifiers,
-runtime and code provenance, settings, random seed, spectra, and inference
-products.
+Optimal estimation, UltraNest, and conda-provided MultiNest consume the same
+`RetrievalProblem` interface. The `sampler.engine` choice also supports OE
+followed by either nested sampler, with bounded priors refined from the OE
+state and covariance. Every run records the resolved configuration, opacity
+identifiers, runtime and code provenance, settings, random seed, timings,
+spectra, and inference products.
 
 See [Configuring and running ROBERT](../configuration.md) for the complete YAML
 schema, directory setup, opacity preparation, and MPI/Slurm workflow. The

@@ -134,6 +134,30 @@ def test_oe_then_nested_sampling_runs_both_stages(monkeypatch, tmp_path) -> None
     assert (tmp_path / "hybrid_handoff.json").is_file()
 
 
+def test_oe_then_multinest_selects_requested_nested_backend(monkeypatch, tmp_path) -> None:
+    calls = []
+
+    def fake_run(problem, *, method, output_dir, **kwargs):
+        calls.append(method)
+        if method == "optimal_estimation":
+            return SimpleNamespace(
+                converged=True,
+                message="converged",
+                inference_result=_oe_result(),
+                best_fit_parameters=_oe_result().best_fit_parameters,
+            )
+        return SimpleNamespace(converged=True, best_fit_parameters={})
+
+    monkeypatch.setattr("robert_exoplanets.retrieval.hybrid.run_retrieval", fake_run)
+    run_oe_then_nested_sampling(
+        _problem(),
+        output_dir=tmp_path,
+        nested_method="multinest",
+    )
+
+    assert calls == ["optimal_estimation", "multinest"]
+
+
 def test_nested_then_oe_uses_best_fit_as_prior_state(monkeypatch, tmp_path) -> None:
     calls = []
 

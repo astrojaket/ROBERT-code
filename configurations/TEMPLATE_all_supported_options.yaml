@@ -249,13 +249,36 @@ parameters:
 # SAMPLER PROPERTIES
 # =============================================================================
 sampler:
+  # Inference engines:
+  #   ultranest, multinest, optimal_estimation,
+  #   optimal_estimation_to_ultranest, optimal_estimation_to_multinest
   engine: ultranest
+
+  # Shared nested-sampling controls. `dlogz` is UltraNest's dlogz and
+  # MultiNest's evidence_tolerance.
   live_points: 400
-  max_calls: 200000
+  max_calls: 200000             # UltraNest only; null means unlimited.
+  multinest_max_iterations: 0   # MultiNest only; 0 means unlimited.
   dlogz: 0.5
-  resume: resume
+  sampling_efficiency: 0.8      # MultiNest: 0.8 parameter estimation, 0.3 evidence.
+  importance_nested_sampling: true
+  multimodal: true
+  iterations_before_update: 100
+  resume: resume                # MultiNest also supports overwrite; UltraNest has more modes.
   show_status: true
   seed: 20260712
+  invalid_loglike_floor: -1.0e100
+
+  # Optimal-estimation phase controls, used by OE-only and OE-to-nested runs.
+  oe_max_iterations: 8
+  oe_convergence_tolerance: 1.0e-4
+  oe_finite_difference_fraction: 1.0e-4
+  oe_damping: 0.0
+
+  # OE-to-nested prior handoff controls.
+  prior_sigma: 4.0
+  minimum_prior_fraction: 0.05
+  require_oe_convergence: true
 
 runtime:
   mpi_processes: auto
