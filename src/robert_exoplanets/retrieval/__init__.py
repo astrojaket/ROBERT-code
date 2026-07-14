@@ -32,13 +32,14 @@ from .results import RetrievalResult
 from .runner import run_retrieval
 from .run_config import (
     InferenceRunConfig,
+    MultiNestRunConfig,
     OptimalEstimationRunConfig,
     RetrievalRunConfig,
     UltraNestRunConfig,
     build_retrieval_problem,
     run_configured_retrieval,
 )
-from .samplers import NestedSamplerResult, run_ultranest
+from .samplers import NestedSamplerResult, run_multinest, run_ultranest
 from .status import load_retrieval_status
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "NestedSamplerResult",
     "NestedSamplingOEResult",
     "MultiDatasetRetrievalProblem",
+    "MultiNestRunConfig",
     "Observation",
     "OptimalEstimationResult",
     "OENestedSamplingResult",
@@ -75,5 +77,6 @@ __all__ = [
     "run_optimal_estimation_from_nested_result",
     "run_retrieval",
     "run_configured_retrieval",
+    "run_multinest",
     "run_ultranest",
 ]

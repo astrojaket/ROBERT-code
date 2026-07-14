@@ -146,7 +146,105 @@ class UltraNestRunConfig:
         }
 
 
-InferenceRunConfig = OptimalEstimationRunConfig | UltraNestRunConfig
+@dataclass(frozen=True)
+class MultiNestRunConfig:
+    """Settings for a reproducible conda-provided PyMultiNest run."""
+
+    n_live_points: int = 400
+    max_iter: int = 0
+    evidence_tolerance: float = 0.5
+    sampling_efficiency: float = 0.8
+    resume: bool = True
+    verbose: bool = True
+    mpi_nprocs: int | None = None
+    seed: int | None = None
+    invalid_loglike_floor: float = -1.0e100
+    importance_nested_sampling: bool = True
+    multimodal: bool = True
+    n_iter_before_update: int = 100
+    extra_run_kwargs: Mapping[str, object] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        live_points = int(self.n_live_points)
+        if isinstance(self.n_live_points, bool) or live_points < 1:
+            raise RobertConfigError("n_live_points must be a positive integer")
+        max_iter = int(self.max_iter)
+        if isinstance(self.max_iter, bool) or max_iter < 0:
+            raise RobertConfigError("max_iter must be a non-negative integer")
+        evidence_tolerance = float(self.evidence_tolerance)
+        if not np.isfinite(evidence_tolerance) or evidence_tolerance <= 0.0:
+            raise RobertConfigError("evidence_tolerance must be finite and positive")
+        sampling_efficiency = float(self.sampling_efficiency)
+        if (
+            not np.isfinite(sampling_efficiency)
+            or sampling_efficiency <= 0.0
+            or sampling_efficiency > 1.0
+        ):
+            raise RobertConfigError("sampling_efficiency must be in (0, 1]")
+        mpi_nprocs = None if self.mpi_nprocs is None else int(self.mpi_nprocs)
+        if mpi_nprocs is not None and mpi_nprocs < 1:
+            raise RobertConfigError("mpi_nprocs must be positive when provided")
+        seed = None if self.seed is None else int(self.seed)
+        if seed is not None and seed < 0:
+            raise RobertConfigError("seed must be non-negative when provided")
+        invalid_floor = float(self.invalid_loglike_floor)
+        if not np.isfinite(invalid_floor) or invalid_floor >= 0.0:
+            raise RobertConfigError("invalid_loglike_floor must be finite and negative")
+        update_interval = int(self.n_iter_before_update)
+        if isinstance(self.n_iter_before_update, bool) or update_interval < 1:
+            raise RobertConfigError("n_iter_before_update must be a positive integer")
+        reserved = {
+            "n_live_points",
+            "max_iter",
+            "evidence_tolerance",
+            "sampling_efficiency",
+            "resume",
+            "verbose",
+            "mpi_nprocs",
+            "seed",
+            "invalid_loglike_floor",
+            "importance_nested_sampling",
+            "multimodal",
+            "n_iter_before_update",
+            "output_dir",
+        }
+        overlap = reserved.intersection(self.extra_run_kwargs)
+        if overlap:
+            raise RobertConfigError(
+                "extra_run_kwargs contains reserved settings: " + ", ".join(sorted(overlap))
+            )
+        object.__setattr__(self, "n_live_points", live_points)
+        object.__setattr__(self, "max_iter", max_iter)
+        object.__setattr__(self, "evidence_tolerance", evidence_tolerance)
+        object.__setattr__(self, "sampling_efficiency", sampling_efficiency)
+        object.__setattr__(self, "mpi_nprocs", mpi_nprocs)
+        object.__setattr__(self, "seed", seed)
+        object.__setattr__(self, "invalid_loglike_floor", invalid_floor)
+        object.__setattr__(self, "n_iter_before_update", update_interval)
+        object.__setattr__(self, "extra_run_kwargs", immutable_mapping(self.extra_run_kwargs))
+
+    @property
+    def method(self) -> str:
+        return "multinest"
+
+    def kwargs(self) -> dict[str, object]:
+        return {
+            "n_live_points": self.n_live_points,
+            "max_iter": self.max_iter,
+            "evidence_tolerance": self.evidence_tolerance,
+            "sampling_efficiency": self.sampling_efficiency,
+            "resume": self.resume,
+            "verbose": self.verbose,
+            "mpi_nprocs": self.mpi_nprocs,
+            "invalid_loglike_floor": self.invalid_loglike_floor,
+            "importance_nested_sampling": self.importance_nested_sampling,
+            "multimodal": self.multimodal,
+            "n_iter_before_update": self.n_iter_before_update,
+            **dict(self.extra_run_kwargs),
+        }
+
+
+InferenceRunConfig = OptimalEstimationRunConfig | UltraNestRunConfig | MultiNestRunConfig
 
 
 @dataclass(frozen=True)
@@ -204,7 +302,11 @@ def run_configured_retrieval(config: RetrievalRunConfig) -> RetrievalResult:
     """Build, run, and serialize a retrieval entirely from Python config."""
 
     problem = build_retrieval_problem(config)
-    seed = config.inference.seed if isinstance(config.inference, UltraNestRunConfig) else None
+    seed = (
+        config.inference.seed
+        if isinstance(config.inference, (UltraNestRunConfig, MultiNestRunConfig))
+        else None
+    )
     return run_retrieval(
         problem,
         method=config.inference.method,
@@ -216,6 +318,7 @@ def run_configured_retrieval(config: RetrievalRunConfig) -> RetrievalResult:
 
 __all__ = [
     "InferenceRunConfig",
+    "MultiNestRunConfig",
     "OptimalEstimationRunConfig",
     "RetrievalRunConfig",
     "UltraNestRunConfig",

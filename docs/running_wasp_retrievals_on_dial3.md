@@ -14,7 +14,7 @@ as independent likelihood terms. The NIRCam overlap-average product is omitted.
 cd /scratch/dp448/dc-tayl1/ROBERT-code
 conda env create -f environment.yml
 conda activate robert-exoplanets
-python -c "import exo_k, mpi4py, ultranest, robert_exoplanets; print('ROBERT environment OK')"
+python -c "import exo_k, mpi4py, pymultinest, ultranest, robert_exoplanets; print('ROBERT environment OK')"
 ```
 
 For an existing environment after a repository update, use:
@@ -99,7 +99,7 @@ exit
 ## Submit a 64-CPU run
 
 The production script requests 64 MPI ranks with account `dp448` on the DIaL3
-`slurm` partition. It uses the Conda OpenMPI `mpirun` launcher so all processes
+`slurm` partition. It uses the Conda MPICH `mpirun` launcher so all processes
 join one `MPI.COMM_WORLD`; using `srun` with this environment launched 64
 independent size-one communicators and caused simultaneous writes to the same
 UltraNest HDF5 checkpoint. Its only run input is the YAML path.

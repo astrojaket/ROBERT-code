@@ -58,8 +58,9 @@ The major sections are intentionally explicit:
 - `radiative_transfer`: model, geometry, Rayleigh treatment, gas combination,
   and numerical backend;
 - `parameters`: ordered retrieval priors and optional forward-model values;
-- `sampler`: UltraNest live points, call limit, convergence target, resume
-  policy, and seed;
+- `sampler`: inference engine (OE, UltraNest, MultiNest, or OE followed by
+  either nested sampler), convergence/iteration controls, resume policy, and
+  seed;
 - `outputs`: a project directory outside the source checkout; and
 - `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise,
   while `scratch_directory` controls runtime caches.
@@ -128,7 +129,7 @@ runner itself does not need target- or machine-specific edits.
 For 64 MPI processes on DiRAC, validate and prepare opacity on the login node,
 then submit `slurm/wasp69b_cloud_free_native_modes.sbatch`. Set `ROBERT_CONFIG` when
 submitting to select a copied configuration. The batch script uses Conda
-OpenMPI's `mpirun`, not `srun`; ROBERT checks that `MPI.COMM_WORLD` really has
+the Conda MPICH `mpirun`, not `srun`; ROBERT checks that `MPI.COMM_WORLD` really has
 64 processes before UltraNest opens a checkpoint.
 
 ```bash

@@ -7,6 +7,7 @@ import pytest
 
 from robert_exoplanets import (
     Observation,
+    MultiNestRunConfig,
     OptimalEstimationRunConfig,
     RetrievalParameter,
     RetrievalParameterSet,
@@ -78,6 +79,7 @@ def test_run_config_executes_and_serializes_optimal_estimation(tmp_path) -> None
 
     assert result.method == "optimal_estimation"
     assert result.best_fit_parameters["level"] == pytest.approx(1.0)
+    assert float(result.metadata["inference_elapsed_seconds"]) >= 0.0
     assert (tmp_path / "manifest.json").exists()
     assert (tmp_path / "result.json").exists()
 
@@ -115,3 +117,15 @@ def test_inference_configs_validate_and_expose_runner_settings() -> None:
         UltraNestRunConfig(extra_run_kwargs={"dlogz": 0.1})
     with pytest.raises(RobertConfigError, match="resume must be one of"):
         UltraNestRunConfig(resume="sometimes")
+
+    multinest = MultiNestRunConfig(
+        n_live_points=50,
+        evidence_tolerance=0.7,
+        sampling_efficiency=0.3,
+        seed=7,
+    )
+    assert multinest.method == "multinest"
+    assert multinest.kwargs()["n_live_points"] == 50
+    assert multinest.max_iter == 0
+    with pytest.raises(RobertConfigError, match="sampling_efficiency"):
+        MultiNestRunConfig(sampling_efficiency=1.1)

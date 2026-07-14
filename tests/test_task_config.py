@@ -100,11 +100,47 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
 
 
 def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
-    assert len(DEFAULTS) == 11
+    assert len(DEFAULTS) == 19
     for path in DEFAULTS:
         config = load_task_config(path)
         assert config.run.name.startswith(("wasp69b-", "wasp80b-"))
         assert config.opacity.resolution == "R1000"
+
+
+@pytest.mark.parametrize(
+    ("suffix", "engine"),
+    [
+        ("multinest", "multinest"),
+        ("optimal_estimation", "optimal_estimation"),
+        ("optimal_estimation_to_ultranest", "optimal_estimation_to_ultranest"),
+        ("optimal_estimation_to_multinest", "optimal_estimation_to_multinest"),
+    ],
+)
+@pytest.mark.parametrize(
+    "scenario", ["cloud_free_native_pg14", "mie_catalog_pg14"]
+)
+def test_wasp69b_inference_benchmarks_only_change_run_controls(
+    scenario: str, suffix: str, engine: str
+) -> None:
+    baseline = load_task_config(
+        ROOT / "configurations" / f"wasp69b_{scenario}_R1000.yaml"
+    )
+    benchmark = load_task_config(
+        ROOT / "configurations" / f"wasp69b_{scenario}_R1000_{suffix}.yaml"
+    )
+
+    assert benchmark.sampler.engine == engine
+    for section in (
+        "bodies",
+        "observations",
+        "atmosphere",
+        "clouds",
+        "opacity",
+        "radiative_transfer",
+        "likelihood",
+        "parameters",
+    ):
+        assert getattr(benchmark, section) == getattr(baseline, section)
 
 
 def test_direct_nk_default_replaces_catalogue_cloud_fields() -> None:

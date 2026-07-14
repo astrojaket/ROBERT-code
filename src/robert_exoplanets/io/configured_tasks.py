@@ -43,8 +43,9 @@ from robert_exoplanets.retrieval import (
     RetrievalParameter,
     RetrievalParameterSet,
     UniformPrior,
+    run_oe_then_nested_sampling,
+    run_retrieval,
 )
-from robert_exoplanets.retrieval.samplers import run_ultranest
 from robert_exoplanets.rt import (
     gauss_legendre_disk_geometry,
     load_nemesispy_cia_table,
@@ -95,7 +96,7 @@ def describe_config(config: TaskConfig) -> str:
             f"Opacity: {config.opacity.resolution} [{', '.join(config.opacity.species)}]",
             f"Geometry: {config.radiative_transfer.geometry.model}",
             f"Parameters: {', '.join(item.name for item in config.parameters)}",
-            f"Sampler: {config.sampler.engine}, live_points={config.sampler.live_points}, max_calls={config.sampler.max_calls}",
+            _sampler_description(config),
             f"MPI processes: {mpi_processes(config)}",
             f"Output: {config.outputs.directory}",
         ]
@@ -551,17 +552,85 @@ def run_retrieval_task(config: TaskConfig, source: Path):
             dumps(smoke, indent=2), encoding="utf-8"
         )
     sampler = config.sampler
-    return run_ultranest(
+    engine = sampler.engine
+    if engine == "optimal_estimation":
+        return run_retrieval(
+            problem,
+            method="optimal_estimation",
+            output_dir=config.outputs.directory / "optimal_estimation",
+            **_optimal_estimation_kwargs(config),
+        )
+    if engine in {"ultranest", "multinest"}:
+        return run_retrieval(
+            problem,
+            method=engine,
+            output_dir=config.outputs.directory / engine,
+            seed=sampler.seed,
+            **_nested_sampler_kwargs(config, engine),
+        )
+    nested_method = "multinest" if engine.endswith("multinest") else "ultranest"
+    return run_oe_then_nested_sampling(
         problem,
-        output_dir=config.outputs.directory / "ultranest",
-        min_num_live_points=sampler.live_points,
-        max_ncalls=sampler.max_calls,
-        dlogz=sampler.dlogz,
-        resume=sampler.resume,
-        show_status=sampler.show_status,
-        mpi_nprocs=mpi_processes(config),
+        output_dir=config.outputs.directory,
+        prior_sigma=sampler.prior_sigma,
+        minimum_prior_fraction=sampler.minimum_prior_fraction,
+        require_oe_convergence=sampler.require_oe_convergence,
+        oe_kwargs=_optimal_estimation_kwargs(config),
+        nested_kwargs=_nested_sampler_kwargs(config, nested_method),
+        nested_method=nested_method,
         seed=sampler.seed,
     )
+
+
+def _optimal_estimation_kwargs(config: TaskConfig) -> dict[str, object]:
+    sampler = config.sampler
+    return {
+        "max_iterations": sampler.oe_max_iterations,
+        "convergence_tolerance": sampler.oe_convergence_tolerance,
+        "finite_difference_fraction": sampler.oe_finite_difference_fraction,
+        "damping": sampler.oe_damping,
+    }
+
+
+def _nested_sampler_kwargs(config: TaskConfig, method: str) -> dict[str, object]:
+    sampler = config.sampler
+    common: dict[str, object] = {
+        "mpi_nprocs": mpi_processes(config),
+        "invalid_loglike_floor": sampler.invalid_loglike_floor,
+    }
+    if method == "ultranest":
+        return {
+            **common,
+            "min_num_live_points": sampler.live_points,
+            "max_ncalls": sampler.max_calls,
+            "dlogz": sampler.dlogz,
+            "resume": sampler.resume,
+            "show_status": sampler.show_status,
+        }
+    return {
+        **common,
+        "n_live_points": sampler.live_points,
+        "max_iter": sampler.multinest_max_iterations,
+        "evidence_tolerance": sampler.dlogz,
+        "sampling_efficiency": sampler.sampling_efficiency,
+        "resume": sampler.resume == "resume",
+        "verbose": sampler.show_status,
+        "importance_nested_sampling": sampler.importance_nested_sampling,
+        "multimodal": sampler.multimodal,
+        "n_iter_before_update": sampler.iterations_before_update,
+    }
+
+
+def _sampler_description(config: TaskConfig) -> str:
+    sampler = config.sampler
+    if sampler.engine == "optimal_estimation":
+        return f"Inference: optimal_estimation, max_iterations={sampler.oe_max_iterations}"
+    limits = (
+        f"max_calls={sampler.max_calls}"
+        if "ultranest" in sampler.engine
+        else f"max_iterations={sampler.multinest_max_iterations or 'unlimited'}"
+    )
+    return f"Inference: {sampler.engine}, live_points={sampler.live_points}, {limits}"
 
 
 def run_smoke_task(config: TaskConfig, source: Path) -> dict[str, float]:

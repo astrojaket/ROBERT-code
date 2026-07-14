@@ -11,6 +11,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    NonNegativeInt,
     PositiveFloat,
     PositiveInt,
     model_validator,
@@ -352,13 +353,40 @@ class LikelihoodConfig(ConfigModel):
 
 
 class SamplerConfig(ConfigModel):
-    engine: Literal["ultranest"] = "ultranest"
+    engine: Literal[
+        "ultranest",
+        "multinest",
+        "optimal_estimation",
+        "optimal_estimation_to_ultranest",
+        "optimal_estimation_to_multinest",
+    ] = "ultranest"
     live_points: PositiveInt = 400
     max_calls: PositiveInt | None = 200_000
+    multinest_max_iterations: NonNegativeInt = 0
     dlogz: PositiveFloat = 0.5
+    sampling_efficiency: float = Field(default=0.8, gt=0.0, le=1.0)
+    importance_nested_sampling: bool = True
+    multimodal: bool = True
+    iterations_before_update: PositiveInt = 100
     resume: Literal["resume", "resume-similar", "overwrite", "subfolder"] = "resume"
     show_status: bool = True
     seed: int | None = Field(default=None, ge=0)
+    invalid_loglike_floor: float = Field(default=-1.0e100, lt=0.0)
+    oe_max_iterations: PositiveInt = 8
+    oe_convergence_tolerance: PositiveFloat = 1.0e-4
+    oe_finite_difference_fraction: PositiveFloat = 1.0e-4
+    oe_damping: float = Field(default=0.0, ge=0.0)
+    prior_sigma: PositiveFloat = 4.0
+    minimum_prior_fraction: float = Field(default=0.05, gt=0.0, le=1.0)
+    require_oe_convergence: bool = True
+
+    @model_validator(mode="after")
+    def validate_engine_settings(self) -> "SamplerConfig":
+        if "multinest" in self.engine and self.resume not in {"resume", "overwrite"}:
+            raise ValueError(
+                "MultiNest resume must be 'resume' or 'overwrite'"
+            )
+        return self
 
 
 class OutputsConfig(ConfigModel):
