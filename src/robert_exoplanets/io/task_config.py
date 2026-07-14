@@ -393,6 +393,33 @@ class OutputsConfig(ConfigModel):
     directory: Path
 
 
+class PlottingConfig(ConfigModel):
+    """Optional automatic and manual post-processing controls."""
+
+    enabled: bool = False
+    retrieval: bool = True
+    forward: bool = True
+    style: str = Field(default="default", min_length=1)
+    image_format: Literal["png", "pdf", "svg"] = "png"
+    dpi: PositiveInt = 180
+    max_posterior_samples: PositiveInt = 20_000
+    dataset_colors: dict[str, str] = Field(default_factory=dict)
+    parameter_labels: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_plot_mappings(self) -> "PlottingConfig":
+        for mapping_name, mapping in (
+            ("dataset_colors", self.dataset_colors),
+            ("parameter_labels", self.parameter_labels),
+        ):
+            invalid = [key for key, value in mapping.items() if not key or not value]
+            if invalid:
+                raise ValueError(
+                    f"plotting.{mapping_name} keys and values must be non-empty"
+                )
+        return self
+
+
 class RuntimeConfig(ConfigModel):
     mpi_processes: PositiveInt | Literal["auto"] = "auto"
     scratch_directory: Path
@@ -425,6 +452,7 @@ class TaskConfig(ConfigModel):
     parameters: tuple[ParameterConfig, ...] = Field(min_length=1)
     sampler: SamplerConfig = SamplerConfig()
     outputs: OutputsConfig
+    plotting: PlottingConfig = PlottingConfig()
     runtime: RuntimeConfig
     housekeeping: HousekeepingConfig | None = None
 

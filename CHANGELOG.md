@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added general retrieval and forward-model post-processing with fit
+  statistics, residual and posterior/OE plots, a WASP-69b sampler benchmark
+  comparison, editable colour/style controls, and an optional YAML automatic
+  plotting hook.
 - Added a conda-provided PyMultiNest/MultiNest backend, strict YAML selection
   for MultiNest and optimal estimation, and OE-to-UltraNest or OE-to-MultiNest
   benchmark workflows with common manifests, results, status, and timings.
