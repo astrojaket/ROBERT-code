@@ -11,7 +11,10 @@ from numpy.typing import ArrayLike, NDArray
 from robert_exoplanets.core import RobertConfigError, RobertError, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
 
+from .multi_dataset import MultiDatasetRetrievalProblem
 from .problem import RetrievalProblem
+
+RetrievalProblemLike = RetrievalProblem | MultiDatasetRetrievalProblem
 
 
 @dataclass(frozen=True)
@@ -30,20 +33,31 @@ class OptimalEstimationResult:
     metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "state_vector", _readonly_array(self.state_vector, "state_vector", 1))
-        object.__setattr__(self, "covariance", _readonly_array(self.covariance, "covariance", 2))
-        object.__setattr__(self, "averaging_kernel", _readonly_array(self.averaging_kernel, "averaging_kernel", 2))
+        object.__setattr__(
+            self, "state_vector", _readonly_array(self.state_vector, "state_vector", 1)
+        )
+        object.__setattr__(
+            self, "covariance", _readonly_array(self.covariance, "covariance", 2)
+        )
+        object.__setattr__(
+            self,
+            "averaging_kernel",
+            _readonly_array(self.averaging_kernel, "averaging_kernel", 2),
+        )
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
     def best_fit_parameters(self) -> dict[str, float]:
         """Return the retrieved state as a parameter mapping."""
 
-        return {name: float(value) for name, value in zip(self.parameter_names, self.state_vector, strict=True)}
+        return {
+            name: float(value)
+            for name, value in zip(self.parameter_names, self.state_vector, strict=True)
+        }
 
 
 def run_optimal_estimation(
-    problem: RetrievalProblem,
+    problem: RetrievalProblemLike,
     *,
     initial_state: ArrayLike | None = None,
     prior_state: ArrayLike | None = None,
@@ -70,14 +84,21 @@ def run_optimal_estimation(
     if not np.isfinite(convergence_tolerance) or convergence_tolerance <= 0.0:
         raise RobertValidationError("convergence_tolerance must be finite and positive")
     if not np.isfinite(finite_difference_fraction) or finite_difference_fraction <= 0.0:
-        raise RobertValidationError("finite_difference_fraction must be finite and positive")
+        raise RobertValidationError(
+            "finite_difference_fraction must be finite and positive"
+        )
     if not np.isfinite(damping) or damping < 0.0:
         raise RobertValidationError("damping must be finite and non-negative")
-    jitter_parameter = problem.likelihood.jitter_parameter
-    if jitter_parameter is not None and jitter_parameter in problem.parameter_names:
+    uncertainty_parameters = _state_dependent_uncertainty_parameters(problem)
+    retrieved_uncertainty_parameters = sorted(
+        uncertainty_parameters.intersection(problem.parameter_names)
+    )
+    if retrieved_uncertainty_parameters:
         raise RobertConfigError(
-            "optimal estimation does not yet support a retrieved jitter parameter; "
-            "supply fixed uncertainties or use nested sampling"
+            "optimal estimation does not yet support retrieved jitter or uncertainty "
+            "scale parameters: "
+            + ", ".join(retrieved_uncertainty_parameters)
+            + "; supply fixed uncertainties or use nested sampling"
         )
 
     n_parameters = problem.ndim
@@ -86,9 +107,15 @@ def run_optimal_estimation(
         if prior_state is not None
         else problem.parameters.midpoint_vector()
     )
-    x = np.array(initial_state, dtype=float, copy=True) if initial_state is not None else np.array(x_a, copy=True)
+    x = (
+        np.array(initial_state, dtype=float, copy=True)
+        if initial_state is not None
+        else np.array(x_a, copy=True)
+    )
     if x.shape != (n_parameters,) or x_a.shape != (n_parameters,):
-        raise RobertValidationError("initial_state and prior_state must match the retrieval dimension")
+        raise RobertValidationError(
+            "initial_state and prior_state must match the retrieval dimension"
+        )
     if not np.all(np.isfinite(x)) or not np.all(np.isfinite(x_a)):
         raise RobertValidationError("initial_state and prior_state must be finite")
 
@@ -106,9 +133,15 @@ def run_optimal_estimation(
     n_iterations = 0
     for iteration in range(1, max_iterations + 1):
         n_iterations = iteration
-        model, current_data, current_uncertainty = problem.gaussian_inputs_from_vector(x)
-        if not np.array_equal(current_data, y) or not np.array_equal(current_uncertainty, uncertainty):
-            raise RobertConfigError("optimal-estimation data and fixed uncertainties changed with state")
+        model, current_data, current_uncertainty = problem.gaussian_inputs_from_vector(
+            x
+        )
+        if not np.array_equal(current_data, y) or not np.array_equal(
+            current_uncertainty, uncertainty
+        ):
+            raise RobertConfigError(
+                "optimal-estimation data and fixed uncertainties changed with state"
+            )
         jacobian = _finite_difference_jacobian(
             problem,
             x,
@@ -138,7 +171,11 @@ def run_optimal_estimation(
             break
         x_next, cost = step
         step_norm = float(np.linalg.norm(x_next - x) / max(1.0, np.linalg.norm(x)))
-        cost_change = abs(previous_cost - cost) / max(1.0, abs(previous_cost)) if np.isfinite(previous_cost) else np.inf
+        cost_change = (
+            abs(previous_cost - cost) / max(1.0, abs(previous_cost))
+            if np.isfinite(previous_cost)
+            else np.inf
+        )
         x = x_next
         previous_cost = cost
         if step_norm < convergence_tolerance or cost_change < convergence_tolerance:
@@ -147,9 +184,15 @@ def run_optimal_estimation(
             break
 
     final_model, final_data, final_uncertainty = problem.gaussian_inputs_from_vector(x)
-    if not np.array_equal(final_data, y) or not np.array_equal(final_uncertainty, uncertainty):
-        raise RobertConfigError("optimal-estimation data and fixed uncertainties changed with state")
-    final_jacobian = _finite_difference_jacobian(problem, x, bounds, fraction=finite_difference_fraction)
+    if not np.array_equal(final_data, y) or not np.array_equal(
+        final_uncertainty, uncertainty
+    ):
+        raise RobertConfigError(
+            "optimal-estimation data and fixed uncertainties changed with state"
+        )
+    final_jacobian = _finite_difference_jacobian(
+        problem, x, bounds, fraction=finite_difference_fraction
+    )
     with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
         posterior_precision = final_jacobian.T @ s_e_inv @ final_jacobian + s_a_inv
     if np.all(np.isfinite(posterior_precision)):
@@ -163,7 +206,9 @@ def run_optimal_estimation(
     residual = y - final_model
     prior_delta = x - x_a
     with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
-        final_cost = float(residual.T @ s_e_inv @ residual + prior_delta.T @ s_a_inv @ prior_delta)
+        final_cost = float(
+            residual.T @ s_e_inv @ residual + prior_delta.T @ s_a_inv @ prior_delta
+        )
     if not np.isfinite(final_cost):
         final_cost = float("inf")
     return OptimalEstimationResult(
@@ -181,7 +226,7 @@ def run_optimal_estimation(
 
 
 def _finite_difference_jacobian(
-    problem: RetrievalProblem,
+    problem: RetrievalProblemLike,
     state: NDArray[np.float64],
     bounds: NDArray[np.float64],
     *,
@@ -199,22 +244,36 @@ def _finite_difference_jacobian(
         actual_step = high[index] - low[index]
         if actual_step <= 0.0:
             continue
-        high_model, high_data, high_uncertainty = problem.gaussian_inputs_from_vector(high)
+        high_model, high_data, high_uncertainty = problem.gaussian_inputs_from_vector(
+            high
+        )
         low_model, low_data, low_uncertainty = problem.gaussian_inputs_from_vector(low)
         if not np.array_equal(high_data, data) or not np.array_equal(low_data, data):
-            raise RobertConfigError("optimal-estimation data changed during finite differencing")
-        if not np.array_equal(high_uncertainty, uncertainty) or not np.array_equal(low_uncertainty, uncertainty):
-            raise RobertConfigError("optimal estimation does not support state-dependent uncertainty")
+            raise RobertConfigError(
+                "optimal-estimation data changed during finite differencing"
+            )
+        if not np.array_equal(high_uncertainty, uncertainty) or not np.array_equal(
+            low_uncertainty, uncertainty
+        ):
+            raise RobertConfigError(
+                "optimal estimation does not support state-dependent uncertainty"
+            )
         jacobian[:, index] = (high_model - low_model) / actual_step
     return jacobian
 
 
-def _prior_covariance(problem: RetrievalProblem, prior_covariance: ArrayLike | None) -> NDArray[np.float64]:
+def _prior_covariance(
+    problem: RetrievalProblemLike,
+    prior_covariance: ArrayLike | None,
+) -> NDArray[np.float64]:
     if prior_covariance is not None:
         covariance = np.array(prior_covariance, dtype=float, copy=True)
     else:
         scales = np.array(
-            [parameter.approximate_standard_deviation for parameter in problem.parameters.parameters],
+            [
+                parameter.approximate_standard_deviation
+                for parameter in problem.parameters.parameters
+            ],
             dtype=float,
         )
         covariance = np.diag(np.square(scales))
@@ -230,7 +289,7 @@ def _prior_covariance(problem: RetrievalProblem, prior_covariance: ArrayLike | N
 
 
 def _cost(
-    problem: RetrievalProblem,
+    problem: RetrievalProblemLike,
     state: NDArray[np.float64],
     prior_state: NDArray[np.float64],
     prior_precision: NDArray[np.float64],
@@ -244,7 +303,7 @@ def _cost(
 
 
 def _backtracking_step(
-    problem: RetrievalProblem,
+    problem: RetrievalProblemLike,
     *,
     current: NDArray[np.float64],
     proposed: NDArray[np.float64],
@@ -268,7 +327,32 @@ def _backtracking_step(
     return None
 
 
-def _clip_to_bounds(values: NDArray[np.float64], bounds: NDArray[np.float64]) -> NDArray[np.float64]:
+def _state_dependent_uncertainty_parameters(
+    problem: RetrievalProblemLike,
+) -> set[str]:
+    if isinstance(problem, MultiDatasetRetrievalProblem):
+        return {
+            parameter
+            for dataset in problem.observations.datasets
+            for parameter in (
+                dataset.jitter_parameter,
+                dataset.uncertainty_scale_parameter,
+            )
+            if parameter is not None
+        }
+    return {
+        parameter
+        for parameter in (
+            problem.likelihood.jitter_parameter,
+            problem.likelihood.uncertainty_scale_parameter,
+        )
+        if parameter is not None
+    }
+
+
+def _clip_to_bounds(
+    values: NDArray[np.float64], bounds: NDArray[np.float64]
+) -> NDArray[np.float64]:
     return np.clip(values, bounds[:, 0], bounds[:, 1])
 
 

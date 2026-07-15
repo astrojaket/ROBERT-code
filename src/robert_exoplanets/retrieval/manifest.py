@@ -17,6 +17,7 @@ from robert_exoplanets._version import __version__
 from robert_exoplanets.core import RobertDataError, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
 
+from .multi_dataset import MultiDatasetRetrievalProblem
 from .problem import RetrievalProblem
 
 RUN_MANIFEST_SCHEMA_VERSION = "1.0"
@@ -46,7 +47,13 @@ class RunManifest:
     schema_version: str = RUN_MANIFEST_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        for name in ("problem_name", "method", "created_at_utc", "config_hash", "schema_version"):
+        for name in (
+            "problem_name",
+            "method",
+            "created_at_utc",
+            "config_hash",
+            "schema_version",
+        ):
             if not str(getattr(self, name)).strip():
                 raise RobertValidationError(f"manifest {name} must not be empty")
         object.__setattr__(self, "parameter_names", tuple(self.parameter_names))
@@ -56,8 +63,12 @@ class RunManifest:
             tuple(immutable_mapping(dict(item)) for item in self.parameter_priors),
         )
         object.__setattr__(self, "likelihood", immutable_mapping(self.likelihood))
-        object.__setattr__(self, "problem_metadata", immutable_mapping(self.problem_metadata))
-        object.__setattr__(self, "opacity_identifiers", immutable_mapping(self.opacity_identifiers))
+        object.__setattr__(
+            self, "problem_metadata", immutable_mapping(self.problem_metadata)
+        )
+        object.__setattr__(
+            self, "opacity_identifiers", immutable_mapping(self.opacity_identifiers)
+        )
         object.__setattr__(self, "settings", immutable_mapping(self.settings))
 
     def to_mapping(self) -> dict[str, object]:
@@ -85,7 +96,7 @@ class RunManifest:
 
 
 def build_run_manifest(
-    problem: RetrievalProblem,
+    problem: RetrievalProblem | MultiDatasetRetrievalProblem,
     *,
     method: str,
     settings: Mapping[str, object],
@@ -106,17 +117,7 @@ def build_run_manifest(
         }
         for parameter in problem.parameters.parameters
     )
-    likelihood_record = _json_mapping(
-        {
-            "type": type(problem.likelihood).__name__,
-            "name": problem.likelihood.name,
-            "include_normalization": problem.likelihood.include_normalization,
-            "offset_parameter": problem.likelihood.offset_parameter,
-            "jitter_parameter": problem.likelihood.jitter_parameter,
-            "coordinate_rtol": problem.likelihood.coordinate_rtol,
-            "coordinate_atol": problem.likelihood.coordinate_atol,
-        }
-    )
+    likelihood_record = _likelihood_record(problem)
     signature = {
         "problem_name": problem.name,
         "parameter_priors": prior_records,
@@ -127,7 +128,9 @@ def build_run_manifest(
         "settings": safe_settings,
         "random_seed": random_seed,
     }
-    encoded = json.dumps(_json_value(signature), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    encoded = json.dumps(
+        _json_value(signature), sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
     git_commit, git_dirty = _git_state()
     return RunManifest(
         problem_name=problem.name,
@@ -146,6 +149,34 @@ def build_run_manifest(
     )
 
 
+def _likelihood_record(
+    problem: RetrievalProblem | MultiDatasetRetrievalProblem,
+) -> dict[str, object]:
+    likelihood = problem.likelihood
+    common: dict[str, object] = {
+        "type": type(likelihood).__name__,
+        "name": likelihood.name,
+        "include_normalization": likelihood.include_normalization,
+        "coordinate_rtol": likelihood.coordinate_rtol,
+        "coordinate_atol": likelihood.coordinate_atol,
+    }
+    if isinstance(problem, MultiDatasetRetrievalProblem):
+        common["datasets"] = [
+            {
+                "name": dataset.name,
+                "offset_parameter": dataset.offset_parameter,
+                "jitter_parameter": dataset.jitter_parameter,
+                "uncertainty_scale_parameter": dataset.uncertainty_scale_parameter,
+                "uncertainty_scale": dataset.uncertainty_scale,
+            }
+            for dataset in problem.observations.datasets
+        ]
+    else:
+        common["offset_parameter"] = likelihood.offset_parameter
+        common["jitter_parameter"] = likelihood.jitter_parameter
+    return _json_mapping(common)
+
+
 def write_run_manifest(manifest: RunManifest, output_dir: str | Path) -> Path:
     """Write a manifest atomically and return its path."""
 
@@ -155,12 +186,16 @@ def write_run_manifest(manifest: RunManifest, output_dir: str | Path) -> Path:
     temporary_path = directory / f".{RUN_MANIFEST_FILENAME}.tmp"
     try:
         temporary_path.write_text(
-            json.dumps(manifest.to_mapping(), indent=2, sort_keys=True, allow_nan=False),
+            json.dumps(
+                manifest.to_mapping(), indent=2, sort_keys=True, allow_nan=False
+            ),
             encoding="utf-8",
         )
         temporary_path.replace(path)
     except OSError as exc:
-        raise RobertDataError(f"failed to write retrieval run manifest: {path}") from exc
+        raise RobertDataError(
+            f"failed to write retrieval run manifest: {path}"
+        ) from exc
     return path
 
 
@@ -191,7 +226,13 @@ def read_run_manifest(path_or_directory: str | Path) -> RunManifest:
             git_dirty=value.get("git_dirty"),
             schema_version=value.get("schema_version", RUN_MANIFEST_SCHEMA_VERSION),
         )
-    except (OSError, KeyError, TypeError, json.JSONDecodeError, RobertValidationError) as exc:
+    except (
+        OSError,
+        KeyError,
+        TypeError,
+        json.JSONDecodeError,
+        RobertValidationError,
+    ) as exc:
         raise RobertDataError(f"failed to read retrieval run manifest: {path}") from exc
 
 

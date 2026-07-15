@@ -32,7 +32,7 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.opacity.resolution == "R1000"
     assert config.opacity.species == ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
     assert config.sampler.live_points == 400
-    assert config.sampler.max_calls == 200_000
+    assert config.sampler.max_calls is None
     assert config.runtime.mpi_processes == "auto"
     assert config.runtime.scratch_directory.is_absolute()
     assert config.outputs.directory.is_absolute()
@@ -170,6 +170,7 @@ def test_complete_template_uses_housekeeping_for_internal_paths() -> None:
     assert config.outputs.directory == config.housekeeping.output_directory
     assert config.runtime.scratch_directory == config.housekeeping.scratch_directory
     assert config.plotting.enabled is False
+    assert config.sampler.max_calls is None
     assert config.plotting.dataset_colors["f322w2"] == "#20639b"
 
 

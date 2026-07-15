@@ -257,7 +257,7 @@ sampler:
   # Shared nested-sampling controls. `dlogz` is UltraNest's dlogz and
   # MultiNest's evidence_tolerance.
   live_points: 400
-  max_calls: 200000             # UltraNest only; null means unlimited.
+  max_calls: null               # UltraNest: null runs to convergence; use a positive safety cap if needed.
   multinest_max_iterations: 0   # MultiNest only; 0 means unlimited.
   dlogz: 0.5
   sampling_efficiency: 0.8      # MultiNest: 0.8 parameter estimation, 0.3 evidence.

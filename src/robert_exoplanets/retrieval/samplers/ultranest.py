@@ -122,13 +122,20 @@ def run_ultranest(
                 ncall = int(info.get("ncall", getattr(sampler, "ncall", ncall_start)))
                 elapsed = max(time.monotonic() - started_monotonic, 0.0)
                 attempt_calls = max(ncall - ncall_start, 0)
+                reached_call_limit = (
+                    max_ncalls is not None and ncall >= int(max_ncalls)
+                )
                 live_loglike = np.asarray(points.get("logl", ()), dtype=float)
                 best_live = float(np.max(live_loglike)) if live_loglike.size else None
                 write_retrieval_status(
                     log_dir,
                     {
                         **status_base,
-                        "state": "running",
+                        "state": (
+                            "call_limit_reached_finalizing"
+                            if reached_call_limit
+                            else "running"
+                        ),
                         "iteration": info.get("it"),
                         "ncall": ncall,
                         "ncall_this_attempt": attempt_calls,
@@ -138,6 +145,12 @@ def run_ultranest(
                         "log_evidence": info.get("logz"),
                         "remaining_log_evidence": info.get("logz_remain"),
                         "log_volume": info.get("logvol"),
+                        "message": (
+                            "maximum likelihood-call limit reached; UltraNest is "
+                            "finalizing MPI results"
+                            if reached_call_limit
+                            else None
+                        ),
                     },
                 )
             if display_callback is not None:
