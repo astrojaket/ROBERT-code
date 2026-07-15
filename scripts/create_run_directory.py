@@ -64,8 +64,11 @@ The submission script sets `PYSYN_CDBS` to
 above the shared `grid/phoenix` atlas. An existing exported value takes
 precedence.
 
-`submit.sbatch` requests {ntasks} MPI rank(s) across {nodes} node(s) and sends
-BEGIN, END, and FAIL notifications to `jake.taylor@physics.ox.ac.uk`.
+`submit.sbatch` is the DIaL3 launcher: it requests {ntasks} MPI rank(s) across
+{nodes} node(s) and sends BEGIN, END, and FAIL notifications to
+`jake.taylor@physics.ox.ac.uk`. `submit.sh` is the Glamdring `addqueue`
+launcher; `addqueue` starts it once per rank, so that script deliberately does
+not start another `mpiexec` layer.
 
 ```bash
 python run_retrieval.py --config configuration.yaml --validate-only
@@ -73,6 +76,7 @@ python run_retrieval.py --config configuration.yaml --initialize
 python run_retrieval.py --config configuration.yaml --prepare-opacity
 python run_retrieval.py --config configuration.yaml --smoke-only
 sbatch submit.sbatch
+# On Glamdring, pass ./submit.sh to addqueue instead.
 python postprocess_retrieval.py --config configuration.yaml
 python postprocess_forward.py --config configuration.yaml
 ```
@@ -123,6 +127,7 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
         "run_forward.py",
         "postprocess_retrieval.py",
         "postprocess_forward.py",
+        "submit.sh",
     ):
         shutil.copy2(ROOT / filename, run_directory / filename)
 

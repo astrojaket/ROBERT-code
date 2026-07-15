@@ -40,6 +40,14 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert (run_directory / "run_forward.py").is_file()
     assert (run_directory / "postprocess_retrieval.py").is_file()
     assert (run_directory / "postprocess_forward.py").is_file()
+    assert (run_directory / "submit.sh").stat().st_mode & 0o111
+    glamdring_submission = (run_directory / "submit.sh").read_text(encoding="utf-8")
+    assert "CONDA_DIR" in glamdring_submission
+    assert (
+        "python -u run_retrieval.py --config configuration.yaml" in glamdring_submission
+    )
+    assert "MultiNestNew/lib" in glamdring_submission
+    assert "mpirun" not in glamdring_submission
     assert config.outputs.directory == run_directory / "outputs"
     assert config.opacity.cache_directory == run_directory / "opacity_cache"
     assert config.runtime.scratch_directory == run_directory / "scratch"
@@ -59,7 +67,9 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert "--config configuration.yaml" in submission
 
 
-def test_create_run_directory_uses_one_rank_for_optimal_estimation(tmp_path: Path) -> None:
+def test_create_run_directory_uses_one_rank_for_optimal_estimation(
+    tmp_path: Path,
+) -> None:
     run_directory = create_run_directory(
         project_dir=tmp_path / "my_project",
         source_config=OE_CONFIG,
@@ -100,7 +110,9 @@ def test_create_run_directory_refuses_to_mix_runs(tmp_path: Path) -> None:
         create_run_directory(**kwargs)
 
 
-def test_create_run_directory_updates_housekeeping_writable_paths(tmp_path: Path) -> None:
+def test_create_run_directory_updates_housekeeping_writable_paths(
+    tmp_path: Path,
+) -> None:
     run_directory = create_run_directory(
         project_dir=tmp_path / "my_project",
         source_config=TEMPLATE,
@@ -109,5 +121,7 @@ def test_create_run_directory_updates_housekeeping_writable_paths(tmp_path: Path
 
     assert config.housekeeping is not None
     assert config.housekeeping.output_directory == run_directory / "outputs"
-    assert config.housekeeping.opacity_cache_directory == run_directory / "opacity_cache"
+    assert (
+        config.housekeeping.opacity_cache_directory == run_directory / "opacity_cache"
+    )
     assert config.housekeeping.scratch_directory == run_directory / "scratch"
