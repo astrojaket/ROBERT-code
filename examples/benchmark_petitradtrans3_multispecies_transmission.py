@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import tempfile
@@ -49,8 +50,11 @@ REFERENCE_PRESSURE_BAR = 0.01
 ATOMIC_MASS_G = 1.66053906660e-24
 
 
-def main() -> dict[str, object]:
-    with np.load(REFERENCE, allow_pickle=False) as archive:
+def main(
+    reference_path: Path = REFERENCE,
+    output_dir: Path = OUTPUT_DIR,
+) -> dict[str, object]:
+    with np.load(reference_path, allow_pickle=False) as archive:
         reference = json.loads(str(archive["metadata_json"]))
         pressure = np.asarray(archive["pressure_bar"], dtype=float)
         temperature = np.asarray(archive["temperature_K"], dtype=float)
@@ -68,6 +72,10 @@ def main() -> dict[str, object]:
         absorption_cm2_g = np.asarray(archive["absorption_opacities"], dtype=float)
         scattering_cm2_g = np.asarray(
             archive["continuum_scattering_opacities"], dtype=float
+        )
+        p_rt_radius_m = (
+            np.asarray(archive["radius_hydrostatic_equilibrium_cm"], dtype=float)
+            * 1.0e-2
         )
 
     volume_fractions = {
@@ -214,11 +222,18 @@ def main() -> dict[str, object]:
     residual_cloud_free_ppm = (robert_clear - p_rt_clear) * 1.0e6
     residual_strict_ppm = (robert_strict - p_rt_rayleigh) * 1.0e6
     residual_native_ppm = (robert_native - p_rt_rayleigh) * 1.0e6
+    shared_radius_shift_m, radius_aligned_strict = _align_effective_radius(
+        np.asarray(strict_result.effective_radius_m),
+        p_rt_rayleigh,
+        STAR_RADIUS_M,
+    )
+    residual_radius_aligned_ppm = (radius_aligned_strict - p_rt_rayleigh) * 1.0e6
     p_rt_rayleigh_effect_ppm = (p_rt_rayleigh - p_rt_clear) * 1.0e6
     native_rayleigh_effect_ppm = (robert_native - robert_clear) * 1.0e6
     strict_rayleigh_effect_ppm = (robert_strict - robert_clear) * 1.0e6
+    p_rt_steady_s = float(reference["timings"]["transmission_steady_median_s"])
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "comparison": "ROBERT_vs_stable_pRT3_multispecies_CIA_Rayleigh_transmission",
         "wavelength_micron": [float(wavelength[0]), float(wavelength[-1])],
         "n_layers": int(pressure.size),
@@ -246,24 +261,68 @@ def main() -> dict[str, object]:
                 )
             ),
         },
+        "radius_convention_diagnostic": {
+            "petitradtrans_radius_at_reference_pressure_error_m": float(
+                np.interp(
+                    np.log(REFERENCE_PRESSURE_BAR),
+                    np.log(pressure),
+                    p_rt_radius_m,
+                )
+                - PLANET_RADIUS_M
+            ),
+            "robert_radius_at_reference_pressure_error_m": float(
+                path_geometry.radius_at_pressure(REFERENCE_PRESSURE_BAR * 1.0e5)
+                - PLANET_RADIUS_M
+            ),
+            "robert_minus_petitradtrans_center_radius_median_m": float(
+                np.median(path_geometry.center_radius_m - p_rt_radius_m)
+            ),
+            "robert_minus_petitradtrans_center_radius_max_abs_m": float(
+                np.max(np.abs(path_geometry.center_radius_m - p_rt_radius_m))
+            ),
+            "shared_rayleigh_best_robert_radius_shift_m": shared_radius_shift_m,
+            "shared_rayleigh_radius_aligned_rms_difference_ppm": float(
+                np.sqrt(np.mean(residual_radius_aligned_ppm**2))
+            ),
+            "shared_rayleigh_radius_aligned_max_abs_difference_ppm": float(
+                np.max(np.abs(residual_radius_aligned_ppm))
+            ),
+            "interpretation": (
+                "The pressure-radius anchors agree closely. The fitted constant shift "
+                "primarily diagnoses different discrete annulus boundary and integration "
+                "conventions, rather than a mismatched requested reference pressure."
+            ),
+        },
         "timings": {
             **reference["timings"],
             "robert_three_cases_first_s": first_s,
             "robert_three_cases_steady_median_s": steady_s,
             "robert_native_case_first_s": native_first_s,
             "robert_native_case_steady_median_s": native_steady_s,
+            "robert_to_petitradtrans_steady_ratio": native_steady_s / p_rt_steady_s,
+            "petitradtrans_to_robert_steady_throughput_ratio": (
+                p_rt_steady_s / native_steady_s
+            ),
+            "timing_scope": (
+                "Steady-state forward calculations after opacity loading; pRT evaluates "
+                "its prepared tables, while ROBERT starts from pRT-exported evaluated "
+                "species opacities and performs random overlap, native Rayleigh, and "
+                "spherical transmission."
+            ),
         },
     }
-    json_path = OUTPUT_DIR / "multispecies_transmission_benchmark.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = output_dir / "multispecies_transmission_benchmark.json"
     json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     np.savez_compressed(
-        OUTPUT_DIR / "multispecies_transmission_benchmark_spectra.npz",
+        output_dir / "multispecies_transmission_benchmark_spectra.npz",
         wavelength_micron=wavelength,
         petitradtrans_clear=p_rt_clear,
         petitradtrans_rayleigh=p_rt_rayleigh,
         robert_clear=robert_clear,
         robert_strict_rayleigh=robert_strict,
         robert_native_rayleigh=robert_native,
+        robert_shared_rayleigh_radius_aligned=radius_aligned_strict,
     )
     _plot(
         wavelength,
@@ -273,9 +332,11 @@ def main() -> dict[str, object]:
         residual_cloud_free_ppm,
         residual_strict_ppm,
         residual_native_ppm,
+        residual_radius_aligned_ppm,
         p_rt_rayleigh_effect_ppm,
         strict_rayleigh_effect_ppm,
         native_rayleigh_effect_ppm,
+        output_dir,
     )
     print(json.dumps(report, indent=2))
     return report
@@ -304,6 +365,40 @@ def _metrics_by_band(
     return output
 
 
+def _align_effective_radius(
+    robert_radius_m: np.ndarray,
+    reference_depth: np.ndarray,
+    star_radius_m: float,
+) -> tuple[float, np.ndarray]:
+    """Apply the least-squares constant radius shift to a transit spectrum."""
+
+    target_radius_squared = reference_depth * star_radius_m**2
+    coefficients = np.array(
+        [
+            robert_radius_m.size,
+            3.0 * np.sum(robert_radius_m),
+            3.0 * np.sum(robert_radius_m**2) - np.sum(target_radius_squared),
+            np.sum(robert_radius_m**3 - target_radius_squared * robert_radius_m),
+        ]
+    )
+    roots = np.roots(coefficients)
+    real_roots = roots[np.isclose(roots.imag, 0.0, atol=1.0e-6)].real
+    if real_roots.size == 0:
+        raise RuntimeError("constant-radius alignment did not produce a real solution")
+    residual_sum = np.array(
+        [
+            np.sum(
+                (((robert_radius_m + shift) / star_radius_m) ** 2 - reference_depth)
+                ** 2
+            )
+            for shift in real_roots
+        ]
+    )
+    shift = float(real_roots[int(np.argmin(residual_sum))])
+    aligned_depth = ((robert_radius_m + shift) / star_radius_m) ** 2
+    return shift, aligned_depth
+
+
 def _plot(
     wavelength: np.ndarray,
     p_rt_clear: np.ndarray,
@@ -312,9 +407,11 @@ def _plot(
     residual_clear: np.ndarray,
     residual_strict: np.ndarray,
     residual_native: np.ndarray,
+    residual_radius_aligned: np.ndarray,
     p_rt_effect: np.ndarray,
     strict_effect: np.ndarray,
     native_effect: np.ndarray,
+    output_dir: Path,
 ) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
     spectrum, residual, effect, optical = axes.flat
@@ -326,6 +423,14 @@ def _plot(
     residual.semilogx(wavelength, residual_clear, color="#777777", lw=0.8, label="No Rayleigh")
     residual.semilogx(wavelength, residual_strict, color=RESIDUAL_COLOR, lw=0.9, label="Shared pRT Rayleigh")
     residual.semilogx(wavelength, residual_native, color=PURPLE_LIGHT, lw=0.8, alpha=0.8, label="ROBERT native Rayleigh")
+    residual.semilogx(
+        wavelength,
+        residual_radius_aligned,
+        color=PURPLE_DARK,
+        lw=0.9,
+        ls=":",
+        label="Shared Rayleigh, radius aligned",
+    )
     residual.axhline(0.0, color=REFERENCE_COLOR, lw=0.8)
     residual.set(ylabel="ROBERT - pRT3 [ppm]", title="Transmission residual")
     residual.legend(frameon=False)
@@ -341,9 +446,13 @@ def _plot(
     for axis in axes.flat:
         axis.set_xlabel("Wavelength [micron]")
         axis.grid(alpha=0.25)
-    fig.savefig(OUTPUT_DIR / "multispecies_transmission_benchmark.png", dpi=180)
+    fig.savefig(output_dir / "multispecies_transmission_benchmark.png", dpi=180)
     plt.close(fig)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--reference", type=Path, default=REFERENCE)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    arguments = parser.parse_args()
+    main(arguments.reference, arguments.output_dir)

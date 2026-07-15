@@ -260,6 +260,170 @@ class CorrelatedKTable:
             },
         )
 
+    @classmethod
+    def from_exomol_cross_section_hdf(
+        cls,
+        path: str | Path,
+        *,
+        species: str,
+        spectral_grid: SpectralGrid,
+        g_points: int = 8,
+        checksum: bool = True,
+    ) -> "CorrelatedKTable":
+        """Correlate real ExoMolOP cross sections within target bins.
+
+        At every source pressure and temperature, the native cross sections in
+        each target wavelength bin are sorted into an empirical cumulative
+        distribution. Native samples are weighted by their wavelength-cell
+        widths so the distribution represents a linear-wavelength top-hat
+        integral. Gauss-Legendre nodes sample that distribution. This changes
+        only the spectral representation; it does not synthesize or otherwise
+        modify the source molecular cross sections.
+        """
+
+        try:
+            import h5py
+        except ImportError as exc:  # pragma: no cover - dependency error path
+            raise RobertValidationError(
+                "loading ExoMol cross sections requires h5py"
+            ) from exc
+        if (
+            isinstance(g_points, bool)
+            or int(g_points) != g_points
+            or int(g_points) < 2
+        ):
+            raise RobertValidationError("g_points must be an integer of at least two")
+        if spectral_grid.bin_edges is None:
+            raise RobertValidationError(
+                "ExoMol cross-section correlation requires spectral bin edges"
+            )
+        source = Path(path).expanduser().resolve()
+        edge_grid = SpectralGrid(
+            values=spectral_grid.bin_edges,
+            unit=spectral_grid.unit,
+            role="internal",
+        )
+        target_wavelength = spectral_grid_values_in_unit(
+            spectral_grid,
+            "micron",
+        )
+        target_edges = spectral_grid_values_in_unit(edge_grid, "micron")
+        nodes, weights = np.polynomial.legendre.leggauss(int(g_points))
+        g_samples = 0.5 * (nodes + 1.0)
+        g_weights = 0.5 * weights
+        try:
+            with h5py.File(source, "r") as handle:
+                required = {"p", "t", "bin_edges", "xsecarr"}
+                missing = sorted(required - set(handle))
+                if missing:
+                    raise RobertValidationError(
+                        "ExoMol cross-section HDF is missing datasets: "
+                        + ", ".join(missing)
+                    )
+                pressure = np.asarray(handle["p"], dtype=float)
+                temperature = np.asarray(handle["t"], dtype=float)
+                source_wavenumber = np.asarray(handle["bin_edges"], dtype=float)
+                cross_sections = handle["xsecarr"]
+                expected = (
+                    pressure.size,
+                    temperature.size,
+                    source_wavenumber.size,
+                )
+                if cross_sections.shape != expected:
+                    raise RobertValidationError(
+                        "ExoMol xsecarr shape must be pressure x temperature x wavenumber"
+                    )
+                if np.any(np.diff(source_wavenumber) <= 0.0):
+                    raise RobertValidationError(
+                        "ExoMol cross-section wavenumber grid must increase"
+                    )
+                unit = str(cross_sections.attrs.get("units", "")).strip()
+                if unit != "cm^2/molecule":
+                    raise RobertValidationError(
+                        "ExoMol cross sections must declare cm^2/molecule units"
+                    )
+                coefficients = np.empty(
+                    (
+                        pressure.size,
+                        temperature.size,
+                        spectral_grid.size,
+                        int(g_points),
+                    ),
+                    dtype=float,
+                )
+                for index, (left, right) in enumerate(
+                    zip(target_edges[:-1], target_edges[1:], strict=True)
+                ):
+                    lower = min(10000.0 / left, 10000.0 / right)
+                    upper = max(10000.0 / left, 10000.0 / right)
+                    start = int(
+                        np.searchsorted(source_wavenumber, lower, side="left")
+                    )
+                    stop = int(
+                        np.searchsorted(source_wavenumber, upper, side="right")
+                    )
+                    if stop - start < int(g_points):
+                        raise RobertCoverageError(
+                            f"target bin {index} contains fewer than {g_points} ExoMol samples"
+                        )
+                    native = np.asarray(
+                        cross_sections[:, :, start:stop],
+                        dtype=float,
+                    )[:, :, ::-1]
+                    native_wavelength = (10000.0 / source_wavenumber[start:stop])[::-1]
+                    bin_lower = min(left, right)
+                    bin_upper = max(left, right)
+                    cell_edges = np.concatenate(
+                        (
+                            [bin_lower],
+                            0.5 * (native_wavelength[:-1] + native_wavelength[1:]),
+                            [bin_upper],
+                        )
+                    )
+                    sample_weights = np.diff(cell_edges)
+                    if np.any(sample_weights <= 0.0):
+                        raise RobertValidationError(
+                            "ExoMol wavelength cells must have positive widths"
+                        )
+                    quantiles = _weighted_quantiles(
+                        native,
+                        sample_weights,
+                        g_samples,
+                    )
+                    coefficients[:, :, index, :] = np.transpose(
+                        quantiles,
+                        (1, 2, 0),
+                    )
+                doi = _decode_hdf_scalar(handle.get("DOI"))
+                line_list = _decode_hdf_scalar(handle.get("key_iso_ll"))
+        except OSError as exc:
+            raise RobertValidationError(
+                f"could not read ExoMol cross sections: {source}"
+            ) from exc
+        coefficients = np.maximum(coefficients, 1.0e-300)
+        return cls(
+            species=species,
+            pressure_bar=pressure,
+            temperature_K=temperature,
+            wavenumber_cm_inverse=10000.0 / target_wavelength,
+            wavelength_micron=target_wavelength,
+            g_samples=g_samples,
+            g_weights=g_weights,
+            kcoeff=coefficients,
+            unit=unit,
+            metadata={
+                "source_format": "exomol_cross_section_hdf5",
+                "source_path": str(source),
+                "checksum_sha256": _path_sha256(source) if checksum else "",
+                "doi": doi,
+                "line_list": line_list,
+                "spectral_preparation": (
+                    "wavelength_weighted_empirical_target_bin_correlated_k"
+                ),
+                "g_points": str(int(g_points)),
+            },
+        )
+
 
 @dataclass(frozen=True)
 class PreparedCorrelatedKOpacity:
@@ -849,6 +1013,43 @@ def _decode_hdf_scalar(dataset: object | None) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value)
+
+
+def _path_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _weighted_quantiles(
+    values: NDArray[np.float64],
+    sample_weights: NDArray[np.float64],
+    quantiles: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return quantile x pressure x temperature weighted empirical values."""
+
+    order = np.argsort(values, axis=-1)
+    sorted_values = np.take_along_axis(values, order, axis=-1)
+    weights = np.broadcast_to(sample_weights, values.shape)
+    sorted_weights = np.take_along_axis(weights, order, axis=-1)
+    positions = np.cumsum(sorted_weights, axis=-1) - 0.5 * sorted_weights
+    positions /= np.sum(sorted_weights, axis=-1, keepdims=True)
+    flattened_values = sorted_values.reshape(-1, sorted_values.shape[-1])
+    flattened_positions = positions.reshape(-1, positions.shape[-1])
+    output = np.empty((quantiles.size, flattened_values.shape[0]), dtype=float)
+    for index, (position, value) in enumerate(
+        zip(flattened_positions, flattened_values, strict=True)
+    ):
+        output[:, index] = np.interp(
+            quantiles,
+            position,
+            value,
+            left=value[0],
+            right=value[-1],
+        )
+    return output.reshape((quantiles.size, *values.shape[:-1]))
 
 
 def _prepared_interpolation(prepared: PreparedCorrelatedKOpacity) -> str:

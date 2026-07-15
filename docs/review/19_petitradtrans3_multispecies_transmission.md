@@ -2,8 +2,8 @@
 
 ## Scope
 
-This is the final transmission validation before transmission development is
-placed on hold. It compares ROBERT with stable petitRADTRANS 3.3.3 from 0.3 to
+This is the maintained multi-species transmission validation gate. It compares
+ROBERT with stable petitRADTRANS 3.3.3 from 0.3 to
 12 micron using 80 pressure points, 3689 wavelength bins, and the exact
 16-point `petit_samples` quadrature stored in the pRT HDF tables. The atmosphere
 contains H2O, CO, CO2, CH4, NH3, and HCN line opacity; H2-H2 and H2-He CIA; and
@@ -79,19 +79,40 @@ absolute baseline. In the molecular infrared the remaining structured peaks
 are below 10 ppm and are consistent with the different spherical annulus and
 pressure discretizations.
 
+### Radius convention diagnostic
+
+The positive shared-Rayleigh residual contains a systematic radius component.
+A least-squares constant shift of -8.27 km to ROBERT's effective radius reduces
+the full-band RMS from 2.57 to 0.98 ppm. This does **not** mean that either code
+used the wrong requested reference pressure: log-pressure interpolation places
+pRT's radius at 0.01 bar only 23.8 m below the requested `1e8` m, while ROBERT
+anchors it exactly. Near the anchor, their pressure-center radii agree at the
+metre-to-hundred-metre level.
+
+The effective shift mainly measures their different discrete conventions. pRT
+treats radii at the supplied pressure centres as annulus boundaries and uses a
+trapezoidal chord integration. ROBERT constructs explicit pressure-cell edges,
+treats each layer as a constant-property shell, and performs Gauss--Legendre
+impact integration. Raw metrics remain the primary cross-code result; the
+radius-aligned metric separates the largely retrievable absolute-radius mode
+from wavelength-dependent spectral-shape differences.
+
 ## Timing
 
-On the Apple-silicon CPU, pRT3 loads and constructs the atmosphere in 2.56 s.
-Its first transmission calculation takes 0.712 s and its steady median is
-0.601 s. One ROBERT native-Rayleigh case takes 2.44 s on its first call and
-2.42 s at steady state. The three-case clear/shared/native diagnostic bundle
-takes 3.22 s at steady state because gas random overlap is shared between its
-three RT solves. The comparison is not a pure opacity-I/O race: pRT evaluates
-its native tables, while ROBERT starts from the species-resolved arrays
-exported by that reference run and performs random overlap plus RT. The stable
-pRT3 implementation is therefore about four times faster for this end-to-end
-case; optimizing ROBERT's multi-gas random-overlap path is emission-relevant
-work, but must preserve the validated physics.
+On the Apple-silicon CPU, pRT3 loads and constructs the atmosphere in 2.96 s.
+Its first transmission calculation takes 0.682 s and its steady median is
+0.591 s. One ROBERT native-Rayleigh case takes 1.02 s on its first call and
+0.994 s at steady state. The three-case clear/shared/native diagnostic bundle
+takes 1.80 s at steady state. Thus the current ROBERT native case is 1.68 times
+slower than pRT3, or 0.59 times its throughput. This is substantially better
+than the prior 2.42 s ROBERT measurement.
+
+The comparison is not a pure opacity-I/O race: both steady-state timers exclude
+table loading, but pRT evaluates its prepared native tables while ROBERT starts
+from the species-resolved evaluated arrays exported by the reference run and
+performs random overlap, native Rayleigh, and spherical transmission. The
+timing is therefore a useful multi-gas performance gate, not a claim that the
+two implementations perform identical work.
 
 ## Reproduction
 
@@ -102,18 +123,19 @@ work, but must preserve the validated physics.
   examples/outputs/petitradtrans3_stable/multispecies_transmission_reference.npz
 
 /Users/jaketaylor/miniforge3/envs/robert-exoplanets/bin/python \
-  examples/benchmark_petitradtrans3_multispecies_transmission.py
+  examples/benchmark_petitradtrans3_multispecies_transmission.py \
+  --output-dir data/validation/multispecies_transmission_petitradtrans3
 ```
 
-The scripts write a JSON report, compressed spectra, and a four-panel benchmark
-plot below `examples/outputs/petitradtrans3_stable/`.
+The first script writes its large pRT reference below the ignored runtime output
+directory. The second writes a compact JSON report, compressed spectra, and a
+four-panel plot to the tracked validation snapshot.
 
 ## Decision
 
 The absorption/extinction spherical transmission core is validated for this
 clear H2/He, molecular+CIA+Rayleigh domain. This does not claim validation for
 refraction, aerosols, multiple scattering, patchy limbs, or finite-star
-effects. Transmission development is now frozen by design. The downloaded
-opacities, composition conversion, correlated-k quadrature, random-overlap
-combination, hydrostatic columns, and continuum machinery will next be reused
-to finish the chemically complete emission validation.
+effects. This benchmark now acts as a regression gate while parameterized
+transmission development continues toward configured multi-species retrievals
+and aerosol physics.

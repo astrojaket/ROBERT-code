@@ -251,18 +251,8 @@ def _prepare_exomol_cross_section_opacity(
     preparation; the source cross sections themselves are never synthesized.
     """
 
-    try:
-        import h5py
-    except ImportError as exc:  # pragma: no cover - dependency error path
-        raise RuntimeError(
-            "ExoMol cross-section opacity preparation requires h5py"
-        ) from exc
-
     cache = cache_directory(config)
     cache.mkdir(parents=True, exist_ok=True)
-    nodes, weights = np.polynomial.legendre.leggauss(config.opacity.binning.g_points)
-    g_samples = 0.5 * (nodes + 1.0)
-    g_weights = 0.5 * weights
     for species in config.opacity.species:
         source = config.opacity.path / f"{species}.h5"
         if not source.is_file():
@@ -270,96 +260,52 @@ def _prepare_exomol_cross_section_opacity(
                 f"ExoMol cross-section HDF is missing for {species}: {source}"
             )
         source_sha = _file_sha256(source)
-        with h5py.File(source, "r") as handle:
-            required = {"p", "t", "bin_edges", "xsecarr"}
-            missing = sorted(required - set(handle))
-            if missing:
-                raise ValueError(
-                    f"ExoMol cross-section HDF is missing datasets: {missing}"
-                )
-            pressure = np.asarray(handle["p"], dtype=float)
-            temperature = np.asarray(handle["t"], dtype=float)
-            source_wavenumber = np.asarray(handle["bin_edges"], dtype=float)
-            cross_sections = handle["xsecarr"]
-            unit = str(cross_sections.attrs.get("units", "")).strip()
-            if unit != "cm^2/molecule":
-                raise ValueError(
-                    "ExoMol cross-section HDF must declare cm^2/molecule units"
-                )
-            doi = _decode_hdf_text(handle.get("DOI"))
-            line_list = _decode_hdf_text(handle.get("key_iso_ll"))
-            for dataset in observations.datasets:
-                target = cache / f"{dataset.name}_{species}.npz"
-                wavelength = np.asarray(
-                    dataset.observation.spectral_grid.values,
-                    dtype=float,
-                )
-                wavelength_edges = dataset.observation.spectral_grid.bin_edges
-                if wavelength_edges is None:
-                    raise ValueError(
-                        "ExoMol cross-section preparation requires observation bin edges"
+        for dataset in observations.datasets:
+            target = cache / f"{dataset.name}_{species}.npz"
+            wavelength = np.asarray(
+                dataset.observation.spectral_grid.values,
+                dtype=float,
+            )
+            if target.exists():
+                with np.load(target, allow_pickle=False) as saved:
+                    current = (
+                        "source_sha256" in saved.files
+                        and str(saved["source_sha256"]) == source_sha
+                        and str(saved.get("spectral_preparation", ""))
+                        == "exomol_cross_section_wavelength_weighted_k"
+                        and saved["g_samples"].size
+                        == config.opacity.binning.g_points
+                        and np.allclose(saved["wavelength_micron"], wavelength)
                     )
-                if target.exists():
-                    with np.load(target, allow_pickle=False) as saved:
-                        current = (
-                            "source_sha256" in saved.files
-                            and str(saved["source_sha256"]) == source_sha
-                            and str(saved.get("spectral_preparation", ""))
-                            == "exomol_cross_section_empirical_k"
-                            and saved["g_samples"].shape == g_samples.shape
-                            and np.allclose(
-                                saved["wavelength_micron"], wavelength
-                            )
-                        )
-                    if current:
-                        continue
-                coefficients = np.empty(
-                    (
-                        pressure.size,
-                        temperature.size,
-                        wavelength.size,
-                        g_samples.size,
-                    ),
-                    dtype=float,
-                )
-                for index, (left, right) in enumerate(
-                    zip(wavelength_edges[:-1], wavelength_edges[1:], strict=True)
-                ):
-                    lower = min(10000.0 / left, 10000.0 / right)
-                    upper = max(10000.0 / left, 10000.0 / right)
-                    start = int(np.searchsorted(source_wavenumber, lower, side="left"))
-                    stop = int(np.searchsorted(source_wavenumber, upper, side="right"))
-                    if stop - start < g_samples.size:
-                        raise ValueError(
-                            f"observation bin {index} contains too few ExoMol samples"
-                        )
-                    native = np.asarray(cross_sections[:, :, start:stop], dtype=float)
-                    quantiles = np.quantile(native, g_samples, axis=2)
-                    coefficients[:, :, index, :] = np.transpose(
-                        quantiles,
-                        (1, 2, 0),
-                    )
-                coefficients = np.maximum(coefficients, 1.0e-300)
-                np.savez_compressed(
-                    target,
-                    species=species,
-                    pressure_bar=pressure,
-                    temperature_K=temperature,
-                    wavenumber_cm_inverse=10000.0 / wavelength,
-                    wavelength_micron=wavelength,
-                    g_samples=g_samples,
-                    g_weights=g_weights,
-                    kcoeff=coefficients,
-                    unit=unit,
-                    source_path=str(source.resolve()),
-                    source_sha256=source_sha,
-                    source_doi=doi,
-                    source_line_list=line_list,
-                    opacity_resolution=config.opacity.resolution,
-                    binning_num=config.opacity.binning.num,
-                    g_points=config.opacity.binning.g_points,
-                    spectral_preparation="exomol_cross_section_empirical_k",
-                )
+                if current:
+                    continue
+            table = CorrelatedKTable.from_exomol_cross_section_hdf(
+                source,
+                species=species,
+                spectral_grid=dataset.observation.spectral_grid,
+                g_points=config.opacity.binning.g_points,
+                checksum=False,
+            )
+            np.savez_compressed(
+                target,
+                species=species,
+                pressure_bar=table.pressure_bar,
+                temperature_K=table.temperature_K,
+                wavenumber_cm_inverse=table.wavenumber_cm_inverse,
+                wavelength_micron=table.wavelength_micron,
+                g_samples=table.g_samples,
+                g_weights=table.g_weights,
+                kcoeff=table.kcoeff,
+                unit=table.unit,
+                source_path=str(source.resolve()),
+                source_sha256=source_sha,
+                source_doi=table.metadata["doi"],
+                source_line_list=table.metadata["line_list"],
+                opacity_resolution=config.opacity.resolution,
+                binning_num=config.opacity.binning.num,
+                g_points=config.opacity.binning.g_points,
+                spectral_preparation="exomol_cross_section_wavelength_weighted_k",
+            )
 
 
 def _file_sha256(path: Path) -> str:
@@ -368,13 +314,6 @@ def _file_sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
-
-
-def _decode_hdf_text(dataset: object) -> str:
-    if dataset is None:
-        return ""
-    value = np.asarray(dataset)[0]
-    return value.decode("utf-8") if isinstance(value, bytes) else str(value)
 
 
 def _load_cached_table(

@@ -14,7 +14,7 @@ from robert_exoplanets import (
     PressureGrid,
     SpectralGrid,
 )
-from robert_exoplanets.core import RobertCoverageError
+from robert_exoplanets.core import RobertCoverageError, RobertValidationError
 from robert_exoplanets.opacity import (
     GridCoverage,
     OpacityDataProduct,
@@ -48,6 +48,54 @@ def test_correlated_k_table_loads_petitradtrans_hdf(tmp_path: Path) -> None:
     assert table.metadata["source_format"] == "petitradtrans_hdf5"
     assert table.metadata["doi"] == "10.0000/example"
     np.testing.assert_allclose(table.wavelength_micron, [10.0, 5.0])
+
+
+def test_correlated_k_table_correlates_exomol_cross_sections_in_bins(
+    tmp_path: Path,
+) -> None:
+    h5py = pytest.importorskip("h5py")
+    path = tmp_path / "H2O.h5"
+    wavenumber = np.linspace(3000.0, 12000.0, 128)
+    native = np.geomspace(1.0e-30, 1.0e-20, 2 * 2 * 128).reshape(2, 2, 128)
+    with h5py.File(path, "w") as handle:
+        handle.create_dataset("p", data=[1.0e-5, 1.0])
+        handle.create_dataset("t", data=[1000.0, 1200.0])
+        handle.create_dataset("bin_edges", data=wavenumber)
+        cross_sections = handle.create_dataset("xsecarr", data=native)
+        cross_sections.attrs["units"] = "cm^2/molecule"
+        handle.create_dataset("DOI", data=[b"test-doi"])
+        handle.create_dataset("key_iso_ll", data=[b"test-line-list"])
+    grid = SpectralGrid(
+        values=np.array([1.0, 2.0]),
+        bin_edges=np.array([0.85, 1.3, 2.5]),
+        unit="micron",
+        role="observed",
+    )
+
+    table = CorrelatedKTable.from_exomol_cross_section_hdf(
+        path,
+        species="H2O",
+        spectral_grid=grid,
+        g_points=8,
+    )
+
+    assert table.kcoeff.shape == (2, 2, 2, 8)
+    assert table.metadata["doi"] == "test-doi"
+    assert table.metadata["line_list"] == "test-line-list"
+    assert table.metadata["g_points"] == "8"
+    assert len(table.metadata["checksum_sha256"]) == 64
+    assert np.all(np.diff(table.kcoeff, axis=-1) >= 0.0)
+
+
+def test_exomol_cross_section_correlation_requires_bin_edges(tmp_path: Path) -> None:
+    grid = SpectralGrid.from_array([1.0, 2.0], unit="micron", role="observed")
+
+    with pytest.raises(RobertValidationError, match="bin edges"):
+        CorrelatedKTable.from_exomol_cross_section_hdf(
+            tmp_path / "missing.h5",
+            species="H2O",
+            spectral_grid=grid,
+        )
 
 
 def test_correlated_k_provider_evaluates_exact_native_grid_points() -> None:

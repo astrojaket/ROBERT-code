@@ -92,6 +92,7 @@ def main() -> None:
             haze_factor=haze_factor,
             frequencies_to_wavelengths=True,
             return_opacities=return_opacities,
+            return_radius_hydrostatic_equilibrium=return_opacities,
         )
 
     start = perf_counter()
@@ -135,6 +136,9 @@ def main() -> None:
         absorption_opacities=np.asarray(extra["opacities"], dtype=float),
         continuum_scattering_opacities=np.asarray(
             extra["continuum_opacities_scattering"], dtype=float
+        ),
+        radius_hydrostatic_equilibrium_cm=np.asarray(
+            extra["radius_hydrostatic_equilibrium"], dtype=float
         ),
     )
     print(json.dumps(metadata, indent=2))

@@ -1,0 +1,103 @@
+{
+  "schema_version": 2,
+  "comparison": "ROBERT_vs_stable_pRT3_multispecies_CIA_Rayleigh_transmission",
+  "wavelength_micron": [
+    0.30005903563735375,
+    11.991810537872418
+  ],
+  "n_layers": 80,
+  "n_wavelength": 3689,
+  "line_species": [
+    "H2O__POKAZATEL",
+    "CO__HITEMP",
+    "CO2__UCL-4000",
+    "CH4__YT34to10",
+    "NH3__CoYuTe",
+    "HCN__Harris"
+  ],
+  "cia_species": [
+    "H2--H2-NatAbund__BoRi.R831_0.6-250mu",
+    "H2--He-NatAbund__BoRi.DeltaWavenumber2_0.5-500mu"
+  ],
+  "rayleigh_species": [
+    "H2",
+    "He"
+  ],
+  "composition": {
+    "petitradtrans_mass_fractions": {
+      "H2": 0.73654,
+      "He": 0.259,
+      "H2O": 0.001,
+      "CO": 0.003,
+      "CO2": 0.0003,
+      "CH4": 0.0001,
+      "NH3": 3e-05,
+      "HCN": 3e-05
+    },
+    "robert_volume_fractions": {
+      "H2": 0.8491908757254121,
+      "He": 0.15039417437416785,
+      "H2O": 0.00012901275259325404,
+      "CO": 0.00024893172764876213,
+      "CO2": 1.5843403321134283e-05,
+      "CH4": 1.4487808363169974e-05,
+      "NH3": 4.09418067364625e-06,
+      "HCN": 2.5800278200851027e-06
+    },
+    "mean_molar_mass_amu": 2.3242008615381975
+  },
+  "metrics_by_band": {
+    "full_0.3-12um": {
+      "cloud_free_rms_difference_ppm": 4.279012269584259,
+      "cloud_free_max_abs_difference_ppm": 10.425545834380836,
+      "shared_rayleigh_rms_difference_ppm": 2.568962916579352,
+      "shared_rayleigh_max_abs_difference_ppm": 9.805055132785373,
+      "native_rayleigh_rms_difference_ppm": 3.2784643280673547,
+      "native_rayleigh_max_abs_difference_ppm": 9.805061014165824,
+      "petitradtrans_rayleigh_max_effect_ppm": 987.2173462483203
+    },
+    "optical_0.3-1um": {
+      "cloud_free_rms_difference_ppm": 6.296000827108112,
+      "cloud_free_max_abs_difference_ppm": 10.425545834380836,
+      "shared_rayleigh_rms_difference_ppm": 1.9443591277213572,
+      "shared_rayleigh_max_abs_difference_ppm": 2.3075253448301414,
+      "native_rayleigh_rms_difference_ppm": 4.045280292159844,
+      "native_rayleigh_max_abs_difference_ppm": 5.234306572426961,
+      "petitradtrans_rayleigh_max_effect_ppm": 987.2173462483203
+    },
+    "infrared_1-12um": {
+      "cloud_free_rms_difference_ppm": 2.824104395161445,
+      "cloud_free_max_abs_difference_ppm": 9.805075363999647,
+      "shared_rayleigh_rms_difference_ppm": 2.822306548548737,
+      "shared_rayleigh_max_abs_difference_ppm": 9.805055132785373,
+      "native_rayleigh_rms_difference_ppm": 2.8332585660373883,
+      "native_rayleigh_max_abs_difference_ppm": 9.805061014165824,
+      "petitradtrans_rayleigh_max_effect_ppm": 11.735025204677452
+    }
+  },
+  "rayleigh_vertical_tau_comparison": {
+    "native_to_pRT_median_ratio_0.3-1um": 1.0288198498661933
+  },
+  "radius_convention_diagnostic": {
+    "petitradtrans_radius_at_reference_pressure_error_m": -23.816417142748833,
+    "robert_radius_at_reference_pressure_error_m": -1.4901161193847656e-08,
+    "robert_minus_petitradtrans_center_radius_median_m": 592.5070427209139,
+    "robert_minus_petitradtrans_center_radius_max_abs_m": 6176.605725809932,
+    "shared_rayleigh_best_robert_radius_shift_m": -8266.284320384731,
+    "shared_rayleigh_radius_aligned_rms_difference_ppm": 0.9795780529630072,
+    "shared_rayleigh_radius_aligned_max_abs_difference_ppm": 7.415753554470758,
+    "interpretation": "The pressure-radius anchors agree closely. The fitted constant shift primarily diagnoses different discrete annulus boundary and integration conventions, rather than a mismatched requested reference pressure."
+  },
+  "timings": {
+    "construct_and_load_s": 2.9649215409881435,
+    "transmission_first_s": 0.682064916996751,
+    "transmission_steady_median_s": 0.5906839999952354,
+    "robert_three_cases_first_s": 4.084077540959697,
+    "robert_three_cases_steady_median_s": 1.7974699159967713,
+    "robert_native_case_first_s": 1.0215902919881046,
+    "robert_native_case_steady_median_s": 0.994468999968376,
+    "robert_to_petitradtrans_steady_ratio": 1.6835888562689996,
+    "petitradtrans_to_robert_steady_throughput_ratio": 0.5939692439020412,
+    "timing_scope": "Steady-state forward calculations after opacity loading; pRT evaluates its prepared tables, while ROBERT starts from pRT-exported evaluated species opacities and performs random overlap, native Rayleigh, and spherical transmission."
+  }
+}

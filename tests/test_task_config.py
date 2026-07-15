@@ -138,7 +138,7 @@ def test_real_cross_section_hdf_is_correlated_inside_observation_bins(
         assert np.isclose(saved["g_weights"].sum(), 1.0)
         assert str(saved["source_line_list"]) == "test-line-list"
         assert str(saved["spectral_preparation"]) == (
-            "exomol_cross_section_empirical_k"
+            "exomol_cross_section_wavelength_weighted_k"
         )
 
 

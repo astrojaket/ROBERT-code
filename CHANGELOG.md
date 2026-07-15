@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Promoted the six-species stable-petitRADTRANS transmission comparison to a
+  tracked accuracy/performance gate, including an explicit reference-radius
+  convention diagnostic and raw versus radius-aligned residuals.
+- Added a native ExoMolOP transmission convergence benchmark, promoted
+  wavelength-weighted target-bin empirical correlated-k preparation into the
+  typed opacity API, and established tested fast and production numerical
+  settings for the clear H2O validation atmosphere.
 - Added a typed `ParameterizedTransmissionForwardModel` and factory using the
   shared atmosphere/opacity pipeline, explicit reference-radius pressure,
   constant or self-consistent inverse-square gravity, CIA/Rayleigh extinction,
