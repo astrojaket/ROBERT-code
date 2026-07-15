@@ -78,6 +78,12 @@ inspect the resolved choices without loading data or opacity, run:
 python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --validate-only
 ```
 
+UltraNest runs to its convergence criteria by default (`sampler.max_calls:
+null`). A positive `max_calls` is an optional safety cap for short checks. When
+that cap is reached, UltraNest stops proposing likelihood evaluations and may
+remain active briefly while all MPI ranks consolidate and write the final
+partial result; `sampler_status.json` identifies that finalization state.
+
 All relative paths are resolved relative to the YAML file, not the runner or
 current shell directory. All real actions create the configured output,
 opacity-cache, and scratch directories automatically. They can also be created

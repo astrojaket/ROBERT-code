@@ -361,7 +361,7 @@ class SamplerConfig(ConfigModel):
         "optimal_estimation_to_multinest",
     ] = "ultranest"
     live_points: PositiveInt = 400
-    max_calls: PositiveInt | None = 200_000
+    max_calls: PositiveInt | None = None
     multinest_max_iterations: NonNegativeInt = 0
     dlogz: PositiveFloat = 0.5
     sampling_efficiency: float = Field(default=0.8, gt=0.0, le=1.0)

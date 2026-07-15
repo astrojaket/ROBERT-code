@@ -46,6 +46,7 @@ from robert_exoplanets.retrieval import (
     run_oe_then_nested_sampling,
     run_retrieval,
 )
+from robert_exoplanets.retrieval.manifest import build_run_manifest
 from robert_exoplanets.rt import (
     gauss_legendre_disk_geometry,
     load_nemesispy_cia_table,
@@ -633,7 +634,9 @@ def _nested_sampler_kwargs(config: TaskConfig, method: str) -> dict[str, object]
 def _sampler_description(config: TaskConfig) -> str:
     sampler = config.sampler
     if sampler.engine == "optimal_estimation":
-        return f"Inference: optimal_estimation, max_iterations={sampler.oe_max_iterations}"
+        return (
+            f"Inference: optimal_estimation, max_iterations={sampler.oe_max_iterations}"
+        )
     limits = (
         f"max_calls={sampler.max_calls}"
         if "ultranest" in sampler.engine
@@ -648,12 +651,46 @@ def run_smoke_task(config: TaskConfig, source: Path) -> dict[str, float]:
     initialize_task_directories(config)
     problem = build_problem(config, load_observations(config))
     smoke = smoke_evaluation(problem)
+    if mpi_rank() == 0:
+        _preflight_retrieval_manifests(config, problem)
     write_config_snapshot(config, source)
     if mpi_rank() == 0:
         (config.outputs.directory / "smoke_evaluation.json").write_text(
             dumps(smoke, indent=2), encoding="utf-8"
         )
     return smoke
+
+
+def _preflight_retrieval_manifests(
+    config: TaskConfig,
+    problem: MultiDatasetRetrievalProblem,
+) -> None:
+    """Exercise manifest serialization for every configured inference phase."""
+
+    engine = config.sampler.engine
+    if engine == "optimal_estimation" or engine.startswith("optimal_estimation_to_"):
+        oe_kwargs = _optimal_estimation_kwargs(config)
+        build_run_manifest(
+            problem,
+            method="optimal_estimation",
+            settings={"method": "optimal_estimation", **oe_kwargs},
+            random_seed=None,
+        )
+    if engine in {"ultranest", "multinest"} or engine.startswith(
+        "optimal_estimation_to_"
+    ):
+        nested_method = "multinest" if engine.endswith("multinest") else "ultranest"
+        nested_kwargs = _nested_sampler_kwargs(config, nested_method)
+        build_run_manifest(
+            problem,
+            method=nested_method,
+            settings={
+                "method": nested_method,
+                **nested_kwargs,
+                "seed": config.sampler.seed,
+            },
+            random_seed=config.sampler.seed,
+        )
 
 
 def run_forward_task(config: TaskConfig, source: Path) -> Path:
