@@ -47,7 +47,11 @@ from .optical_depth import (
     assemble_gas_optical_depth,
     assemble_opacity_sampling_gas_optical_depth,
 )
-from .path_geometry import HydrostaticPathGeometry, hydrostatic_path_geometry
+from .path_geometry import (
+    HydrostaticPathGeometry,
+    hydrostatic_path_geometry,
+    inverse_square_hydrostatic_path_geometry,
+)
 from .geometry import (
     DiscGeometry,
     DiscPoint,
@@ -123,6 +127,7 @@ __all__ = [
     "gauss_legendre_disk_geometry",
     "geometry_from_emission_angles",
     "hydrostatic_path_geometry",
+    "inverse_square_hydrostatic_path_geometry",
     "isotropic_phase_function",
     "integrate_thermal_emission",
     "integrate_thermal_emission_spectrum",

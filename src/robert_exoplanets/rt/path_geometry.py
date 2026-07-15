@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Mapping
 
 import numpy as np
@@ -173,6 +173,7 @@ def hydrostatic_path_geometry(
         raise RobertValidationError("hydrostatic scale heights must be finite and positive")
 
     edge_pressure_pa = pressure_values_in_unit(atmosphere.pressure_grid.edges, atmosphere.pressure_grid.unit, "pa")
+    _require_pressure_in_grid(reference_pressure_pa, edge_pressure_pa)
     center_pressure_pa = pressure_values_in_unit(
         atmosphere.pressure_grid.centers,
         atmosphere.pressure_grid.unit,
@@ -213,9 +214,103 @@ def hydrostatic_path_geometry(
         center_radius_m=center_radius,
         metadata={
             "path_model": "hydrostatic_spherical_shell",
+            "gravity_model": "supplied_layer_profile",
             "reference_radius_m": f"{reference_radius:.12g}",
             "reference_pressure_pa": f"{reference_pressure_pa:.12g}",
             "reference_pressure_unit": reference_pressure_unit,
+        },
+    )
+
+
+def inverse_square_hydrostatic_path_geometry(
+    atmosphere: AtmosphereState,
+    *,
+    reference_radius_m: float,
+    reference_pressure: float,
+    reference_gravity_m_s2: float,
+    reference_pressure_unit: str = "bar",
+    convergence_tolerance: float = 1.0e-12,
+    max_iterations: int = 50,
+) -> HydrostaticPathGeometry:
+    """Build a self-consistent hydrostatic geometry with ``g(r) = GM / r^2``.
+
+    Gravity is represented by one value at each layer centre, matching the
+    constant-property layer convention used by gas-column and shell-path
+    calculations. The layer gravity and radii are iterated to a fixed point so
+    the returned profile can be used consistently by both opacity assembly and
+    transmission geometry.
+    """
+
+    reference_radius = _positive_float(reference_radius_m, "reference_radius_m")
+    reference_gravity = _positive_float(
+        reference_gravity_m_s2,
+        "reference_gravity_m_s2",
+    )
+    tolerance = float(convergence_tolerance)
+    if not np.isfinite(tolerance) or tolerance <= 0.0:
+        raise RobertValidationError(
+            "convergence_tolerance must be finite and positive"
+        )
+    if (
+        isinstance(max_iterations, bool)
+        or int(max_iterations) != max_iterations
+        or int(max_iterations) < 1
+    ):
+        raise RobertValidationError("max_iterations must be a positive integer")
+
+    gravity = np.full(atmosphere.n_layers, reference_gravity, dtype=float)
+    geometry = None
+    iterations = 0
+    for iterations in range(1, int(max_iterations) + 1):
+        geometry = hydrostatic_path_geometry(
+            atmosphere,
+            gravity_m_s2=gravity,
+            reference_radius_m=reference_radius,
+            reference_pressure=reference_pressure,
+            reference_pressure_unit=reference_pressure_unit,
+        )
+        updated_gravity = reference_gravity * (
+            reference_radius / geometry.center_radius_m
+        ) ** 2
+        if np.allclose(
+            updated_gravity,
+            gravity,
+            rtol=tolerance,
+            atol=0.0,
+        ):
+            gravity = updated_gravity
+            break
+        gravity = updated_gravity
+    else:
+        raise RobertValidationError(
+            "inverse-square hydrostatic geometry did not converge"
+        )
+
+    geometry = hydrostatic_path_geometry(
+        atmosphere,
+        gravity_m_s2=gravity,
+        reference_radius_m=reference_radius,
+        reference_pressure=reference_pressure,
+        reference_pressure_unit=reference_pressure_unit,
+    )
+    residual = reference_gravity * (
+        reference_radius / geometry.center_radius_m
+    ) ** 2
+    if not np.allclose(residual, gravity, rtol=tolerance * 10.0, atol=0.0):
+        raise RobertValidationError(
+            "inverse-square hydrostatic geometry failed its final consistency check"
+        )
+    return replace(
+        geometry,
+        metadata={
+            **dict(geometry.metadata),
+            "gravity_model": "inverse_square_layer_center_fixed_point",
+            "reference_gravity_m_s2": f"{reference_gravity:.12g}",
+            "gravitational_parameter_m3_s2": (
+                f"{reference_gravity * reference_radius**2:.12g}"
+            ),
+            "gravity_iterations": str(iterations),
+            "gravity_convergence_tolerance": f"{tolerance:.12g}",
         },
     )
 
@@ -241,14 +336,19 @@ def _layer_index_for_pressure(pressure_pa: float, edge_pressure_pa: NDArray[np.f
         upper = max(log_edges[layer_index], log_edges[layer_index + 1])
         if lower <= log_pressure <= upper:
             return layer_index
-    nearest_edge = int(np.argmin(np.abs(log_edges - log_pressure)))
-    if nearest_edge == 0:
-        return 0
-    if nearest_edge == edge_pressure_pa.size - 1:
-        return edge_pressure_pa.size - 2
-    if log_pressure < np.min(log_edges):
-        return nearest_edge if edge_pressure_pa[nearest_edge] < edge_pressure_pa[nearest_edge - 1] else nearest_edge - 1
-    return nearest_edge - 1
+    raise RobertValidationError("pressure lies outside the hydrostatic pressure grid")
+
+
+def _require_pressure_in_grid(
+    pressure_pa: float,
+    edge_pressure_pa: NDArray[np.float64],
+) -> None:
+    lower = float(np.min(edge_pressure_pa))
+    upper = float(np.max(edge_pressure_pa))
+    if pressure_pa < lower or pressure_pa > upper:
+        raise RobertValidationError(
+            "reference pressure must lie within the atmospheric pressure-grid edges"
+        )
 
 
 def _shell_path_lengths(

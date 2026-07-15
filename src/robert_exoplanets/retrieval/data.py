@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +13,49 @@ from robert_exoplanets.instruments import Observation, infer_wavelength_bin_edge
 
 
 ROBERT_OBSERVATION_SCHEMA = "robert-emission-observation-v1"
+
+
+def load_observation_npz(path: str | Path) -> Observation:
+    """Load a self-describing ROBERT spectral observation.
+
+    Unlike the legacy emission-specific loader, this entry point honors the
+    wavelength unit, value unit, observable, and instrument stored in the
+    archive. It therefore supports both eclipse- and transit-depth products.
+    """
+
+    file_path = Path(path).expanduser()
+    if not file_path.exists():
+        raise RobertDataError(f"observation NPZ does not exist: {file_path}")
+    with np.load(file_path, allow_pickle=False) as archive:
+        keys = set(archive.files)
+        wavelength_unit = (
+            str(archive["wavelength_unit"])
+            if "wavelength_unit" in keys
+            else "micron"
+        )
+        flux_unit = (
+            str(archive["flux_unit"])
+            if "flux_unit" in keys
+            else "eclipse_depth"
+        )
+        observable = (
+            str(archive["observable"])
+            if "observable" in keys
+            else "eclipse_depth"
+        )
+    observation = load_emission_observation_npz(
+        file_path,
+        wavelength_unit=wavelength_unit,
+        flux_unit=flux_unit,
+        observable=observable,
+    )
+    return replace(
+        observation,
+        metadata={
+            **dict(observation.metadata),
+            "source_format": "npz_spectral_observation",
+        },
+    )
 
 
 def load_emission_observation_npz(
@@ -138,6 +182,17 @@ def save_emission_observation_npz(
         payload["wavelength_bin_edges"] = observation.wavelength_bin_edges
     np.savez_compressed(output, **payload)
     return output
+
+
+def save_observation_npz(
+    observation: Observation,
+    path: str | Path,
+    *,
+    overwrite: bool = False,
+) -> Path:
+    """Write any self-describing ROBERT spectral observation."""
+
+    return save_emission_observation_npz(observation, path, overwrite=overwrite)
 
 
 def load_emission_observation_table(
@@ -300,6 +355,8 @@ __all__ = [
     "ROBERT_OBSERVATION_SCHEMA",
     "convert_emission_observation_table",
     "load_emission_observation_npz",
+    "load_observation_npz",
     "load_emission_observation_table",
     "save_emission_observation_npz",
+    "save_observation_npz",
 ]

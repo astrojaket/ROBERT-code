@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from robert_exoplanets import (
     AtmosphereState,
@@ -12,9 +13,11 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     hydrostatic_path_geometry,
+    inverse_square_hydrostatic_path_geometry,
     normal_emission_geometry,
     solve_emission,
 )
+from robert_exoplanets.core import RobertValidationError
 
 BOLTZMANN_CONSTANT_J_K = 1.380649e-23
 AMU_KG = 1.66053906660e-27
@@ -70,6 +73,82 @@ def test_hydrostatic_path_geometry_returns_spherical_shell_path_factors() -> Non
     expected_path = np.where(impact_parameter < shell_outer, expected_path, 0.0)
     expected = expected_path / (shell_outer - shell_inner)
     np.testing.assert_allclose(factors[1], expected)
+
+
+def test_inverse_square_geometry_decreases_gravity_with_altitude() -> None:
+    atmosphere = _isothermal_atmosphere()
+    reference_radius = 1.0e8
+    reference_gravity = 10.0
+
+    path = inverse_square_hydrostatic_path_geometry(
+        atmosphere,
+        reference_radius_m=reference_radius,
+        reference_pressure=1.0,
+        reference_gravity_m_s2=reference_gravity,
+    )
+
+    expected_gravity = reference_gravity * (
+        reference_radius / path.center_radius_m
+    ) ** 2
+    np.testing.assert_allclose(
+        path.gravity_m_s2,
+        expected_gravity,
+        rtol=2.0e-12,
+    )
+    assert path.gravity_m_s2[0] < path.gravity_m_s2[-1]
+    assert path.metadata["gravity_model"] == (
+        "inverse_square_layer_center_fixed_point"
+    )
+    np.testing.assert_allclose(
+        path.radius_at_pressure(1.0e5),
+        reference_radius,
+    )
+
+
+def test_inverse_square_geometry_converges_to_isothermal_analytic_radius() -> None:
+    pressure_grid = PressureGrid.from_log_centers(
+        10.0,
+        1.0e-5,
+        n_layers=80,
+        unit="bar",
+    )
+    atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=np.full(pressure_grid.n_layers, 1000.0),
+        composition={"H2": np.ones(pressure_grid.n_layers)},
+        mean_molecular_weight=2.3,
+    )
+    reference_radius = 1.0e8
+    reference_gravity = 10.0
+
+    path = inverse_square_hydrostatic_path_geometry(
+        atmosphere,
+        reference_radius_m=reference_radius,
+        reference_pressure=10.0,
+        reference_gravity_m_s2=reference_gravity,
+    )
+
+    gravitational_parameter = reference_gravity * reference_radius**2
+    coefficient = (
+        BOLTZMANN_CONSTANT_J_K
+        * 1000.0
+        / (gravitational_parameter * 2.3 * AMU_KG)
+    )
+    top_pressure = float(np.min(pressure_grid.edges))
+    analytic_top_radius = 1.0 / (
+        1.0 / reference_radius + coefficient * np.log(top_pressure / 10.0)
+    )
+    assert path.top_radius_m == pytest.approx(analytic_top_radius, abs=15.0)
+
+
+def test_hydrostatic_geometry_rejects_reference_pressure_outside_grid() -> None:
+    with pytest.raises(RobertValidationError, match="reference pressure"):
+        hydrostatic_path_geometry(
+            _isothermal_atmosphere(),
+            gravity_m_s2=10.0,
+            reference_radius_m=1.0e8,
+            reference_pressure=10.0,
+        )
 
 
 def test_emission_with_normal_spherical_path_matches_plane_parallel() -> None:

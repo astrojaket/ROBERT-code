@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from hashlib import sha256
 from json import dumps
 import os
 from pathlib import Path
@@ -29,12 +30,15 @@ from robert_exoplanets.core import PressureGrid
 from robert_exoplanets.forward import (
     ParameterizedEmissionFactoryConfig,
     ParameterizedEmissionModelConfig,
+    ParameterizedTransmissionFactoryConfig,
+    ParameterizedTransmissionModelConfig,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     RefractiveIndexCloudConfig,
     build_multi_dataset_emission_model,
     build_parameterized_emission_model,
+    build_parameterized_transmission_model,
 )
-from robert_exoplanets.instruments import ObservationCollection
+from robert_exoplanets.instruments import ObservationCollection, ObservationDataset
 from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
 from robert_exoplanets.opacity import CorrelatedKOpacityProvider, CorrelatedKTable
 from robert_exoplanets.retrieval import (
@@ -43,6 +47,7 @@ from robert_exoplanets.retrieval import (
     RetrievalParameter,
     RetrievalParameterSet,
     UniformPrior,
+    load_observation_npz,
     run_oe_then_nested_sampling,
     run_retrieval,
 )
@@ -95,7 +100,12 @@ def describe_config(config: TaskConfig) -> str:
             f"Data: {config.observations.loader} [{', '.join(config.observations.datasets)}]",
             f"Atmosphere: {config.atmosphere.temperature.model}, {config.atmosphere.chemistry.model}, clouds={config.clouds.model}",
             f"Opacity: {config.opacity.resolution} [{', '.join(config.opacity.species)}]",
-            f"Geometry: {config.radiative_transfer.geometry.model}",
+            (
+                f"Transmission: reference={config.radiative_transfer.reference_pressure_bar:g} bar, "
+                f"gravity={config.radiative_transfer.gravity_model}"
+                if config.radiative_transfer.model == "transmission"
+                else f"Geometry: {config.radiative_transfer.geometry.model}"
+            ),
             f"Parameters: {', '.join(item.name for item in config.parameters)}",
             _sampler_description(config),
             (
@@ -110,6 +120,24 @@ def describe_config(config: TaskConfig) -> str:
 
 
 def load_observations(config: TaskConfig) -> ObservationCollection:
+    if config.observations.loader == "robert_npz":
+        name = config.observations.datasets[0]
+        observation = load_observation_npz(config.observations.path)
+        option = config.observations.dataset_options.get(name)
+        dataset = ObservationDataset(name=name, observation=observation)
+        if option is not None:
+            dataset = replace(
+                dataset,
+                offset_parameter=option.offset_parameter,
+                jitter_parameter=option.jitter_parameter,
+                uncertainty_scale_parameter=option.uncertainty_scale_parameter,
+                uncertainty_scale=option.uncertainty_scale,
+            )
+        return ObservationCollection(
+            datasets=(dataset,),
+            name=f"{name} ROBERT NPZ observation",
+            metadata={"source_path": str(config.observations.path)},
+        )
     loaders = {
         "schlawin2024_wasp69b": load_schlawin2024_wasp69b,
         "wiser2025_wasp80b": load_wiser2025_wasp80b,
@@ -151,7 +179,11 @@ def cache_directory(config: TaskConfig) -> Path:
 
 
 def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> None:
-    """Recompress the selected KTA species into each observed spectral grid."""
+    """Prepare selected molecular opacity on each observed spectral grid."""
+
+    if config.opacity.format == "exomol_cross_section_hdf":
+        _prepare_exomol_cross_section_opacity(config, observations)
+        return
 
     cache = cache_directory(config)
     cache.mkdir(parents=True, exist_ok=True)
@@ -207,6 +239,144 @@ def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> 
             )
 
 
+def _prepare_exomol_cross_section_opacity(
+    config: TaskConfig,
+    observations: ObservationCollection,
+) -> None:
+    """Correlate real ExoMolOP cross sections within observation bins.
+
+    Each source wavelength sample is sorted by cross section independently at
+    every pressure and temperature. Gauss-Legendre nodes then sample that
+    empirical cumulative distribution. This is a target-bin correlated-k
+    preparation; the source cross sections themselves are never synthesized.
+    """
+
+    try:
+        import h5py
+    except ImportError as exc:  # pragma: no cover - dependency error path
+        raise RuntimeError(
+            "ExoMol cross-section opacity preparation requires h5py"
+        ) from exc
+
+    cache = cache_directory(config)
+    cache.mkdir(parents=True, exist_ok=True)
+    nodes, weights = np.polynomial.legendre.leggauss(config.opacity.binning.g_points)
+    g_samples = 0.5 * (nodes + 1.0)
+    g_weights = 0.5 * weights
+    for species in config.opacity.species:
+        source = config.opacity.path / f"{species}.h5"
+        if not source.is_file():
+            raise FileNotFoundError(
+                f"ExoMol cross-section HDF is missing for {species}: {source}"
+            )
+        source_sha = _file_sha256(source)
+        with h5py.File(source, "r") as handle:
+            required = {"p", "t", "bin_edges", "xsecarr"}
+            missing = sorted(required - set(handle))
+            if missing:
+                raise ValueError(
+                    f"ExoMol cross-section HDF is missing datasets: {missing}"
+                )
+            pressure = np.asarray(handle["p"], dtype=float)
+            temperature = np.asarray(handle["t"], dtype=float)
+            source_wavenumber = np.asarray(handle["bin_edges"], dtype=float)
+            cross_sections = handle["xsecarr"]
+            unit = str(cross_sections.attrs.get("units", "")).strip()
+            if unit != "cm^2/molecule":
+                raise ValueError(
+                    "ExoMol cross-section HDF must declare cm^2/molecule units"
+                )
+            doi = _decode_hdf_text(handle.get("DOI"))
+            line_list = _decode_hdf_text(handle.get("key_iso_ll"))
+            for dataset in observations.datasets:
+                target = cache / f"{dataset.name}_{species}.npz"
+                wavelength = np.asarray(
+                    dataset.observation.spectral_grid.values,
+                    dtype=float,
+                )
+                wavelength_edges = dataset.observation.spectral_grid.bin_edges
+                if wavelength_edges is None:
+                    raise ValueError(
+                        "ExoMol cross-section preparation requires observation bin edges"
+                    )
+                if target.exists():
+                    with np.load(target, allow_pickle=False) as saved:
+                        current = (
+                            "source_sha256" in saved.files
+                            and str(saved["source_sha256"]) == source_sha
+                            and str(saved.get("spectral_preparation", ""))
+                            == "exomol_cross_section_empirical_k"
+                            and saved["g_samples"].shape == g_samples.shape
+                            and np.allclose(
+                                saved["wavelength_micron"], wavelength
+                            )
+                        )
+                    if current:
+                        continue
+                coefficients = np.empty(
+                    (
+                        pressure.size,
+                        temperature.size,
+                        wavelength.size,
+                        g_samples.size,
+                    ),
+                    dtype=float,
+                )
+                for index, (left, right) in enumerate(
+                    zip(wavelength_edges[:-1], wavelength_edges[1:], strict=True)
+                ):
+                    lower = min(10000.0 / left, 10000.0 / right)
+                    upper = max(10000.0 / left, 10000.0 / right)
+                    start = int(np.searchsorted(source_wavenumber, lower, side="left"))
+                    stop = int(np.searchsorted(source_wavenumber, upper, side="right"))
+                    if stop - start < g_samples.size:
+                        raise ValueError(
+                            f"observation bin {index} contains too few ExoMol samples"
+                        )
+                    native = np.asarray(cross_sections[:, :, start:stop], dtype=float)
+                    quantiles = np.quantile(native, g_samples, axis=2)
+                    coefficients[:, :, index, :] = np.transpose(
+                        quantiles,
+                        (1, 2, 0),
+                    )
+                coefficients = np.maximum(coefficients, 1.0e-300)
+                np.savez_compressed(
+                    target,
+                    species=species,
+                    pressure_bar=pressure,
+                    temperature_K=temperature,
+                    wavenumber_cm_inverse=10000.0 / wavelength,
+                    wavelength_micron=wavelength,
+                    g_samples=g_samples,
+                    g_weights=g_weights,
+                    kcoeff=coefficients,
+                    unit=unit,
+                    source_path=str(source.resolve()),
+                    source_sha256=source_sha,
+                    source_doi=doi,
+                    source_line_list=line_list,
+                    opacity_resolution=config.opacity.resolution,
+                    binning_num=config.opacity.binning.num,
+                    g_points=config.opacity.binning.g_points,
+                    spectral_preparation="exomol_cross_section_empirical_k",
+                )
+
+
+def _file_sha256(path: Path) -> str:
+    digest = sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _decode_hdf_text(dataset: object) -> str:
+    if dataset is None:
+        return ""
+    value = np.asarray(dataset)[0]
+    return value.decode("utf-8") if isinstance(value, bytes) else str(value)
+
+
 def _load_cached_table(
     config: TaskConfig, dataset: str, species: str
 ) -> CorrelatedKTable:
@@ -227,6 +397,12 @@ def _load_cached_table(
             if "spectral_preparation" in saved.files
             else "legacy_prepared_cache"
         )
+        source_doi = str(saved["source_doi"]) if "source_doi" in saved.files else ""
+        source_line_list = (
+            str(saved["source_line_list"])
+            if "source_line_list" in saved.files
+            else ""
+        )
         return CorrelatedKTable(
             species=species,
             pressure_bar=saved["pressure_bar"],
@@ -242,6 +418,8 @@ def _load_cached_table(
                 "checksum_sha256": str(saved["source_sha256"]),
                 "opacity_resolution": opacity_resolution,
                 "spectral_preparation": spectral_preparation,
+                "source_doi": source_doi,
+                "source_line_list": source_line_list,
             },
         )
 
@@ -389,14 +567,26 @@ def build_problem(
     )
     cia = load_nemesispy_cia_table()
     rt = config.radiative_transfer
-    model_config = ParameterizedEmissionModelConfig(
-        opacity_species=config.opacity.species,
-        include_rayleigh=rt.include_rayleigh,
-        gas_combination=rt.gas_combination,
-        thermal_integration_backend=rt.thermal_integration_backend,
-        stellar_spectrum_model=star_item.spectrum_model,
-        metadata={"configured_geometry": geometry_item.model},
-    )
+    if rt.model == "emission":
+        model_config = ParameterizedEmissionModelConfig(
+            opacity_species=config.opacity.species,
+            include_rayleigh=rt.include_rayleigh,
+            gas_combination=rt.gas_combination,
+            thermal_integration_backend=rt.thermal_integration_backend,
+            stellar_spectrum_model=star_item.spectrum_model,
+            metadata={"configured_geometry": geometry_item.model},
+        )
+    else:
+        model_config = ParameterizedTransmissionModelConfig(
+            opacity_species=config.opacity.species,
+            reference_pressure_bar=rt.reference_pressure_bar,
+            radius_scale_parameter=rt.radius_scale_parameter,
+            gravity_model=rt.gravity_model,
+            include_rayleigh=rt.include_rayleigh,
+            gas_combination=rt.gas_combination,
+            impact_quadrature_order=rt.impact_quadrature_order,
+            metadata={"configured_model": "transmission"},
+        )
     configs = {}
     cloud_models = {}
     spectral_grids = {}
@@ -458,41 +648,59 @@ def build_problem(
             name=f"{planet.name}-{dataset.name}-{config.opacity.resolution}-binned",
             interpolation="log_pressure_temperature_log_k_clip",
         )
-        factory = ParameterizedEmissionFactoryConfig(
-            planet=planet,
-            star=star,
-            temperature_profile=temperature,
-            chemistry_model=chemistry,
-            mean_molecular_weight_model=mean_molecular_weight,
-            pressure_grid=pressure,
-            cia_table=cia,
-            geometry=geometry,
-            opacity_source=provider,
-            opacity_binning=None,
-            model=model_config,
-        )
         spectral_grids[dataset.name] = dataset.observation.spectral_grid
-        if cloud is None:
-            configs[dataset.name] = factory
-        else:
-            base_model = build_parameterized_emission_model(
+        if rt.model == "transmission":
+            factory = ParameterizedTransmissionFactoryConfig(
+                planet=planet,
+                star=star,
+                temperature_profile=temperature,
+                chemistry_model=chemistry,
+                mean_molecular_weight_model=mean_molecular_weight,
+                pressure_grid=pressure,
+                cia_table=cia,
+                opacity_source=provider,
+                opacity_binning=None,
+                model=model_config,
+            )
+            cloud_models[dataset.name] = build_parameterized_transmission_model(
                 factory,
                 spectral_grid=dataset.observation.spectral_grid,
             )
-            cloud_models[dataset.name] = (
-                ParameterizedRefractiveIndexCloudEmissionForwardModel(
-                    planet=base_model.planet,
-                    star=base_model.star,
-                    spectral_grid=base_model.spectral_grid,
-                    atmosphere_builder=base_model.atmosphere_builder,
-                    opacity_provider=base_model.opacity_provider,
-                    config=base_model.config,
-                    cia_table=base_model.cia_table,
-                    geometry=base_model.geometry,
-                    cloud=cloud,
-                )
+        else:
+            factory = ParameterizedEmissionFactoryConfig(
+                planet=planet,
+                star=star,
+                temperature_profile=temperature,
+                chemistry_model=chemistry,
+                mean_molecular_weight_model=mean_molecular_weight,
+                pressure_grid=pressure,
+                cia_table=cia,
+                geometry=geometry,
+                opacity_source=provider,
+                opacity_binning=None,
+                model=model_config,
             )
-    if cloud is None:
+            if cloud is None:
+                configs[dataset.name] = factory
+            else:
+                base_model = build_parameterized_emission_model(
+                    factory,
+                    spectral_grid=dataset.observation.spectral_grid,
+                )
+                cloud_models[dataset.name] = (
+                    ParameterizedRefractiveIndexCloudEmissionForwardModel(
+                        planet=base_model.planet,
+                        star=base_model.star,
+                        spectral_grid=base_model.spectral_grid,
+                        atmosphere_builder=base_model.atmosphere_builder,
+                        opacity_provider=base_model.opacity_provider,
+                        config=base_model.config,
+                        cia_table=base_model.cia_table,
+                        geometry=base_model.geometry,
+                        cloud=cloud,
+                    )
+                )
+    if rt.model == "emission" and cloud is None:
         forward_model = build_multi_dataset_emission_model(
             configs, spectral_grids=spectral_grids
         )
@@ -522,6 +730,7 @@ def build_problem(
             "opacity_resolution": config.opacity.resolution,
             "cloud_model": config.clouds.model,
             "geometry": geometry_item.model,
+            "radiative_transfer_model": rt.model,
         },
         opacity_identifiers=opacity_ids,
     )

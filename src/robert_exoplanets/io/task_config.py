@@ -66,12 +66,22 @@ class DatasetNuisanceConfig(ConfigModel):
 
 
 class ObservationsConfig(ConfigModel):
-    loader: Literal["schlawin2024_wasp69b", "wiser2025_wasp80b"]
+    loader: Literal[
+        "robert_npz",
+        "schlawin2024_wasp69b",
+        "wiser2025_wasp80b",
+    ]
     path: Path
     datasets: tuple[str, ...] = Field(min_length=1)
     verify_checksum: bool = True
     miri_offset_parameter: str | None = None
     dataset_options: dict[str, DatasetNuisanceConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_loader_options(self) -> "ObservationsConfig":
+        if self.loader == "robert_npz" and len(self.datasets) != 1:
+            raise ValueError("robert_npz observations require exactly one dataset name")
+        return self
 
 
 class PressureConfig(ConfigModel):
@@ -322,10 +332,11 @@ class OpacityBinningConfig(ConfigModel):
     num: PositiveInt = 300
     use_rebin: bool = False
     remove_zeros: bool = True
+    g_points: PositiveInt = 8
 
 
 class OpacityConfig(ConfigModel):
-    format: Literal["exomol_kta"]
+    format: Literal["exomol_kta", "exomol_cross_section_hdf"]
     path: Path
     resolution: str = Field(pattern=r"^R[1-9][0-9]*$")
     species: tuple[str, ...] = Field(min_length=1)
@@ -339,13 +350,29 @@ class GeometryConfig(ConfigModel):
 
 
 class RadiativeTransferConfig(ConfigModel):
-    model: Literal["emission"] = "emission"
+    model: Literal["emission", "transmission"] = "emission"
     geometry: GeometryConfig = GeometryConfig()
     include_rayleigh: bool = True
-    gas_combination: Literal["random_overlap", "equivalent_extinction"] = (
+    gas_combination: Literal[
+        "sum_by_g", "random_overlap", "equivalent_extinction"
+    ] = (
         "random_overlap"
     )
     thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
+    reference_pressure_bar: PositiveFloat = 1.0
+    radius_scale_parameter: str | None = None
+    gravity_model: Literal["constant", "inverse_square"] = "inverse_square"
+    impact_quadrature_order: int = Field(default=8, ge=2)
+
+    @model_validator(mode="after")
+    def validate_model_options(self) -> "RadiativeTransferConfig":
+        if self.model == "transmission" and self.gas_combination == "equivalent_extinction":
+            raise ValueError(
+                "transmission gas_combination must be 'sum_by_g' or 'random_overlap'"
+            )
+        if self.radius_scale_parameter is not None and not self.radius_scale_parameter:
+            raise ValueError("radius_scale_parameter must be non-empty")
+        return self
 
 
 class PriorConfig(ConfigModel):
@@ -561,6 +588,22 @@ class TaskConfig(ConfigModel):
             )
         if self.observations.miri_offset_parameter is not None:
             required.add(self.observations.miri_offset_parameter)
+        radiative_transfer = self.radiative_transfer
+        if radiative_transfer.model == "transmission":
+            if self.clouds.model != "none":
+                raise ValueError(
+                    "configured transmission currently supports cloud-free models only"
+                )
+            if not (
+                self.atmosphere.pressure.top_bar
+                <= radiative_transfer.reference_pressure_bar
+                <= self.atmosphere.pressure.bottom_bar
+            ):
+                raise ValueError(
+                    "transmission reference_pressure_bar must lie within the pressure grid"
+                )
+            if radiative_transfer.radius_scale_parameter is not None:
+                required.add(radiative_transfer.radius_scale_parameter)
         missing_parameters = sorted(required - set(names))
         if missing_parameters:
             raise ValueError(

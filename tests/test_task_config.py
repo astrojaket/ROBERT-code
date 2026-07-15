@@ -5,22 +5,32 @@ from __future__ import annotations
 from copy import deepcopy
 from pathlib import Path
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from robert_exoplanets.io.configured_tasks import (
     load_observations as load_configured_observations,
+    prepare_opacity,
 )
 from robert_exoplanets.io.task_config import (
     TaskConfig,
     initialize_task_directories,
     load_task_config,
 )
+from robert_exoplanets.instruments import (
+    Observation,
+    ObservationCollection,
+    ObservationDataset,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
 TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
+TRANSMISSION = (
+    ROOT / "configurations" / "synthetic_transmission_injection_recovery_multinest.yaml"
+)
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 
 
@@ -53,6 +63,83 @@ def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
     parsed = TaskConfig.model_validate(raw)
 
     assert parsed.bodies.star.spectrum_model == "blackbody"
+
+
+def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
+    config = load_task_config(TRANSMISSION)
+
+    assert config.observations.loader == "robert_npz"
+    assert config.opacity.format == "exomol_cross_section_hdf"
+    assert config.opacity.binning.g_points == 8
+    assert config.radiative_transfer.model == "transmission"
+    assert config.radiative_transfer.reference_pressure_bar == 1.0
+    assert config.radiative_transfer.radius_scale_parameter == "radius_scale"
+    assert config.radiative_transfer.gravity_model == "inverse_square"
+    assert config.sampler.engine == "multinest"
+    assert config.sampler.live_points == 40
+    assert config.runtime.mpi_processes == 2
+
+
+def test_transmission_radius_parameter_must_be_in_retrieval_parameters() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["parameters"] = [
+        item for item in raw["parameters"] if item["name"] != "radius_scale"
+    ]
+
+    with pytest.raises(ValidationError, match="radius_scale"):
+        TaskConfig.model_validate(raw)
+
+
+def test_real_cross_section_hdf_is_correlated_inside_observation_bins(
+    tmp_path: Path,
+) -> None:
+    h5py = pytest.importorskip("h5py")
+    config = load_task_config(TRANSMISSION)
+    source = tmp_path / "source"
+    source.mkdir()
+    with h5py.File(source / "H2O.h5", "w") as handle:
+        handle.create_dataset("p", data=[1.0e-5, 1.0])
+        handle.create_dataset("t", data=[1000.0, 1200.0])
+        handle.create_dataset("bin_edges", data=np.linspace(3000.0, 12000.0, 128))
+        cross_sections = handle.create_dataset(
+            "xsecarr",
+            data=np.geomspace(1.0e-30, 1.0e-20, 2 * 2 * 128).reshape(2, 2, 128),
+        )
+        cross_sections.attrs["units"] = "cm^2/molecule"
+        handle.create_dataset("DOI", data=[b"test-doi"])
+        handle.create_dataset("key_iso_ll", data=[b"test-line-list"])
+    cache = tmp_path / "cache"
+    config = config.model_copy(
+        update={
+            "opacity": config.opacity.model_copy(
+                update={"path": source, "cache_directory": cache}
+            )
+        }
+    )
+    observation = Observation.from_arrays(
+        wavelength=[1.0, 2.0],
+        wavelength_bin_edges=[0.85, 1.3, 2.5],
+        flux=[0.01, 0.01],
+        uncertainty=[1.0e-5, 1.0e-5],
+        flux_unit="transit_depth",
+        observable="transit_depth",
+    )
+    observations = ObservationCollection(
+        datasets=(
+            ObservationDataset(name="synthetic_transit", observation=observation),
+        )
+    )
+
+    prepare_opacity(config, observations)
+
+    with np.load(cache / "R100" / "synthetic_transit_H2O.npz") as saved:
+        assert saved["kcoeff"].shape == (2, 2, 2, 8)
+        assert np.isclose(saved["g_weights"].sum(), 1.0)
+        assert str(saved["source_line_list"]) == "test-line-list"
+        assert str(saved["spectral_preparation"]) == (
+            "exomol_cross_section_empirical_k"
+        )
 
 
 def test_unknown_configuration_field_is_rejected() -> None:

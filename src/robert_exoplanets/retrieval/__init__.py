@@ -4,8 +4,10 @@ from .data import (
     ROBERT_OBSERVATION_SCHEMA,
     convert_emission_observation_table,
     load_emission_observation_npz,
+    load_observation_npz,
     load_emission_observation_table,
     save_emission_observation_npz,
+    save_observation_npz,
 )
 from robert_exoplanets.instruments import Observation
 from .hybrid import (
@@ -63,8 +65,10 @@ __all__ = [
     "UltraNestRunConfig",
     "build_retrieval_problem",
     "load_emission_observation_npz",
+    "load_observation_npz",
     "load_emission_observation_table",
     "save_emission_observation_npz",
+    "save_observation_npz",
     "convert_emission_observation_table",
     "ROBERT_OBSERVATION_SCHEMA",
     "load_nested_sampler_result",

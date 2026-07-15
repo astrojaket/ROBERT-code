@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added a typed `ParameterizedTransmissionForwardModel` and factory using the
+  shared atmosphere/opacity pipeline, explicit reference-radius pressure,
+  constant or self-consistent inverse-square gravity, CIA/Rayleigh extinction,
+  strict grid validation, and retained spherical-annulus diagnostics.
+- Integrated transmission into schema-v2 YAML tasks and self-describing NPZ
+  observations, added target-bin correlated-k preparation from real ExoMolOP
+  cross-section HDF files, and added a reproducible MultiNest transmission
+  injection-recovery workflow.
 - Aligned the WASP-69 sampler benchmark with the Schlawin analysis by using
   the 4750 K, log(g)=4.5, solar-metallicity PHOENIX grid point and the H2O,
   CO2, CO, CH4, NH3, and independently retrieved SO2 opacity set; all nested

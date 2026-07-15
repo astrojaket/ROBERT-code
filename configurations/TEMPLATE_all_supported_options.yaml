@@ -41,7 +41,7 @@ bodies:
 # with F322W2 and F444W: it is their derived six-bin overlap average.
 # =============================================================================
 observations:
-  loader: schlawin2024_wasp69b   # Alternatives: wiser2025_wasp80b
+  loader: schlawin2024_wasp69b   # Alternatives: wiser2025_wasp80b, robert_npz
   datasets: [f322w2, f444w, lrs]
   verify_checksum: true
   miri_offset_parameter: null    # Legacy shorthand; prefer dataset_options below.
@@ -159,23 +159,29 @@ clouds:
 # OPACITY AND RADIATIVE TRANSFER
 # =============================================================================
 opacity:
-  format: exomol_kta
+  format: exomol_kta          # Alternative: exomol_cross_section_hdf
   resolution: R1000           # Alternative: R15000
   species: [H2O, CO2, CO, CH4, NH3, SO2]
   binning:
     num: 300
     use_rebin: false
     remove_zeros: true
+    g_points: 8               # Used by exomol_cross_section_hdf only.
   # path and cache_directory are populated from housekeeping.
 
 radiative_transfer:
-  model: emission
+  model: emission             # Alternative: transmission
   geometry:
     model: normal_emission    # Alternative: gauss_legendre_disk
     points: 4                 # Used by gauss_legendre_disk only.
   include_rayleigh: true
   gas_combination: random_overlap  # Alternative: equivalent_extinction
   thermal_integration_backend: auto # Alternatives: numpy, numba
+  # Transmission-only controls:
+  reference_pressure_bar: 1.0
+  radius_scale_parameter: null # Example: radius_scale; add it to parameters.
+  gravity_model: inverse_square # Alternative: constant
+  impact_quadrature_order: 8
 
 likelihood:
   model: gaussian
@@ -221,6 +227,9 @@ parameters:
   # - {name: log_CH4, label: log10(CH4 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -6.0}
   # - {name: log_NH3, label: log10(NH3 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -7.0}
   # - {name: log_HCN, label: log10(HCN VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -8.0}
+
+  # --- Optional transmission reference-radius scale ---
+  # - {name: radius_scale, prior: {type: uniform, lower: 0.98, upper: 1.02}, value: 1.0}
 
   # --- Optional FastChem constant-abundance override ---
   - {name: log_SO2, label: log10(SO2 VMR), prior: {type: uniform, lower: -10.0, upper: -4.0}, value: -8.0}

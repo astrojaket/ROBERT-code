@@ -55,17 +55,17 @@ sbatch submit.sbatch
 The major sections are intentionally explicit:
 
 - `bodies`: planetary and stellar parameters;
-- `observations`: published-data loader, data path, and selected instrument
-  datasets (including `lrs` for MIRI);
+- `observations`: published-data loader or self-describing ROBERT NPZ, data
+  path, and selected instrument datasets;
 - `atmosphere`: pressure grid; a Parmentier-Guillot, isothermal, or external
   tabulated CSV temperature profile; chemistry model; and the FastChem name
   corresponding to each molecule;
-- `clouds`: currently `none`, because this runner exposes only the validated
-  cloud-free path;
-- `opacity`: KTA root, `R1000`/`R15000`, selected opacity molecules, and an
-  external cache directory;
-- `radiative_transfer`: model, geometry, Rayleigh treatment, gas combination,
-  and numerical backend;
+- `clouds`: cloud-free or configured emission-cloud treatment; configured
+  transmission currently requires `none`;
+- `opacity`: KTA or ExoMolOP cross-section root, resolution label, selected
+  molecules, target-bin preparation, and an external cache directory;
+- `radiative_transfer`: emission geometry/backend or transmission reference
+  pressure, radius parameter, gravity law, and impact quadrature;
 - `parameters`: ordered retrieval priors and optional forward-model values;
 - `sampler`: inference engine (OE, UltraNest, MultiNest, or OE followed by
   either nested sampler), convergence/iteration controls, resume policy, and

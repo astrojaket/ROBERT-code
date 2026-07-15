@@ -30,6 +30,9 @@ class RadiativeTransferBackend:
     def emission(self, atmosphere, opacity, geometry):
         ...
 
+    def transmission(self, atmosphere, opacity, geometry):
+        ...
+
     def diagnostics(self):
         ...
 ```
@@ -43,7 +46,8 @@ Inputs:
 Outputs:
 
 - `Spectrum`.
-- RT diagnostics such as contribution functions.
+- RT diagnostics such as contribution functions, effective radii, and
+  atmospheric-annulus area contributions.
 
 Invariants:
 

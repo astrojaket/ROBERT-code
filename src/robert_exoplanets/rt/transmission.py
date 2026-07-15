@@ -10,6 +10,10 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
 from robert_exoplanets.core._immutability import immutable_mapping
+from robert_exoplanets.opacity import (
+    pressure_values_in_unit,
+    spectral_grid_values_in_unit,
+)
 
 from .optical_depth import GasOpticalDepth
 from .path_geometry import HydrostaticPathGeometry
@@ -23,6 +27,7 @@ class AbsorptionTransmissionResult:
     effective_radius_m: ArrayLike
     impact_radius_edges_m: ArrayLike
     annulus_area_contribution_m2: ArrayLike
+    path_geometry: HydrostaticPathGeometry | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -66,19 +71,22 @@ def solve_absorption_transmission(
     included.
     """
 
-    if path_geometry.pressure_grid is not gas_optical_depth.pressure_grid:
-        if not np.array_equal(
-            path_geometry.pressure_grid.edges,
-            gas_optical_depth.pressure_grid.edges,
-        ):
-            raise RobertValidationError("path geometry and gas optical depth pressure grids differ")
+    _validate_path_geometry_match(gas_optical_depth, path_geometry)
     star_radius = _positive_float(star_radius_m, "star_radius_m")
-    if impact_quadrature_order < 2:
-        raise RobertValidationError("impact_quadrature_order must be at least two")
+    if (
+        isinstance(impact_quadrature_order, bool)
+        or int(impact_quadrature_order) != impact_quadrature_order
+        or int(impact_quadrature_order) < 2
+    ):
+        raise RobertValidationError(
+            "impact_quadrature_order must be an integer of at least two"
+        )
+    impact_quadrature_order = int(impact_quadrature_order)
 
     tau = np.array(gas_optical_depth.total_tau, dtype=float, copy=True)
     opacity_sources = ["gas"]
     for contribution in additional_optical_depths or ():
+        _validate_contribution_grid_match(gas_optical_depth, contribution)
         values = np.asarray(getattr(contribution, "tau", contribution), dtype=float)
         name = str(getattr(contribution, "name", type(contribution).__name__))
         if values.shape == tau.shape[:2]:
@@ -153,6 +161,12 @@ def solve_absorption_transmission(
         "top_radius_m": f"{float(impact_edges[-1]):.17g}",
         "star_radius_m": f"{star_radius:.17g}",
         "opacity_sources": "+".join(opacity_sources),
+        "top_layer_max_vertical_tau": (
+            f"{float(np.max(tau[_top_layer_index(gas_optical_depth)])):.17g}"
+        ),
+        "bottom_layer_min_vertical_tau": (
+            f"{float(np.min(tau[_bottom_layer_index(gas_optical_depth)])):.17g}"
+        ),
     }
     transit_depth = Spectrum(
         spectral_grid=output_grid,
@@ -166,8 +180,96 @@ def solve_absorption_transmission(
         effective_radius_m=effective_radius,
         impact_radius_edges_m=impact_edges,
         annulus_area_contribution_m2=annulus_contribution,
+        path_geometry=path_geometry,
         metadata=metadata,
     )
+
+
+def _top_layer_index(gas_optical_depth: GasOpticalDepth) -> int:
+    pressure = pressure_values_in_unit(
+        gas_optical_depth.pressure_grid.centers,
+        gas_optical_depth.pressure_grid.unit,
+        "pa",
+    )
+    return int(np.argmin(pressure))
+
+
+def _bottom_layer_index(gas_optical_depth: GasOpticalDepth) -> int:
+    pressure = pressure_values_in_unit(
+        gas_optical_depth.pressure_grid.centers,
+        gas_optical_depth.pressure_grid.unit,
+        "pa",
+    )
+    return int(np.argmax(pressure))
+
+
+def _validate_path_geometry_match(
+    gas_optical_depth: GasOpticalDepth,
+    path_geometry: HydrostaticPathGeometry,
+) -> None:
+    gas_edges = pressure_values_in_unit(
+        gas_optical_depth.pressure_grid.edges,
+        gas_optical_depth.pressure_grid.unit,
+        "pa",
+    )
+    path_edges = pressure_values_in_unit(
+        path_geometry.pressure_grid.edges,
+        path_geometry.pressure_grid.unit,
+        "pa",
+    )
+    if gas_edges.shape != path_edges.shape or not np.allclose(
+        gas_edges,
+        path_edges,
+        rtol=1.0e-10,
+        atol=0.0,
+    ):
+        raise RobertValidationError(
+            "path geometry pressure grid must match gas optical-depth pressure grid"
+        )
+
+
+def _validate_contribution_grid_match(
+    gas_optical_depth: GasOpticalDepth,
+    contribution: object,
+) -> None:
+    if hasattr(contribution, "spectral_grid"):
+        contribution_wavelength = spectral_grid_values_in_unit(
+            getattr(contribution, "spectral_grid"),
+            "micron",
+        )
+        gas_wavelength = spectral_grid_values_in_unit(
+            gas_optical_depth.spectral_grid,
+            "micron",
+        )
+        if contribution_wavelength.shape != gas_wavelength.shape or not np.allclose(
+            contribution_wavelength,
+            gas_wavelength,
+            rtol=1.0e-12,
+            atol=0.0,
+        ):
+            raise RobertValidationError(
+                "additional optical-depth spectral grid must match gas grid"
+            )
+    if hasattr(contribution, "pressure_grid"):
+        contribution_pressure = pressure_values_in_unit(
+            getattr(contribution, "pressure_grid").centers,
+            getattr(contribution, "pressure_grid").unit,
+            "pa",
+        )
+        gas_pressure = pressure_values_in_unit(
+            gas_optical_depth.pressure_grid.centers,
+            gas_optical_depth.pressure_grid.unit,
+            "pa",
+        )
+        if contribution_pressure.shape != gas_pressure.shape or not np.allclose(
+            contribution_pressure,
+            gas_pressure,
+            rtol=1.0e-10,
+            atol=0.0,
+        ):
+            raise RobertValidationError(
+                "additional optical-depth pressure grid must match gas grid"
+            )
 
 
 def _full_shell_chord_lengths(

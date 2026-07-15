@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from robert_exoplanets import (
     AtmosphereState,
     EvaluatedCorrelatedKOpacity,
     PreparedCorrelatedKOpacity,
+    LayerOpticalDepth,
     PressureGrid,
     SpectralGrid,
     assemble_gas_optical_depth,
     hydrostatic_path_geometry,
     solve_absorption_transmission,
 )
+from robert_exoplanets.core import RobertValidationError
 
 
 def test_transparent_atmosphere_returns_opaque_base_radius() -> None:
@@ -81,6 +84,40 @@ def test_additional_extinction_increases_transit_depth() -> None:
     )
 
     assert np.all(extinct.transit_depth.values > clear.transit_depth.values)
+
+
+def test_transmission_rejects_mismatched_optical_depth_grid() -> None:
+    gas_tau, path = _one_layer_case(np.array([0.0]))
+    mismatched = LayerOpticalDepth(
+        name="mismatched haze",
+        tau=np.ones((1, 1)),
+        pressure_grid=gas_tau.pressure_grid,
+        spectral_grid=SpectralGrid.from_array(
+            [3.0],
+            unit="micron",
+            role="opacity",
+        ),
+    )
+
+    with pytest.raises(RobertValidationError, match="spectral grid"):
+        solve_absorption_transmission(
+            gas_tau,
+            path,
+            star_radius_m=7.0e8,
+            additional_optical_depths=[mismatched],
+        )
+
+
+def test_transmission_requires_integer_impact_quadrature_order() -> None:
+    gas_tau, path = _one_layer_case(np.array([0.0]))
+
+    with pytest.raises(RobertValidationError, match="integer"):
+        solve_absorption_transmission(
+            gas_tau,
+            path,
+            star_radius_m=7.0e8,
+            impact_quadrature_order=2.5,
+        )
 
 
 def _one_layer_case(

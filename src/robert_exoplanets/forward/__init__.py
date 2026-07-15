@@ -21,13 +21,19 @@ from .factory import (
     ExoKTableBinning,
     ExoMolOpacitySamplingSource,
     ParameterizedEmissionFactoryConfig,
+    ParameterizedTransmissionFactoryConfig,
     ParameterizedClearSkyEmissionFactoryConfig,
     build_clear_sky_emission_model,
     build_emission_model,
     build_multi_dataset_emission_model,
     build_parameterized_emission_model,
+    build_parameterized_transmission_model,
     build_parameterized_clear_sky_emission_model,
     pressure_grid_from_opacity,
+)
+from .transmission import (
+    ParameterizedTransmissionForwardModel,
+    ParameterizedTransmissionModelConfig,
 )
 from .inhomogeneous import (
     DilutedEmissionModel,
@@ -59,6 +65,9 @@ __all__ = [
     "NativeSpectrumMultiDatasetPrediction",
     "ParameterizedEmissionFactoryConfig",
     "ParameterizedEmissionForwardModel",
+    "ParameterizedTransmissionFactoryConfig",
+    "ParameterizedTransmissionForwardModel",
+    "ParameterizedTransmissionModelConfig",
     "ParameterizedClearSkyEmissionFactoryConfig",
     "ParameterizedClearSkyEmissionForwardModel",
     "ParameterizedClearSkyEmissionModelConfig",
@@ -72,6 +81,7 @@ __all__ = [
     "build_multi_dataset_emission_model",
     "build_disk_emission_model",
     "build_parameterized_emission_model",
+    "build_parameterized_transmission_model",
     "build_parameterized_clear_sky_emission_model",
     "pressure_grid_from_opacity",
 ]

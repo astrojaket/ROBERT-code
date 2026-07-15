@@ -227,8 +227,34 @@ integrates occulting area over impact parameter. The result includes effective
 radius and annulus-area diagnostics. Its present scope is direct-beam
 absorption/extinction: scattered light returned to the beam, refraction,
 finite-star effects, and limb darkening remain future validation work. The
-realistic HAT-P-32b benchmark and quadrature convergence are documented in
-`docs/review/16_emission_transmission_validation.md`.
+the stable petitRADTRANS benchmark is documented in
+`docs/review/19_petitradtrans3_multispecies_transmission.md`, with the later
+independent PICASO molecular/cloud comparison in
+`docs/review/36_official_picaso_molecular_cloud_parity.md`.
+
+`ParameterizedTransmissionForwardModel` promotes this kernel into the typed
+forward-model layer. Like `ParameterizedEmissionForwardModel`, it prepares
+opacity once and evaluates temperature, chemistry, opacity, and RT for every
+parameter vector. The name uses *transmission* because it predicts a
+transmission spectrum/transit depth; *transit model* would more naturally imply
+a time-dependent light-curve calculation, which ROBERT does not perform here.
+
+The planetary radius is an explicit reference radius at a configured reference
+pressure. Reference pressures outside the atmospheric grid are rejected rather
+than extrapolated. Two gravity modes are available through the Python model
+configuration:
+
+- `constant`: one supplied or mass-derived reference gravity is used in all
+  layers;
+- `inverse_square`: layer-centre gravity and hydrostatic radii are iterated to
+  consistency with `g(r) = g_ref (R_ref / r)^2`.
+
+Inverse-square gravity is therefore a specific variable-gravity model. Moving
+upward to lower pressure normally increases radius and decreases gravity. The
+same converged layer-gravity profile is used for vertical gas columns and
+spherical path geometry. Transmission results retain the path geometry,
+effective radius, annulus-area contributions, and top/bottom vertical optical-
+depth diagnostics.
 
 The sign convention and formal solution follow Rutten (2003): optical depth
 increases downward, `mu dI/dtau = I - S`, and the top boundary has no incident

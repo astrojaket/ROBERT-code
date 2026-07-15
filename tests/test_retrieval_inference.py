@@ -8,14 +8,17 @@ import pytest
 
 from robert_exoplanets import (
     LogUniformPrior,
+    Observation,
     RetrievalParameter,
     RetrievalParameterSet,
     RetrievalProblem,
     Spectrum,
     UniformPrior,
     load_emission_observation_npz,
+    load_observation_npz,
     run_optimal_estimation,
     run_retrieval,
+    save_observation_npz,
 )
 from robert_exoplanets.core import RobertDataError
 from robert_exoplanets.retrieval.manifest import build_run_manifest
@@ -24,6 +27,25 @@ from robert_exoplanets.retrieval.samplers.ultranest import (
     _result_from_ultranest,
     _validate_mpi_world_size,
 )
+
+
+def test_self_describing_npz_preserves_transit_depth_semantics(tmp_path) -> None:
+    observation = Observation.from_arrays(
+        wavelength=[1.0, 1.5],
+        flux=[0.012, 0.0121],
+        uncertainty=[1.0e-5, 1.0e-5],
+        flux_unit="transit_depth",
+        observable="transit_depth",
+        instrument="synthetic transit",
+    )
+    path = save_observation_npz(observation, tmp_path / "transit.npz")
+
+    loaded = load_observation_npz(path)
+
+    assert loaded.flux_unit == "transit_depth"
+    assert loaded.observable == "transit_depth"
+    assert loaded.instrument == "synthetic transit"
+    assert loaded.metadata["source_format"] == "npz_spectral_observation"
 
 
 def test_parameter_set_transforms_unit_cube_and_log_prior() -> None:

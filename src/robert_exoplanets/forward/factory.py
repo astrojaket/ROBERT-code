@@ -36,6 +36,10 @@ from .emission import (
     ParameterizedEmissionModelConfig,
 )
 from .multi_dataset import MultiDatasetEmissionForwardModel, PreparedSpectrumResponse
+from .transmission import (
+    ParameterizedTransmissionForwardModel,
+    ParameterizedTransmissionModelConfig,
+)
 
 
 @dataclass(frozen=True)
@@ -339,6 +343,62 @@ class ParameterizedEmissionFactoryConfig:
         object.__setattr__(self, "mean_molecular_weight", mmw)
 
 
+@dataclass(frozen=True)
+class ParameterizedTransmissionFactoryConfig:
+    """Python configuration for runtime transmission parameterizations."""
+
+    planet: Planet
+    star: Star
+    temperature_profile: TemperatureProfile
+    chemistry_model: ChemistryModel
+    opacity_source: ExoKOpacitySource | ExoMolOpacitySamplingSource | OpacityProvider
+    model: ParameterizedTransmissionModelConfig
+    cia_table: CiaTable | tuple[CiaTable, ...] | None = None
+    pressure_grid: PressureGrid | None = None
+    mean_molecular_weight: float = 2.3
+    mean_molecular_weight_model: MeanMolecularWeightModel | None = None
+    opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
+
+    def __post_init__(self) -> None:
+        for value, label in (
+            (self.temperature_profile, "temperature_profile"),
+            (self.chemistry_model, "chemistry_model"),
+        ):
+            if not callable(getattr(value, "evaluate", None)) or not callable(
+                getattr(value, "required_parameters", None)
+            ):
+                raise RobertConfigError(
+                    f"{label} does not implement its ROBERT protocol"
+                )
+        source_species = self.opacity_source.species
+        missing_source = tuple(
+            species
+            for species in self.model.opacity_species
+            if species not in source_species
+        )
+        if missing_source:
+            raise RobertConfigError(
+                "opacity source is missing model species: "
+                + ", ".join(missing_source)
+            )
+        missing_chemistry = tuple(
+            species
+            for species in self.model.opacity_species
+            if species not in self.chemistry_model.species
+        )
+        if missing_chemistry:
+            raise RobertConfigError(
+                "chemistry model is missing opacity species: "
+                + ", ".join(missing_chemistry)
+            )
+        mmw = float(self.mean_molecular_weight)
+        if not np.isfinite(mmw) or mmw <= 0.0:
+            raise RobertConfigError(
+                "mean_molecular_weight must be finite and positive"
+            )
+        object.__setattr__(self, "mean_molecular_weight", mmw)
+
+
 def _prepare_provider(
     provider: OpacityProvider,
     binning: ExoKTableBinning | None,
@@ -445,6 +505,59 @@ def build_parameterized_emission_model(
         config=model_config,
         cia_table=config.cia_table,
         geometry=config.geometry,
+    )
+
+
+def build_parameterized_transmission_model(
+    config: ParameterizedTransmissionFactoryConfig,
+    *,
+    spectral_grid: SpectralGrid,
+) -> ParameterizedTransmissionForwardModel:
+    """Construct a prepared model with runtime transmission physics."""
+
+    if not isinstance(config, ParameterizedTransmissionFactoryConfig):
+        raise RobertConfigError(
+            "config must be a ParameterizedTransmissionFactoryConfig"
+        )
+    native_provider = (
+        config.opacity_source.load()
+        if isinstance(
+            config.opacity_source,
+            (ExoKOpacitySource, ExoMolOpacitySamplingSource),
+        )
+        else config.opacity_source
+    )
+    pressure_grid = config.pressure_grid or pressure_grid_from_opacity(
+        native_provider,
+        species=config.model.opacity_species[0],
+    )
+    provider = _prepare_provider(
+        native_provider,
+        config.opacity_binning,
+        spectral_grid,
+    )
+    atmosphere_builder = AtmosphereBuilder(
+        pressure_grid=pressure_grid,
+        temperature_profile=config.temperature_profile,
+        chemistry_model=config.chemistry_model,
+        mean_molecular_weight=config.mean_molecular_weight,
+        mean_molecular_weight_model=config.mean_molecular_weight_model,
+    )
+    model_config = replace(
+        config.model,
+        metadata={
+            **dict(config.model.metadata),
+            **_parameterized_factory_manifest_metadata(config),
+        },
+    )
+    return ParameterizedTransmissionForwardModel(
+        planet=config.planet,
+        star=config.star,
+        spectral_grid=spectral_grid,
+        atmosphere_builder=atmosphere_builder,
+        opacity_provider=provider,
+        config=model_config,
+        cia_table=config.cia_table,
     )
 
 
@@ -600,7 +713,8 @@ def _factory_manifest_metadata(config: EmissionFactoryConfig) -> dict[str, str]:
 
 
 def _parameterized_factory_manifest_metadata(
-    config: ParameterizedEmissionFactoryConfig,
+    config: ParameterizedEmissionFactoryConfig
+    | ParameterizedTransmissionFactoryConfig,
 ) -> dict[str, str]:
     metadata = {
         "factory_configuration_interface": "typed_python",

@@ -98,13 +98,18 @@ ignored by git.
   log surface gravity, and metallicity, prepared once on each model grid and
   used by default for emission contrast; a blackbody fallback remains explicit.
 - Correlated-k opacity preparation and evaluation for ExoMolOP/exo_k and
-  ROBERT-native archives, including multi-gas mixing, CIA, Rayleigh scattering,
-  spectral rebinning, interpolation, coverage checks, and provenance tracking.
+  ROBERT-native archives, plus target-bin empirical correlated-k preparation
+  from real ExoMolOP cross-section HDF files, including provenance tracking.
 - Configurable pressure-temperature profiles and equilibrium or prescribed
   chemistry, evaluated consistently within each likelihood call.
 - Cloud-free and cloudy thermal-emission radiative transfer, including disk
   integration, hydrostatic geometry, Mie cloud optics, Toon two-stream, and
   SH4 multiple-scattering solvers.
+- A typed parameterized transmission foundation with exact spherical shell
+  chords, explicit reference radius and pressure, constant or self-consistent
+  inverse-square gravity, correlated-k/CIA/Rayleigh extinction, and annulus
+  diagnostics, strict YAML retrieval integration, and synthetic
+  injection-recovery coverage. Scattering-return physics remains future work.
 - Shared-atmosphere, multi-instrument forward modelling with instrument-aware
   binning and Gaussian likelihood support for masks, offsets, and jitter.
 - Optimal-estimation, UltraNest, MultiNest, and OE-to-nested inference through

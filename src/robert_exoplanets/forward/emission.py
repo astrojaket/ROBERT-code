@@ -19,18 +19,14 @@ from robert_exoplanets.core import (
 )
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import (
-    OpacitySamplingProvider,
     OpacityProvider,
     PreparedOpacity,
-    PreparedOpacitySampling,
     pressure_values_in_unit,
 )
 from robert_exoplanets.rt import (
     CiaTable,
     DiscGeometry,
     RefractiveIndexSpectrum,
-    assemble_gas_optical_depth,
-    assemble_opacity_sampling_gas_optical_depth,
     cia_optical_depth,
     gauss_legendre_disk_geometry,
     grey_cloud_from_mass_extinction,
@@ -44,6 +40,8 @@ from robert_exoplanets.rt import (
     thermal_integration_backend_name,
 )
 from robert_exoplanets.stellar import prepare_stellar_spectrum
+
+from ._atmospheric import evaluate_gas_optical_depth
 
 GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 
@@ -460,7 +458,7 @@ class EmissionForwardModel:
             ),
             metadata={"forward_model": "emission"},
         )
-        gas_optical_depth = _evaluate_gas_optical_depth(
+        gas_optical_depth = evaluate_gas_optical_depth(
             self.opacity_provider,
             self.prepared_opacity,
             atmosphere,
@@ -764,7 +762,7 @@ class ParameterizedEmissionForwardModel:
                 raise RobertValidationError(
                     "shared atmosphere pressure grid must match the prepared emission model"
                 )
-        gas_optical_depth = _evaluate_gas_optical_depth(
+        gas_optical_depth = evaluate_gas_optical_depth(
             self.opacity_provider,
             self.prepared_opacity,
             atmosphere,
@@ -917,7 +915,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
                 "parameterized cloudy emission parameters must be finite"
             )
         atmosphere = self.atmosphere_builder.build(parameter_values)
-        gas_optical_depth = _evaluate_gas_optical_depth(
+        gas_optical_depth = evaluate_gas_optical_depth(
             self.opacity_provider,
             self.prepared_opacity,
             atmosphere,
@@ -1240,7 +1238,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                 "parameterized refractive-index cloud parameters must be finite"
             )
         atmosphere = self.atmosphere_builder.build(parameter_values)
-        gas_optical_depth = _evaluate_gas_optical_depth(
+        gas_optical_depth = evaluate_gas_optical_depth(
             self.opacity_provider,
             self.prepared_opacity,
             atmosphere,
@@ -1384,36 +1382,6 @@ def _planet_gravity(planet: Planet) -> float:
             "planet mass and radius are required to derive gravity"
         )
     return float(GRAVITATIONAL_CONSTANT_M3_KG_S2 * planet.mass_kg / planet.radius_m**2)
-
-
-def _evaluate_gas_optical_depth(
-    provider: OpacityProvider,
-    prepared: PreparedOpacity,
-    atmosphere: AtmosphereState,
-    *,
-    gravity_m_s2: float,
-    gas_combination: str,
-    retain_species_tau: bool = True,
-):
-    if isinstance(provider, OpacitySamplingProvider):
-        if not isinstance(prepared, PreparedOpacitySampling):
-            raise RobertValidationError(
-                "opacity-sampling provider requires prepared opacity sampling"
-            )
-        return assemble_opacity_sampling_gas_optical_depth(
-            atmosphere,
-            provider,
-            prepared,
-            gravity_m_s2=gravity_m_s2,
-        )
-    evaluated = provider.evaluate(atmosphere, prepared)
-    return assemble_gas_optical_depth(
-        atmosphere,
-        evaluated,
-        gravity_m_s2=gravity_m_s2,
-        gas_combination=gas_combination,
-        retain_species_tau=retain_species_tau,
-    )
 
 
 def _array_signature(*arrays: ArrayLike, labels: tuple[str, ...] = ()) -> str:
