@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed multi-dataset retrieval manifests and added the flattened Gaussian
+  data contract required for configured optimal-estimation runs; smoke checks
+  now preflight manifest serialization for every configured inference phase.
 - Added general retrieval and forward-model post-processing with fit
   statistics, residual and posterior/OE plots, a WASP-69b sampler benchmark
   comparison, editable colour/style controls, and an optional YAML automatic
