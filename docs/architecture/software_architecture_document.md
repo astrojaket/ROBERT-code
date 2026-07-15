@@ -35,6 +35,7 @@ robert_exoplanets/
   cli/
   core/
   bodies/
+  stellar/
   atmosphere/
   parameterizations/
   chemistry/
@@ -134,6 +135,36 @@ Allowed dependencies:
 Forbidden dependencies:
 
 - `rt`, `opacity`, `samplers`, `likelihoods`.
+
+### `stellar`
+
+Purpose:
+
+- Prepare stellar photosphere spectra for emission normalization,
+  irradiation, and future transit-light-source-effect components.
+
+Public API:
+
+- `StellarSpectrumModel`.
+- `PhoenixStellarSpectrumModel`.
+- `BlackbodyStellarSpectrumModel`.
+
+Internal implementation:
+
+- Stellar-atmosphere catalog interpolation and coverage validation.
+- Flux-conserving preparation on immutable spectral grids.
+- Explicit surface-flux and radiance conventions.
+
+Allowed dependencies:
+
+- `core`.
+- `bodies`.
+- Optional catalog adapters imported at the package edge.
+
+Forbidden dependencies:
+
+- `rt`, `opacity`, `likelihoods`, `samplers`.
+- File access during a likelihood call.
 
 ### `atmosphere`
 

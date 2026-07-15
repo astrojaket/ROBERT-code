@@ -6,6 +6,12 @@ ROBERT and best-fitting model spectra use `mediumpurple`, related ROBERT curves
 use darker or lighter purples, and external reference spectra use neutral dark
 tones for contrast.
 
+## Stellar spectra
+
+- `benchmark_g_star_stellar_spectrum.py`: flux-conserving STScI PHOENIX
+  profile for a Sun-like G2V star versus the explicit blackbody fallback,
+  including the resulting secondary-eclipse normalization difference.
+
 ## PICASO
 
 - `compare_grey_cloud_rt_picaso.py`: controlled grey-cloud radiative transfer.

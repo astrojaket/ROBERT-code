@@ -80,6 +80,8 @@ Responsibilities:
 
 - Store stellar information used for emission contrast, irradiation, and future
   contamination models.
+- Supply effective temperature, log surface gravity, and metallicity to a
+  selected stellar-spectrum model, or carry an explicitly prepared spectrum.
 
 Ownership:
 
@@ -92,8 +94,8 @@ Lifecycle:
 
 Relationships:
 
-- Used by RT, instrument, and stellar contamination components through public
-  fields.
+- Used by stellar-spectrum preparation, RT, instrument, and stellar
+  contamination components through public fields.
 
 ### `PressureGrid`
 

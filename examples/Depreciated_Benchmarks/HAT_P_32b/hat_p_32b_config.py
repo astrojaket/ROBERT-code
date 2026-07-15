@@ -95,6 +95,7 @@ def make_hat_p_32b_model_config(
             include_rayleigh=include_rayleigh,
             gas_combination="random_overlap",
             thermal_integration_backend="auto",
+            stellar_spectrum_model="blackbody",
             metadata={
                 "target": "HAT-P-32b",
                 "configuration": "examples.hat_p_32b_config",

@@ -26,6 +26,8 @@ The project architecture is governed by [RFC-0001: ROBERT Architectural Specific
 ```bash
 conda env create --file environment.yml
 conda activate robert-exoplanets
+# Point STScI stsynphot at a reference-data root containing grid/phoenix.
+export PYSYN_CDBS=/path/to/grp/redcat/trds
 pytest
 python examples/plot_blackbody_reference.py
 python examples/plot_synthetic_tau_weighting.py
@@ -92,6 +94,9 @@ ignored by git.
 - Strict, versioned YAML configuration for reproducible forward-model and
   retrieval runs, backed by typed planet, star, atmosphere, observation, and
   instrument data models.
+- STScI PHOENIX stellar-atmosphere spectra selected by effective temperature,
+  log surface gravity, and metallicity, prepared once on each model grid and
+  used by default for emission contrast; a blackbody fallback remains explicit.
 - Correlated-k opacity preparation and evaluation for ExoMolOP/exo_k and
   ROBERT-native archives, including multi-gas mixing, CIA, Rayleigh scattering,
   spectral rebinning, interpolation, coverage checks, and provenance tracking.

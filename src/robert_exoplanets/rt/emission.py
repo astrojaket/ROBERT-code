@@ -281,6 +281,7 @@ def solve_emission(
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
+    stellar_spectrum: Spectrum | None = None,
 ) -> EmissionResult:
     """Solve thermal emission for a cloud-free atmosphere.
 
@@ -674,19 +675,19 @@ def solve_emission(
     eclipse_depth = None
     if (
         star_temperature_k is not None
+        or stellar_spectrum is not None
         or planet_radius_m is not None
         or star_radius_m is not None
     ):
-        if (
-            star_temperature_k is None
-            or planet_radius_m is None
-            or star_radius_m is None
-        ):
+        if planet_radius_m is None or star_radius_m is None:
             raise RobertValidationError(
-                "star_temperature_k, planet_radius_m, and star_radius_m are all required for eclipse depth"
+                "planet_radius_m and star_radius_m are required for eclipse depth"
             )
-        stellar_radiance = _planck_radiance_wavelength(
-            wavelength, float(star_temperature_k)
+        stellar_radiance, stellar_metadata = _stellar_radiance_for_eclipse(
+            output_grid,
+            wavelength,
+            star_temperature_k=star_temperature_k,
+            stellar_spectrum=stellar_spectrum,
         )
         planet_radius = _positive_float(planet_radius_m, "planet_radius_m")
         star_radius = _positive_float(star_radius_m, "star_radius_m")
@@ -699,7 +700,7 @@ def solve_emission(
             )
         depth.setflags(write=False)
         eclipse_metadata = dict(common_metadata)
-        eclipse_metadata["stellar_model"] = "blackbody"
+        eclipse_metadata.update(stellar_metadata)
         eclipse_depth = Spectrum(
             spectral_grid=output_grid,
             values=depth,
@@ -742,6 +743,7 @@ def solve_emission_spectrum(
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
+    stellar_spectrum: Spectrum | None = None,
 ) -> Spectrum:
     """Return only thermal radiance or eclipse depth for retrieval calls.
 
@@ -913,7 +915,12 @@ def solve_emission_spectrum(
             path_geometry.metadata.get("path_model", "hydrostatic_spherical_shell")
         ),
     }
-    if star_temperature_k is None and planet_radius_m is None and star_radius_m is None:
+    if (
+        star_temperature_k is None
+        and stellar_spectrum is None
+        and planet_radius_m is None
+        and star_radius_m is None
+    ):
         return Spectrum(
             spectral_grid=output_grid,
             values=radiance_values,
@@ -921,12 +928,15 @@ def solve_emission_spectrum(
             observable="spectral_radiance",
             metadata=metadata,
         )
-    if star_temperature_k is None or planet_radius_m is None or star_radius_m is None:
+    if planet_radius_m is None or star_radius_m is None:
         raise RobertValidationError(
-            "star_temperature_k, planet_radius_m, and star_radius_m are all required for eclipse depth"
+            "planet_radius_m and star_radius_m are required for eclipse depth"
         )
-    stellar_radiance = _planck_radiance_wavelength(
-        wavelength, float(star_temperature_k)
+    stellar_radiance, stellar_metadata = _stellar_radiance_for_eclipse(
+        output_grid,
+        wavelength,
+        star_temperature_k=star_temperature_k,
+        stellar_spectrum=stellar_spectrum,
     )
     planet_radius = _positive_float(planet_radius_m, "planet_radius_m")
     star_radius = _positive_float(star_radius_m, "star_radius_m")
@@ -940,7 +950,7 @@ def solve_emission_spectrum(
         values=depth,
         unit="eclipse_depth",
         observable="eclipse_depth",
-        metadata={**metadata, "stellar_model": "blackbody"},
+        metadata={**metadata, **stellar_metadata},
     )
 
 
@@ -1050,6 +1060,71 @@ def _planck_radiance_wavelength(
         raise RobertValidationError("Planck source calculation produced invalid values")
     radiance.setflags(write=False)
     return radiance
+
+
+def _stellar_radiance_for_eclipse(
+    output_grid: SpectralGrid,
+    wavelength_micron: NDArray[np.float64],
+    *,
+    star_temperature_k: float | None,
+    stellar_spectrum: Spectrum | None,
+) -> tuple[NDArray[np.float64], dict[str, str]]:
+    if star_temperature_k is not None and stellar_spectrum is not None:
+        raise RobertValidationError(
+            "provide exactly one of star_temperature_k or stellar_spectrum for eclipse depth"
+        )
+    if star_temperature_k is None and stellar_spectrum is None:
+        raise RobertValidationError(
+            "provide star_temperature_k or stellar_spectrum for eclipse depth"
+        )
+    if stellar_spectrum is None:
+        radiance = _planck_radiance_wavelength(
+            wavelength_micron, float(star_temperature_k)
+        )
+        return radiance, {"stellar_model": "blackbody"}
+
+    if stellar_spectrum.unit != "W m^-3 sr^-1":
+        raise RobertValidationError(
+            "stellar_spectrum unit must be 'W m^-3 sr^-1'"
+        )
+    if stellar_spectrum.observable != "stellar_spectral_radiance":
+        raise RobertValidationError(
+            "stellar_spectrum observable must be 'stellar_spectral_radiance'"
+        )
+    spectrum_grid = stellar_spectrum.spectral_grid
+    if spectrum_grid.unit != output_grid.unit or spectrum_grid.values.shape != (
+        output_grid.values.shape
+    ):
+        raise RobertValidationError(
+            "stellar_spectrum grid must match the emission wavelength grid"
+        )
+    if not np.allclose(
+        spectrum_grid.values,
+        output_grid.values,
+        rtol=1.0e-12,
+        atol=0.0,
+    ):
+        raise RobertValidationError(
+            "stellar_spectrum grid must match the emission wavelength grid"
+        )
+    radiance = np.asarray(stellar_spectrum.values, dtype=float)
+    if not np.all(np.isfinite(radiance)) or np.any(radiance <= 0.0):
+        raise RobertValidationError(
+            "stellar_spectrum radiance must be finite and positive"
+        )
+    metadata = {
+        "stellar_model": str(
+            stellar_spectrum.metadata.get("stellar_model", "provided_spectrum")
+        )
+    }
+    metadata.update(
+        {
+            f"stellar_spectrum_{key}": str(value)
+            for key, value in stellar_spectrum.metadata.items()
+            if key != "stellar_model"
+        }
+    )
+    return radiance, metadata
 
 
 def _exclusive_cumulative(values: NDArray[np.float64]) -> NDArray[np.float64]:

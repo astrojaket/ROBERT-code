@@ -46,12 +46,16 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
     assert f"#SBATCH --chdir={run_directory}" in submission
     assert f'cd "{run_directory}"' in submission
-    assert "#SBATCH --nodes=2" in submission
+    assert "#SBATCH --nodes=1" in submission
     assert "#SBATCH --ntasks=128" in submission
-    assert "#SBATCH --ntasks-per-node=64" in submission
+    assert "#SBATCH --ntasks-per-node=128" in submission
     assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
     assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
     assert 'mpirun -np "${SLURM_NTASKS}"' in submission
+    assert (
+        'export PYSYN_CDBS="${PYSYN_CDBS:-/scratch/dp448/dc-tayl1/grp/redcat/trds}"'
+        in submission
+    )
     assert "--config configuration.yaml" in submission
 
 
@@ -81,9 +85,9 @@ def test_create_run_directory_uses_128_ranks_for_nested_workflows(
     )
 
     submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
-    assert "#SBATCH --nodes=2" in submission
+    assert "#SBATCH --nodes=1" in submission
     assert "#SBATCH --ntasks=128" in submission
-    assert "#SBATCH --ntasks-per-node=64" in submission
+    assert "#SBATCH --ntasks-per-node=128" in submission
     assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
     assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
 

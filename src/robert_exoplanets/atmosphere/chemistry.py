@@ -333,6 +333,7 @@ class FastChemEquilibriumChemistry:
     )
     metallicity_parameter_name: str = "metallicity"
     carbon_to_oxygen_parameter_name: str = "CtoO"
+    constant_log10_vmr_parameters: Mapping[str, str] = field(default_factory=dict)
     name: str = "fastchem-equilibrium"
     convention: str = "volume_mixing_ratio"
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -352,9 +353,32 @@ class FastChemEquilibriumChemistry:
             raise RobertValidationError("FastChem labels must be unique")
         if not self.metallicity_parameter_name or not self.carbon_to_oxygen_parameter_name:
             raise RobertValidationError("FastChem parameter names must not be empty")
+        overrides = {
+            _validate_species_name(species): str(parameter)
+            for species, parameter in self.constant_log10_vmr_parameters.items()
+        }
+        unknown_overrides = sorted(set(overrides) - set(labels))
+        if unknown_overrides:
+            raise RobertValidationError(
+                "constant FastChem overrides are not configured species: "
+                + ", ".join(unknown_overrides)
+            )
+        if any(not parameter for parameter in overrides.values()):
+            raise RobertValidationError(
+                "constant FastChem override parameter names must not be empty"
+            )
+        if len(set(overrides.values())) != len(overrides):
+            raise RobertValidationError(
+                "constant FastChem override parameter names must be unique"
+            )
         object.__setattr__(self, "fastchem_path", path)
         object.__setattr__(self, "fastchem_species", tuple(str(item) for item in self.fastchem_species))
         object.__setattr__(self, "labels", labels)
+        object.__setattr__(
+            self,
+            "constant_log10_vmr_parameters",
+            immutable_mapping(overrides),
+        )
         object.__setattr__(
             self,
             "metadata",
@@ -363,6 +387,10 @@ class FastChemEquilibriumChemistry:
                     "fastchem_path": str(path),
                     "metallicity_parameter": self.metallicity_parameter_name,
                     "carbon_to_oxygen_parameter": self.carbon_to_oxygen_parameter_name,
+                    "constant_log10_vmr_parameters": ",".join(
+                        f"{species}:{parameter}"
+                        for species, parameter in overrides.items()
+                    ),
                     **dict(self.metadata),
                 }
             ),
@@ -377,7 +405,11 @@ class FastChemEquilibriumChemistry:
     def required_parameters(self) -> tuple[str, ...]:
         """Return required FastChem parameter names."""
 
-        return (self.metallicity_parameter_name, self.carbon_to_oxygen_parameter_name)
+        return (
+            self.metallicity_parameter_name,
+            self.carbon_to_oxygen_parameter_name,
+            *self.constant_log10_vmr_parameters.values(),
+        )
 
     def evaluate(
         self,
@@ -437,6 +469,24 @@ class FastChemEquilibriumChemistry:
         profiles: dict[str, NDArray[np.float64]] = {}
         for index, label in enumerate(self.labels):
             profiles[label] = _readonly_layer_array(vmr[:, index], f"{label} FastChem VMR", pressure_grid.n_layers)
+        for label, parameter_name in self.constant_log10_vmr_parameters.items():
+            log10_vmr = _parameter_value(
+                parameters,
+                parameter_name,
+                context="FastChem constant abundance override",
+            )
+            if log10_vmr > 0.0:
+                raise RobertValidationError(
+                    f"{label} constant log10 VMR must not exceed zero"
+                )
+            ratio = float(10.0**log10_vmr)
+            if not np.isfinite(ratio) or ratio <= 0.0:
+                raise RobertValidationError(
+                    f"{label} constant VMR must be finite and positive"
+                )
+            profiles[label] = _readonly_constant_profile(
+                ratio, pressure_grid.n_layers
+            )
         return profiles
 
     @cached_property

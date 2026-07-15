@@ -1,6 +1,6 @@
 # ROBERT cloud-free emission retrieval: WASP-69b NIRCam + MIRI native modes.
 # Paths below are explicit DiRAC paths. Copy this file for each science run.
-schema_version: 1
+schema_version: 2
 
 run:
   name: wasp69b-cloud-free-native-modes-R1000
@@ -15,6 +15,9 @@ bodies:
     name: WASP-69
     radius_m: 565568100.0      # 0.813 R_Sun
     effective_temperature_k: 4750.0
+    log_g_cgs: 4.5
+    metallicity_dex: 0.0       # Closest PHOENIX node; matches Schlawin BOSZ [M/H]
+    spectrum_model: phoenix    # Alternative: blackbody
 
 observations:
   loader: schlawin2024_wasp69b
@@ -43,9 +46,11 @@ atmosphere:
       - {label: CO,  fastchem_name: C1O1}
       - {label: CH4, fastchem_name: C1H4}
       - {label: NH3, fastchem_name: H3N1}
-      - {label: HCN, fastchem_name: C1H1N1_1}
+      - {label: SO2, fastchem_name: O2S1}
       - {label: H2,  fastchem_name: H2}
       - {label: He,  fastchem_name: He}
+    # Schlawin et al. retrieved SO2 independently of equilibrium chemistry.
+    constant_log10_vmr_parameters: {SO2: log_SO2}
 
 clouds:
   model: none
@@ -54,7 +59,7 @@ opacity:
   format: exomol_kta
   path: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
   resolution: R1000          # Change to R15000 to select that directory/file suffix
-  species: [H2O, CO2, CO, CH4, NH3, HCN]
+  species: [H2O, CO2, CO, CH4, NH3, SO2]
   cache_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-cache/wasp69b_native_modes
   binning:
     num: 300
@@ -101,6 +106,10 @@ parameters:
   - name: alpha
     prior: {type: uniform, lower: 0.0, upper: 1.0}
     value: 0.5
+  - name: log_SO2
+    label: log10(SO2 VMR)
+    prior: {type: uniform, lower: -10.0, upper: -4.0}
+    value: -8.0
 
 sampler:
   engine: ultranest

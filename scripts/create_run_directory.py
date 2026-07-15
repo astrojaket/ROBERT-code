@@ -37,6 +37,7 @@ source "${{ROBERT_CONDA_ROOT:-${{HOME}}/miniconda3}}/etc/profile.d/conda.sh"
 conda activate "${{ROBERT_CONDA_ENV:-robert-exoplanets}}"
 export OMP_NUM_THREADS=1
 export NUMBA_NUM_THREADS=1
+export PYSYN_CDBS="${{PYSYN_CDBS:-/scratch/dp448/dc-tayl1/grp/redcat/trds}}"
 
 mpirun -np "${{SLURM_NTASKS}}" python -u run_retrieval.py --config configuration.yaml
 """
@@ -57,6 +58,11 @@ writable paths are deliberately local to this directory:
 The input data, FastChem, and K-table paths remain the values selected in the
 source configuration. `source_configuration.yaml` is the unmodified copy for
 comparison.
+
+The submission script sets `PYSYN_CDBS` to
+`/scratch/dp448/dc-tayl1/grp/redcat/trds` by default, which is the directory
+above the shared `grid/phoenix` atlas. An existing exported value takes
+precedence.
 
 `submit.sbatch` requests {ntasks} MPI rank(s) across {nodes} node(s) and sends
 BEGIN, END, and FAIL notifications to `jake.taylor@physics.ox.ac.uk`.
@@ -138,9 +144,9 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     load_task_config(execution_config)
 
     is_oe_only = config.sampler.engine == "optimal_estimation"
-    nodes = 1 if is_oe_only else 2
+    nodes = 1
     ntasks = 1 if is_oe_only else 128
-    ntasks_per_node = 1 if is_oe_only else 64
+    ntasks_per_node = 1 if is_oe_only else 128
     (run_directory / "submit.sbatch").write_text(
         _SBATCH.format(
             run_name=run_name,

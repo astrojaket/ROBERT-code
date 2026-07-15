@@ -2,12 +2,20 @@
 
 ## Unreleased
 
+- Aligned the WASP-69 sampler benchmark with the Schlawin analysis by using
+  the 4750 K, log(g)=4.5, solar-metallicity PHOENIX grid point and the H2O,
+  CO2, CO, CH4, NH3, and independently retrieved SO2 opacity set; all nested
+  phases now use 400 live points on one 128-task node.
 - Fixed multi-dataset retrieval manifests and added the flattened Gaussian
   data contract required for configured optimal-estimation runs; smoke checks
   now preflight manifest serialization for every configured inference phase.
 - Changed configured UltraNest runs to converge without a likelihood-call cap
   by default and report call-limit finalization explicitly when an optional
   finite cap is used.
+- Made STScI PHOENIX stellar-atmosphere spectra the default emission
+  denominator, with explicit temperature/metallicity/log(g) interpolation,
+  bolometric normalization, flux-conserving binning, immutable provenance, a
+  blackbody option, and a Sun-like G-star benchmark.
 - Added general retrieval and forward-model post-processing with fit
   statistics, residual and posterior/OE plots, a WASP-69b sampler benchmark
   comparison, editable colour/style controls, and an optional YAML automatic

@@ -33,6 +33,8 @@ STAR = Star(
     name="WASP-69",
     radius_m=0.813 * SOLAR_RADIUS_M,
     effective_temperature_k=4750.0,
+    log_g_cgs=4.5,
+    metallicity_dex=0.15,
 )
 PLANET_GRAVITY_M_S2 = (
     GRAVITATIONAL_CONSTANT_M3_KG_S2 * PLANET.mass_kg / PLANET.radius_m**2

@@ -288,6 +288,8 @@ def build_problem(
         name=star_item.name,
         radius_m=star_item.radius_m,
         effective_temperature_k=star_item.effective_temperature_k,
+        log_g_cgs=star_item.log_g_cgs,
+        metallicity_dex=star_item.metallicity_dex,
     )
     pressure_item = config.atmosphere.pressure
     pressure = PressureGrid.from_log_centers(
@@ -349,6 +351,9 @@ def build_problem(
             labels=tuple(item.label for item in chemistry_item.species),
             metallicity_parameter_name=chemistry_item.metallicity_parameter,
             carbon_to_oxygen_parameter_name=chemistry_item.carbon_to_oxygen_parameter,
+            constant_log10_vmr_parameters=(
+                chemistry_item.constant_log10_vmr_parameters or {}
+            ),
         )
         mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
     else:
@@ -389,6 +394,7 @@ def build_problem(
         include_rayleigh=rt.include_rayleigh,
         gas_combination=rt.gas_combination,
         thermal_integration_backend=rt.thermal_integration_backend,
+        stellar_spectrum_model=star_item.spectrum_model,
         metadata={"configured_geometry": geometry_item.model},
     )
     configs = {}
