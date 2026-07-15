@@ -1,0 +1,20 @@
+{
+  "case": "synthetic-six-molecule-transmission-injection-recovery",
+  "n_wavelength": 96,
+  "opacity": "ExoMolOP R=15000 H2O/POKAZATEL, CO/Li2015, CO2/UCL-4000, CH4/YT34to10, NH3/CoYuTe, HCN/Harris",
+  "parameters": {
+    "log_CH4": -3.7,
+    "log_CO": -3.0,
+    "log_CO2": -3.5,
+    "log_H2O": -3.2,
+    "log_HCN": -3.8,
+    "log_NH3": -3.6,
+    "radius_scale": 1.003
+  },
+  "seed": 20260716,
+  "uncertainty_ppm": 8.0,
+  "wavelength_micron": [
+    0.6,
+    12.0
+  ]
+}

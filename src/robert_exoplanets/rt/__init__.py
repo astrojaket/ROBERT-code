@@ -14,6 +14,7 @@ from .clouds import (
     grey_cloud_deck,
     grey_cloud_from_mass_extinction,
     power_law_haze,
+    power_law_haze_from_mass_extinction,
 )
 from .cloud_io import (
     load_cloud_optical_properties_csv,
@@ -147,6 +148,7 @@ __all__ = [
     "grey_cloud_deck",
     "grey_cloud_from_mass_extinction",
     "power_law_haze",
+    "power_law_haze_from_mass_extinction",
     "jax_random_overlap_device_info",
     "jax_random_overlap_species_tau",
     "random_overlap_species_tau",

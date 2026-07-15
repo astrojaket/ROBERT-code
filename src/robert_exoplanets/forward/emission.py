@@ -41,7 +41,11 @@ from robert_exoplanets.rt import (
 )
 from robert_exoplanets.stellar import prepare_stellar_spectrum
 
-from ._atmospheric import evaluate_gas_optical_depth
+from ._atmospheric import (
+    evaluate_additional_optical_depths,
+    evaluate_gas_optical_depth,
+)
+from .clouds import ParameterizedCloudModel
 
 GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 
@@ -512,7 +516,7 @@ class EmissionForwardModel:
 
 @dataclass(frozen=True)
 class ParameterizedEmissionForwardModel:
-    """Cloud-free emission model with runtime temperature and chemistry profiles."""
+    """Emission model with shared runtime atmosphere and cloud parameterizations."""
 
     planet: Planet
     star: Star
@@ -522,6 +526,7 @@ class ParameterizedEmissionForwardModel:
     config: ParameterizedEmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     geometry: DiscGeometry | None = None
+    cloud_model: ParameterizedCloudModel | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
     prepared_stellar_spectrum: Spectrum = field(init=False, repr=False)
     gravity_m_s2: float = field(init=False)
@@ -599,6 +604,8 @@ class ParameterizedEmissionForwardModel:
         ]
         if self.config.radius_scale_parameter is not None:
             parameters.append(self.config.radius_scale_parameter)
+        if self.cloud_model is not None:
+            parameters.extend(self.cloud_model.required_parameters)
         return tuple(parameters)
 
     @property
@@ -703,6 +710,11 @@ class ParameterizedEmissionForwardModel:
                     f"chemistry_{key}": str(value)
                     for key, value in chemistry_metadata.items()
                 },
+                **(
+                    {}
+                    if self.cloud_model is None
+                    else dict(self.cloud_model.manifest_metadata)
+                ),
                 **dict(self.config.metadata),
             }
         )
@@ -770,21 +782,21 @@ class ParameterizedEmissionForwardModel:
             gas_combination=self.config.gas_combination,
             retain_species_tau=self.config.compute_diagnostics,
         )
-        additional_optical_depths = []
-        for table in self.cia_tables:
-            additional_optical_depths.append(
-                cia_optical_depth(
-                    gas_optical_depth,
-                    table,
-                    normal_hydrogen=self.config.cia_normal_hydrogen,
-                    temperature_extrapolation=self.config.cia_temperature_extrapolation,
-                    spectral_extrapolation=self.config.cia_spectral_extrapolation,
-                )
-            )
-        if self.config.include_rayleigh:
-            additional_optical_depths.append(
-                rayleigh_scattering_optical_depth(gas_optical_depth)
-            )
+        additional_optical_depths = evaluate_additional_optical_depths(
+            gas_optical_depth,
+            cia_tables=self.cia_tables,
+            include_rayleigh=self.config.include_rayleigh,
+            cia_normal_hydrogen=self.config.cia_normal_hydrogen,
+            cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
+            cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+            cloud_model=self.cloud_model,
+            parameters=parameter_values,
+        )
+        multiple_scattering_backend = (
+            "none"
+            if self.cloud_model is None
+            else self.cloud_model.multiple_scattering_backend
+        )
         radius_scale = (
             1.0
             if self.config.radius_scale_parameter is None
@@ -801,6 +813,7 @@ class ParameterizedEmissionForwardModel:
                 star_radius_m=self.star.radius_m,
                 stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
+                multiple_scattering_backend=multiple_scattering_backend,
             )
         result = solve_emission(
             gas_optical_depth,
@@ -810,10 +823,11 @@ class ParameterizedEmissionForwardModel:
             star_radius_m=self.star.radius_m,
             stellar_spectrum=self.prepared_stellar_spectrum,
             thermal_integration_backend=self.config.thermal_integration_backend,
+            multiple_scattering_backend=multiple_scattering_backend,
         )
         if result.eclipse_depth is None:
             raise RobertValidationError(
-                "cloud-free emission solver did not return eclipse depth"
+                "emission solver did not return eclipse depth"
             )
         return result.eclipse_depth
 

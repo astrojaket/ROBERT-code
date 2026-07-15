@@ -1,0 +1,96 @@
+{
+  "case_name": "synthetic-six-molecule-transmission-injection-recovery",
+  "chi_square": 83.7898068431816,
+  "fit_passed": true,
+  "inference_converged": true,
+  "metadata": {
+    "live_points": "40",
+    "mpi_processes": "2",
+    "opacity": "ExoMolOP R=15000 H2O/POKAZATEL, CO/Li2015, CO2/UCL-4000, CH4/YT34to10, NH3/CoYuTe, HCN/Harris",
+    "sampler": "MultiNest",
+    "wavelength_bins": "96"
+  },
+  "n_active_points": 96,
+  "n_parameters": 7,
+  "parameter_recoveries": [
+    {
+      "absolute_error": 0.03908481955062815,
+      "absolute_tolerance": 0.3,
+      "estimate": -3.2390848195506283,
+      "name": "log_H2O",
+      "passed": true,
+      "posterior_standard_deviation": 0.021717897193092164,
+      "standardized_error": 1.7996594791442286,
+      "truth": -3.2
+    },
+    {
+      "absolute_error": 0.03330775501897154,
+      "absolute_tolerance": 0.35,
+      "estimate": -3.0333077550189715,
+      "name": "log_CO",
+      "passed": true,
+      "posterior_standard_deviation": 0.10237060511021678,
+      "standardized_error": 0.32536444405218584,
+      "truth": -3.0
+    },
+    {
+      "absolute_error": 0.032656265422599695,
+      "absolute_tolerance": 0.3,
+      "estimate": -3.5326562654225997,
+      "name": "log_CO2",
+      "passed": true,
+      "posterior_standard_deviation": 0.023502446065070518,
+      "standardized_error": 1.3894836874504581,
+      "truth": -3.5
+    },
+    {
+      "absolute_error": 0.020877268990467712,
+      "absolute_tolerance": 0.35,
+      "estimate": -3.720877268990468,
+      "name": "log_CH4",
+      "passed": true,
+      "posterior_standard_deviation": 0.018654328524713885,
+      "standardized_error": 1.119164861003107,
+      "truth": -3.7
+    },
+    {
+      "absolute_error": 0.015235617956207204,
+      "absolute_tolerance": 0.35,
+      "estimate": -3.6152356179562073,
+      "name": "log_NH3",
+      "passed": true,
+      "posterior_standard_deviation": 0.017473925012201286,
+      "standardized_error": 0.8719058795072561,
+      "truth": -3.6
+    },
+    {
+      "absolute_error": 0.061536326862814406,
+      "absolute_tolerance": 0.4,
+      "estimate": -3.8615363268628142,
+      "name": "log_HCN",
+      "passed": true,
+      "posterior_standard_deviation": 0.037219743677865284,
+      "standardized_error": 1.6533248427342149,
+      "truth": -3.8
+    },
+    {
+      "absolute_error": 0.00016015148636161491,
+      "absolute_tolerance": 0.001,
+      "estimate": 1.0031601514863615,
+      "name": "radius_scale",
+      "passed": true,
+      "posterior_standard_deviation": 0.00010791655509449769,
+      "standardized_error": 1.4840307515503757,
+      "truth": 1.003
+    }
+  ],
+  "parameters_passed": true,
+  "passed": true,
+  "reduced_chi_square": 0.941458503855973,
+  "reduced_chi_square_bounds": [
+    0.7,
+    1.3
+  ],
+  "schema_version": "1.0",
+  "seed": 20260716
+}

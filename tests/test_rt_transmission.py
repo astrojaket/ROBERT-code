@@ -7,6 +7,7 @@ import pytest
 
 from robert_exoplanets import (
     AtmosphereState,
+    CloudOpticalProperties,
     EvaluatedCorrelatedKOpacity,
     PreparedCorrelatedKOpacity,
     LayerOpticalDepth,
@@ -84,6 +85,30 @@ def test_additional_extinction_increases_transit_depth() -> None:
     )
 
     assert np.all(extinct.transit_depth.values > clear.transit_depth.values)
+
+
+def test_transmission_accepts_shared_cloud_optical_properties() -> None:
+    gas_tau, path = _one_layer_case(np.array([0.0]))
+    cloud = CloudOpticalProperties(
+        name="shared cloud",
+        extinction_tau=np.ones((1, 1)),
+        pressure_grid=gas_tau.pressure_grid,
+        spectral_grid=gas_tau.spectral_grid,
+        single_scattering_albedo=0.9,
+        asymmetry_factor=0.5,
+    )
+
+    result = solve_absorption_transmission(
+        gas_tau,
+        path,
+        star_radius_m=7.0e8,
+        additional_optical_depths=[cloud],
+    )
+
+    assert result.metadata["opacity_sources"] == "gas+shared cloud"
+    assert result.transit_depth.values[0] > (
+        path.bottom_radius_m / 7.0e8
+    ) ** 2
 
 
 def test_transmission_rejects_mismatched_optical_depth_grid() -> None:

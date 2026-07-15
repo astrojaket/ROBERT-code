@@ -272,6 +272,69 @@ def power_law_haze(
     )
 
 
+def power_law_haze_from_mass_extinction(
+    gas_optical_depth: GasOpticalDepth,
+    *,
+    mass_extinction_at_reference_cm2_g: float,
+    reference_wavelength_micron: float = 1.0,
+    slope: float = -4.0,
+    name: str = "well-mixed power-law haze",
+    single_scattering_albedo: ArrayLike | float = 1.0,
+    asymmetry_factor: ArrayLike | float = 0.0,
+) -> CloudOpticalProperties:
+    """Create a well-mixed power-law haze from bulk-atmosphere mass opacity.
+
+    The reference mass-extinction coefficient is in ``cm2/g`` of bulk
+    atmosphere. Hydrostatic mass columns set the vertical distribution, while
+    the spectral dependence is ``(wavelength / reference_wavelength)**slope``.
+    The same optical properties can be consumed by emission or transmission
+    radiative transfer.
+    """
+
+    opacity = _non_negative_scalar(
+        mass_extinction_at_reference_cm2_g,
+        "mass_extinction_at_reference_cm2_g",
+    )
+    reference_wavelength = _positive_scalar(
+        reference_wavelength_micron,
+        "reference_wavelength_micron",
+    )
+    spectral_slope = float(slope)
+    if not np.isfinite(spectral_slope):
+        raise RobertValidationError("slope must be finite")
+    wavelength = spectral_grid_values_in_unit(
+        gas_optical_depth.spectral_grid,
+        "micron",
+    )
+    layer_tau_reference = (
+        opacity
+        * 0.1
+        * gas_optical_depth.layer_pressure_thickness_pa
+        / gas_optical_depth.gravity_m_s2
+    )
+    spectral_scale = np.power(
+        wavelength / reference_wavelength,
+        spectral_slope,
+    )
+    tau = layer_tau_reference[:, None] * spectral_scale[None, :]
+    return CloudOpticalProperties(
+        name=name,
+        extinction_tau=tau,
+        spectral_grid=gas_optical_depth.spectral_grid,
+        pressure_grid=gas_optical_depth.pressure_grid,
+        single_scattering_albedo=single_scattering_albedo,
+        asymmetry_factor=asymmetry_factor,
+        metadata={
+            "vertical_model": "well_mixed_bulk_mass_extinction",
+            "spectral_model": "power_law",
+            "reference_wavelength_micron": f"{reference_wavelength:.12g}",
+            "mass_extinction_at_reference_cm2_g": f"{opacity:.17g}",
+            "slope": f"{spectral_slope:.12g}",
+            "hydrostatic_conversion": "tau=kappa*delta_pressure/gravity",
+        },
+    )
+
+
 def _readonly_array(
     values: ArrayLike,
     name: str,

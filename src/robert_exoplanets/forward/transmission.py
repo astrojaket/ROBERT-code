@@ -26,14 +26,16 @@ from robert_exoplanets.opacity import (
 from robert_exoplanets.rt import (
     AbsorptionTransmissionResult,
     CiaTable,
-    cia_optical_depth,
     hydrostatic_path_geometry,
     inverse_square_hydrostatic_path_geometry,
-    rayleigh_scattering_optical_depth,
     solve_absorption_transmission,
 )
 
-from ._atmospheric import evaluate_gas_optical_depth
+from ._atmospheric import (
+    evaluate_additional_optical_depths,
+    evaluate_gas_optical_depth,
+)
+from .clouds import ParameterizedCloudModel
 
 GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 
@@ -134,6 +136,7 @@ class ParameterizedTransmissionForwardModel:
     opacity_provider: OpacityProvider
     config: ParameterizedTransmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
+    cloud_model: ParameterizedCloudModel | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -209,6 +212,8 @@ class ParameterizedTransmissionForwardModel:
         ]
         if self.config.radius_scale_parameter is not None:
             parameters.append(self.config.radius_scale_parameter)
+        if self.cloud_model is not None:
+            parameters.extend(self.cloud_model.required_parameters)
         return tuple(parameters)
 
     @property
@@ -274,6 +279,11 @@ class ParameterizedTransmissionForwardModel:
                         else (self.spectral_grid.bin_edges,)
                     ),
                     labels=(self.spectral_grid.unit,),
+                ),
+                **(
+                    {}
+                    if self.cloud_model is None
+                    else dict(self.cloud_model.manifest_metadata)
                 ),
                 **dict(self.config.metadata),
             }
@@ -353,22 +363,16 @@ class ParameterizedTransmissionForwardModel:
             gas_combination=self.config.gas_combination,
             retain_species_tau=False,
         )
-        additional_optical_depths = [
-            cia_optical_depth(
-                gas_optical_depth,
-                table,
-                normal_hydrogen=self.config.cia_normal_hydrogen,
-                temperature_extrapolation=(
-                    self.config.cia_temperature_extrapolation
-                ),
-                spectral_extrapolation=self.config.cia_spectral_extrapolation,
-            )
-            for table in self.cia_tables
-        ]
-        if self.config.include_rayleigh:
-            additional_optical_depths.append(
-                rayleigh_scattering_optical_depth(gas_optical_depth)
-            )
+        additional_optical_depths = evaluate_additional_optical_depths(
+            gas_optical_depth,
+            cia_tables=self.cia_tables,
+            include_rayleigh=self.config.include_rayleigh,
+            cia_normal_hydrogen=self.config.cia_normal_hydrogen,
+            cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
+            cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+            cloud_model=self.cloud_model,
+            parameters=parameter_values,
+        )
         result = solve_absorption_transmission(
             gas_optical_depth,
             path_geometry,

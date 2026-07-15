@@ -87,7 +87,14 @@ def solve_absorption_transmission(
     opacity_sources = ["gas"]
     for contribution in additional_optical_depths or ():
         _validate_contribution_grid_match(gas_optical_depth, contribution)
-        values = np.asarray(getattr(contribution, "tau", contribution), dtype=float)
+        values = np.asarray(
+            getattr(
+                contribution,
+                "extinction_tau",
+                getattr(contribution, "tau", contribution),
+            ),
+            dtype=float,
+        )
         name = str(getattr(contribution, "name", type(contribution).__name__))
         if values.shape == tau.shape[:2]:
             values = values[:, :, None]

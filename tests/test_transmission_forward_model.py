@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -10,6 +12,7 @@ from robert_exoplanets import (
     CorrelatedKTable,
     FreeChemistry,
     IsothermalTemperatureProfile,
+    ParameterizedDeckHazeCloudModel,
     ParameterizedTransmissionFactoryConfig,
     ParameterizedTransmissionModelConfig,
     Planet,
@@ -142,6 +145,40 @@ def test_transmission_depth_responds_to_abundance_and_reference_radius() -> None
 
     assert np.all(high_abundance.values > low_abundance.values)
     assert np.all(larger_radius.values > low_abundance.values)
+
+
+def test_transmission_uses_shared_parameterized_deck_haze_model() -> None:
+    clear_factory = _factory()
+    cloud_model = ParameterizedDeckHazeCloudModel(
+        deck_single_scattering_albedo=0.0,
+        haze_single_scattering_albedo=1.0,
+    )
+    cloudy = build_parameterized_transmission_model(
+        replace(clear_factory, cloud_model=cloud_model),
+        spectral_grid=_spectral_grid(),
+    )
+    clear = build_parameterized_transmission_model(
+        clear_factory,
+        spectral_grid=_spectral_grid(),
+    )
+    parameters = {
+        "temperature": 1000.0,
+        "log_h2o": -6.0,
+        "radius_scale": 1.0,
+        "log_cloud_top_pressure_bar": -2.0,
+        "log_cloud_optical_depth": 1.0,
+        "log_haze_mass_extinction": -5.0,
+        "haze_slope": -4.0,
+    }
+
+    cloudy_spectrum = cloudy(parameters)
+    clear_spectrum = clear(
+        {name: parameters[name] for name in clear.required_parameters}
+    )
+
+    assert cloudy.required_parameters == tuple(parameters)
+    assert cloudy.manifest_metadata["cloud_geometry_independent"] == "true"
+    assert np.all(cloudy_spectrum.values > clear_spectrum.values)
 
 
 def test_transmission_model_validates_radius_and_gravity_choices() -> None:

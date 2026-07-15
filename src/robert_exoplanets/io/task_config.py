@@ -255,6 +255,45 @@ class CloudFreeConfig(ConfigModel):
 ClearCloudConfig = CloudFreeConfig
 
 
+class DeckHazeCloudConfig(ConfigModel):
+    """Shared grey-deck and well-mixed power-law haze parameterization."""
+
+    model: Literal["deck_haze"]
+    log10_cloud_top_pressure_bar_parameter: str = Field(
+        default="log_cloud_top_pressure_bar",
+        min_length=1,
+    )
+    log10_cloud_optical_depth_parameter: str = Field(
+        default="log_cloud_optical_depth",
+        min_length=1,
+    )
+    log10_haze_mass_extinction_parameter: str = Field(
+        default="log_haze_mass_extinction",
+        min_length=1,
+    )
+    haze_slope_parameter: str = Field(default="haze_slope", min_length=1)
+    haze_reference_wavelength_micron: PositiveFloat = 1.0
+    deck_single_scattering_albedo: float = Field(default=0.0, ge=0.0, le=1.0)
+    deck_asymmetry_factor: float = Field(default=0.0, ge=-1.0, le=1.0)
+    haze_single_scattering_albedo: float = Field(default=1.0, ge=0.0, le=1.0)
+    haze_asymmetry_factor: float = Field(default=0.0, ge=-1.0, le=1.0)
+    multiple_scattering_backend: Literal[
+        "none", "two_stream", "toon_hemispheric_mean", "sh4", "p3"
+    ] = "sh4"
+
+    @model_validator(mode="after")
+    def validate_parameter_names(self) -> "DeckHazeCloudConfig":
+        names = (
+            self.log10_cloud_top_pressure_bar_parameter,
+            self.log10_cloud_optical_depth_parameter,
+            self.log10_haze_mass_extinction_parameter,
+            self.haze_slope_parameter,
+        )
+        if len(set(names)) != len(names):
+            raise ValueError("deck+haze cloud parameter names must be unique")
+        return self
+
+
 class MieCatalogCloudConfig(ConfigModel):
     """Fixed laboratory optical constants with retrieved cloud structure."""
 
@@ -323,7 +362,10 @@ class MieDirectNkCloudConfig(ConfigModel):
 
 
 CloudsConfig = Annotated[
-    CloudFreeConfig | MieCatalogCloudConfig | MieDirectNkCloudConfig,
+    CloudFreeConfig
+    | DeckHazeCloudConfig
+    | MieCatalogCloudConfig
+    | MieDirectNkCloudConfig,
     Field(discriminator="model"),
 ]
 
@@ -590,9 +632,9 @@ class TaskConfig(ConfigModel):
             required.add(self.observations.miri_offset_parameter)
         radiative_transfer = self.radiative_transfer
         if radiative_transfer.model == "transmission":
-            if self.clouds.model != "none":
+            if self.clouds.model in {"mie_catalog", "mie_direct_nk"}:
                 raise ValueError(
-                    "configured transmission currently supports cloud-free models only"
+                    "configured transmission does not yet support Mie cloud models"
                 )
             if not (
                 self.atmosphere.pressure.top_bar
@@ -611,7 +653,14 @@ class TaskConfig(ConfigModel):
                 + ", ".join(missing_parameters)
             )
         clouds = self.clouds
-        if clouds.model != "none":
+        if clouds.model == "deck_haze":
+            cloud_parameters = {
+                clouds.log10_cloud_top_pressure_bar_parameter,
+                clouds.log10_cloud_optical_depth_parameter,
+                clouds.log10_haze_mass_extinction_parameter,
+                clouds.haze_slope_parameter,
+            }
+        elif clouds.model != "none":
             cloud_parameters = {
                 clouds.log10_mass_fraction_parameter,
                 clouds.log10_radius_micron_parameter,
@@ -621,6 +670,9 @@ class TaskConfig(ConfigModel):
             if clouds.model == "mie_direct_nk":
                 cloud_parameters.update(clouds.real_index_parameter_names)
                 cloud_parameters.update(clouds.log10_imaginary_index_parameter_names)
+        else:
+            cloud_parameters = set()
+        if cloud_parameters:
             missing_cloud_parameters = sorted(cloud_parameters - set(names))
             if missing_cloud_parameters:
                 raise ValueError(

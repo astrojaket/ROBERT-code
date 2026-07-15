@@ -1,0 +1,23 @@
+{
+  "attempt_id": "20260715T193755.604044Z-local-0-48320",
+  "converged": true,
+  "elapsed_seconds": 150.88455041701673,
+  "evidence_tolerance": 0.5,
+  "hostname": "aoppmaclap37",
+  "log_evidence": 967.0627535438888,
+  "log_evidence_error": 0.041089016316664,
+  "max_iter": 0,
+  "message": "converged",
+  "mpi_nprocs": 2,
+  "n_live_points": 40,
+  "n_samples": 660,
+  "pid": 48320,
+  "resume": false,
+  "sampling_efficiency": 0.8,
+  "seed": 20260716,
+  "slurm_array_task_id": null,
+  "slurm_job_id": null,
+  "started_at_utc": "2026-07-15T19:37:55.604033+00:00",
+  "state": "converged",
+  "updated_at_utc": "2026-07-15T19:40:26.489181+00:00"
+}

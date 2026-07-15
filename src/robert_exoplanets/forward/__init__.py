@@ -1,5 +1,7 @@
 """Forward-model orchestration helpers."""
 
+from .clouds import ParameterizedCloudModel, ParameterizedDeckHazeCloudModel
+
 from .emission import (
     ClearSkyEmissionForwardModel,
     ClearSkyEmissionModelConfig,
@@ -64,6 +66,8 @@ __all__ = [
     "NativeSpectrumMultiDatasetForwardModel",
     "NativeSpectrumMultiDatasetPrediction",
     "ParameterizedEmissionFactoryConfig",
+    "ParameterizedCloudModel",
+    "ParameterizedDeckHazeCloudModel",
     "ParameterizedEmissionForwardModel",
     "ParameterizedTransmissionFactoryConfig",
     "ParameterizedTransmissionForwardModel",

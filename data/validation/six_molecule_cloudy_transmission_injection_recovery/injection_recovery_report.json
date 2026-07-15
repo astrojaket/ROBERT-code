@@ -1,0 +1,136 @@
+{
+  "case_name": "synthetic-six-molecule-cloudy-transmission-injection-recovery",
+  "chi_square": 81.30119885485962,
+  "fit_passed": true,
+  "inference_converged": true,
+  "metadata": {
+    "live_points": "50",
+    "mpi_processes": "2",
+    "opacity": "ExoMolOP R=15000 H2O/POKAZATEL, CO/Li2015, CO2/UCL-4000, CH4/YT34to10, NH3/CoYuTe, HCN/Harris",
+    "sampler": "MultiNest",
+    "wavelength_bins": "96"
+  },
+  "n_active_points": 96,
+  "n_parameters": 11,
+  "parameter_recoveries": [
+    {
+      "absolute_error": 0.12373033492350016,
+      "absolute_tolerance": 0.3,
+      "estimate": -3.3237303349235003,
+      "name": "log_H2O",
+      "passed": true,
+      "posterior_standard_deviation": 0.10342166960397797,
+      "standardized_error": 1.1963676026241703,
+      "truth": -3.2
+    },
+    {
+      "absolute_error": 0.18838169735749366,
+      "absolute_tolerance": 0.35,
+      "estimate": -3.1883816973574937,
+      "name": "log_CO",
+      "passed": true,
+      "posterior_standard_deviation": 0.1319879061117332,
+      "standardized_error": 1.4272648374163979,
+      "truth": -3.0
+    },
+    {
+      "absolute_error": 0.15286229408196483,
+      "absolute_tolerance": 0.3,
+      "estimate": -3.652862294081965,
+      "name": "log_CO2",
+      "passed": true,
+      "posterior_standard_deviation": 0.11018513929954556,
+      "standardized_error": 1.387322238313813,
+      "truth": -3.5
+    },
+    {
+      "absolute_error": 0.13547127195946151,
+      "absolute_tolerance": 0.35,
+      "estimate": -3.8354712719594617,
+      "name": "log_CH4",
+      "passed": true,
+      "posterior_standard_deviation": 0.10000357869842813,
+      "standardized_error": 1.354664240246743,
+      "truth": -3.7
+    },
+    {
+      "absolute_error": 0.10283906616841376,
+      "absolute_tolerance": 0.35,
+      "estimate": -3.702839066168414,
+      "name": "log_NH3",
+      "passed": true,
+      "posterior_standard_deviation": 0.0993587287038124,
+      "standardized_error": 1.0350279991501925,
+      "truth": -3.6
+    },
+    {
+      "absolute_error": 0.12255218407255475,
+      "absolute_tolerance": 0.4,
+      "estimate": -3.9225521840725546,
+      "name": "log_HCN",
+      "passed": true,
+      "posterior_standard_deviation": 0.10711675666896474,
+      "standardized_error": 1.1440990922764016,
+      "truth": -3.8
+    },
+    {
+      "absolute_error": 0.0007945737302177402,
+      "absolute_tolerance": 0.001,
+      "estimate": 1.0037945737302176,
+      "name": "radius_scale",
+      "passed": true,
+      "posterior_standard_deviation": 0.0007888700321136639,
+      "standardized_error": 1.0072302126736823,
+      "truth": 1.003
+    },
+    {
+      "absolute_error": 0.14510166653427792,
+      "absolute_tolerance": 0.35,
+      "estimate": -2.854898333465722,
+      "name": "log_cloud_top_pressure_bar",
+      "passed": true,
+      "posterior_standard_deviation": 0.09693423965963703,
+      "standardized_error": 1.4969082859036196,
+      "truth": -3.0
+    },
+    {
+      "absolute_error": 0.047172584654654015,
+      "absolute_tolerance": 0.5,
+      "estimate": -0.952827415345346,
+      "name": "log_cloud_optical_depth",
+      "passed": true,
+      "posterior_standard_deviation": 0.0450264513481723,
+      "standardized_error": 1.0476638340846915,
+      "truth": -1.0
+    },
+    {
+      "absolute_error": 0.5418381207597385,
+      "absolute_tolerance": 0.75,
+      "estimate": -4.841838120759738,
+      "name": "log_haze_mass_extinction",
+      "passed": true,
+      "posterior_standard_deviation": 0.3058302454602142,
+      "standardized_error": 1.7716956671318724,
+      "truth": -4.3
+    },
+    {
+      "absolute_error": 1.2323004364143735,
+      "absolute_tolerance": 1.5,
+      "estimate": -5.2323004364143735,
+      "name": "haze_slope",
+      "passed": true,
+      "posterior_standard_deviation": 1.0914186949015485,
+      "standardized_error": 1.1290812977374676,
+      "truth": -4.0
+    }
+  ],
+  "parameters_passed": true,
+  "passed": true,
+  "reduced_chi_square": 0.9564846924101131,
+  "reduced_chi_square_bounds": [
+    0.7,
+    1.3
+  ],
+  "schema_version": "1.0",
+  "seed": 20260717
+}

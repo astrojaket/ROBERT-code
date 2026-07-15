@@ -30,6 +30,7 @@ from robert_exoplanets.core import PressureGrid
 from robert_exoplanets.forward import (
     ParameterizedEmissionFactoryConfig,
     ParameterizedEmissionModelConfig,
+    ParameterizedDeckHazeCloudModel,
     ParameterizedTransmissionFactoryConfig,
     ParameterizedTransmissionModelConfig,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
@@ -531,6 +532,32 @@ def build_problem(
     spectral_grids = {}
     clouds = config.clouds
     cloud = None
+    shared_cloud_model = None
+    if clouds.model == "deck_haze":
+        shared_cloud_model = ParameterizedDeckHazeCloudModel(
+            log10_cloud_top_pressure_bar_parameter=(
+                clouds.log10_cloud_top_pressure_bar_parameter
+            ),
+            log10_cloud_optical_depth_parameter=(
+                clouds.log10_cloud_optical_depth_parameter
+            ),
+            log10_haze_mass_extinction_parameter=(
+                clouds.log10_haze_mass_extinction_parameter
+            ),
+            haze_slope_parameter=clouds.haze_slope_parameter,
+            haze_reference_wavelength_micron=(
+                clouds.haze_reference_wavelength_micron
+            ),
+            deck_single_scattering_albedo=(
+                clouds.deck_single_scattering_albedo
+            ),
+            deck_asymmetry_factor=clouds.deck_asymmetry_factor,
+            haze_single_scattering_albedo=(
+                clouds.haze_single_scattering_albedo
+            ),
+            haze_asymmetry_factor=clouds.haze_asymmetry_factor,
+            multiple_scattering_backend=clouds.multiple_scattering_backend,
+        )
     if clouds.model == "mie_catalog":
         cloud = RefractiveIndexCloudConfig(
             refractive_index_wavelength_micron=(),
@@ -600,6 +627,7 @@ def build_problem(
                 opacity_source=provider,
                 opacity_binning=None,
                 model=model_config,
+                cloud_model=shared_cloud_model,
             )
             cloud_models[dataset.name] = build_parameterized_transmission_model(
                 factory,
@@ -618,6 +646,7 @@ def build_problem(
                 opacity_source=provider,
                 opacity_binning=None,
                 model=model_config,
+                cloud_model=shared_cloud_model,
             )
             if cloud is None:
                 configs[dataset.name] = factory

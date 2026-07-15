@@ -1,4 +1,4 @@
-# ROBERT complete user-editable template (schema version 1).
+# ROBERT complete user-editable template (schema version 2).
 #
 # Start every new project by copying this file. Keep ONLY one active choice for
 # each model block. Commented entries are valid options or priors but are not
@@ -136,6 +136,22 @@ atmosphere:
 clouds:
   model: none
 
+  # Shared emission/transmission grey deck plus well-mixed power-law haze:
+  # The same vertical extinction, absorption/scattering split, and parameters
+  # are used in both modes. Transmission removes scattered light from the
+  # direct beam; emission uses the selected multiple-scattering backend.
+  # model: deck_haze
+  # log10_cloud_top_pressure_bar_parameter: log_cloud_top_pressure_bar
+  # log10_cloud_optical_depth_parameter: log_cloud_optical_depth
+  # log10_haze_mass_extinction_parameter: log_haze_mass_extinction
+  # haze_slope_parameter: haze_slope
+  # haze_reference_wavelength_micron: 1.0
+  # deck_single_scattering_albedo: 0.0
+  # deck_asymmetry_factor: 0.0
+  # haze_single_scattering_albedo: 1.0
+  # haze_asymmetry_factor: 0.0
+  # multiple_scattering_backend: sh4 # Alternatives: none, two_stream, toon_hemispheric_mean, p3.
+
   # Fixed-material Mie cloud:
   # model: mie_catalog
   # material: MgSiO3
@@ -230,6 +246,17 @@ parameters:
 
   # --- Optional transmission reference-radius scale ---
   # - {name: radius_scale, prior: {type: uniform, lower: 0.98, upper: 1.02}, value: 1.0}
+
+  # --- Shared deck+haze cloud parameters ---
+  # Broad starting ranges are shown. Constrain cloud-top pressure to the active
+  # pressure grid and narrow priors when external information warrants it.
+  # `log_haze_mass_extinction` is log10(cm2/g of bulk atmosphere), not a
+  # condensate-only opacity. The 50-live-point validation used narrower ranges:
+  # cloud top [-4,-2], deck tau [-2,0], haze extinction [-5.5,-3.5], slope [-6,-1].
+  # - {name: log_cloud_top_pressure_bar, label: log10 cloud-top pressure (bar), unit: dex, prior: {type: uniform, lower: -6.0, upper: 2.0}, value: -3.0}
+  # - {name: log_cloud_optical_depth, label: log10 cloud-deck optical depth, unit: dex, prior: {type: uniform, lower: -4.0, upper: 2.0}, value: -1.0}
+  # - {name: log_haze_mass_extinction, label: log10 haze mass extinction (cm2/g), unit: dex, prior: {type: uniform, lower: -10.0, upper: 0.0}, value: -4.3}
+  # - {name: haze_slope, label: Haze wavelength slope, prior: {type: uniform, lower: -8.0, upper: 2.0}, value: -4.0}
 
   # --- Optional FastChem constant-abundance override ---
   - {name: log_SO2, label: log10(SO2 VMR), prior: {type: uniform, lower: -10.0, upper: -4.0}, value: -8.0}

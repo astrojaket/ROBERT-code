@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added a geometry-independent parameterized grey cloud deck plus well-mixed
+  power-law haze model, shared CIA/Rayleigh/cloud extinction assembly for
+  emission and transmission, and schema-v2 YAML integration for both modes.
+  A real-opacity, six-molecule cloudy transmission closure test retrieves 11
+  gas, radius, deck, and haze parameters with two-core, 50-live-point
+  MultiNest and reduced chi-square 0.956.
+- Added a configured seven-parameter transmission closure test that retrieves
+  H2O, CO, CO2, CH4, NH3, HCN, and reference radius from a deterministic
+  real-opacity injection using two-core MultiNest.
 - Promoted the six-species stable-petitRADTRANS transmission comparison to a
   tracked accuracy/performance gate, including an explicit reference-radius
   convention diagnostic and raw versus radius-aligned residuals.

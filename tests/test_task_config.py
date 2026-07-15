@@ -31,6 +31,16 @@ TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
 TRANSMISSION = (
     ROOT / "configurations" / "synthetic_transmission_injection_recovery_multinest.yaml"
 )
+MULTISPECIES_TRANSMISSION = (
+    ROOT
+    / "configurations"
+    / "synthetic_six_molecule_transmission_injection_recovery_multinest.yaml"
+)
+CLOUDY_MULTISPECIES_TRANSMISSION = (
+    ROOT
+    / "configurations"
+    / "synthetic_six_molecule_cloudy_transmission_injection_recovery_multinest.yaml"
+)
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 
 
@@ -78,6 +88,69 @@ def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 40
     assert config.runtime.mpi_processes == 2
+
+
+def test_yaml_configures_six_molecule_transmission_recovery() -> None:
+    config = load_task_config(MULTISPECIES_TRANSMISSION)
+
+    expected_species = ("H2O", "CO", "CO2", "CH4", "NH3", "HCN")
+    assert config.opacity.species == expected_species
+    assert config.atmosphere.chemistry.species == expected_species
+    assert tuple(config.atmosphere.chemistry.parameter_names) == expected_species
+    assert tuple(item.name for item in config.parameters) == (
+        "log_H2O",
+        "log_CO",
+        "log_CO2",
+        "log_CH4",
+        "log_NH3",
+        "log_HCN",
+        "radius_scale",
+    )
+    assert config.radiative_transfer.gas_combination == "random_overlap"
+    assert config.sampler.live_points == 40
+    assert config.runtime.mpi_processes == 2
+
+
+def test_yaml_configures_cloudy_six_molecule_transmission_recovery() -> None:
+    config = load_task_config(CLOUDY_MULTISPECIES_TRANSMISSION)
+
+    assert config.clouds.model == "deck_haze"
+    assert config.clouds.haze_slope_parameter == "haze_slope"
+    assert tuple(item.name for item in config.parameters)[-4:] == (
+        "log_cloud_top_pressure_bar",
+        "log_cloud_optical_depth",
+        "log_haze_mass_extinction",
+        "haze_slope",
+    )
+    assert config.sampler.live_points == 50
+    assert config.runtime.mpi_processes == 2
+
+
+@pytest.mark.parametrize("source", [MULTISPECIES_TRANSMISSION, EXAMPLE])
+def test_deck_haze_yaml_is_shared_by_transmission_and_emission(source: Path) -> None:
+    config = load_task_config(source)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["clouds"] = {"model": "deck_haze"}
+    raw["parameters"] = [
+        *raw["parameters"],
+        *(
+            {
+                "name": name,
+                "prior": {"type": "uniform", "lower": lower, "upper": upper},
+            }
+            for name, lower, upper in (
+                ("log_cloud_top_pressure_bar", -4.0, 1.0),
+                ("log_cloud_optical_depth", -2.0, 3.0),
+                ("log_haze_mass_extinction", -12.0, -2.0),
+                ("haze_slope", -8.0, 2.0),
+            )
+        ),
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.clouds.model == "deck_haze"
+    assert parsed.clouds.multiple_scattering_backend == "sh4"
 
 
 def test_transmission_radius_parameter_must_be_in_retrieval_parameters() -> None:

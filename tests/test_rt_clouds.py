@@ -17,6 +17,7 @@ from robert_exoplanets import (
     grey_cloud_from_mass_extinction,
     planck_radiance_wavelength,
     power_law_haze,
+    power_law_haze_from_mass_extinction,
     solve_emission,
     solve_emission_spectrum,
     two_stream_scattering_diagnostics,
@@ -126,6 +127,37 @@ def test_power_law_haze_scales_with_wavelength() -> None:
     np.testing.assert_allclose(np.sum(haze.extinction_tau, axis=0), [0.9, 0.9 / 16.0])
     np.testing.assert_allclose(haze.single_scattering_albedo, 1.0)
     assert haze.metadata["spectral_model"] == "power_law"
+
+
+def test_power_law_mass_haze_uses_shared_hydrostatic_vertical_profile() -> None:
+    pressure_grid = _pressure_grid()
+    spectral_grid = SpectralGrid.from_array(
+        [1.0, 2.0], unit="micron", role="opacity"
+    )
+    gas_tau = _zero_gas_tau_for_profile(
+        pressure_grid=pressure_grid,
+        spectral_grid=spectral_grid,
+        temperature=np.full(pressure_grid.n_layers, 1000.0),
+    )
+
+    haze = power_law_haze_from_mass_extinction(
+        gas_tau,
+        mass_extinction_at_reference_cm2_g=2.0,
+        reference_wavelength_micron=1.0,
+        slope=-4.0,
+    )
+
+    expected_reference = (
+        2.0
+        * 0.1
+        * gas_tau.layer_pressure_thickness_pa
+        / gas_tau.gravity_m_s2
+    )
+    np.testing.assert_allclose(haze.extinction_tau[:, 0], expected_reference)
+    np.testing.assert_allclose(
+        haze.extinction_tau[:, 1], expected_reference / 16.0
+    )
+    assert haze.metadata["vertical_model"] == "well_mixed_bulk_mass_extinction"
 
 
 def test_emission_solver_accepts_cloud_optical_properties() -> None:

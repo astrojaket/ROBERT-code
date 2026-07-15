@@ -1,0 +1,63 @@
+{
+  "arrays": "result_arrays.npz",
+  "best_fit_log_likelihood": 997.7939269482276,
+  "best_fit_parameters": {
+    "haze_slope": -5.2323004364143735,
+    "log_CH4": -3.8354712719594617,
+    "log_CO": -3.1883816973574937,
+    "log_CO2": -3.652862294081965,
+    "log_H2O": -3.3237303349235003,
+    "log_HCN": -3.9225521840725546,
+    "log_NH3": -3.702839066168414,
+    "log_cloud_optical_depth": -0.952827415345346,
+    "log_cloud_top_pressure_bar": -2.854898333465722,
+    "log_haze_mass_extinction": -4.841838120759738,
+    "radius_scale": 1.0037945737302176
+  },
+  "config_hash": "ed8ca9d2b70d74403670db04dc05dcc8db6e2fde5dc27541e131b711a08a3005",
+  "converged": true,
+  "git_commit": "b7f95f05eb76be3cd71a6f73e2d84d32156aa15a",
+  "log_evidence": 961.3217834219212,
+  "log_evidence_error": 0.03448334044223756,
+  "manifest": "manifest.json",
+  "message": "converged",
+  "metadata": {
+    "attempt_id": "20260715T195655.999643Z-local-0-60923",
+    "config_hash": "ed8ca9d2b70d74403670db04dc05dcc8db6e2fde5dc27541e131b711a08a3005",
+    "elapsed_seconds": "1453.491487",
+    "inference_elapsed_seconds": "1466.161407",
+    "invalid_loglike_floor": "-1e+100",
+    "max_iter": "0",
+    "mpi_nprocs": "2",
+    "output_dir": "/Users/jaketaylor/Dropbox/ROBERT-code/examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery/multinest",
+    "outputfiles_basename": "/Users/jaketaylor/Dropbox/ROBERT-code/examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery/multinest/chains/1-",
+    "problem": "synthetic-six-molecule-cloudy-transmission-injection-recovery",
+    "resume": "False",
+    "seed": "20260717"
+  },
+  "method": "multinest",
+  "opacity_identifiers": {
+    "synthetic_transit:CH4": "87fe3971038a3b1975a341cf2ef8632d76ec612b093f812479833072c738d11d",
+    "synthetic_transit:CO": "4f66cfca115eeb76fd8580bdf10f616db038d928b4af9d18ddc0c584a7116596",
+    "synthetic_transit:CO2": "de25847fada9879ee11dc9bfd031b57e8747bbef108d05c242b62c2cfe82b314",
+    "synthetic_transit:H2O": "ba9d455db93809661aee79e7d322fde19da0236af1c1a9bb68f5b24735efb7fb",
+    "synthetic_transit:HCN": "9d0a50c7a08a788d52c8947787bdd6be59acd9a00960ee59d3f15fba979fb3df",
+    "synthetic_transit:NH3": "e5069a45aabffad377e26cb8025ae051ed64c3109ab31d41cff9081461bba8e7"
+  },
+  "parameter_names": [
+    "log_H2O",
+    "log_CO",
+    "log_CO2",
+    "log_CH4",
+    "log_NH3",
+    "log_HCN",
+    "radius_scale",
+    "log_cloud_top_pressure_bar",
+    "log_cloud_optical_depth",
+    "log_haze_mass_extinction",
+    "haze_slope"
+  ],
+  "problem_name": "synthetic-six-molecule-cloudy-transmission-injection-recovery",
+  "robert_version": "0.3.0",
+  "schema_version": "1.0"
+}

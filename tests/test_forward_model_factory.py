@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +19,7 @@ from robert_exoplanets import (
     IsothermalTemperatureProfile,
     Planet,
     ParameterizedEmissionFactoryConfig,
+    ParameterizedDeckHazeCloudModel,
     ParameterizedGreyCloudEmissionForwardModel,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     ParameterizedEmissionModelConfig,
@@ -252,6 +254,59 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
         "runtime_temperature_and_chemistry"
     )
     assert np.all(hot.values > cool.values)
+
+
+def test_parameterized_emission_uses_shared_deck_haze_model() -> None:
+    base = ParameterizedEmissionFactoryConfig(
+        planet=Planet(name="Cloudy b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(
+            name="Cloudy star",
+            radius_m=7.0e8,
+            effective_temperature_k=5500.0,
+        ),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
+        ),
+    )
+    cloud = ParameterizedDeckHazeCloudModel(
+        deck_single_scattering_albedo=0.0,
+        haze_single_scattering_albedo=0.0,
+        multiple_scattering_backend="none",
+    )
+    clear = build_parameterized_emission_model(base, spectral_grid=_spectral_grid())
+    cloudy = build_parameterized_emission_model(
+        replace(base, cloud_model=cloud),
+        spectral_grid=_spectral_grid(),
+    )
+    parameters = {
+        "T_iso": 1000.0,
+        "log_h2o": -3.0,
+        "log_cloud_top_pressure_bar": -0.5,
+        "log_cloud_optical_depth": 0.0,
+        "log_haze_mass_extinction": -10.0,
+        "haze_slope": -4.0,
+    }
+
+    clear_spectrum = clear({"T_iso": 1000.0, "log_h2o": -3.0})
+    cloudy_spectrum = cloudy(parameters)
+
+    assert cloudy.required_parameters == tuple(parameters)
+    assert cloudy.manifest_metadata["cloud_geometry_independent"] == "true"
+    np.testing.assert_allclose(cloudy_spectrum.values, clear_spectrum.values)
+    assert cloudy_spectrum.metadata["opacity_sources"] == (
+        "correlated_k+grey cloud deck+well-mixed power-law haze"
+    )
 
 
 def test_shared_atmosphere_multi_dataset_model_matches_independent_models(

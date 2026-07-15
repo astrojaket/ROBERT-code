@@ -35,6 +35,7 @@ from .emission import (
     ParameterizedEmissionForwardModel,
     ParameterizedEmissionModelConfig,
 )
+from .clouds import ParameterizedCloudModel
 from .multi_dataset import MultiDatasetEmissionForwardModel, PreparedSpectrumResponse
 from .transmission import (
     ParameterizedTransmissionForwardModel,
@@ -305,6 +306,7 @@ class ParameterizedEmissionFactoryConfig:
     mean_molecular_weight_model: MeanMolecularWeightModel | None = None
     opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
     geometry: DiscGeometry | None = None
+    cloud_model: ParameterizedCloudModel | None = None
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -358,6 +360,7 @@ class ParameterizedTransmissionFactoryConfig:
     mean_molecular_weight: float = 2.3
     mean_molecular_weight_model: MeanMolecularWeightModel | None = None
     opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
+    cloud_model: ParameterizedCloudModel | None = None
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -505,6 +508,7 @@ def build_parameterized_emission_model(
         config=model_config,
         cia_table=config.cia_table,
         geometry=config.geometry,
+        cloud_model=config.cloud_model,
     )
 
 
@@ -558,6 +562,7 @@ def build_parameterized_transmission_model(
         opacity_provider=provider,
         config=model_config,
         cia_table=config.cia_table,
+        cloud_model=config.cloud_model,
     )
 
 
@@ -626,6 +631,7 @@ def _validate_shared_atmosphere_config(
         ("pressure_grid", reference.pressure_grid, candidate.pressure_grid),
         ("cia_table", reference.cia_table, candidate.cia_table),
         ("geometry", reference.geometry, candidate.geometry),
+        ("cloud_model", reference.cloud_model, candidate.cloud_model),
     )
     different = [label for label, left, right in shared_objects if left is not right]
     if different:
