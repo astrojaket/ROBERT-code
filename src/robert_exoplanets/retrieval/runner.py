@@ -19,13 +19,15 @@ from .manifest import (
     read_run_manifest,
     write_run_manifest,
 )
+from .multi_dataset import MultiDatasetRetrievalProblem
 from .optimal_estimation import run_optimal_estimation
 from .problem import RetrievalProblem
 from .results import RetrievalResult, build_retrieval_result, write_retrieval_result
 from .samplers import run_multinest, run_ultranest
 
+
 def run_retrieval(
-    problem: RetrievalProblem,
+    problem: RetrievalProblem | MultiDatasetRetrievalProblem,
     *,
     method: str = "optimal_estimation",
     output_dir: str | Path | None = None,
@@ -93,9 +95,13 @@ def run_retrieval(
         if normalized == "optimal_estimation":
             inference_result = run_optimal_estimation(problem, **kwargs)
         elif normalized == "ultranest":
-            inference_result = run_ultranest(problem, output_dir=output_path, seed=seed, **kwargs)
+            inference_result = run_ultranest(
+                problem, output_dir=output_path, seed=seed, **kwargs
+            )
         else:
-            inference_result = run_multinest(problem, output_dir=output_path, seed=seed, **kwargs)
+            inference_result = run_multinest(
+                problem, output_dir=output_path, seed=seed, **kwargs
+            )
         inference_elapsed = max(time.monotonic() - inference_started, 0.0)
         result = build_retrieval_result(
             inference_result, manifest=manifest, output_dir=output_path
@@ -128,7 +134,8 @@ def _prepare_manifest(
 
     manifest_path = output_path / RUN_MANIFEST_FILENAME
     resume_existing = is_nested and (
-        resume is True or str(resume).strip().lower() in {"resume", "resume-similar", "true"}
+        resume is True
+        or str(resume).strip().lower() in {"resume", "resume-similar", "true"}
     )
     if resume_existing and manifest_path.exists():
         original = read_run_manifest(manifest_path)
@@ -137,7 +144,9 @@ def _prepare_manifest(
     else:
         write_run_manifest(current, output_path)
         active = current
-    _write_attempt_manifest(current, output_path, original_config_hash=active.config_hash)
+    _write_attempt_manifest(
+        current, output_path, original_config_hash=active.config_hash
+    )
     return active
 
 
@@ -152,7 +161,9 @@ def _validate_resume_compatibility(original: RunManifest, current: RunManifest) 
         "opacity_identifiers",
         "random_seed",
     )
-    changed = [name for name in fields if getattr(original, name) != getattr(current, name)]
+    changed = [
+        name for name in fields if getattr(original, name) != getattr(current, name)
+    ]
     original_floor = original.settings.get("invalid_loglike_floor")
     current_floor = current.settings.get("invalid_loglike_floor")
     if original_floor != current_floor:
@@ -185,7 +196,9 @@ def _write_attempt_manifest(
             encoding="utf-8",
         )
     except OSError as exc:
-        raise RobertDataError(f"failed to write retrieval attempt manifest: {path}") from exc
+        raise RobertDataError(
+            f"failed to write retrieval attempt manifest: {path}"
+        ) from exc
     return path
 
 

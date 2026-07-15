@@ -98,6 +98,24 @@ class MultiDatasetRetrievalProblem:
             )
         return spectra
 
+    def gaussian_inputs_from_vector(
+        self,
+        vector: ArrayLike,
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+        """Return deterministic flattened Gaussian arrays for optimal estimation."""
+
+        parameters = self.parameter_mapping(vector)
+        inputs = self.likelihood.effective_inputs_by_dataset(
+            self.predict(parameters),
+            self.observations,
+            parameters,
+        )
+        ordered = [inputs[dataset.name] for dataset in self.observations.datasets]
+        return tuple(
+            np.concatenate([dataset_inputs[index] for dataset_inputs in ordered])
+            for index in range(3)
+        )
+
     def log_likelihood_from_vector(self, vector: ArrayLike) -> float:
         try:
             parameters = self.parameter_mapping(vector)
