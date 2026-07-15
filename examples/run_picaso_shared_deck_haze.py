@@ -93,9 +93,28 @@ def evaluate(contract_path: Path, output_path: Path, opacity_db: Path, resample:
         outputs[f"{case_name}_gas_tau"] = np.asarray(
             atmosphere.taugas[:, :, 0], dtype=float
         )[:, order]
+        outputs[f"{case_name}_rayleigh_tau"] = np.asarray(
+            atmosphere.tauray[:, :, 0], dtype=float
+        )[:, order]
         outputs[f"{case_name}_cloud_tau"] = np.asarray(
             atmosphere.taucld[:, :, 0], dtype=float
         )[:, order]
+        if case_name == "clear":
+            outputs["picaso_level_radius_m"] = np.asarray(
+                atmosphere.level["z"], dtype=float
+            ) / 100.0
+            outputs["picaso_level_pressure_pa"] = np.asarray(
+                atmosphere.level["pressure"], dtype=float
+            ) * 0.1
+            outputs["picaso_level_temperature_k"] = np.asarray(
+                atmosphere.level["temperature"], dtype=float
+            )
+            outputs["picaso_layer_mmw_amu"] = np.asarray(
+                atmosphere.layer["mmw"], dtype=float
+            )
+            outputs["picaso_layer_column_mass_kg_m2"] = np.asarray(
+                atmosphere.layer["colden"], dtype=float
+            ) * 10.0
         timing[case_name] = {
             "thermal": thermal_seconds,
             "transmission": transmission_seconds,

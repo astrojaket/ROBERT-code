@@ -51,6 +51,30 @@ def test_hydrostatic_path_geometry_anchors_reference_radius_and_pressure() -> No
     assert path.bottom_radius_m < reference_radius
 
 
+def test_consistent_reference_anchor_remap_preserves_geometry() -> None:
+    atmosphere = _isothermal_atmosphere()
+    original = hydrostatic_path_geometry(
+        atmosphere,
+        gravity_m_s2=10.0,
+        reference_radius_m=1.0e8,
+        reference_pressure=1.0,
+        reference_pressure_unit="bar",
+    )
+    remapped_pressure_bar = 1.0e-2
+    remapped = hydrostatic_path_geometry(
+        atmosphere,
+        gravity_m_s2=10.0,
+        reference_radius_m=original.radius_at_pressure(
+            remapped_pressure_bar * 1.0e5
+        ),
+        reference_pressure=remapped_pressure_bar,
+        reference_pressure_unit="bar",
+    )
+
+    np.testing.assert_allclose(remapped.edge_radius_m, original.edge_radius_m)
+    np.testing.assert_allclose(remapped.center_radius_m, original.center_radius_m)
+
+
 def test_hydrostatic_path_geometry_returns_spherical_shell_path_factors() -> None:
     atmosphere = _isothermal_atmosphere()
     path = hydrostatic_path_geometry(
