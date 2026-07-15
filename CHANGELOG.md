@@ -5,6 +5,9 @@
 - Fixed multi-dataset retrieval manifests and added the flattened Gaussian
   data contract required for configured optimal-estimation runs; smoke checks
   now preflight manifest serialization for every configured inference phase.
+- Changed configured UltraNest runs to converge without a likelihood-call cap
+  by default and report call-limit finalization explicitly when an optional
+  finite cap is used.
 - Added general retrieval and forward-model post-processing with fit
   statistics, residual and posterior/OE plots, a WASP-69b sampler benchmark
   comparison, editable colour/style controls, and an optional YAML automatic

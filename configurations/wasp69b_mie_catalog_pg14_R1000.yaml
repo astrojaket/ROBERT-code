@@ -35,7 +35,7 @@ parameters:
 
 sampler:
   live_points: 200
-  max_calls: 100000
+  max_calls: null
   dlogz: 0.5
   resume: resume
   show_status: false
