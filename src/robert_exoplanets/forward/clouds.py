@@ -9,11 +9,16 @@ import numpy as np
 
 from robert_exoplanets.core import RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
+from robert_exoplanets.opacity import pressure_values_in_unit
 from robert_exoplanets.rt import (
     CloudOpticalProperties,
     GasOpticalDepth,
+    RefractiveIndexSpectrum,
     grey_cloud_deck,
+    lognormal_mie_optics,
+    mie_cloud_from_mass_fraction,
     power_law_haze_from_mass_extinction,
+    refractive_index_from_parameters,
 )
 
 
@@ -204,7 +209,219 @@ class ParameterizedDeckHazeCloudModel:
         return deck, haze
 
 
+@dataclass(frozen=True)
+class ParameterizedMieCloudModel:
+    """Shared lognormal homogeneous-sphere Mie particle cloud.
+
+    The refractive index can be fixed from a material catalogue or retrieved
+    as nodal real ``n`` and log10 imaginary ``k`` values. Evaluation returns
+    geometry-independent layer optical properties consumed unchanged by
+    emission and transmission.
+    """
+
+    refractive_index_wavelength_micron: tuple[float, ...]
+    real_index_parameter_names: tuple[str, ...]
+    log10_imaginary_index_parameter_names: tuple[str, ...]
+    log10_condensate_mass_fraction_parameter: str
+    log10_effective_radius_micron_parameter: str
+    particle_density_kg_m3: float
+    geometric_stddev: float = 1.0
+    geometric_stddev_parameter: str | None = None
+    log10_cloud_top_pressure_bar_parameter: str | None = None
+    log10_cloud_base_pressure_bar_parameter: str | None = None
+    quadrature_points: int = 1
+    refractive_index_extrapolation: str = "raise"
+    multiple_scattering_backend: str = "sh4"
+    fixed_refractive_index: RefractiveIndexSpectrum | None = None
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        wavelength = tuple(float(value) for value in self.refractive_index_wavelength_micron)
+        real_names = tuple(str(value).strip() for value in self.real_index_parameter_names)
+        imaginary_names = tuple(
+            str(value).strip() for value in self.log10_imaginary_index_parameter_names
+        )
+        if self.fixed_refractive_index is None:
+            if not wavelength or any(not np.isfinite(value) or value <= 0.0 for value in wavelength):
+                raise RobertValidationError(
+                    "refractive-index wavelength nodes must be finite and positive"
+                )
+            if any(right <= left for left, right in zip(wavelength[:-1], wavelength[1:], strict=True)):
+                raise RobertValidationError(
+                    "refractive-index wavelength nodes must be strictly increasing"
+                )
+            if len(real_names) != len(wavelength) or len(imaginary_names) != len(wavelength):
+                raise RobertValidationError(
+                    "refractive-index parameter names must match wavelength nodes"
+                )
+        elif wavelength or real_names or imaginary_names:
+            raise RobertValidationError(
+                "fixed_refractive_index cannot be combined with retrieved n/k nodes"
+            )
+        scalar_names = (
+            str(self.log10_condensate_mass_fraction_parameter).strip(),
+            str(self.log10_effective_radius_micron_parameter).strip(),
+        )
+        optional_names = tuple(
+            None if value is None else str(value).strip()
+            for value in (
+                self.geometric_stddev_parameter,
+                self.log10_cloud_top_pressure_bar_parameter,
+                self.log10_cloud_base_pressure_bar_parameter,
+            )
+        )
+        names = (
+            *real_names,
+            *imaginary_names,
+            *scalar_names,
+            *(value for value in optional_names if value is not None),
+        )
+        if any(not name for name in names) or len(names) != len(set(names)):
+            raise RobertValidationError(
+                "cloud retrieval parameter names must be non-empty and unique"
+            )
+        density = float(self.particle_density_kg_m3)
+        width = float(self.geometric_stddev)
+        points = int(self.quadrature_points)
+        extrapolation = str(self.refractive_index_extrapolation).strip().lower()
+        backend = str(self.multiple_scattering_backend).strip().lower()
+        if not np.isfinite(density) or density <= 0.0:
+            raise RobertValidationError("particle_density_kg_m3 must be finite and positive")
+        if not np.isfinite(width) or width < 1.0:
+            raise RobertValidationError("geometric_stddev must be finite and at least one")
+        if points < 1:
+            raise RobertValidationError("quadrature_points must be positive")
+        if extrapolation not in {"raise", "clip"}:
+            raise RobertValidationError(
+                "refractive_index_extrapolation must be 'raise' or 'clip'"
+            )
+        if backend not in {"two_stream", "toon_hemispheric_mean", "sh4", "p3"}:
+            raise RobertValidationError("Mie cloud requires a multiple-scattering backend")
+        object.__setattr__(self, "refractive_index_wavelength_micron", wavelength)
+        object.__setattr__(self, "real_index_parameter_names", real_names)
+        object.__setattr__(self, "log10_imaginary_index_parameter_names", imaginary_names)
+        object.__setattr__(self, "log10_condensate_mass_fraction_parameter", scalar_names[0])
+        object.__setattr__(self, "log10_effective_radius_micron_parameter", scalar_names[1])
+        object.__setattr__(self, "geometric_stddev_parameter", optional_names[0])
+        object.__setattr__(self, "log10_cloud_top_pressure_bar_parameter", optional_names[1])
+        object.__setattr__(self, "log10_cloud_base_pressure_bar_parameter", optional_names[2])
+        object.__setattr__(self, "particle_density_kg_m3", density)
+        object.__setattr__(self, "geometric_stddev", width)
+        object.__setattr__(self, "quadrature_points", points)
+        object.__setattr__(self, "refractive_index_extrapolation", extrapolation)
+        object.__setattr__(self, "multiple_scattering_backend", backend)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+    @property
+    def required_parameters(self) -> tuple[str, ...]:
+        parameters = [
+            self.log10_condensate_mass_fraction_parameter,
+            self.log10_effective_radius_micron_parameter,
+        ]
+        if self.fixed_refractive_index is None:
+            parameters[:0] = [
+                *self.real_index_parameter_names,
+                *self.log10_imaginary_index_parameter_names,
+            ]
+        parameters.extend(
+            value
+            for value in (
+                self.geometric_stddev_parameter,
+                self.log10_cloud_top_pressure_bar_parameter,
+                self.log10_cloud_base_pressure_bar_parameter,
+            )
+            if value is not None
+        )
+        return tuple(parameters)
+
+    @property
+    def manifest_metadata(self) -> Mapping[str, str]:
+        return immutable_mapping(
+            {
+                "cloud_model": "lognormal_homogeneous_sphere_mie",
+                "cloud_geometry_independent": "true",
+                "cloud_refractive_index_mode": (
+                    "fixed_tabulated_n_k"
+                    if self.fixed_refractive_index is not None
+                    else "retrieved_nodal_n_log10_k"
+                ),
+                "cloud_particle_density_kg_m3": f"{self.particle_density_kg_m3:.17g}",
+                "cloud_geometric_stddev": f"{self.geometric_stddev:.17g}",
+                "cloud_quadrature_points": str(self.quadrature_points),
+                "cloud_multiple_scattering_backend": self.multiple_scattering_backend,
+                "cloud_phase_function_closure": "exact_mie_legendre_moments_through_l4",
+                **dict(self.metadata),
+            }
+        )
+
+    def evaluate(
+        self,
+        gas_optical_depth: GasOpticalDepth,
+        parameters: Mapping[str, float],
+    ) -> tuple[CloudOpticalProperties]:
+        values = {}
+        for name in self.required_parameters:
+            if name not in parameters:
+                raise RobertValidationError(f"cloud parameter is missing: {name}")
+            value = float(parameters[name])
+            if not np.isfinite(value):
+                raise RobertValidationError(f"cloud parameter {name!r} must be finite")
+            values[name] = value
+        index = self.fixed_refractive_index
+        if index is None:
+            index = refractive_index_from_parameters(
+                self.refractive_index_wavelength_micron,
+                values,
+                real_parameter_names=self.real_index_parameter_names,
+                log10_imaginary_parameter_names=self.log10_imaginary_index_parameter_names,
+            )
+        particle_optics = lognormal_mie_optics(
+            index,
+            gas_optical_depth.spectral_grid,
+            effective_radius_micron=(
+                10.0 ** values[self.log10_effective_radius_micron_parameter]
+            ),
+            geometric_stddev=(
+                self.geometric_stddev
+                if self.geometric_stddev_parameter is None
+                else values[self.geometric_stddev_parameter]
+            ),
+            particle_density_kg_m3=self.particle_density_kg_m3,
+            quadrature_points=self.quadrature_points,
+            extrapolation=self.refractive_index_extrapolation,
+        )
+        pressure_bar = pressure_values_in_unit(
+            gas_optical_depth.pressure_grid.centers,
+            gas_optical_depth.pressure_grid.unit,
+            "bar",
+        )
+        active = np.ones(gas_optical_depth.pressure_grid.n_layers, dtype=bool)
+        top_pressure = None
+        base_pressure = None
+        if self.log10_cloud_top_pressure_bar_parameter is not None:
+            top_pressure = 10.0 ** values[self.log10_cloud_top_pressure_bar_parameter]
+            active &= pressure_bar >= top_pressure
+        if self.log10_cloud_base_pressure_bar_parameter is not None:
+            base_pressure = 10.0 ** values[self.log10_cloud_base_pressure_bar_parameter]
+            active &= pressure_bar <= base_pressure
+        if top_pressure is not None and base_pressure is not None and top_pressure > base_pressure:
+            raise RobertValidationError("cloud top pressure must not exceed cloud base pressure")
+        mass_fraction = np.where(
+            active,
+            10.0 ** values[self.log10_condensate_mass_fraction_parameter],
+            0.0,
+        )
+        return (
+            mie_cloud_from_mass_fraction(
+                gas_optical_depth,
+                particle_optics,
+                condensate_mass_fraction=mass_fraction,
+            ),
+        )
+
+
 __all__ = [
     "ParameterizedCloudModel",
     "ParameterizedDeckHazeCloudModel",
+    "ParameterizedMieCloudModel",
 ]

@@ -166,20 +166,33 @@ def grey_cloud_deck(
 ) -> CloudOpticalProperties:
     """Create a spectrally grey cloud deck below a pressure level.
 
-    ``optical_depth`` is the vertical extinction optical depth integrated over
-    all layer centers deeper than ``cloud_top_pressure``.
+    ``optical_depth`` is the vertical extinction optical depth integrated
+    below ``cloud_top_pressure``. Extinction is uniform per log-pressure
+    interval, with fractional coverage of the layer intersected by the cloud
+    top. This avoids snapping the deck boundary to layer centers.
     """
 
     tau_total = _non_negative_scalar(optical_depth, "optical_depth")
     top_pressure = _positive_scalar(cloud_top_pressure, "cloud_top_pressure")
     top_unit = cloud_top_pressure_unit or pressure_grid.unit
-    pressure_pa = pressure_values_in_unit(pressure_grid.centers, pressure_grid.unit, "pa")
+    pressure_edges_pa = pressure_values_in_unit(
+        pressure_grid.edges, pressure_grid.unit, "pa"
+    )
     top_pressure_pa = pressure_values_in_unit(np.array([top_pressure]), top_unit, "pa")[0]
-    active = pressure_pa >= top_pressure_pa
-    if not np.any(active):
+    layer_low = np.minimum(pressure_edges_pa[:-1], pressure_edges_pa[1:])
+    layer_high = np.maximum(pressure_edges_pa[:-1], pressure_edges_pa[1:])
+    overlap_low = np.maximum(layer_low, top_pressure_pa)
+    log_pressure_overlap = np.where(
+        layer_high > overlap_low,
+        np.log(layer_high / overlap_low),
+        0.0,
+    )
+    if not np.any(log_pressure_overlap > 0.0):
         raise RobertValidationError("grey cloud deck has no active layers below cloud_top_pressure")
     tau = np.zeros((pressure_grid.n_layers, spectral_grid.size), dtype=float)
-    tau[active] = tau_total / int(np.sum(active))
+    tau[:, :] = (
+        tau_total * log_pressure_overlap / np.sum(log_pressure_overlap)
+    )[:, None]
     return CloudOpticalProperties(
         name=name,
         extinction_tau=tau,
@@ -188,7 +201,8 @@ def grey_cloud_deck(
         single_scattering_albedo=single_scattering_albedo,
         asymmetry_factor=asymmetry_factor,
         metadata={
-            "vertical_model": "grey_cloud_deck_uniform_tau_below_top",
+            "vertical_model": "grey_cloud_deck_uniform_d_tau_d_log_pressure",
+            "boundary_treatment": "fractional_log_pressure_layer_overlap",
             "cloud_top_pressure_pa": f"{float(top_pressure_pa):.12g}",
             "input_optical_depth": f"{tau_total:.12g}",
         },

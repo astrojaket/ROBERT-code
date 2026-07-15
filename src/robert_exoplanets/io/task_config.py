@@ -632,10 +632,6 @@ class TaskConfig(ConfigModel):
             required.add(self.observations.miri_offset_parameter)
         radiative_transfer = self.radiative_transfer
         if radiative_transfer.model == "transmission":
-            if self.clouds.model in {"mie_catalog", "mie_direct_nk"}:
-                raise ValueError(
-                    "configured transmission does not yet support Mie cloud models"
-                )
             if not (
                 self.atmosphere.pressure.top_bar
                 <= radiative_transfer.reference_pressure_bar

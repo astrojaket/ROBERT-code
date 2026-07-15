@@ -31,12 +31,10 @@ from robert_exoplanets.forward import (
     ParameterizedEmissionFactoryConfig,
     ParameterizedEmissionModelConfig,
     ParameterizedDeckHazeCloudModel,
+    ParameterizedMieCloudModel,
     ParameterizedTransmissionFactoryConfig,
     ParameterizedTransmissionModelConfig,
-    ParameterizedRefractiveIndexCloudEmissionForwardModel,
-    RefractiveIndexCloudConfig,
     build_multi_dataset_emission_model,
-    build_parameterized_emission_model,
     build_parameterized_transmission_model,
 )
 from robert_exoplanets.instruments import ObservationCollection, ObservationDataset
@@ -531,7 +529,6 @@ def build_problem(
     cloud_models = {}
     spectral_grids = {}
     clouds = config.clouds
-    cloud = None
     shared_cloud_model = None
     if clouds.model == "deck_haze":
         shared_cloud_model = ParameterizedDeckHazeCloudModel(
@@ -559,7 +556,7 @@ def build_problem(
             multiple_scattering_backend=clouds.multiple_scattering_backend,
         )
     if clouds.model == "mie_catalog":
-        cloud = RefractiveIndexCloudConfig(
+        shared_cloud_model = ParameterizedMieCloudModel(
             refractive_index_wavelength_micron=(),
             real_index_parameter_names=(),
             log10_imaginary_index_parameter_names=(),
@@ -577,7 +574,7 @@ def build_problem(
             multiple_scattering_backend=clouds.multiple_scattering_backend,
         )
     elif clouds.model == "mie_direct_nk":
-        cloud = RefractiveIndexCloudConfig(
+        shared_cloud_model = ParameterizedMieCloudModel(
             refractive_index_wavelength_micron=clouds.refractive_index_wavelength_micron,
             real_index_parameter_names=clouds.real_index_parameter_names,
             log10_imaginary_index_parameter_names=clouds.log10_imaginary_index_parameter_names,
@@ -648,27 +645,8 @@ def build_problem(
                 model=model_config,
                 cloud_model=shared_cloud_model,
             )
-            if cloud is None:
-                configs[dataset.name] = factory
-            else:
-                base_model = build_parameterized_emission_model(
-                    factory,
-                    spectral_grid=dataset.observation.spectral_grid,
-                )
-                cloud_models[dataset.name] = (
-                    ParameterizedRefractiveIndexCloudEmissionForwardModel(
-                        planet=base_model.planet,
-                        star=base_model.star,
-                        spectral_grid=base_model.spectral_grid,
-                        atmosphere_builder=base_model.atmosphere_builder,
-                        opacity_provider=base_model.opacity_provider,
-                        config=base_model.config,
-                        cia_table=base_model.cia_table,
-                        geometry=base_model.geometry,
-                        cloud=cloud,
-                    )
-                )
-    if rt.model == "emission" and cloud is None:
+            configs[dataset.name] = factory
+    if rt.model == "emission":
         forward_model = build_multi_dataset_emission_model(
             configs, spectral_grids=spectral_grids
         )

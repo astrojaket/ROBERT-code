@@ -85,9 +85,34 @@ def test_grey_cloud_deck_distributes_tau_below_cloud_top() -> None:
         optical_depth=0.6,
     )
 
-    expected = np.array([[0.0, 0.0], [0.3, 0.3], [0.3, 0.3]])
+    expected = np.array([[0.0, 0.0], [0.4, 0.4], [0.2, 0.2]])
     np.testing.assert_allclose(cloud.extinction_tau, expected)
-    assert cloud.metadata["vertical_model"] == "grey_cloud_deck_uniform_tau_below_top"
+    assert cloud.metadata["vertical_model"] == (
+        "grey_cloud_deck_uniform_d_tau_d_log_pressure"
+    )
+    assert cloud.metadata["boundary_treatment"] == (
+        "fractional_log_pressure_layer_overlap"
+    )
+
+
+def test_grey_cloud_deck_fractionally_covers_boundary_layer() -> None:
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-5, 1.0e-3, 1.0e-1]),
+        centers=np.array([1.0e-4, 1.0e-2]),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")
+
+    cloud = grey_cloud_deck(
+        pressure_grid,
+        spectral_grid,
+        cloud_top_pressure=1.0e-4,
+        cloud_top_pressure_unit="bar",
+        optical_depth=0.6,
+    )
+
+    np.testing.assert_allclose(cloud.extinction_tau[:, 0], [0.2, 0.4])
+    assert np.sum(cloud.extinction_tau[:, 0]) == pytest.approx(0.6)
 
 
 def test_grey_mass_extinction_uses_hydrostatic_bulk_mass_column() -> None:

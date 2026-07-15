@@ -1,6 +1,10 @@
 """Forward-model orchestration helpers."""
 
-from .clouds import ParameterizedCloudModel, ParameterizedDeckHazeCloudModel
+from .clouds import (
+    ParameterizedCloudModel,
+    ParameterizedDeckHazeCloudModel,
+    ParameterizedMieCloudModel,
+)
 
 from .emission import (
     ClearSkyEmissionForwardModel,
@@ -68,6 +72,7 @@ __all__ = [
     "ParameterizedEmissionFactoryConfig",
     "ParameterizedCloudModel",
     "ParameterizedDeckHazeCloudModel",
+    "ParameterizedMieCloudModel",
     "ParameterizedEmissionForwardModel",
     "ParameterizedTransmissionFactoryConfig",
     "ParameterizedTransmissionForwardModel",

@@ -152,7 +152,9 @@ clouds:
   # haze_asymmetry_factor: 0.0
   # multiple_scattering_backend: sh4 # Alternatives: none, two_stream, toon_hemispheric_mean, p3.
 
-  # Fixed-material Mie cloud:
+  # Shared emission/transmission fixed-material Mie cloud. Both geometries use
+  # the same lognormal particle extinction, albedo, phase moments, and vertical
+  # condensate profile; only the downstream ray geometry differs.
   # model: mie_catalog
   # material: MgSiO3
   # particle_density_kg_m3: 3200.0
@@ -161,7 +163,7 @@ clouds:
   # multiple_scattering_backend: sh4
   # optical_constants_path is populated from housekeeping.optical_constants_directory.
 
-  # Retrieved refractive-index Mie cloud:
+  # Shared emission/transmission retrieved refractive-index Mie cloud:
   # model: mie_direct_nk
   # refractive_index_wavelength_micron: [2.4, 4.0, 5.5, 7.0, 9.0, 12.0]
   # real_index_parameter_names: [cloud_n_0, cloud_n_1, cloud_n_2, cloud_n_3, cloud_n_4, cloud_n_5]

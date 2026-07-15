@@ -284,6 +284,19 @@ def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
         assert config.opacity.resolution == "R1000"
 
 
+def test_mie_catalog_configuration_is_valid_for_transmission() -> None:
+    config = load_task_config(
+        ROOT / "configurations" / "wasp69b_mie_catalog_pg14_R1000.yaml"
+    )
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["radiative_transfer"]["model"] = "transmission"
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.radiative_transfer.model == "transmission"
+    assert parsed.clouds.model == "mie_catalog"
+
+
 @pytest.mark.parametrize(
     ("suffix", "engine"),
     [

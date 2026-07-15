@@ -11,6 +11,8 @@ from robert_exoplanets import (
     AtmosphereState,
     EvaluatedCorrelatedKOpacity,
     OpticalConstantsCatalog,
+    ParameterizedCloudModel,
+    ParameterizedMieCloudModel,
     PreparedCorrelatedKOpacity,
     PressureGrid,
     RefractiveIndexSpectrum,
@@ -189,6 +191,55 @@ def test_retrieved_refractive_index_uses_n_and_log10_k_nodes() -> None:
     np.testing.assert_allclose(index.real_index, [1.4, 1.6])
     np.testing.assert_allclose(index.imaginary_index, [1.0e-4, 1.0e-2])
     assert index.metadata["parameterization"] == "nodal_n_log10_k"
+
+
+def test_parameterized_mie_cloud_is_geometry_independent_and_matches_core_physics() -> None:
+    spectral_grid = SpectralGrid.from_array([2.0, 4.0], unit="micron", role="opacity")
+    index = RefractiveIndexSpectrum(
+        wavelength_micron=[1.0, 5.0],
+        real_index=[1.6, 1.6],
+        imaginary_index=[1.0e-3, 1.0e-3],
+        name="shared synthetic particles",
+    )
+    gas_tau = _zero_gas_tau(spectral_grid)
+    model = ParameterizedMieCloudModel(
+        refractive_index_wavelength_micron=(),
+        real_index_parameter_names=(),
+        log10_imaginary_index_parameter_names=(),
+        fixed_refractive_index=index,
+        log10_condensate_mass_fraction_parameter="log_cloud_mass_fraction",
+        log10_effective_radius_micron_parameter="log_cloud_radius_micron",
+        particle_density_kg_m3=3000.0,
+        geometric_stddev=1.0,
+        log10_cloud_top_pressure_bar_parameter="log_cloud_top_pressure_bar",
+    )
+    parameters = {
+        "log_cloud_mass_fraction": -4.0,
+        "log_cloud_radius_micron": np.log10(0.2),
+        "log_cloud_top_pressure_bar": -3.0,
+    }
+
+    (shared_cloud,) = model.evaluate(gas_tau, parameters)
+    optics = lognormal_mie_optics(
+        index,
+        spectral_grid,
+        effective_radius_micron=0.2,
+        geometric_stddev=1.0,
+        particle_density_kg_m3=3000.0,
+    )
+    expected = mie_cloud_from_mass_fraction(
+        gas_tau,
+        optics,
+        condensate_mass_fraction=np.array([0.0, 1.0e-4]),
+    )
+
+    assert isinstance(model, ParameterizedCloudModel)
+    np.testing.assert_allclose(shared_cloud.extinction_tau, expected.extinction_tau)
+    np.testing.assert_allclose(
+        shared_cloud.single_scattering_albedo,
+        expected.single_scattering_albedo,
+    )
+    assert model.manifest_metadata["cloud_geometry_independent"] == "true"
 
 
 def _zero_gas_tau(spectral_grid: SpectralGrid):
