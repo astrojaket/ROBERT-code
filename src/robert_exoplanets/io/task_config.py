@@ -166,6 +166,26 @@ class FastChemConfig(ConfigModel):
     species: tuple[ChemistrySpeciesConfig, ...] = Field(min_length=1)
     metallicity_parameter: str = "metallicity"
     carbon_to_oxygen_parameter: str = "CtoO"
+    constant_log10_vmr_parameters: dict[str, str] | None = Field(
+        default_factory=dict
+    )
+
+    @model_validator(mode="after")
+    def validate_constant_overrides(self) -> "FastChemConfig":
+        labels = {item.label for item in self.species}
+        overrides = self.constant_log10_vmr_parameters or {}
+        unknown = sorted(set(overrides) - labels)
+        if unknown:
+            raise ValueError(
+                "constant_log10_vmr_parameters contains unknown species: "
+                + ", ".join(unknown)
+            )
+        parameters = tuple(overrides.values())
+        if any(not name for name in parameters):
+            raise ValueError("constant log10 VMR parameter names must not be empty")
+        if len(set(parameters)) != len(parameters):
+            raise ValueError("constant log10 VMR parameter names must be unique")
+        return self
 
 
 class FreeChemistryConfig(ConfigModel):
@@ -487,6 +507,9 @@ class TaskConfig(ConfigModel):
                     chemistry_config.metallicity_parameter,
                     chemistry_config.carbon_to_oxygen_parameter,
                 }
+            )
+            required.update(
+                (chemistry_config.constant_log10_vmr_parameters or {}).values()
             )
         else:
             required.update(

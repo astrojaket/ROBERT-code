@@ -192,34 +192,36 @@ def test_composition_mean_molecular_weight_can_preserve_raw_selected_species_sum
 
 def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     pytest.importorskip("pyfastchem")
-    fastchem_path = Path.home() / "Dropbox" / "fastchem"
+    fastchem_path = Path(__file__).parents[1] / "data" / "chemistry" / "fastchem"
     if not fastchem_path.exists():
         pytest.skip("local FastChem data files are not available")
     grid = PressureGrid.logspace(1.0e-4, 1.0e-2, n_layers=2, unit="bar")
     chemistry = FastChemEquilibriumChemistry(
         fastchem_path=fastchem_path,
-        fastchem_species=("H2O1", "C1O1", "H2", "He"),
-        labels=("H2O", "CO", "H2", "He"),
+        fastchem_species=("H2O1", "C1O1", "O2S1", "H2", "He"),
+        labels=("H2O", "CO", "SO2", "H2", "He"),
+        constant_log10_vmr_parameters={"SO2": "log_SO2"},
     )
 
     composition = chemistry.evaluate(
-        {"metallicity": 0.0, "CtoO": 0.55},
+        {"metallicity": 0.0, "CtoO": 0.55, "log_SO2": -7.0},
         grid,
         np.full(grid.n_layers, 1500.0),
     )
 
-    assert chemistry.required_parameters() == ("metallicity", "CtoO")
-    assert set(composition) == {"H2O", "CO", "H2", "He"}
+    assert chemistry.required_parameters() == ("metallicity", "CtoO", "log_SO2")
+    assert set(composition) == {"H2O", "CO", "SO2", "H2", "He"}
+    np.testing.assert_allclose(composition["SO2"], np.full(2, 1.0e-7))
     assert np.all(composition["H2"] > 0.0)
     assert np.all(composition["He"] > 0.0)
     assert composition["H2"].flags.writeable is False
     enriched = chemistry.evaluate(
-        {"metallicity": 1.0, "CtoO": 0.8},
+        {"metallicity": 1.0, "CtoO": 0.8, "log_SO2": -6.0},
         grid,
         np.full(grid.n_layers, 1500.0),
     )
     repeated = chemistry.evaluate(
-        {"metallicity": 0.0, "CtoO": 0.55},
+        {"metallicity": 0.0, "CtoO": 0.55, "log_SO2": -7.0},
         grid,
         np.full(grid.n_layers, 1500.0),
     )
