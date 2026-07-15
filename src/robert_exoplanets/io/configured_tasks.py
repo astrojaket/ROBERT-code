@@ -351,6 +351,9 @@ def build_problem(
             labels=tuple(item.label for item in chemistry_item.species),
             metallicity_parameter_name=chemistry_item.metallicity_parameter,
             carbon_to_oxygen_parameter_name=chemistry_item.carbon_to_oxygen_parameter,
+            constant_log10_vmr_parameters=(
+                chemistry_item.constant_log10_vmr_parameters or {}
+            ),
         )
         mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
     else:

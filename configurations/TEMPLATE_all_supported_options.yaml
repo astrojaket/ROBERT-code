@@ -31,7 +31,7 @@ bodies:
     radius_m: 565568100.0
     effective_temperature_k: 4750.0
     log_g_cgs: 4.5
-    metallicity_dex: 0.15
+    metallicity_dex: 0.0
     spectrum_model: phoenix    # Alternative: blackbody
 
 # =============================================================================
@@ -113,9 +113,11 @@ atmosphere:
       - {label: CO,  fastchem_name: C1O1}
       - {label: CH4, fastchem_name: C1H4}
       - {label: NH3, fastchem_name: H3N1}
-      - {label: HCN, fastchem_name: C1H1N1_1}
+      - {label: SO2, fastchem_name: O2S1}
       - {label: H2,  fastchem_name: H2}
       - {label: He,  fastchem_name: He}
+    # Optional constant-abundance overrides layered onto equilibrium chemistry.
+    constant_log10_vmr_parameters: {SO2: log_SO2}
     # model: free
     # species: [H2O, CO2, CO, CH4, NH3, HCN]
     # parameter_mode: log10       # Parameters are log10(VMR); alternative: linear.
@@ -159,7 +161,7 @@ clouds:
 opacity:
   format: exomol_kta
   resolution: R1000           # Alternative: R15000
-  species: [H2O, CO2, CO, CH4, NH3, HCN]
+  species: [H2O, CO2, CO, CH4, NH3, SO2]
   binning:
     num: 300
     use_rebin: false
@@ -219,6 +221,9 @@ parameters:
   # - {name: log_CH4, label: log10(CH4 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -6.0}
   # - {name: log_NH3, label: log10(NH3 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -7.0}
   # - {name: log_HCN, label: log10(HCN VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -8.0}
+
+  # --- Optional FastChem constant-abundance override ---
+  - {name: log_SO2, label: log10(SO2 VMR), prior: {type: uniform, lower: -10.0, upper: -4.0}, value: -8.0}
 
   # --- Dataset nuisance parameters referenced by observations.dataset_options ---
   # - {name: f322w2_offset, unit: eclipse_depth, prior: {type: uniform, lower: -5.0e-4, upper: 5.0e-4}, value: 0.0}

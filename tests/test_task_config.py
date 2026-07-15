@@ -30,7 +30,10 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.schema_version == 2
     assert config.observations.datasets == ("f322w2", "f444w", "lrs")
     assert config.opacity.resolution == "R1000"
-    assert config.opacity.species == ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
+    assert config.opacity.species == ("H2O", "CO2", "CO", "CH4", "NH3", "SO2")
+    assert config.atmosphere.chemistry.constant_log10_vmr_parameters == {
+        "SO2": "log_SO2"
+    }
     assert config.sampler.live_points == 400
     assert config.sampler.max_calls is None
     assert config.runtime.mpi_processes == "auto"
@@ -39,7 +42,7 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.plotting.enabled is False
     assert config.bodies.star.spectrum_model == "phoenix"
     assert config.bodies.star.log_g_cgs == 4.5
-    assert config.bodies.star.metallicity_dex == 0.15
+    assert config.bodies.star.metallicity_dex == 0.0
 
 
 def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
@@ -144,6 +147,9 @@ def test_wasp69b_inference_benchmarks_only_change_run_controls(
     )
 
     assert benchmark.sampler.engine == engine
+    assert baseline.sampler.live_points == 400
+    if engine != "optimal_estimation":
+        assert benchmark.sampler.live_points == 400
     assert baseline.plotting.enabled is True
     assert benchmark.plotting.enabled is True
     for section in (
@@ -279,7 +285,7 @@ def test_yaml_supports_free_chemistry() -> None:
     raw = deepcopy(config.model_dump(mode="python"))
     raw["atmosphere"]["chemistry"] = {
         "model": "free",
-        "species": ["H2O", "CO2", "CO", "CH4", "NH3", "HCN"],
+        "species": ["H2O", "CO2", "CO", "CH4", "NH3", "SO2"],
         "parameter_mode": "log10",
         "parameter_names": {
             "H2O": "log_H2O",
@@ -287,7 +293,7 @@ def test_yaml_supports_free_chemistry() -> None:
             "CO": "log_CO",
             "CH4": "log_CH4",
             "NH3": "log_NH3",
-            "HCN": "log_HCN",
+            "SO2": "log_SO2",
         },
         "background_species": ["H2", "He"],
         "background_fractions": [0.8547, 0.1453],
@@ -295,7 +301,7 @@ def test_yaml_supports_free_chemistry() -> None:
     raw["parameters"] = [
         item
         for item in raw["parameters"]
-        if item["name"] not in {"metallicity", "CtoO"}
+        if item["name"] not in {"metallicity", "CtoO", "log_SO2"}
     ]
     raw["parameters"] = [
         *raw["parameters"],
@@ -304,7 +310,7 @@ def test_yaml_supports_free_chemistry() -> None:
                 "name": f"log_{species}",
                 "prior": {"type": "uniform", "lower": -12, "upper": -1},
             }
-            for species in ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
+            for species in ("H2O", "CO2", "CO", "CH4", "NH3", "SO2")
         ),
     ]
 

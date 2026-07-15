@@ -30,7 +30,7 @@ creator uses `run.name` as the directory name, preserves the original YAML,
 copies both runners and a minimal `submit.sbatch`, and sets the generated
 configuration's output, opacity-cache, and scratch paths inside that directory.
 The generated script requests one rank on one node for an OE-only run and 128
-ranks across two nodes for UltraNest, MultiNest, and either OE-to-nested
+ranks on one node for UltraNest, MultiNest, and either OE-to-nested
 workflow. It emails `jake.taylor@physics.ox.ac.uk` when the job begins, ends,
 or fails.
 
@@ -83,7 +83,7 @@ Set the Synphot reference-data root before preparing a forward model; the path
 must be the directory above `grid/`, not the `grid/phoenix` directory itself:
 
 ```bash
-export PYSYN_CDBS=/Users/jaketaylor/Dropbox/NemesisPy-Docker/grp/redcat/trds
+export PYSYN_CDBS=/scratch/dp448/dc-tayl1/grp/redcat/trds
 ```
 
 The stellar block records all three PHOENIX interpolation coordinates:
@@ -95,7 +95,7 @@ bodies:
     radius_m: 565568100.0
     effective_temperature_k: 4750.0
     log_g_cgs: 4.5
-    metallicity_dex: 0.15
+    metallicity_dex: 0.0
     spectrum_model: phoenix
 ```
 
@@ -105,6 +105,24 @@ spectral bins during model construction, so no stellar file I/O occurs during
 likelihood evaluation. ROBERT converts the tabulated surface flux to radiance
 as `F_lambda / pi` and normalizes the finite atlas integral to
 `sigma * T_eff**4`; both choices are recorded in spectrum and run metadata.
+
+The WASP-69 benchmark opacity set follows the molecules named in Schlawin et
+al.: H2O, CO2, CO, CH4, NH3, and SO2. The first five use FastChem equilibrium
+profiles. SO2 follows the paper's PICASO retrieval treatment as a constant
+abundance controlled by `log_SO2`:
+
+```yaml
+atmosphere:
+  chemistry:
+    model: fastchem_equilibrium
+    constant_log10_vmr_parameters: {SO2: log_SO2}
+parameters:
+  - name: log_SO2
+    prior: {type: uniform, lower: -10.0, upper: -4.0}
+```
+
+The configured K-table directory must contain an SO2 R1000 product before
+opacity preparation is run.
 
 Unknown fields and inconsistent molecule/parameter references are errors. To
 inspect the resolved choices without loading data or opacity, run:
@@ -180,7 +198,7 @@ runner itself does not need target- or machine-specific edits.
 
 For DiRAC, create an isolated project directory and submit its generated
 `submit.sbatch`. OE-only scripts request one rank; UltraNest, MultiNest, and
-hybrid scripts request 128 ranks across two nodes. The script uses Conda MPICH
+hybrid scripts request 128 ranks on one node. The script uses Conda MPICH
 `mpirun`, not `srun`, and ROBERT verifies the MPI world before a sampler opens
 shared output files.
 

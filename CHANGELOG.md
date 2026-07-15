@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Aligned the WASP-69 sampler benchmark with the Schlawin analysis by using
+  the 4750 K, log(g)=4.5, solar-metallicity PHOENIX grid point and the H2O,
+  CO2, CO, CH4, NH3, and independently retrieved SO2 opacity set; all nested
+  phases now use 400 live points on one 128-task node.
 - Fixed multi-dataset retrieval manifests and added the flattened Gaussian
   data contract required for configured optimal-estimation runs; smoke checks
   now preflight manifest serialization for every configured inference phase.

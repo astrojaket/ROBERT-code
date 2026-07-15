@@ -12,6 +12,11 @@ The target defaults use PHOENIX stellar-atmosphere spectra selected by
 model. Change `bodies.star.spectrum_model` to `blackbody` only for an explicit
 Planck-spectrum comparison.
 
+The WASP-69 configurations use the PHOENIX grid point at 4750 K,
+`log(g)=4.5`, and `[M/H]=0.0`. Their active gas opacity set is H2O, CO2, CO,
+CH4, NH3, and SO2; SO2 is a retrieved constant-abundance override with the
+same prior in every sampler variant.
+
 | Target | Scenario | Default YAML |
 | --- | --- | --- |
 | WASP-69b | Cloud-free, native F322W2/F444W/LRS, PG14 | `wasp69b_cloud_free_native_pg14_R1000.yaml` |
