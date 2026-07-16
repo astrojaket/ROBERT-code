@@ -86,4 +86,99 @@ stops.
 
 ## Results
 
-Pending the predeclared pilot and resource decision.
+The representative pilot authorized the full local run.  It measured a
+largest process/orchestrator peak RSS of `5.04 GB` with `9.91 GB` available at
+the decision point and projected `1435 s` for the complete solver workload,
+below the `7200 s` ceiling.  The complete run plus its repeated safety pilot
+took `3783.7 s` (`63.1 min`); the full-matrix portion was `3666.4 s`.  The
+projection underestimated the complete tensor compaction and JSON assembly,
+but the actual run remained laptop-safe and below the two-hour target.  Peak
+orchestrator RSS in the complete run was `5.57 GB`.
+
+Track A did **not** pass the predeclared full-domain gates.  The failures are
+retained rather than relaxing limits after seeing the matrix:
+
+| Diagnostic | Observed | Limit | Result |
+| --- | ---: | ---: | --- |
+| Primary absolute-spectrum p95 symmetric relative difference | `0.3085` | `0.01` | fail |
+| Primary cloud-effect p95 difference / pair peak | `0.1575` | `0.02` | fail |
+| Primary cloud-effect eclipse RMS | `3.47 ppm` | `0.50 ppm` | fail |
+| Primary contribution centroid RMS | `0 dex` | `0.05 dex` | pass |
+| Primary contribution-profile p95 TV | `0` | `0.05` | pass |
+| Primary cloud-response p95 TV | `0` | `0.08` | pass |
+| 80-to-160 absolute-spectrum p95 symmetric relative difference | `0.2703` | `0.01` | fail |
+| 80-to-160 cloud-effect p95 difference / pair peak | `0.0883` | `0.02` | fail |
+| 80-to-160 cloud-effect eclipse RMS | `3.60 ppm` | `0.50 ppm` | fail |
+| 80-to-160 contribution centroid RMS | `0.0161 dex` | `0.05 dex` | pass |
+| 80-to-160 contribution-profile p95 TV | `0.5000` | `0.05` | fail |
+| 80-to-160 cloud-response p95 TV | `0.7080` | `0.08` | fail |
+| Isothermal cloud-effect maximum | `0 ppm` | `1e-10 ppm` | pass |
+| Maximum absolute `omega0` | `0` | `0` | pass |
+
+The worst primary absolute difference is the retrieved-like,
+`tau(5 micron)=100`, `1 mbar`, slope `-4` case.  The worst primary signed
+cloud-effect result is the inverted, `tau=100`, `10 mbar`, slope `-4` case.
+The same extreme short-wavelength opacity and high cloud placement dominate
+absolute 80-to-160 convergence.  Optically thick source localization within
+one coarse cell also produces large total-variation convergence even while
+the contribution centroid converges to `0.0161 dex`; retaining both metrics
+prevents a stable centroid from hiding unresolved profile shape.
+
+The failure is not universal across the useful cloud domain.  For the
+monotonic `tau=1`, `10 mbar`, grey case at 80 cells, shared ROBERT and pRT have
+`0.203%` absolute-spectrum p95 difference, `0.155%` cloud-effect p95 difference
+over pair peak, and only `0.00848 ppm` eclipse-effect RMS difference.  ROBERT
+and the corrected isolated PICASO exact-absorption path agree to about
+`3.2e-16` in that case.  For the retrieved-like archived Virga/Mie extinction
+case, shared ROBERT/pRT reach `1.72%` absolute p95 but only `0.0391%` in the
+cloud-effect metric and `0.0134 ppm` eclipse-effect RMS.  The full Cartesian
+matrix therefore exposes a restricted extreme-domain discretization failure,
+not a blanket failure of moderate absorbing clouds.
+
+One analysis-path defect was found without changing any physical contract or
+gate.  PICASO's low-level `get_thermal_1d` returned all NaNs when passed exact
+`omega0=0`.  Its Stage-7 shared worker was replaced with the exact absorbing
+formal path already validated in Stage 1 and used for PICASO contributions in
+Stages 4--6.  All three corrected shared-PICASO artifacts are finite and keep
+`omega0=0`, Rayleigh off, cloud scattering off, and delta-M off.  The complete
+preserved worker matrix was then reanalysed in `88.3 s`; the original solver
+wall time remains the reported full-matrix time.  The Track-A gates above were
+unchanged and still fail.
+
+Track B remains attribution-only.  For the moderate monotonic grey case,
+native ROBERT/pRT have `1.99%` absolute spectral p95, `1.62%` cloud-effect p95,
+and `0.473 ppm` effect RMS.  For the archived physical case they have `2.50%`,
+`0.242%`, and `0.416 ppm`, respectively, while the pRT node-opacity placement
+diagnostic differs from the ROBERT/PICASO conservative layer placement by
+about `1.01 dex` in centroid RMS.  Pairs containing PICASO retain the
+independent-opacity attribution from Stages 3--6: even the moderate grey case
+reaches about `68%` absolute spectral p95 and `3.16 ppm` cloud-effect RMS for
+ROBERT/PICASO.  These values are reported, not gated.
+
+Band/window records preserve the signed effects.  In the monotonic moderate
+grey Track-A case, the CO2 `4.1--4.5 micron` band has a mean effect of about
+`-1.51 ppm`, an RMS of `3.45 ppm`, and a minimum near `-9.76 ppm`.  The archived
+physical case gives about `-3.14 ppm` mean, `6.97 ppm` RMS, and `-19.1 ppm`
+minimum in the same band.  Native Track B changes those values because each
+framework constructs gas and cloud opacity independently; all native-grid
+extrema remain in the JSON report.
+
+The Stage-7 cloud-response profiles were projected onto the six Stage-5/6
+pressure centres for explicit comparison with earlier diagnostics.  Median
+p95 total-variation distances are about `0.745` versus Stage-4 projected
+contribution, `0.777` versus Stage-5 temperature response, and `0.724` versus
+the mean Stage-6 composition response over the selected grey and archived
+cases.  The large distances are physically informative: cloud-induced source
+redistribution is related to, but is not identical with, contribution,
+temperature, or composition response.
+
+The versioned outputs are
+`docs/data/emission_intercomparison/stage_7_report.json` and
+`docs/data/emission_intercomparison/stage_7_absorbing_cloud_arrays.npz`.
+The latter preserves complete R=100 spectra, eclipse depths, signed effects,
+cloud extinction, contributions, and cloud responses.  Normalized profiles
+use documented recoverable packed-uint12 storage with maximum quantization
+error `1.22e-4`; this keeps the `70 MB` artifact below GitHub's file limit.
+Raw process-isolated native-grid artifacts remain ignored under
+`examples/outputs/emission_intercomparison/stage_7/` and occupy about
+`7.3 GB`.

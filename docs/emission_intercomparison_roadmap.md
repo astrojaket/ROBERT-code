@@ -3,8 +3,8 @@
 This document is the canonical stage numbering for the ROBERT, PICASO, and
 petitRADTRANS thermal-emission intercomparison and its companion paper.  It
 supersedes the earlier seven-stage draft: temperature and composition
-Jacobians are now explicit completed stages, so cloud and retrieval work moves
-to Stages 7--9.
+Jacobians and absorbing clouds are now explicit completed stages, so cloud
+scattering and retrieval work moves to Stages 8--9.
 
 ## Completed stages
 
@@ -22,11 +22,17 @@ to Stages 7--9.
 6. **Composition Jacobians.** Localized H2O, CO, CO2, and CH4 log-VMR
    perturbations, composition normalization, CIA/MMW coupling, cross-species
    fractions, and finite-difference linearity tests.
+7. **Absorbing clouds.** Grey/power-law decks and archived Virga/Mie
+   extinction with `omega0=0`, shared- and native-cloud tracks, complete
+   vertical diagnostics, and 40/80/160 convergence.  Moderate shared cases
+   close, but the predeclared full-domain Track-A gates fail for extreme
+   high-altitude, optically thick, steep-slope clouds and their vertical
+   convergence; the failure remains a Stage-8 input constraint.
 
-The versioned Stage 1--6 reports under
+The versioned Stage 1--7 reports under
 `docs/data/emission_intercomparison/` remain the source of numerical results.
 
-## Stage 7: absorbing clouds
+## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures
 are allowed to differ.  Every cloud has single-scattering albedo `omega0=0`.
@@ -54,6 +60,12 @@ from the end-to-end cloud parity benchmark.  Stage 7 begins with a measured
 matrix projection is at most two hours with comfortable memory margin.  The
 predeclared methods and numerical gates are recorded in
 `docs/review/50_emission_intercomparison_stage_7.md`.
+
+The complete run remained laptop-safe, but the frozen Track-A limits were not
+met across the full extreme matrix.  Stage 8 must therefore treat the accepted
+moderate absorbing-cloud subset separately from the unresolved extreme
+placement/discretization domain rather than assuming all Stage-7 cases are a
+validated scattering baseline.
 
 ## Stage 8: cloud scattering and solver order
 

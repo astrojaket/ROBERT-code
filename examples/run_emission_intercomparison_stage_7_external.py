@@ -55,6 +55,8 @@ def _formal_contribution(
     g_weights: np.ndarray,
     emission_mu: np.ndarray,
     disk_weights: np.ndarray,
+    *,
+    normalize: bool = True,
 ) -> np.ndarray:
     """Return the Stage-1 pure-absorption layer source decomposition."""
 
@@ -94,7 +96,7 @@ def _formal_contribution(
             * np.sum(np.exp(-np.sum(slant, axis=0)) * weights[None, :], axis=-1)
         )
     layers[-1] += bottom
-    return _normalize(layers)
+    return _normalize(layers) if normalize else layers
 
 
 def _shared_total_tau(contract: dict[str, np.ndarray]) -> np.ndarray:
@@ -109,11 +111,7 @@ def _shared_total_tau(contract: dict[str, np.ndarray]) -> np.ndarray:
 def _run_shared_picaso(
     contract: dict[str, np.ndarray],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    from picaso.fluxes import get_thermal_1d
-
     wavelength = contract["wavelength_micron"]
-    pressure = contract["pressure_edges_bar"].copy() * 1.0e6
-    pressure[0] = 0.0
     total_tau = _shared_total_tau(contract)
     flux = np.empty((contract["case_id"].size, wavelength.size))
     contribution = np.empty(
@@ -122,36 +120,18 @@ def _run_shared_picaso(
     runtime = np.empty(contract["case_id"].size)
     for case_index, tau in enumerate(total_tau):
         started = perf_counter()
-        point, _ = get_thermal_1d(
-            pressure.size,
-            1.0e4 / wavelength,
-            wavelength.size,
-            contract["emission_mu"].size,
-            1,
-            contract["temperature_edges_k"][case_index],
-            tau,
-            np.zeros_like(tau),
-            np.zeros_like(tau),
-            pressure,
-            contract["emission_mu"][:, None],
-            np.zeros(wavelength.size),
-            1,
-            np.zeros(wavelength.size),
-            0,
-        )
-        runtime[case_index] = perf_counter() - started
-        intensity = point[:, 0, :] * (0.1 / (2.0 * np.pi))
-        flux[case_index] = np.pi * np.sum(
-            contract["disk_weights"][:, None] * intensity, axis=0
-        )
-        contribution[case_index] = _formal_contribution(
+        layer_radiance = _formal_contribution(
             wavelength,
             contract["temperature_edges_k"][case_index],
             tau,
             np.array([1.0]),
             contract["emission_mu"],
             contract["disk_weights"],
+            normalize=False,
         )
+        runtime[case_index] = perf_counter() - started
+        flux[case_index] = np.pi * np.sum(layer_radiance, axis=0)
+        contribution[case_index] = _normalize(layer_radiance)
     return flux, contribution, runtime, total_tau
 
 

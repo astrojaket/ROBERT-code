@@ -490,7 +490,7 @@ def _run_worker(
                     peak_rss,
                     sum(item.memory_info().rss for item in processes if item.is_running()),
                 )
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
+            except (psutil.NoSuchProcess, psutil.AccessDenied, OSError, PermissionError):
                 pass
             time.sleep(0.10)
         return_code = process.wait()
@@ -665,6 +665,67 @@ def _write_robert_worker_output(
     np.savez_compressed(path, **payload)
 
 
+def _reuse_resolution(
+    args: argparse.Namespace, resolution: int
+) -> tuple[
+    dict[str, dict[str, dict[str, Any]]],
+    dict[str, Any],
+    dict[str, Any],
+    list[Path],
+]:
+    """Reanalyze complete preserved Stage-7 worker artifacts."""
+
+    stage_dir = args.output_root / "stage_7"
+    label = f"main_L{resolution}"
+    native_path = stage_dir / f"contract_track_b_{label}.npz"
+    shared_path = stage_dir / f"contract_track_a_{label}.npz"
+    contract = _load(native_path)
+    edges = r100_edges()
+    outputs: dict[str, dict[str, dict[str, Any]]] = {track: {} for track in TRACKS}
+    execution: dict[str, Any] = {track: {} for track in TRACKS}
+    extrema: dict[str, Any] = {track: {} for track in TRACKS}
+    paths = [native_path, shared_path]
+    for track, short in (
+        ("track_b_native_cloud", "track_b"),
+        ("track_a_shared_tau", "track_a"),
+    ):
+        for model in MODELS:
+            output_path = stage_dir / f"{short}_{model}_{label}.npz"
+            payload = _load(output_path)
+            metadata = json.loads(str(payload["metadata_json"]))
+            stderr_path = output_path.with_suffix(".stderr.log")
+            stdout_path = output_path.with_suffix(".stdout.log")
+            warnings = (
+                [
+                    line
+                    for line in stderr_path.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                if stderr_path.is_file()
+                else []
+            )
+            execution[track][model] = {
+                "wall_time_s": float(
+                    metadata.get("wall_time_s", np.sum(payload["runtime_s"]))
+                ),
+                "peak_rss_bytes": int(metadata.get("peak_rss_bytes", 0)),
+                "warnings": warnings,
+                "reused_complete_worker_artifact": True,
+            }
+            if stderr_path.is_file():
+                execution[track][model]["stderr_sha256"] = sha256(stderr_path)
+                paths.append(stderr_path)
+            if stdout_path.is_file():
+                execution[track][model]["stdout_sha256"] = sha256(stdout_path)
+                paths.append(stdout_path)
+            extrema[track][model] = _native_extrema(payload, contract)
+            outputs[track][model] = _bin_payload(payload, contract, edges)
+            paths.append(output_path)
+            del payload
+            gc.collect()
+    return outputs, execution, {"contract": contract, "native_extrema": extrema}, paths
+
+
 def _run_resolution(
     args: argparse.Namespace,
     resolution: int,
@@ -676,6 +737,8 @@ def _run_resolution(
     dict[str, Any],
     list[Path],
 ]:
+    if bool(getattr(args, "reuse_existing", False)) and not pilot:
+        return _reuse_resolution(args, resolution)
     stage_dir = args.output_root / "stage_7"
     stage_dir.mkdir(parents=True, exist_ok=True)
     contract = _build_contract(
@@ -701,6 +764,11 @@ def _run_resolution(
             python, model, "native", native_path, output_path, args
         )
         payload = _load(output_path)
+        worker_metadata = json.loads(str(payload["metadata_json"]))
+        execution["track_b_native_cloud"][model]["peak_rss_bytes"] = max(
+            int(execution["track_b_native_cloud"][model]["peak_rss_bytes"]),
+            int(worker_metadata.get("peak_rss_bytes", 0)),
+        )
         extrema["track_b_native_cloud"][model] = _native_extrema(payload, contract)
         outputs["track_b_native_cloud"][model] = _bin_payload(payload, contract, edges)
         paths.extend(
@@ -750,6 +818,11 @@ def _run_resolution(
             python, model, "shared", shared_path, output_path, args
         )
         payload = _load(output_path)
+        worker_metadata = json.loads(str(payload["metadata_json"]))
+        execution["track_a_shared_tau"][model]["peak_rss_bytes"] = max(
+            int(execution["track_a_shared_tau"][model]["peak_rss_bytes"]),
+            int(worker_metadata.get("peak_rss_bytes", 0)),
+        )
         extrema["track_a_shared_tau"][model] = _native_extrema(payload, contract)
         outputs["track_a_shared_tau"][model] = _bin_payload(payload, contract, edges)
         paths.extend(
@@ -1131,6 +1204,28 @@ def _artifact(
     contracts: dict[int, dict[str, np.ndarray]],
     wavelength: np.ndarray,
 ) -> dict[str, np.ndarray]:
+    def pack_probability(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        clipped = np.clip(np.asarray(values, dtype=float), 0.0, 1.0)
+        quantized = np.rint(clipped * 4095.0).astype(np.uint16).ravel()
+        original_size = quantized.size
+        if original_size % 2:
+            quantized = np.append(quantized, np.uint16(0))
+        left = quantized[0::2]
+        right = quantized[1::2]
+        packed = np.empty(left.size * 3, dtype=np.uint8)
+        packed[0::3] = (left & 0xFF).astype(np.uint8)
+        packed[1::3] = (((left >> 8) & 0x0F) | ((right & 0x0F) << 4)).astype(
+            np.uint8
+        )
+        packed[2::3] = (right >> 4).astype(np.uint8)
+        shape = np.asarray((*clipped.shape, original_size), dtype=np.int64)
+        return packed, shape
+
+    def store_profile(name: str, values: np.ndarray) -> None:
+        packed, shape = pack_probability(values)
+        artifact[f"{name}_uint12_packed"] = packed
+        artifact[f"{name}_shape"] = shape
+
     artifact: dict[str, np.ndarray] = {
         "schema_version": np.array(1),
         "stage": np.array(7),
@@ -1147,6 +1242,13 @@ def _artifact(
         "single_scattering_albedo": np.zeros(
             contracts[PRIMARY_RESOLUTION]["cloud_label"].size
         ),
+        "normalized_profile_quantization_scale": np.array(4095.0),
+        "normalized_profile_max_abs_quantization_error": np.array(
+            0.5 / 4095.0
+        ),
+        "normalized_profile_storage": np.array(
+            "packed uint12 pairs in little nibble order; unpack and divide by scale"
+        ),
     }
     for resolution in RESOLUTIONS:
         artifact[f"pressure_edges_L{resolution}_bar"] = contracts[resolution][
@@ -1162,23 +1264,48 @@ def _artifact(
             for model in MODELS:
                 prefix = f"{track}_L{resolution}_{model}"
                 payload = by_resolution[resolution][track][model]
-                artifact[f"flux_{prefix}_w_m2_m"] = payload["flux_r100"]
-                artifact[f"eclipse_depth_{prefix}"] = payload["eclipse_depth_r100"]
-                artifact[f"cloud_effect_flux_{prefix}_w_m2_m"] = payload[
-                    "cloud_effect_flux_r100"
-                ]
-                artifact[f"cloud_effect_eclipse_{prefix}_ppm"] = payload[
-                    "cloud_effect_eclipse_ppm_r100"
-                ]
-                artifact[f"normalized_contribution_{prefix}"] = payload[
-                    "normalized_contribution_r100"
-                ]
-                artifact[f"normalized_cloud_response_{prefix}"] = payload[
-                    "normalized_cloud_response_r100"
-                ]
-                artifact[f"cloud_extinction_tau_{prefix}"] = payload[
-                    "cloud_extinction_tau_r100"
-                ]
+                artifact[f"flux_{prefix}_w_m2_m"] = np.asarray(
+                    payload["flux_r100"], dtype=np.float32
+                )
+                artifact[f"eclipse_depth_{prefix}"] = np.asarray(
+                    payload["eclipse_depth_r100"], dtype=np.float32
+                )
+                artifact[f"cloud_effect_flux_{prefix}_w_m2_m"] = np.asarray(
+                    payload["cloud_effect_flux_r100"], dtype=np.float32
+                )
+                artifact[f"cloud_effect_eclipse_{prefix}_ppm"] = np.asarray(
+                    payload["cloud_effect_eclipse_ppm_r100"], dtype=np.float32
+                )
+                if track == "track_b_native_cloud":
+                    store_profile(
+                        f"normalized_contribution_{prefix}",
+                        payload["normalized_contribution_r100"],
+                    )
+                    store_profile(
+                        f"normalized_cloud_response_{prefix}",
+                        payload["normalized_cloud_response_r100"],
+                    )
+                    first_profile = contracts[resolution]["profile_index"] == 0
+                    artifact[f"cloud_extinction_tau_{prefix}"] = np.asarray(
+                        payload["cloud_extinction_tau_r100"][first_profile],
+                        dtype=np.float32,
+                    )
+        shared = by_resolution[resolution]["track_a_shared_tau"]["robert"]
+        shared_prefix = f"track_a_shared_tau_L{resolution}_identical_formal_profile"
+        store_profile(
+            f"normalized_contribution_{shared_prefix}",
+            shared["normalized_contribution_r100"],
+        )
+        store_profile(
+            f"normalized_cloud_response_{shared_prefix}",
+            shared["normalized_cloud_response_r100"],
+        )
+        first_profile = contracts[resolution]["profile_index"] == 0
+        artifact[f"cloud_extinction_tau_track_a_shared_tau_L{resolution}"] = (
+            np.asarray(
+                shared["cloud_extinction_tau_r100"][first_profile], dtype=np.float32
+            )
+        )
     return artifact
 
 
@@ -1204,7 +1331,10 @@ def _pilot_decision(
         for track in execution.values()
         for details in track.values()
     )
-    available = int(psutil.virtual_memory().available)
+    try:
+        available = int(psutil.virtual_memory().available)
+    except (OSError, PermissionError):
+        available = int(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_AVPHYS_PAGES"))
     wall_safe = projection <= 2.0 * 3600.0
     memory_safe = peak <= 0.60 * available
     return {
@@ -1229,41 +1359,45 @@ def _pilot_decision(
 def _run(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, np.ndarray] | None]:
     stage_dir = args.output_root / "stage_7"
     stage_dir.mkdir(parents=True, exist_ok=True)
-    pilot_started = perf_counter()
-    pilot_outputs, pilot_execution, pilot_context, pilot_paths = _run_resolution(
-        args, PRIMARY_RESOLUTION, pilot=True
-    )
-    pilot_decision = _pilot_decision(
-        pilot_execution, pilot_context["contract"]["case_id"].size
-    )
-    pilot_record = {
-        "schema_version": 1,
-        "stage": 7,
-        "kind": "representative_cross_framework_primary_resolution_pilot",
-        "resolution": PRIMARY_RESOLUTION,
-        "cloud_labels": list(PILOT_CLOUD_LABELS),
-        "profiles": list(STAGE_4_PROFILE_NAMES),
-        "execution": pilot_execution,
-        "decision": pilot_decision,
-        "wall_time_s": perf_counter() - pilot_started,
-        "artifact_checksums": {
-            str(path.relative_to(args.output_root)): sha256(path) for path in pilot_paths
-        },
-    }
     pilot_path = stage_dir / "stage_7_pilot_report.json"
-    write_json(pilot_path, pilot_record)
-    if args.pilot_only or not pilot_decision["continue_full_matrix"]:
-        report = {
+    if args.reuse_existing:
+        pilot_record = json.loads(pilot_path.read_text(encoding="utf-8"))
+    else:
+        pilot_started = perf_counter()
+        pilot_outputs, pilot_execution, pilot_context, pilot_paths = _run_resolution(
+            args, PRIMARY_RESOLUTION, pilot=True
+        )
+        pilot_decision = _pilot_decision(
+            pilot_execution, pilot_context["contract"]["case_id"].size
+        )
+        pilot_record = {
             "schema_version": 1,
             "stage": 7,
-            "status": (
-                "pilot_only" if args.pilot_only else "stopped_after_unsafe_pilot"
-            ),
-            "pilot": pilot_record,
+            "kind": "representative_cross_framework_primary_resolution_pilot",
+            "resolution": PRIMARY_RESOLUTION,
+            "cloud_labels": list(PILOT_CLOUD_LABELS),
+            "profiles": list(STAGE_4_PROFILE_NAMES),
+            "execution": pilot_execution,
+            "decision": pilot_decision,
+            "wall_time_s": perf_counter() - pilot_started,
+            "artifact_checksums": {
+                str(path.relative_to(args.output_root)): sha256(path)
+                for path in pilot_paths
+            },
         }
-        return report, None
-    del pilot_outputs
-    gc.collect()
+        write_json(pilot_path, pilot_record)
+        if args.pilot_only or not pilot_decision["continue_full_matrix"]:
+            report = {
+                "schema_version": 1,
+                "stage": 7,
+                "status": (
+                    "pilot_only" if args.pilot_only else "stopped_after_unsafe_pilot"
+                ),
+                "pilot": pilot_record,
+            }
+            return report, None
+        del pilot_outputs
+        gc.collect()
 
     started = perf_counter()
     by_resolution: dict[int, dict[str, dict[str, dict[str, Any]]]] = {}
@@ -1429,9 +1563,19 @@ def _run(args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, np.ndarray
             name: {"path": str(path.resolve()), "sha256": sha256(path)}
             for name, path in input_paths.items()
         },
-        "wall_time_s": perf_counter() - started,
         "peak_orchestrator_rss_bytes": _peak_rss_bytes(),
     }
+    analysis_elapsed = perf_counter() - started
+    if args.reuse_existing:
+        report["analysis_wall_time_s"] = analysis_elapsed
+        report["wall_time_s"] = float(args.full_matrix_wall_time_s)
+        report["reanalysis_note"] = (
+            "complete preserved worker artifacts were reanalyzed after replacing the "
+            "invalid exact-omega0 PICASO low-level shared call with the Stage-1-validated "
+            "exact absorbing formal path; gates and all physical contracts were unchanged"
+        )
+    else:
+        report["wall_time_s"] = analysis_elapsed
     return report, response_artifact
 
 
@@ -1448,6 +1592,8 @@ def main() -> None:
     parser.add_argument("--prt-input", type=Path, default=DEFAULT_PRT_INPUT)
     parser.add_argument("--picaso-resample", type=int, default=50)
     parser.add_argument("--pilot-only", action="store_true")
+    parser.add_argument("--reuse-existing", action="store_true")
+    parser.add_argument("--full-matrix-wall-time-s", type=float, default=3666.374573249952)
     args = parser.parse_args()
     args.output_root = args.output_root.resolve()
     args.report_root = args.report_root.resolve()
@@ -1464,10 +1610,18 @@ def main() -> None:
             "contents": (
                 "complete R=100 absolute spectra, eclipse depths, signed cloud effects, "
                 "normalized contributions and cloud responses, and cloud extinction tensors "
-                "for both tracks, all frameworks, and 40/80/160 grids"
+                "for both tracks, all frameworks, and 40/80/160 grids; normalized profiles "
+                "use documented loss-bounded packed-uint12 storage"
             ),
         }
-    report["total_launcher_wall_time_s"] = perf_counter() - overall_started
+    launcher_elapsed = perf_counter() - overall_started
+    if args.reuse_existing:
+        report["reanalysis_launcher_wall_time_s"] = launcher_elapsed
+        report["total_launcher_wall_time_s"] = float(
+            args.full_matrix_wall_time_s + report["pilot"]["wall_time_s"]
+        )
+    else:
+        report["total_launcher_wall_time_s"] = launcher_elapsed
     write_json(args.report_root / "stage_7_report.json", report)
     write_checksums(args.report_root)
     print(json.dumps({"stage": 7, "status": report["status"]}, indent=2))

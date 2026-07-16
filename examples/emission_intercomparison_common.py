@@ -881,13 +881,28 @@ def bin_mean(
     for index, (lower, upper) in enumerate(zip(edges[:-1], edges[1:], strict=True)):
         selected = (wavelength > lower) & (wavelength < upper)
         x = np.r_[lower, wavelength[selected], upper]
-        for row, spectrum in enumerate(spectra):
-            y = np.r_[
-                np.interp(lower, wavelength, spectrum),
-                spectrum[selected],
-                np.interp(upper, wavelength, spectrum),
-            ]
-            result[row, index] = np.trapezoid(y, x) / (upper - lower)
+        lower_index = int(np.searchsorted(wavelength, lower, side="right") - 1)
+        upper_index = int(np.searchsorted(wavelength, upper, side="right") - 1)
+        lower_index = min(max(lower_index, 0), wavelength.size - 2)
+        upper_index = min(max(upper_index, 0), wavelength.size - 2)
+        lower_fraction = (
+            (lower - wavelength[lower_index])
+            / (wavelength[lower_index + 1] - wavelength[lower_index])
+        )
+        upper_fraction = (
+            (upper - wavelength[upper_index])
+            / (wavelength[upper_index + 1] - wavelength[upper_index])
+        )
+        lower_values = spectra[:, lower_index] + lower_fraction * (
+            spectra[:, lower_index + 1] - spectra[:, lower_index]
+        )
+        upper_values = spectra[:, upper_index] + upper_fraction * (
+            spectra[:, upper_index + 1] - spectra[:, upper_index]
+        )
+        y = np.concatenate(
+            (lower_values[:, None], spectra[:, selected], upper_values[:, None]), axis=1
+        )
+        result[:, index] = np.trapezoid(y, x, axis=1) / (upper - lower)
     return result[0] if np.asarray(values).ndim == 1 else result
 
 

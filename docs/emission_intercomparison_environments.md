@@ -112,6 +112,16 @@ ROBERT layer extinction, PICASO native cloud tables, and pRT native `cm2/g`
 additional absorption callbacks.  Its report and complete R=100 cloud arrays
 are written under `docs/data/emission_intercomparison/`.
 
+The completed Stage-7 run took `3666.4 s` for the full matrix plus `88.3 s`
+for defect-correction reanalysis, with `5.57 GB` peak orchestrator RSS.  The
+resource pilot authorized local execution, and the actual end-to-end launcher
+time including its repeated pilot was `3783.7 s`.  Exact-`omega0` PICASO
+shared calculations use the independently implemented Stage-1 absorbing
+formal path because PICASO's low-level scattering routine returns NaNs at
+exact zero; native PICASO cloud calculations remain on the official native
+path.  This distinction and the unchanged failed full-domain gates are
+recorded in the report.
+
 The canonical continuation through absorbing clouds, cloud scattering, and
 cloud-free plus cloudy cross-retrievals is documented in
 `docs/emission_intercomparison_roadmap.md`.  Stage-9 implementation, contracts,

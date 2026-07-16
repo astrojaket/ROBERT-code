@@ -19,6 +19,13 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 stage7 = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(stage7)
+WORKER_SPEC = importlib.util.spec_from_file_location(
+    "run_emission_intercomparison_stage_7_external",
+    EXAMPLES / "run_emission_intercomparison_stage_7_external.py",
+)
+assert WORKER_SPEC is not None and WORKER_SPEC.loader is not None
+worker = importlib.util.module_from_spec(WORKER_SPEC)
+WORKER_SPEC.loader.exec_module(worker)
 
 
 def _contract() -> dict[str, np.ndarray]:
@@ -35,11 +42,30 @@ def _contract() -> dict[str, np.ndarray]:
 def test_shared_worker_contract_separates_gas_and_cloud_tau() -> None:
     contract = _contract()
     contract["shared_gas_tau"] = np.full((4, 2, 2), 0.5)
-    total = stage7._formal_contribution  # worker function import remains available
-    assert callable(total)
+    total = worker._shared_total_tau(contract)
+
     assert contract["shared_gas_tau"].shape == (4, 2, 2)
     assert contract["cloud_extinction_tau"].shape[1:] == (2, 2)
+    expected = (
+        contract["shared_gas_tau"][contract["profile_index"]]
+        + contract["cloud_extinction_tau"][contract["case_cloud_index"]]
+    )
+    np.testing.assert_allclose(total, expected)
     assert np.all(contract["cloud_single_scattering_albedo"] == 0.0)
+
+
+def test_native_prt_contract_builds_absorption_only_opacity() -> None:
+    contract = _contract()
+    clear = worker._prt_cloud_opacity_function(contract, 0, 1500.0)
+    deck = worker._prt_cloud_opacity_function(contract, 1, 1500.0)
+    wavelength = np.array([1.0, 2.0])
+    pressure = np.array([1.0e-5, 1.0e-2, 1.0, 100.0])
+
+    np.testing.assert_array_equal(clear(wavelength, pressure), 0.0)
+    absorption = deck(wavelength, pressure)
+    assert absorption.shape == (2, 4)
+    assert np.all(absorption >= 0.0)
+    assert np.all(absorption[:, pressure < contract["cloud_top_pressure_bar"][1]] == 0.0)
 
 
 def test_cloud_effect_metrics_preserve_sign_and_avoid_point_ratios() -> None:
