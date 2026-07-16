@@ -101,3 +101,10 @@ opacity/CIA recomputation for Track B, and a primary-resolution finite-
 difference audit at 0.05, 0.10, and 0.20 dex.  Its absolute interpreters,
 package versions, warnings, contracts, checksums, and raw/summarized timings
 are recorded in `docs/data/emission_intercomparison/stage_6_report.json`.
+
+The canonical continuation through absorbing clouds, cloud scattering, and
+cloud-free plus cloudy cross-retrievals is documented in
+`docs/emission_intercomparison_roadmap.md`.  Stage-9 implementation, contracts,
+synthetic inputs, and smoke tests are prepared locally; the full posterior
+matrix is then pulled from GitHub and executed on Glamdring, with DiRAC kept as
+a fallback target.

@@ -157,3 +157,10 @@ The versioned outputs are
 `docs/data/emission_intercomparison/stage_6_response_tensors.npz`.  Detailed
 process-isolated contracts and worker outputs remain under the ignored
 `examples/outputs/emission_intercomparison/stage_6/` directory.
+
+The post-Stage-6 programme is fixed in
+`docs/emission_intercomparison_roadmap.md`: Stage 7 covers absorbing clouds,
+Stage 8 covers cloud scattering and solver order, and Stage 9 performs both
+cloud-free and cloudy directed cross-retrievals.  Stage-9 files and smoke runs
+are prepared locally before the full sampler matrix is pulled onto and run on
+Glamdring.
