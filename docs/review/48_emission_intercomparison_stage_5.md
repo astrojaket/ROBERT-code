@@ -127,3 +127,6 @@ interpreter and package version for each framework, method definitions,
 contracts, source and output checksums, timings, pairwise results, and both
 40-to-80 and 80-to-160 convergence.  Detailed process artifacts remain under
 the ignored `examples/outputs/emission_intercomparison/stage_5/` directory.
+
+Stage 6 molecular-abundance and composition-Jacobian results are documented
+in `docs/review/49_emission_intercomparison_stage_6.md`.

@@ -72,12 +72,13 @@ Only the external PICASO worker runs in `picaso`, and only the external pRT
 worker runs in `petitradtrans-stable`.  The worker metadata must record the
 absolute Python executable and package version for every generated artifact.
 
-Run Stages 4 and 5 from the ROBERT environment after the smoke tests:
+Run Stages 4--6 from the ROBERT environment after the smoke tests:
 
 ```bash
 conda activate robert-exoplanets
 python examples/benchmark_emission_intercomparison_stage_4.py
 python examples/benchmark_emission_intercomparison_stage_5.py
+python examples/benchmark_emission_intercomparison_stage_6.py
 ```
 
 The launcher supplies 40/80/160 ROBERT cells, the matching cell edges as
@@ -92,3 +93,11 @@ track.  The latter recomputes opacity separately in every framework and
 finite-difference case.  The launcher records all three absolute interpreter
 paths and package versions in
 `docs/data/emission_intercomparison/stage_5_report.json`.
+
+Stage 6 preserves the same 40/80/160 vertical-grid and process-isolation
+contracts.  It adds localized H2O, CO, CO2, and CH4 log10-VMR perturbations,
+case-specific shared optical depths for Track A, native composition-dependent
+opacity/CIA recomputation for Track B, and a primary-resolution finite-
+difference audit at 0.05, 0.10, and 0.20 dex.  Its absolute interpreters,
+package versions, warnings, contracts, checksums, and raw/summarized timings
+are recorded in `docs/data/emission_intercomparison/stage_6_report.json`.

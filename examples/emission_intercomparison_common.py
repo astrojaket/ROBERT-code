@@ -42,6 +42,8 @@ STAGE_5_PERTURBATION_CENTERS_BAR = tuple(
 )
 STAGE_5_PERTURBATION_AMPLITUDE_K = 10.0
 STAGE_5_LOCALIZATION_SIGMA_DEX = 0.35
+STAGE_6_PERTURBATION_AMPLITUDE_DEX = 0.10
+STAGE_6_LINEARITY_AMPLITUDES_DEX = (0.05, 0.10, 0.20)
 
 
 def disk_quadrature(n_mu: int = 8) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -113,10 +115,69 @@ def background_composition(
         "He": 0.15 * remainder,
         **{name: float(molecular_vmr.get(name, 0.0)) for name in SPECIES},
     }
-    mean_molar_mass = sum(
-        composition[name] * MOLAR_MASS[name] for name in composition
-    )
+    mean_molar_mass = sum(composition[name] * MOLAR_MASS[name] for name in composition)
     return composition, float(mean_molar_mass)
+
+
+def complete_composition_profile(molecular_vmr: np.ndarray) -> np.ndarray:
+    """Add an 85:15 H2/He remainder to pressure-dependent molecular VMRs."""
+
+    molecular = np.asarray(molecular_vmr, dtype=float)
+    if molecular.shape[-1:] != (len(SPECIES),):
+        raise ValueError("molecular_vmr must end with the four-species axis")
+    if np.any(~np.isfinite(molecular)) or np.any(molecular < 0.0):
+        raise ValueError("molecular_vmr must be finite and non-negative")
+    molecular_total = np.sum(molecular, axis=-1)
+    if np.any(molecular_total >= 1.0):
+        raise ValueError("molecular VMR sum must be less than one everywhere")
+    remainder = 1.0 - molecular_total
+    return np.concatenate(
+        (
+            (0.85 * remainder)[..., None],
+            (0.15 * remainder)[..., None],
+            molecular,
+        ),
+        axis=-1,
+    )
+
+
+def mean_molecular_weight_profile(gas_vmr: np.ndarray) -> np.ndarray:
+    """Return mean molecular weight for H2, He, H2O, CO, CO2, CH4 VMRs."""
+
+    vmr = np.asarray(gas_vmr, dtype=float)
+    names = ("H2", "He", *SPECIES)
+    if vmr.shape[-1:] != (len(names),):
+        raise ValueError("gas_vmr must end with H2, He, and four species")
+    return np.sum(vmr * np.asarray([MOLAR_MASS[name] for name in names]), axis=-1)
+
+
+def localized_log_vmr_composition(
+    pressure_bar: np.ndarray,
+    target_species: str,
+    center_bar: float,
+    sign: int,
+    amplitude_dex: float,
+    *,
+    sigma_dex: float = STAGE_5_LOCALIZATION_SIGMA_DEX,
+) -> np.ndarray:
+    """Return a renormalized localized +/- log10-VMR perturbation profile."""
+
+    if target_species not in SPECIES:
+        raise ValueError(f"unsupported target species: {target_species}")
+    if sign not in (-1, 1):
+        raise ValueError("sign must be -1 or +1")
+    amplitude = float(amplitude_dex)
+    if not np.isfinite(amplitude) or amplitude <= 0.0:
+        raise ValueError("amplitude_dex must be finite and positive")
+    pressure = np.asarray(pressure_bar, dtype=float)
+    molecular = np.broadcast_to(
+        np.asarray([STAGE_3_MOLECULAR_VMR[name] for name in SPECIES]),
+        (pressure.size, len(SPECIES)),
+    ).copy()
+    species_index = SPECIES.index(target_species)
+    localization = temperature_localization(pressure, center_bar, sigma_dex=sigma_dex)
+    molecular[:, species_index] *= 10.0 ** (sign * amplitude * localization)
+    return complete_composition_profile(molecular)
 
 
 def r100_edges(lower: float = 0.51, upper: float = 11.9) -> np.ndarray:
@@ -139,9 +200,7 @@ def stage_1_contract(n_layers: int) -> dict[str, np.ndarray]:
             case_ids.append(f"T{int(temperature)}_tau{total_tau:g}_L{n_layers}")
             temperatures.append(np.full(n_layers + 1, temperature))
             component_tau.append(
-                total_tau
-                * pressure_fraction[:, None]
-                * np.ones((1, wavelength.size))
+                total_tau * pressure_fraction[:, None] * np.ones((1, wavelength.size))
             )
     return {
         "schema_version": np.array(1),
@@ -172,9 +231,7 @@ def stage_2_contract(n_layers: int) -> dict[str, np.ndarray]:
         template = molecular_band_template(wavelength, species)
         for anchor in STAGE_1_TEMPERATURES_K:
             for vmr in STAGE_2_VMR:
-                case_ids.append(
-                    f"{species}_T{int(anchor)}_vmr{vmr:.0e}_L{n_layers}"
-                )
+                case_ids.append(f"{species}_T{int(anchor)}_vmr{vmr:.0e}_L{n_layers}")
                 temperatures.append(temperature_profile(pressure_edges, anchor))
                 components = np.zeros((len(SPECIES), n_layers, wavelength.size))
                 temperature_scale = (anchor / 1000.0) ** 0.25
@@ -210,7 +267,9 @@ def stage_2_contract(n_layers: int) -> dict[str, np.ndarray]:
     }
 
 
-def stage_3_contract(n_layers: int, *, include_cia: bool = True) -> dict[str, np.ndarray]:
+def stage_3_contract(
+    n_layers: int, *, include_cia: bool = True
+) -> dict[str, np.ndarray]:
     """Build the four-molecule native-opacity Track-B contract."""
 
     pressure_edges, _ = pressure_grid(n_layers)
@@ -237,7 +296,9 @@ def stage_3_contract(n_layers: int, *, include_cia: bool = True) -> dict[str, np
     }
 
 
-def stage_4_contract(n_cells: int, *, include_cia: bool = True) -> dict[str, np.ndarray]:
+def stage_4_contract(
+    n_cells: int, *, include_cia: bool = True
+) -> dict[str, np.ndarray]:
     """Build the native-opacity thermal-structure Track-B contract.
 
     ROBERT and PICASO use ``pressure_edges_bar`` to describe ``n_cells``
@@ -271,9 +332,7 @@ def stage_4_contract(n_cells: int, *, include_cia: bool = True) -> dict[str, np.
     return {
         "schema_version": np.array(1),
         "stage": np.array(4),
-        "case_id": np.asarray(
-            [f"{name}_L{n_cells}" for name in STAGE_4_PROFILE_NAMES]
-        ),
+        "case_id": np.asarray([f"{name}_L{n_cells}" for name in STAGE_4_PROFILE_NAMES]),
         "profile_name": np.asarray(STAGE_4_PROFILE_NAMES),
         "pressure_edges_bar": pressure_edges,
         "pressure_centers_bar": pressure_centers,
@@ -360,9 +419,7 @@ def stage_5_contract(
         )
     for profile_index, profile_name in enumerate(STAGE_4_PROFILE_NAMES):
         baseline_edges = stage_4_temperature_profile(pressure_edges, profile_name)
-        baseline_cells = stage_4_temperature_profile(
-            pressure_centers, profile_name
-        )
+        baseline_cells = stage_4_temperature_profile(pressure_centers, profile_name)
         for center_index, center in enumerate(STAGE_5_PERTURBATION_CENTERS_BAR):
             edge_shape = temperature_localization(
                 pressure_edges, center, sigma_dex=sigma
@@ -371,18 +428,12 @@ def stage_5_contract(
                 pressure_centers, center, sigma_dex=sigma
             )
             for sign, label in ((-1, "minus"), (1, "plus")):
-                case_ids.append(
-                    f"{profile_name}_P{center:.0e}_{label}_L{n_cells}"
-                )
+                case_ids.append(f"{profile_name}_P{center:.0e}_{label}_L{n_cells}")
                 profile_indices.append(profile_index)
                 center_indices.append(center_index)
                 signs.append(sign)
-                edge_temperatures.append(
-                    baseline_edges + sign * amplitude * edge_shape
-                )
-                cell_temperatures.append(
-                    baseline_cells + sign * amplitude * cell_shape
-                )
+                edge_temperatures.append(baseline_edges + sign * amplitude * edge_shape)
+                cell_temperatures.append(baseline_cells + sign * amplitude * cell_shape)
     case_count = len(case_ids)
     contribution_mask = np.asarray(signs) == 0
     return {
@@ -393,9 +444,7 @@ def stage_5_contract(
         "profile_index": np.asarray(profile_indices, dtype=int),
         "perturbation_center_index": np.asarray(center_indices, dtype=int),
         "perturbation_sign": np.asarray(signs, dtype=int),
-        "perturbation_centers_bar": np.asarray(
-            STAGE_5_PERTURBATION_CENTERS_BAR
-        ),
+        "perturbation_centers_bar": np.asarray(STAGE_5_PERTURBATION_CENTERS_BAR),
         "perturbation_amplitude_k": np.array(amplitude),
         "localization_sigma_dex": np.array(sigma),
         "pressure_edges_bar": pressure_edges,
@@ -413,9 +462,143 @@ def stage_5_contract(
     }
 
 
-def molecular_band_template(
-    wavelength_micron: np.ndarray, species: str
-) -> np.ndarray:
+def stage_6_contract(
+    n_cells: int,
+    *,
+    include_cia: bool = True,
+    amplitude_dex: float = STAGE_6_PERTURBATION_AMPLITUDE_DEX,
+    sigma_dex: float = STAGE_5_LOCALIZATION_SIGMA_DEX,
+    profile_names: tuple[str, ...] = STAGE_4_PROFILE_NAMES,
+) -> dict[str, np.ndarray]:
+    """Build localized composition finite-difference cases for Stage 6.
+
+    PICASO compositions and temperatures are sampled at pressure edges.
+    ROBERT cell quantities and pRT nodes use the geometric cell centres.
+    Baseline cases precede symmetric minus/plus cases for each target species
+    and perturbation centre.
+    """
+
+    amplitude = float(amplitude_dex)
+    sigma = float(sigma_dex)
+    if not np.isfinite(amplitude) or amplitude <= 0.0:
+        raise ValueError("amplitude_dex must be finite and positive")
+    if not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("sigma_dex must be finite and positive")
+    profiles = tuple(profile_names)
+    if not profiles or any(name not in STAGE_4_PROFILE_NAMES for name in profiles):
+        raise ValueError("profile_names must contain supported Stage-4 profiles")
+
+    pressure_edges, pressure_centers = pressure_grid(n_cells)
+    mu, legendre, disk = disk_quadrature()
+    baseline_molecular_edges = np.broadcast_to(
+        np.asarray([STAGE_3_MOLECULAR_VMR[name] for name in SPECIES]),
+        (pressure_edges.size, len(SPECIES)),
+    )
+    baseline_molecular_cells = np.broadcast_to(
+        np.asarray([STAGE_3_MOLECULAR_VMR[name] for name in SPECIES]),
+        (pressure_centers.size, len(SPECIES)),
+    )
+    baseline_edges = complete_composition_profile(baseline_molecular_edges)
+    baseline_cells = complete_composition_profile(baseline_molecular_cells)
+
+    case_ids: list[str] = []
+    profile_indices: list[int] = []
+    species_indices: list[int] = []
+    center_indices: list[int] = []
+    signs: list[int] = []
+    edge_temperatures: list[np.ndarray] = []
+    cell_temperatures: list[np.ndarray] = []
+    edge_compositions: list[np.ndarray] = []
+    cell_compositions: list[np.ndarray] = []
+
+    for profile_index, profile_name in enumerate(profiles):
+        case_ids.append(f"{profile_name}_baseline_L{n_cells}")
+        profile_indices.append(profile_index)
+        species_indices.append(-1)
+        center_indices.append(-1)
+        signs.append(0)
+        edge_temperatures.append(
+            stage_4_temperature_profile(pressure_edges, profile_name)
+        )
+        cell_temperatures.append(
+            stage_4_temperature_profile(pressure_centers, profile_name)
+        )
+        edge_compositions.append(baseline_edges)
+        cell_compositions.append(baseline_cells)
+
+    for profile_index, profile_name in enumerate(profiles):
+        profile_edges = stage_4_temperature_profile(pressure_edges, profile_name)
+        profile_cells = stage_4_temperature_profile(pressure_centers, profile_name)
+        for species_index, species in enumerate(SPECIES):
+            for center_index, center in enumerate(STAGE_5_PERTURBATION_CENTERS_BAR):
+                for sign, label in ((-1, "minus"), (1, "plus")):
+                    case_ids.append(
+                        f"{profile_name}_{species}_P{center:.0e}_{label}_"
+                        f"A{amplitude:.2f}_L{n_cells}"
+                    )
+                    profile_indices.append(profile_index)
+                    species_indices.append(species_index)
+                    center_indices.append(center_index)
+                    signs.append(sign)
+                    edge_temperatures.append(profile_edges)
+                    cell_temperatures.append(profile_cells)
+                    edge_compositions.append(
+                        localized_log_vmr_composition(
+                            pressure_edges,
+                            species,
+                            center,
+                            sign,
+                            amplitude,
+                            sigma_dex=sigma,
+                        )
+                    )
+                    cell_compositions.append(
+                        localized_log_vmr_composition(
+                            pressure_centers,
+                            species,
+                            center,
+                            sign,
+                            amplitude,
+                            sigma_dex=sigma,
+                        )
+                    )
+
+    gas_vmr_edges = np.asarray(edge_compositions)
+    gas_vmr_cells = np.asarray(cell_compositions)
+    contribution_mask = np.asarray(signs) == 0
+    return {
+        "schema_version": np.array(1),
+        "stage": np.array(6),
+        "case_id": np.asarray(case_ids),
+        "profile_name": np.asarray(profiles),
+        "species_name": np.asarray(SPECIES),
+        "profile_index": np.asarray(profile_indices, dtype=int),
+        "target_species_index": np.asarray(species_indices, dtype=int),
+        "perturbation_center_index": np.asarray(center_indices, dtype=int),
+        "perturbation_sign": np.asarray(signs, dtype=int),
+        "perturbation_centers_bar": np.asarray(STAGE_5_PERTURBATION_CENTERS_BAR),
+        "perturbation_amplitude_dex": np.array(amplitude),
+        "localization_sigma_dex": np.array(sigma),
+        "pressure_edges_bar": pressure_edges,
+        "pressure_centers_bar": pressure_centers,
+        "prt_pressure_bar": pressure_centers,
+        "temperature_edges_k": np.asarray(edge_temperatures),
+        "temperature_cells_k": np.asarray(cell_temperatures),
+        "gas_vmr_edges": gas_vmr_edges,
+        "gas_vmr_cells": gas_vmr_cells,
+        "gas_vmr": gas_vmr_cells,
+        "mean_molecular_weight_edges": mean_molecular_weight_profile(gas_vmr_edges),
+        "mean_molecular_weight_cells": mean_molecular_weight_profile(gas_vmr_cells),
+        "native_include_cia": np.array(include_cia),
+        "native_return_contribution": np.array(True),
+        "native_contribution_case_mask": contribution_mask,
+        "emission_mu": mu,
+        "legendre_weights": legendre,
+        "disk_weights": disk,
+    }
+
+
+def molecular_band_template(wavelength_micron: np.ndarray, species: str) -> np.ndarray:
     """Return a deterministic structured optical-depth template for Track A."""
 
     bands = {
@@ -431,9 +614,7 @@ def molecular_band_template(
     for index, center in enumerate(bands[species]):
         width = 0.055 + 0.012 * (index % 3)
         strength = 0.6 + 0.25 * (index % 4)
-        template += strength * np.exp(
-            -0.5 * (np.log(wavelength / center) / width) ** 2
-        )
+        template += strength * np.exp(-0.5 * (np.log(wavelength / center) / width) ** 2)
     return template
 
 
@@ -465,7 +646,9 @@ def bin_mean(
     return result[0] if np.asarray(values).ndim == 1 else result
 
 
-def planck_flux_w_m2_m(wavelength_micron: np.ndarray, temperature_k: float) -> np.ndarray:
+def planck_flux_w_m2_m(
+    wavelength_micron: np.ndarray, temperature_k: float
+) -> np.ndarray:
     from scipy.constants import c, h, k
 
     wavelength_m = np.asarray(wavelength_micron, dtype=float) * 1.0e-6
@@ -477,9 +660,7 @@ def planck_flux_w_m2_m(wavelength_micron: np.ndarray, temperature_k: float) -> n
 def eclipse_depth(flux: np.ndarray, wavelength_micron: np.ndarray) -> np.ndarray:
     stellar = planck_flux_w_m2_m(wavelength_micron, STAR_TEMPERATURE_K)
     return (
-        np.asarray(flux, dtype=float)
-        / stellar
-        * (PLANET_RADIUS_M / STAR_RADIUS_M) ** 2
+        np.asarray(flux, dtype=float) / stellar * (PLANET_RADIUS_M / STAR_RADIUS_M) ** 2
     )
 
 
@@ -565,9 +746,7 @@ def contribution_metrics(
         "centroid_pressure_p95_abs_difference_dex": float(
             np.percentile(np.abs(centroid_difference), 95.0)
         ),
-        "peak_pressure_rms_difference_dex": float(
-            np.sqrt(np.mean(peak_difference**2))
-        ),
+        "peak_pressure_rms_difference_dex": float(np.sqrt(np.mean(peak_difference**2))),
         "peak_pressure_median_difference_dex": float(np.median(peak_difference)),
         "profile_total_variation_median": float(np.median(total_variation)),
         "profile_total_variation_p95": float(np.percentile(total_variation, 95.0)),
@@ -604,12 +783,168 @@ def normalize_temperature_response(values: np.ndarray) -> np.ndarray:
     )
 
 
+def normalize_composition_response(values: np.ndarray) -> np.ndarray:
+    """Normalize absolute species-by-pressure-by-wavelength Jacobians in pressure."""
+
+    response = np.abs(np.asarray(values, dtype=float))
+    if response.ndim != 3:
+        raise ValueError(
+            "composition response must be species by pressure by wavelength"
+        )
+    if np.any(~np.isfinite(response)):
+        raise ValueError("composition response must be finite")
+    total = np.sum(response, axis=1, keepdims=True)
+    return np.divide(response, total, out=np.zeros_like(response), where=total > 0.0)
+
+
+def cross_species_sensitivity_fractions(values: np.ndarray) -> np.ndarray:
+    """Normalize pressure-integrated absolute sensitivity over four species."""
+
+    jacobian = np.asarray(values, dtype=float)
+    if jacobian.ndim != 3 or jacobian.shape[0] != len(SPECIES):
+        raise ValueError("values must be four species by pressure by wavelength")
+    if np.any(~np.isfinite(jacobian)):
+        raise ValueError("values must be finite")
+    sensitivity = np.sum(np.abs(jacobian), axis=1)
+    total = np.sum(sensitivity, axis=0, keepdims=True)
+    return np.divide(
+        sensitivity, total, out=np.zeros_like(sensitivity), where=total > 0.0
+    )
+
+
+def apply_jacobian_roundoff_floor(
+    values: np.ndarray,
+    flux_scale: np.ndarray,
+    amplitude: float,
+    *,
+    epsilon_factor: float = 32.0,
+) -> np.ndarray:
+    """Set finite-difference values indistinguishable from roundoff to zero.
+
+    The floor is ``epsilon_factor * eps * flux_scale / amplitude``.  This is
+    especially important for analytically zero composition derivatives of an
+    isothermal atmosphere with a blackbody lower boundary: normalizing raw
+    cancellation noise would otherwise create arbitrary vertical responses.
+    """
+
+    jacobian = np.asarray(values, dtype=float)
+    scale = np.asarray(flux_scale, dtype=float)
+    step = float(amplitude)
+    factor = float(epsilon_factor)
+    if scale.shape != (jacobian.shape[-1],):
+        raise ValueError("flux_scale must match the final wavelength axis")
+    if np.any(~np.isfinite(jacobian)) or np.any(~np.isfinite(scale)):
+        raise ValueError("Jacobian and flux scale must be finite")
+    if np.any(scale < 0.0) or not np.isfinite(step) or step <= 0.0:
+        raise ValueError("flux scale must be non-negative and amplitude positive")
+    if not np.isfinite(factor) or factor <= 0.0:
+        raise ValueError("epsilon_factor must be finite and positive")
+    floor = factor * np.finfo(float).eps * scale / step
+    return np.where(np.abs(jacobian) <= floor, 0.0, jacobian)
+
+
 def eclipse_jacobian_ppm_per_k(
     flux_jacobian: np.ndarray, wavelength_micron: np.ndarray
 ) -> np.ndarray:
     """Convert a planet-flux temperature Jacobian to eclipse ppm/K."""
 
     return eclipse_depth(flux_jacobian, wavelength_micron) * 1.0e6
+
+
+def eclipse_jacobian_ppm_per_dex(
+    flux_jacobian: np.ndarray, wavelength_micron: np.ndarray
+) -> np.ndarray:
+    """Convert a planet-flux log10-VMR Jacobian to eclipse ppm/dex."""
+
+    return eclipse_depth(flux_jacobian, wavelength_micron) * 1.0e6
+
+
+def signed_jacobian_metrics(
+    left: np.ndarray,
+    right: np.ndarray,
+    wavelength_micron: np.ndarray,
+) -> dict[str, float]:
+    """Compare signed composition Jacobians without singular pointwise ratios."""
+
+    left_values = np.asarray(left, dtype=float)
+    right_values = np.asarray(right, dtype=float)
+    if left_values.shape != right_values.shape or left_values.ndim < 2:
+        raise ValueError("Jacobian tensors must have matching shapes")
+    wavelength = np.asarray(wavelength_micron, dtype=float)
+    if wavelength.shape != (left_values.shape[-1],):
+        raise ValueError("wavelength_micron must match the final Jacobian axis")
+    if np.any(~np.isfinite(left_values)) or np.any(~np.isfinite(right_values)):
+        raise ValueError("Jacobian tensors must be finite")
+    flattened_left = left_values.reshape(-1, left_values.shape[-1])
+    flattened_right = right_values.reshape(-1, right_values.shape[-1])
+    peak = np.maximum(
+        np.max(np.abs(flattened_left), axis=1),
+        np.max(np.abs(flattened_right), axis=1),
+    )[:, None]
+    scaled = np.divide(
+        np.abs(flattened_left - flattened_right),
+        peak,
+        out=np.zeros_like(flattened_left),
+        where=peak > 0.0,
+    )
+    difference = left_values - right_values
+    eclipse_difference = eclipse_jacobian_ppm_per_dex(difference, wavelength)
+    pair_rms = max(
+        float(np.sqrt(np.mean(left_values**2))),
+        float(np.sqrt(np.mean(right_values**2))),
+        np.finfo(float).tiny,
+    )
+    return {
+        "median_abs_difference_over_pair_peak": float(np.median(scaled)),
+        "p95_abs_difference_over_pair_peak": float(np.percentile(scaled, 95.0)),
+        "max_abs_difference_over_pair_peak": float(np.max(scaled)),
+        "relative_rms_difference": float(np.sqrt(np.mean(difference**2)) / pair_rms),
+        "rms_eclipse_jacobian_difference_ppm_per_dex": float(
+            np.sqrt(np.mean(eclipse_difference**2))
+        ),
+        "max_abs_eclipse_jacobian_difference_ppm_per_dex": float(
+            np.max(np.abs(eclipse_difference))
+        ),
+    }
+
+
+def amplitude_linearity_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    wavelength_micron: np.ndarray,
+) -> dict[str, float]:
+    """Report central-difference truncation/nonlinearity against a reference step."""
+
+    metrics = signed_jacobian_metrics(reference, candidate, wavelength_micron)
+    difference = np.asarray(candidate, dtype=float) - np.asarray(reference, dtype=float)
+    metrics["rms_truncation_difference_flux_per_dex"] = float(
+        np.sqrt(np.mean(difference**2))
+    )
+    metrics["max_abs_truncation_difference_flux_per_dex"] = float(
+        np.max(np.abs(difference))
+    )
+    return metrics
+
+
+def cross_species_fraction_metrics(
+    left: np.ndarray, right: np.ndarray
+) -> dict[str, float]:
+    """Compare species-by-wavelength sensitivity fractions."""
+
+    left_values = np.asarray(left, dtype=float)
+    right_values = np.asarray(right, dtype=float)
+    if left_values.shape != right_values.shape or left_values.ndim != 2:
+        raise ValueError("fraction arrays must be matching species by wavelength")
+    if np.any(~np.isfinite(left_values)) or np.any(~np.isfinite(right_values)):
+        raise ValueError("fraction arrays must be finite")
+    difference = left_values - right_values
+    total_variation = 0.5 * np.sum(np.abs(difference), axis=0)
+    return {
+        "fraction_rms_difference": float(np.sqrt(np.mean(difference**2))),
+        "fraction_max_abs_difference": float(np.max(np.abs(difference))),
+        "species_total_variation_median": float(np.median(total_variation)),
+        "species_total_variation_p95": float(np.percentile(total_variation, 95.0)),
+    }
 
 
 def temperature_jacobian_metrics(
@@ -628,7 +963,9 @@ def temperature_jacobian_metrics(
     left_values = np.asarray(left, dtype=float)
     right_values = np.asarray(right, dtype=float)
     if left_values.shape != right_values.shape or left_values.ndim != 2:
-        raise ValueError("Jacobian arrays must have matching centre-by-wavelength shapes")
+        raise ValueError(
+            "Jacobian arrays must have matching centre-by-wavelength shapes"
+        )
     wavelength = np.asarray(wavelength_micron, dtype=float)
     if wavelength.shape != (left_values.shape[1],):
         raise ValueError("wavelength_micron must match the Jacobian spectral axis")
@@ -652,9 +989,7 @@ def temperature_jacobian_metrics(
     pair_rms = max(left_rms, right_rms, np.finfo(float).tiny)
     return {
         "median_abs_difference_over_pair_peak": float(np.median(scaled)),
-        "p95_abs_difference_over_pair_peak": float(
-            np.percentile(scaled, 95.0)
-        ),
+        "p95_abs_difference_over_pair_peak": float(np.percentile(scaled, 95.0)),
         "max_abs_difference_over_pair_peak": float(np.max(scaled)),
         "relative_rms_difference": float(
             np.sqrt(np.mean((left_values - right_values) ** 2)) / pair_rms

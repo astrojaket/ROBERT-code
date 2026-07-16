@@ -6,11 +6,14 @@ import importlib.util
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "examples/emission_intercomparison_common.py"
-SPEC = importlib.util.spec_from_file_location("emission_intercomparison_common", MODULE_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "emission_intercomparison_common", MODULE_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 common = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(common)
@@ -79,8 +82,7 @@ def test_stage_4_contract_aligns_robert_cells_with_prt_nodes() -> None:
     np.testing.assert_allclose(
         contract["prt_pressure_bar"],
         np.sqrt(
-            contract["pressure_edges_bar"][:-1]
-            * contract["pressure_edges_bar"][1:]
+            contract["pressure_edges_bar"][:-1] * contract["pressure_edges_bar"][1:]
         ),
     )
     assert contract["temperature_edges_k"].shape == (4, 41)
@@ -128,16 +130,11 @@ def test_stage_5_contract_has_symmetric_localized_temperature_cases() -> None:
     for profile_index in range(n_profiles):
         baseline = contract["temperature_cells_k"][profile_index]
         for center_index in range(n_centers):
-            selected = (
-                (contract["profile_index"] == profile_index)
-                & (contract["perturbation_center_index"] == center_index)
+            selected = (contract["profile_index"] == profile_index) & (
+                contract["perturbation_center_index"] == center_index
             )
-            minus = np.flatnonzero(
-                selected & (contract["perturbation_sign"] == -1)
-            )
-            plus = np.flatnonzero(
-                selected & (contract["perturbation_sign"] == 1)
-            )
+            minus = np.flatnonzero(selected & (contract["perturbation_sign"] == -1))
+            plus = np.flatnonzero(selected & (contract["perturbation_sign"] == 1))
             assert minus.size == plus.size == 1
             np.testing.assert_allclose(
                 0.5
@@ -152,9 +149,7 @@ def test_stage_5_contract_has_symmetric_localized_temperature_cases() -> None:
 def test_temperature_localization_is_unit_peak_and_log_symmetric() -> None:
     center = 0.1
     pressure = np.array([center / 10.0, center, center * 10.0])
-    localization = common.temperature_localization(
-        pressure, center, sigma_dex=0.35
-    )
+    localization = common.temperature_localization(pressure, center, sigma_dex=0.35)
 
     assert localization[1] == 1.0
     assert localization[0] == localization[2]
@@ -191,9 +186,7 @@ def test_contribution_metrics_detect_identical_and_shifted_profiles() -> None:
     pressure = np.geomspace(1.0e-4, 10.0, 6)
     contribution = np.zeros((6, 3))
     contribution[2] = 1.0
-    identical = common.contribution_metrics(
-        contribution, contribution.copy(), pressure
-    )
+    identical = common.contribution_metrics(contribution, contribution.copy(), pressure)
 
     assert all(value == 0.0 for value in identical.values())
 
@@ -228,3 +221,102 @@ def test_r100_grid_stays_inside_all_native_spectral_ranges() -> None:
     assert edges[0] >= 0.5
     assert edges[-1] <= 12.0
     assert np.all(np.diff(edges) > 0.0)
+
+
+def test_stage_6_composition_normalization_and_h2_he_remainder() -> None:
+    molecular = np.array(
+        [
+            [1.0e-3, 3.0e-4, 1.0e-4, 1.0e-5],
+            [2.0e-3, 3.0e-4, 1.0e-4, 1.0e-5],
+        ]
+    )
+    composition = common.complete_composition_profile(molecular)
+
+    np.testing.assert_allclose(np.sum(composition, axis=1), 1.0)
+    np.testing.assert_allclose(composition[:, 0] / composition[:, 1], 0.85 / 0.15)
+    np.testing.assert_allclose(composition[:, 2:], molecular)
+    assert np.all(common.mean_molecular_weight_profile(composition) > 2.0)
+
+
+def test_stage_6_symmetric_log_vmr_perturbations_and_localization() -> None:
+    center = 0.1
+    pressure = np.array([0.01, center, 1.0])
+    minus = common.localized_log_vmr_composition(pressure, "H2O", center, -1, 0.10)
+    plus = common.localized_log_vmr_composition(pressure, "H2O", center, 1, 0.10)
+    baseline = common.STAGE_3_MOLECULAR_VMR["H2O"]
+    log_minus = np.log10(minus[:, 2] / baseline)
+    log_plus = np.log10(plus[:, 2] / baseline)
+
+    np.testing.assert_allclose(log_plus, -log_minus)
+    assert log_plus[1] == pytest.approx(0.10)
+    assert log_plus[0] == pytest.approx(log_plus[2])
+    np.testing.assert_allclose(np.sum(minus, axis=1), 1.0)
+    np.testing.assert_allclose(np.sum(plus, axis=1), 1.0)
+
+
+def test_stage_6_contract_has_species_pressure_and_worker_grid_contracts() -> None:
+    contract = common.stage_6_contract(40)
+    expected_cases = 4 * (1 + 2 * 4 * 6)
+
+    assert contract["case_id"].shape == (expected_cases,)
+    assert contract["gas_vmr_edges"].shape == (expected_cases, 41, 6)
+    assert contract["gas_vmr_cells"].shape == (expected_cases, 40, 6)
+    assert contract["temperature_edges_k"].shape == (expected_cases, 41)
+    assert contract["temperature_cells_k"].shape == (expected_cases, 40)
+    np.testing.assert_allclose(
+        contract["prt_pressure_bar"], contract["pressure_centers_bar"]
+    )
+    np.testing.assert_allclose(np.sum(contract["gas_vmr_edges"], axis=2), 1.0)
+    np.testing.assert_allclose(np.sum(contract["gas_vmr_cells"], axis=2), 1.0)
+    assert np.count_nonzero(contract["native_contribution_case_mask"]) == 4
+
+
+def test_stage_6_tensor_normalization_and_cross_species_fractions() -> None:
+    jacobian = np.arange(1.0, 4 * 6 * 5 + 1).reshape(4, 6, 5)
+    response = common.normalize_composition_response(jacobian)
+    fractions = common.cross_species_sensitivity_fractions(jacobian)
+
+    np.testing.assert_allclose(np.sum(response, axis=1), 1.0)
+    np.testing.assert_allclose(np.sum(fractions, axis=0), 1.0)
+
+
+def test_stage_6_signed_pressure_and_linearity_metrics() -> None:
+    wavelength = np.geomspace(0.8, 8.0, 5)
+    jacobian = np.arange(-30.0, 30.0).reshape(4, 3, 5)
+    identical = common.signed_jacobian_metrics(jacobian, jacobian, wavelength)
+    linearity = common.amplitude_linearity_metrics(jacobian, jacobian, wavelength)
+    fractions = common.cross_species_sensitivity_fractions(jacobian)
+    fraction_metrics = common.cross_species_fraction_metrics(fractions, fractions)
+    pressure = np.geomspace(1.0e-4, 1.0e1, 3)
+    response = common.normalize_composition_response(jacobian)
+    pressure_metrics = common.contribution_metrics(response[0], response[0], pressure)
+
+    assert all(value == 0.0 for value in identical.values())
+    assert all(value == 0.0 for value in linearity.values())
+    assert all(value == 0.0 for value in fraction_metrics.values())
+    assert all(value == 0.0 for value in pressure_metrics.values())
+    np.testing.assert_allclose(
+        common.eclipse_jacobian_ppm_per_dex(jacobian, wavelength),
+        common.eclipse_depth(jacobian, wavelength) * 1.0e6,
+    )
+
+
+def test_stage_6_worker_uses_case_specific_shared_optical_depth() -> None:
+    contract = common.stage_6_contract(
+        40, profile_names=("monotonic",), amplitude_dex=0.05
+    )
+    shared = np.arange(contract["case_id"].size * 40 * 3, dtype=float).reshape(
+        contract["case_id"].size, 40, 3
+    )
+    contract["shared_total_tau"] = shared
+
+    np.testing.assert_array_equal(worker._shared_total_tau(contract), shared)
+
+
+def test_stage_6_jacobian_roundoff_floor_preserves_resolved_signal() -> None:
+    values = np.array([[1.0e-5, 1.0], [-1.0e-5, -2.0]])
+    scale = np.array([1.0e10, 1.0e10])
+    filtered = common.apply_jacobian_roundoff_floor(values, scale, 0.10)
+
+    np.testing.assert_array_equal(filtered[:, 0], 0.0)
+    np.testing.assert_array_equal(filtered[:, 1], values[:, 1])

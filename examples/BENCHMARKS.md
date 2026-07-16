@@ -35,6 +35,11 @@ files, local opacity paths, and smoke tests are documented in
   and R=100 temperature-Jacobian comparison for the Stage-4 profiles, with a
   shared-optical-depth RT track and a native temperature-dependent-opacity
   track on the same 40/80/160 grids.
+- `benchmark_emission_intercomparison_stage_6.py`: H2O, CO, CO2, and CH4
+  abundance-response tensors and signed R=100 composition Jacobians, including
+  shared case-specific optical-depth and native-opacity tracks, 40/80/160
+  convergence, cross-species sensitivity fractions, and a three-amplitude
+  finite-difference linearity audit.
 
 ## petitRADTRANS
 

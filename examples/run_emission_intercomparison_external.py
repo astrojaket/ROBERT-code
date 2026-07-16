@@ -33,13 +33,7 @@ def _planck_radiance_wavelength(
     wavelength_m = np.asarray(wavelength_micron, dtype=float) * 1.0e-6
     temperature = np.asarray(temperature_k, dtype=float)[:, None]
     exponent = h * c / (wavelength_m[None, :] * k * temperature)
-    return (
-        2.0
-        * h
-        * c**2
-        / wavelength_m[None, :] ** 5
-        / np.expm1(exponent)
-    )
+    return 2.0 * h * c**2 / wavelength_m[None, :] ** 5 / np.expm1(exponent)
 
 
 def _normalize_contribution(values: np.ndarray) -> np.ndarray:
@@ -93,14 +87,10 @@ def _absorbing_formal_contribution(
         linear_weight = np.empty_like(slant_tau)
         value = slant_tau[small]
         linear_weight[small] = (
-            value / 2.0
-            - value**2 / 3.0
-            + value**3 / 8.0
-            - value**4 / 30.0
+            value / 2.0 - value**2 / 3.0 + value**3 / 8.0 - value**4 / 30.0
         )
         linear_weight[~small] = (
-            escape[~small]
-            - slant_tau[~small] * np.exp(-slant_tau[~small])
+            escape[~small] - slant_tau[~small] * np.exp(-slant_tau[~small])
         ) / slant_tau[~small]
         emitted = (
             source[:-1, :, None] * escape
@@ -109,8 +99,10 @@ def _absorbing_formal_contribution(
         layer_contribution += float(point_weight) * np.sum(
             transmission_before * emitted * weights[None, None, :], axis=-1
         )
-        bottom_contribution += float(point_weight) * source[-1] * np.sum(
-            np.exp(-np.sum(slant_tau, axis=0)) * weights[None, :], axis=-1
+        bottom_contribution += (
+            float(point_weight)
+            * source[-1]
+            * np.sum(np.exp(-np.sum(slant_tau, axis=0)) * weights[None, :], axis=-1)
         )
     layer_contribution[-1] += bottom_contribution
     return _normalize_contribution(layer_contribution)
@@ -120,8 +112,11 @@ def _shared_total_tau(contract: dict[str, np.ndarray]) -> np.ndarray:
     """Return case-indexed shared optical depth for Track-A workers."""
 
     if "shared_total_tau" in contract:
+        shared = np.asarray(contract["shared_total_tau"], dtype=float)
+        if shared.shape[0] == np.asarray(contract["case_id"]).size:
+            return shared
         profile_index = np.asarray(contract["profile_index"], dtype=int)
-        return np.asarray(contract["shared_total_tau"], dtype=float)[profile_index]
+        return shared[profile_index]
     return np.asarray(contract["component_tau"], dtype=float).sum(axis=1)
 
 
@@ -158,9 +153,7 @@ def _shared_picaso(contract: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndar
         )
         runtime[case_index] = perf_counter() - started
         intensity = point[:, 0, :] * (0.1 / (2.0 * np.pi))
-        flux[case_index] = np.pi * np.sum(
-            disk_weights[:, None] * intensity, axis=0
-        )
+        flux[case_index] = np.pi * np.sum(disk_weights[:, None] * intensity, axis=0)
     return flux, runtime
 
 
@@ -199,12 +192,17 @@ def _shared_prt(contract: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray
     return flux, runtime
 
 
-def _mass_fractions(vmr: np.ndarray) -> tuple[dict[str, float], float]:
+def _mass_fractions(
+    vmr: np.ndarray,
+) -> tuple[dict[str, np.ndarray], np.ndarray]:
     names = ("H2", "He", "H2O", "CO", "CO2", "CH4")
     masses = np.array([2.01588, 4.002602, 18.01528, 28.0101, 44.0095, 16.04246])
-    mean_molar_mass = float(np.sum(vmr * masses))
-    fractions = vmr * masses / mean_molar_mass
-    return dict(zip(names, fractions, strict=True)), mean_molar_mass
+    values = np.asarray(vmr, dtype=float)
+    if values.shape[-1] != len(names):
+        raise ValueError("VMR array must end with H2, He, and four species")
+    mean_molar_mass = np.sum(values * masses, axis=-1)
+    fractions = values * masses / mean_molar_mass[..., None]
+    return dict(zip(names, np.moveaxis(fractions, -1, 0), strict=True)), mean_molar_mass
 
 
 def _native_prt(
@@ -223,9 +221,7 @@ def _native_prt(
         "H2--He-NatAbund__BoRi.DeltaWavenumber2_0.5-500mu",
     )
     pressure = contract.get("prt_pressure_bar", contract["pressure_edges_bar"])
-    temperatures = contract.get(
-        "temperature_cells_k", contract["temperature_edges_k"]
-    )
+    temperatures = contract.get("temperature_cells_k", contract["temperature_edges_k"])
     return_contribution = bool(contract.get("native_return_contribution", False))
     contribution_mask = np.asarray(
         contract.get(
@@ -238,7 +234,9 @@ def _native_prt(
         pressures=pressure,
         wavelength_boundaries=np.array([0.5, 12.0]),
         line_species=list(line_species),
-        gas_continuum_contributors=(list(cia_species) if bool(contract["native_include_cia"]) else []),
+        gas_continuum_contributors=(
+            list(cia_species) if bool(contract["native_include_cia"]) else []
+        ),
         scattering_in_emission=False,
         emission_angle_grid=np.vstack(
             (contract["emission_mu"], contract["legendre_weights"])
@@ -250,14 +248,17 @@ def _native_prt(
     contribution_case_index = []
     runtime = []
     wavelength = None
-    for case_index, vmr in enumerate(contract["gas_vmr"]):
+    cell_vmr = contract.get("gas_vmr_cells", contract["gas_vmr"])
+    for case_index, vmr in enumerate(cell_vmr):
         fractions, mean_molar_mass = _mass_fractions(vmr)
         mass_fractions = {
-            line: np.full(pressure.size, fractions[name])
-            for line, name in zip(line_species, ("H2O", "CO", "CO2", "CH4"), strict=True)
+            line: np.broadcast_to(fractions[name], (pressure.size,))
+            for line, name in zip(
+                line_species, ("H2O", "CO", "CO2", "CH4"), strict=True
+            )
         }
-        mass_fractions["H2"] = np.full(pressure.size, fractions["H2"])
-        mass_fractions["He"] = np.full(pressure.size, fractions["He"])
+        mass_fractions["H2"] = np.broadcast_to(fractions["H2"], (pressure.size,))
+        mass_fractions["He"] = np.broadcast_to(fractions["He"], (pressure.size,))
         started = perf_counter()
         case_return_contribution = bool(
             return_contribution and contribution_mask[case_index]
@@ -265,7 +266,7 @@ def _native_prt(
         result = atmosphere.calculate_flux(
             temperatures=temperatures[case_index],
             mass_fractions=mass_fractions,
-            mean_molar_masses=np.full(pressure.size, mean_molar_mass),
+            mean_molar_masses=np.broadcast_to(mean_molar_mass, (pressure.size,)),
             reference_gravity=1500.0,
             frequencies_to_wavelengths=True,
             return_contribution=case_return_contribution,
@@ -276,9 +277,7 @@ def _native_prt(
         wavelength = native_wavelength[order]
         output_flux.append(np.asarray(result[1], dtype=float)[order] * 0.1)
         if case_return_contribution:
-            contribution = np.asarray(
-                result[2]["emission_contribution"], dtype=float
-            )
+            contribution = np.asarray(result[2]["emission_contribution"], dtype=float)
             if contribution.shape[0] != pressure.size:
                 contribution = contribution.T
             if contribution.shape != (pressure.size, native_wavelength.size):
@@ -330,18 +329,21 @@ def _native_picaso(
     contribution_case_index = []
     runtime = []
     wavelength = None
-    for case_index, vmr in enumerate(contract["gas_vmr"]):
+    edge_vmr = contract.get("gas_vmr_edges", contract["gas_vmr"])
+    for case_index, vmr in enumerate(edge_vmr):
+        if vmr.ndim == 1:
+            vmr = np.broadcast_to(vmr, (pressure.size, vmr.size))
         case = jdi.inputs(calculation="browndwarf")
         case.gravity(gravity=15.0, gravity_unit=u.m / u.s**2)
         profile = {
             "pressure": pressure,
             "temperature": contract["temperature_edges_k"][case_index],
-            "H2": np.full(pressure.size, vmr[0]),
-            "He": np.full(pressure.size, vmr[1]),
-            "H2O": np.full(pressure.size, vmr[2]),
-            "CO": np.full(pressure.size, vmr[3]),
-            "CO2": np.full(pressure.size, vmr[4]),
-            "CH4": np.full(pressure.size, vmr[5]),
+            "H2": vmr[:, 0],
+            "He": vmr[:, 1],
+            "H2O": vmr[:, 2],
+            "CO": vmr[:, 3],
+            "CO2": vmr[:, 4],
+            "CH4": vmr[:, 5],
         }
         case.atmosphere(df=pd.DataFrame(profile), verbose=False)
         case.approx(
@@ -419,11 +421,13 @@ def main() -> None:
     elif args.model == "picaso":
         if args.picaso_reference is None or args.picaso_database is None:
             parser.error("PICASO native mode requires reference and database paths")
-        wavelength, flux, runtime, contribution, contribution_case_index = _native_picaso(
-            contract,
-            args.picaso_reference,
-            args.picaso_database,
-            args.picaso_resample,
+        wavelength, flux, runtime, contribution, contribution_case_index = (
+            _native_picaso(
+                contract,
+                args.picaso_reference,
+                args.picaso_database,
+                args.picaso_resample,
+            )
         )
     else:
         if args.input_data is None:
