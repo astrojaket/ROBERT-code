@@ -28,6 +28,9 @@ files, local opacity paths, and smoke tests are documented in
 - `benchmark_emission_intercomparison_stages_1_3.py`: staged ROBERT/PICASO/pRT
   thermal-emission comparison.  Stages 1--2 share optical depth to isolate
   radiative transfer; Stage 3 uses each code's native molecular opacity path.
+- `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
+  structure and contribution-function comparison for isothermal, monotonic,
+  inverted, and retrieved-like profiles on 40/80/160 vertical grids.
 
 ## petitRADTRANS
 

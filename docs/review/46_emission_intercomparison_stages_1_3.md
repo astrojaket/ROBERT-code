@@ -71,6 +71,6 @@ python examples/benchmark_emission_intercomparison_stages_1_3.py
 
 The launcher records versioned reports under
 `docs/data/emission_intercomparison/` and detailed ignored NPZ artifacts under
-`examples/outputs/emission_intercomparison/`.  The next stage is Stage 4:
-thermal-structure and contribution-function comparisons for isothermal,
-monotonic, inverted, and retrieved-like profiles.
+`examples/outputs/emission_intercomparison/`.  Stage 4 thermal-structure and
+contribution-function results are documented in
+`docs/review/47_emission_intercomparison_stage_4.md`.

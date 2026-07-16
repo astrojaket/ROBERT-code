@@ -15,6 +15,14 @@ assert SPEC is not None and SPEC.loader is not None
 common = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(common)
 
+WORKER_PATH = ROOT / "examples/run_emission_intercomparison_external.py"
+WORKER_SPEC = importlib.util.spec_from_file_location(
+    "run_emission_intercomparison_external", WORKER_PATH
+)
+assert WORKER_SPEC is not None and WORKER_SPEC.loader is not None
+worker = importlib.util.module_from_spec(WORKER_SPEC)
+WORKER_SPEC.loader.exec_module(worker)
+
 
 def test_stage_1_contract_covers_grey_matrix_and_conserves_total_tau() -> None:
     contract = common.stage_1_contract(16)
@@ -54,6 +62,86 @@ def test_stage_3_contract_fixes_composition_and_cia_switch() -> None:
         contract["gas_vmr"][0, 2:],
         [1.0e-3, 3.0e-4, 1.0e-4, 1.0e-5],
     )
+
+
+def test_stage_4_contract_aligns_robert_cells_with_prt_nodes() -> None:
+    contract = common.stage_4_contract(40)
+
+    assert contract["case_id"].tolist() == [
+        "isothermal_L40",
+        "monotonic_L40",
+        "inverted_L40",
+        "retrieved_like_L40",
+    ]
+    assert contract["pressure_edges_bar"].shape == (41,)
+    assert contract["pressure_centers_bar"].shape == (40,)
+    assert contract["prt_pressure_bar"].shape == (40,)
+    np.testing.assert_allclose(
+        contract["prt_pressure_bar"],
+        np.sqrt(
+            contract["pressure_edges_bar"][:-1]
+            * contract["pressure_edges_bar"][1:]
+        ),
+    )
+    assert contract["temperature_edges_k"].shape == (4, 41)
+    assert contract["temperature_cells_k"].shape == (4, 40)
+    np.testing.assert_allclose(np.sum(contract["gas_vmr"], axis=1), 1.0)
+    assert bool(contract["native_include_cia"])
+    assert bool(contract["native_return_contribution"])
+
+
+def test_stage_4_profiles_cover_requested_thermal_structures() -> None:
+    contract = common.stage_4_contract(80)
+    profiles = dict(
+        zip(
+            contract["profile_name"],
+            contract["temperature_cells_k"],
+            strict=True,
+        )
+    )
+
+    assert np.ptp(profiles["isothermal"]) == 0.0
+    assert np.all(np.diff(profiles["monotonic"]) > 0.0)
+    assert np.any(np.diff(profiles["inverted"]) < 0.0)
+    assert np.any(np.diff(profiles["inverted"]) > 0.0)
+    retrieved_gradient = np.diff(profiles["retrieved_like"])
+    assert np.all(retrieved_gradient >= 0.0)
+    assert np.ptp(retrieved_gradient) > 10.0
+
+
+def test_contribution_metrics_detect_identical_and_shifted_profiles() -> None:
+    pressure = np.geomspace(1.0e-4, 10.0, 6)
+    contribution = np.zeros((6, 3))
+    contribution[2] = 1.0
+    identical = common.contribution_metrics(
+        contribution, contribution.copy(), pressure
+    )
+
+    assert all(value == 0.0 for value in identical.values())
+
+    shifted = np.roll(contribution, 1, axis=0)
+    different = common.contribution_metrics(contribution, shifted, pressure)
+    assert different["centroid_pressure_rms_difference_dex"] == 1.0
+    assert different["peak_pressure_rms_difference_dex"] == 1.0
+    assert different["profile_total_variation_median"] == 1.0
+
+
+def test_external_absorbing_contribution_is_normalized_by_wavelength() -> None:
+    wavelength = np.geomspace(0.8, 8.0, 9)
+    temperature_edges = np.array([900.0, 1100.0, 1300.0, 1500.0])
+    layer_tau = np.full((3, wavelength.size, 2), 0.2)
+    contribution = worker._absorbing_formal_contribution(
+        wavelength,
+        temperature_edges,
+        layer_tau,
+        np.array([0.4, 0.6]),
+        np.array([0.25, 0.75]),
+        np.array([0.2, 0.8]),
+    )
+
+    assert contribution.shape == (3, wavelength.size)
+    assert np.all(contribution >= 0.0)
+    np.testing.assert_allclose(np.sum(contribution, axis=0), 1.0)
 
 
 def test_r100_grid_stays_inside_all_native_spectral_ranges() -> None:

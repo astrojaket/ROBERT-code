@@ -31,6 +31,12 @@ STAGE_3_MOLECULAR_VMR = {
     "CO2": 1.0e-4,
     "CH4": 1.0e-5,
 }
+STAGE_4_PROFILE_NAMES = (
+    "isothermal",
+    "monotonic",
+    "inverted",
+    "retrieved_like",
+)
 
 
 def disk_quadrature(n_mu: int = 8) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -53,6 +59,39 @@ def temperature_profile(pressure_bar: np.ndarray, anchor_k: float) -> np.ndarray
     pressure = np.asarray(pressure_bar, dtype=float)
     coordinate = 2.0 * (np.log10(pressure) + 5.0) / 7.0 - 1.0
     return float(anchor_k) + 150.0 * coordinate
+
+
+def stage_4_temperature_profile(
+    pressure_bar: np.ndarray, profile_name: str
+) -> np.ndarray:
+    """Return one deterministic Stage-4 thermal profile on arbitrary pressures.
+
+    The profiles are defined in log pressure so ROBERT cell edges, ROBERT cell
+    centres, PICASO levels, and pRT pressure nodes all sample the same
+    continuous thermal structure.
+    """
+
+    pressure = np.asarray(pressure_bar, dtype=float)
+    if np.any(~np.isfinite(pressure)) or np.any(pressure <= 0.0):
+        raise ValueError("pressure_bar must contain finite positive values")
+    coordinate = (np.log10(pressure) + 5.0) / 7.0
+    if profile_name == "isothermal":
+        return np.full_like(pressure, 1250.0)
+    if profile_name == "monotonic":
+        return 800.0 + 900.0 * coordinate
+    if profile_name == "inverted":
+        return np.interp(
+            coordinate,
+            [0.0, 0.25, 0.45, 0.65, 1.0],
+            [850.0, 1050.0, 1500.0, 1300.0, 1750.0],
+        )
+    if profile_name == "retrieved_like":
+        return np.interp(
+            coordinate,
+            [0.0, 0.12, 0.28, 0.45, 0.62, 0.78, 1.0],
+            [760.0, 780.0, 900.0, 1240.0, 1480.0, 1580.0, 1660.0],
+        )
+    raise ValueError(f"unsupported Stage-4 profile: {profile_name}")
 
 
 def background_composition(
@@ -193,6 +232,58 @@ def stage_3_contract(n_layers: int, *, include_cia: bool = True) -> dict[str, np
     }
 
 
+def stage_4_contract(n_cells: int, *, include_cia: bool = True) -> dict[str, np.ndarray]:
+    """Build the native-opacity thermal-structure Track-B contract.
+
+    ROBERT and PICASO use ``pressure_edges_bar`` to describe ``n_cells``
+    atmospheric cells.  pRT defines its atmosphere on pressure nodes, so it
+    receives the geometric cell centres in ``prt_pressure_bar``.  This gives
+    every code exactly ``n_cells`` contribution coordinates.
+    """
+
+    pressure_edges, pressure_centers = pressure_grid(n_cells)
+    composition, _ = background_composition(STAGE_3_MOLECULAR_VMR)
+    mu, legendre, disk = disk_quadrature()
+    vmr = np.array(
+        [
+            composition["H2"],
+            composition["He"],
+            *(composition[name] for name in SPECIES),
+        ]
+    )
+    edge_temperatures = np.stack(
+        [
+            stage_4_temperature_profile(pressure_edges, name)
+            for name in STAGE_4_PROFILE_NAMES
+        ]
+    )
+    cell_temperatures = np.stack(
+        [
+            stage_4_temperature_profile(pressure_centers, name)
+            for name in STAGE_4_PROFILE_NAMES
+        ]
+    )
+    return {
+        "schema_version": np.array(1),
+        "stage": np.array(4),
+        "case_id": np.asarray(
+            [f"{name}_L{n_cells}" for name in STAGE_4_PROFILE_NAMES]
+        ),
+        "profile_name": np.asarray(STAGE_4_PROFILE_NAMES),
+        "pressure_edges_bar": pressure_edges,
+        "pressure_centers_bar": pressure_centers,
+        "prt_pressure_bar": pressure_centers,
+        "temperature_edges_k": edge_temperatures,
+        "temperature_cells_k": cell_temperatures,
+        "gas_vmr": np.broadcast_to(vmr, (len(STAGE_4_PROFILE_NAMES), vmr.size)),
+        "native_include_cia": np.array(include_cia),
+        "native_return_contribution": np.array(True),
+        "emission_mu": mu,
+        "legendre_weights": legendre,
+        "disk_weights": disk,
+    }
+
+
 def molecular_band_template(
     wavelength_micron: np.ndarray, species: str
 ) -> np.ndarray:
@@ -293,6 +384,77 @@ def pairwise_metrics(
             spectra[left], spectra[right], wavelength_micron
         )
         for left, right in combinations(spectra, 2)
+    }
+
+
+def normalize_contribution(values: np.ndarray) -> np.ndarray:
+    """Normalize a pressure-by-wavelength contribution array by wavelength."""
+
+    contribution = np.asarray(values, dtype=float)
+    if contribution.ndim != 2:
+        raise ValueError("contribution values must be pressure by wavelength")
+    if np.any(~np.isfinite(contribution)) or np.any(contribution < 0.0):
+        raise ValueError("contribution values must be finite and non-negative")
+    total = np.sum(contribution, axis=0, keepdims=True)
+    return np.divide(
+        contribution,
+        total,
+        out=np.zeros_like(contribution),
+        where=total > 0.0,
+    )
+
+
+def contribution_metrics(
+    left: np.ndarray,
+    right: np.ndarray,
+    pressure_bar: np.ndarray,
+) -> dict[str, float]:
+    """Compare normalized contribution functions on a shared pressure grid."""
+
+    left_values = normalize_contribution(left)
+    right_values = normalize_contribution(right)
+    pressure = np.asarray(pressure_bar, dtype=float)
+    if left_values.shape != right_values.shape:
+        raise ValueError("contribution arrays must have matching shapes")
+    if pressure.shape != (left_values.shape[0],) or np.any(pressure <= 0.0):
+        raise ValueError("pressure_bar must match the contribution pressure axis")
+    log_pressure = np.log10(pressure)[:, None]
+    left_centroid = np.sum(left_values * log_pressure, axis=0)
+    right_centroid = np.sum(right_values * log_pressure, axis=0)
+    centroid_difference = left_centroid - right_centroid
+    left_peak = pressure[np.argmax(left_values, axis=0)]
+    right_peak = pressure[np.argmax(right_values, axis=0)]
+    peak_difference = np.log10(left_peak / right_peak)
+    total_variation = 0.5 * np.sum(np.abs(left_values - right_values), axis=0)
+    return {
+        "centroid_pressure_rms_difference_dex": float(
+            np.sqrt(np.mean(centroid_difference**2))
+        ),
+        "centroid_pressure_median_difference_dex": float(
+            np.median(centroid_difference)
+        ),
+        "centroid_pressure_p95_abs_difference_dex": float(
+            np.percentile(np.abs(centroid_difference), 95.0)
+        ),
+        "peak_pressure_rms_difference_dex": float(
+            np.sqrt(np.mean(peak_difference**2))
+        ),
+        "peak_pressure_median_difference_dex": float(np.median(peak_difference)),
+        "profile_total_variation_median": float(np.median(total_variation)),
+        "profile_total_variation_p95": float(np.percentile(total_variation, 95.0)),
+    }
+
+
+def pairwise_contribution_metrics(
+    contributions: dict[str, np.ndarray], pressure_bar: np.ndarray
+) -> dict[str, dict[str, float]]:
+    """Return contribution metrics for every pair of named models."""
+
+    return {
+        f"{left}__{right}": contribution_metrics(
+            contributions[left], contributions[right], pressure_bar
+        )
+        for left, right in combinations(contributions, 2)
     }
 
 

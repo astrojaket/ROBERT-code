@@ -71,3 +71,15 @@ All ROBERT benchmark orchestration and analysis runs in `robert-exoplanets`.
 Only the external PICASO worker runs in `picaso`, and only the external pRT
 worker runs in `petitradtrans-stable`.  The worker metadata must record the
 absolute Python executable and package version for every generated artifact.
+
+Run Stage 4 from the ROBERT environment after the smoke tests:
+
+```bash
+conda activate robert-exoplanets
+python examples/benchmark_emission_intercomparison_stage_4.py
+```
+
+The launcher supplies 40/80/160 ROBERT cells, the matching cell edges as
+PICASO levels, and the ROBERT geometric cell centres as the corresponding pRT
+pressure nodes.  When opacity data live outside the fresh clone, pass
+`--picaso-reference`, `--picaso-database`, and `--prt-input` explicitly.
