@@ -40,6 +40,13 @@ files, local opacity paths, and smoke tests are documented in
   shared case-specific optical-depth and native-opacity tracks, 40/80/160
   convergence, cross-species sensitivity fractions, and a three-amplitude
   finite-difference linearity audit.
+- `benchmark_emission_intercomparison_stage_7.py`: absorbing-cloud placement
+  and extinction on the 40/80/160 grids, including the full optical-depth,
+  cloud-top, and spectral-slope matrix plus an archived Virga/Mie extinction
+  field.  The launcher runs a primary-grid resource pilot, keeps `omega0=0`,
+  separates identical-tau Track A from native-cloud Track B, and preserves
+  full spectra, cloud effects, vertical profiles, convergence, timings, and
+  peak-memory records.
 
 ## petitRADTRANS
 

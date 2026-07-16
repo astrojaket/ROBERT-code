@@ -44,6 +44,10 @@ STAGE_5_PERTURBATION_AMPLITUDE_K = 10.0
 STAGE_5_LOCALIZATION_SIGMA_DEX = 0.35
 STAGE_6_PERTURBATION_AMPLITUDE_DEX = 0.10
 STAGE_6_LINEARITY_AMPLITUDES_DEX = (0.05, 0.10, 0.20)
+STAGE_7_CLOUD_OPTICAL_DEPTHS = (0.1, 1.0, 10.0, 100.0)
+STAGE_7_CLOUD_TOP_PRESSURES_BAR = (1.0e-3, 1.0e-2, 1.0e-1)
+STAGE_7_EXTINCTION_SLOPES = (-4.0, -2.0, 0.0, 2.0)
+STAGE_7_REFERENCE_WAVELENGTH_MICRON = 5.0
 
 
 def disk_quadrature(n_mu: int = 8) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -592,6 +596,247 @@ def stage_6_contract(
         "native_include_cia": np.array(include_cia),
         "native_return_contribution": np.array(True),
         "native_contribution_case_mask": contribution_mask,
+        "emission_mu": mu,
+        "legendre_weights": legendre,
+        "disk_weights": disk,
+    }
+
+
+def absorbing_cloud_tau(
+    pressure_edges_bar: np.ndarray,
+    wavelength_micron: np.ndarray,
+    *,
+    optical_depth_at_reference: float,
+    cloud_top_pressure_bar: float,
+    slope: float,
+    reference_wavelength_micron: float = STAGE_7_REFERENCE_WAVELENGTH_MICRON,
+) -> np.ndarray:
+    """Return the frozen Stage-7 absorbing-deck extinction contract.
+
+    The reference optical depth is distributed uniformly in log pressure below
+    the cloud top, including fractional overlap of the intersected layer.  Its
+    spectral law is ``tau(lambda)=tau_ref*(lambda/lambda_ref)**slope``.
+    """
+
+    edges = np.asarray(pressure_edges_bar, dtype=float)
+    wavelength = np.asarray(wavelength_micron, dtype=float)
+    tau_reference = float(optical_depth_at_reference)
+    top = float(cloud_top_pressure_bar)
+    spectral_slope = float(slope)
+    reference = float(reference_wavelength_micron)
+    if edges.ndim != 1 or edges.size < 2 or np.any(~np.isfinite(edges)):
+        raise ValueError("pressure_edges_bar must be a finite one-dimensional grid")
+    if np.any(edges <= 0.0) or np.any(np.diff(edges) <= 0.0):
+        raise ValueError("pressure_edges_bar must be positive and increasing")
+    if wavelength.ndim != 1 or np.any(~np.isfinite(wavelength)):
+        raise ValueError("wavelength_micron must be a finite one-dimensional grid")
+    if np.any(wavelength <= 0.0):
+        raise ValueError("wavelength_micron must be positive")
+    if not np.isfinite(tau_reference) or tau_reference < 0.0:
+        raise ValueError("optical_depth_at_reference must be finite and non-negative")
+    if not np.isfinite(top) or top <= 0.0:
+        raise ValueError("cloud_top_pressure_bar must be finite and positive")
+    if not np.isfinite(spectral_slope):
+        raise ValueError("slope must be finite")
+    if not np.isfinite(reference) or reference <= 0.0:
+        raise ValueError("reference_wavelength_micron must be finite and positive")
+    overlap_low = np.maximum(edges[:-1], top)
+    overlap = np.where(edges[1:] > overlap_low, np.log(edges[1:] / overlap_low), 0.0)
+    if not np.any(overlap > 0.0):
+        raise ValueError("cloud top leaves no active pressure interval")
+    vertical_fraction = overlap / np.sum(overlap)
+    spectral_tau = tau_reference * (wavelength / reference) ** spectral_slope
+    return vertical_fraction[:, None] * spectral_tau[None, :]
+
+
+def regrid_tabulated_cloud_tau(
+    source_pressure_edges_bar: np.ndarray,
+    source_wavelength_micron: np.ndarray,
+    source_extinction_tau: np.ndarray,
+    target_pressure_edges_bar: np.ndarray,
+    target_wavelength_micron: np.ndarray,
+) -> np.ndarray:
+    """Conservatively regrid archived layer extinction for Stage 7.
+
+    Pressure remapping conserves layer optical depth assuming uniform
+    ``d tau / d log(P)`` inside each archived layer.  Spectral interpolation is
+    log-linear in positive extinction and uses constant endpoint extension.
+    """
+
+    source_edges = np.asarray(source_pressure_edges_bar, dtype=float)
+    source_wavelength = np.asarray(source_wavelength_micron, dtype=float)
+    source_tau = np.asarray(source_extinction_tau, dtype=float)
+    target_edges = np.asarray(target_pressure_edges_bar, dtype=float)
+    target_wavelength = np.asarray(target_wavelength_micron, dtype=float)
+    if source_tau.shape != (source_edges.size - 1, source_wavelength.size):
+        raise ValueError("source extinction must be layer by wavelength")
+    for name, values in (
+        ("source pressure", source_edges),
+        ("target pressure", target_edges),
+        ("source wavelength", source_wavelength),
+        ("target wavelength", target_wavelength),
+    ):
+        if values.ndim != 1 or np.any(~np.isfinite(values)) or np.any(values <= 0.0):
+            raise ValueError(f"{name} grid must be finite, positive, and one-dimensional")
+        if np.any(np.diff(values) <= 0.0):
+            raise ValueError(f"{name} grid must be increasing")
+    if np.any(~np.isfinite(source_tau)) or np.any(source_tau < 0.0):
+        raise ValueError("source extinction must be finite and non-negative")
+
+    log_source = np.log(source_edges)
+    log_target = np.log(target_edges)
+    remapped = np.zeros((target_edges.size - 1, source_wavelength.size))
+    for source_index in range(source_edges.size - 1):
+        width = log_source[source_index + 1] - log_source[source_index]
+        overlap_low = np.maximum(log_target[:-1], log_source[source_index])
+        overlap_high = np.minimum(log_target[1:], log_source[source_index + 1])
+        fraction = np.clip(overlap_high - overlap_low, 0.0, None) / width
+        remapped += fraction[:, None] * source_tau[source_index][None, :]
+
+    tiny = np.finfo(float).tiny
+    output = np.empty((remapped.shape[0], target_wavelength.size))
+    log_source_wavelength = np.log(source_wavelength)
+    log_target_wavelength = np.log(target_wavelength)
+    for layer_index, layer_tau in enumerate(remapped):
+        if not np.any(layer_tau > 0.0):
+            output[layer_index] = 0.0
+            continue
+        output[layer_index] = np.exp(
+            np.interp(
+                log_target_wavelength,
+                log_source_wavelength,
+                np.log(np.maximum(layer_tau, tiny)),
+                left=np.log(max(layer_tau[0], tiny)),
+                right=np.log(max(layer_tau[-1], tiny)),
+            )
+        )
+    return output
+
+
+def stage_7_contract(
+    n_cells: int,
+    wavelength_micron: np.ndarray,
+    *,
+    archived_pressure_edges_bar: np.ndarray,
+    archived_wavelength_micron: np.ndarray,
+    archived_extinction_tau: np.ndarray,
+    cloud_indices: np.ndarray | None = None,
+) -> dict[str, np.ndarray]:
+    """Build the frozen Stage-7 absorbing-cloud case contract."""
+
+    pressure_edges, pressure_centers = pressure_grid(n_cells)
+    wavelength = np.asarray(wavelength_micron, dtype=float)
+    cloud_kind = ["clear"]
+    cloud_labels = ["clear"]
+    optical_depth = [0.0]
+    top_pressure = [np.nan]
+    slope = [0.0]
+    for tau_ref in STAGE_7_CLOUD_OPTICAL_DEPTHS:
+        for top_bar in STAGE_7_CLOUD_TOP_PRESSURES_BAR:
+            for spectral_slope in STAGE_7_EXTINCTION_SLOPES:
+                cloud_kind.append("power_law_deck")
+                cloud_labels.append(
+                    f"deck_tau{tau_ref:g}_top{top_bar * 1e3:g}mbar_slope{spectral_slope:+g}"
+                )
+                optical_depth.append(tau_ref)
+                top_pressure.append(top_bar)
+                slope.append(spectral_slope)
+    cloud_kind.append("archived_tabulated")
+    cloud_labels.append("archived_virga_mie_extinction")
+    optical_depth.append(np.nan)
+    top_pressure.append(np.nan)
+    slope.append(np.nan)
+
+    all_cloud_indices = np.arange(len(cloud_labels), dtype=int)
+    selected_cloud_indices = (
+        all_cloud_indices
+        if cloud_indices is None
+        else np.asarray(cloud_indices, dtype=int)
+    )
+    if selected_cloud_indices.ndim != 1 or selected_cloud_indices.size == 0:
+        raise ValueError("cloud_indices must select at least one cloud definition")
+    if np.any(selected_cloud_indices < 0) or np.any(selected_cloud_indices >= len(cloud_labels)):
+        raise ValueError("cloud_indices contains an invalid cloud definition")
+
+    cloud_tau = np.zeros((len(cloud_labels), n_cells, wavelength.size))
+    for cloud_index in range(1, len(cloud_labels) - 1):
+        cloud_tau[cloud_index] = absorbing_cloud_tau(
+            pressure_edges,
+            wavelength,
+            optical_depth_at_reference=optical_depth[cloud_index],
+            cloud_top_pressure_bar=top_pressure[cloud_index],
+            slope=slope[cloud_index],
+        )
+    cloud_tau[-1] = regrid_tabulated_cloud_tau(
+        archived_pressure_edges_bar,
+        archived_wavelength_micron,
+        archived_extinction_tau,
+        pressure_edges,
+        wavelength,
+    )
+
+    composition, _ = background_composition(STAGE_3_MOLECULAR_VMR)
+    vmr = np.asarray(
+        [composition["H2"], composition["He"], *(composition[name] for name in SPECIES)]
+    )
+    case_profile_index = np.repeat(
+        np.arange(len(STAGE_4_PROFILE_NAMES), dtype=int), selected_cloud_indices.size
+    )
+    case_cloud_index = np.tile(selected_cloud_indices, len(STAGE_4_PROFILE_NAMES))
+    case_ids = np.asarray(
+        [
+            f"{STAGE_4_PROFILE_NAMES[profile_index]}__{cloud_labels[cloud_index]}__L{n_cells}"
+            for profile_index, cloud_index in zip(
+                case_profile_index, case_cloud_index, strict=True
+            )
+        ]
+    )
+    edge_temperature_by_profile = np.stack(
+        [
+            stage_4_temperature_profile(pressure_edges, profile_name)
+            for profile_name in STAGE_4_PROFILE_NAMES
+        ]
+    )
+    cell_temperature_by_profile = np.stack(
+        [
+            stage_4_temperature_profile(pressure_centers, profile_name)
+            for profile_name in STAGE_4_PROFILE_NAMES
+        ]
+    )
+    mu, legendre, disk = disk_quadrature()
+    return {
+        "schema_version": np.array(1),
+        "stage": np.array(7),
+        "case_id": case_ids,
+        "profile_name": np.asarray(STAGE_4_PROFILE_NAMES),
+        "profile_index": case_profile_index,
+        "case_cloud_index": case_cloud_index,
+        "cloud_label": np.asarray(cloud_labels),
+        "cloud_kind": np.asarray(cloud_kind),
+        "cloud_optical_depth_at_reference": np.asarray(optical_depth),
+        "cloud_top_pressure_bar": np.asarray(top_pressure),
+        "cloud_extinction_slope": np.asarray(slope),
+        "cloud_reference_wavelength_micron": np.array(
+            STAGE_7_REFERENCE_WAVELENGTH_MICRON
+        ),
+        "cloud_single_scattering_albedo": np.zeros(len(cloud_labels)),
+        "cloud_asymmetry_factor": np.zeros(len(cloud_labels)),
+        "cloud_extinction_tau": cloud_tau,
+        "selected_cloud_index": selected_cloud_indices,
+        "archived_pressure_edges_bar": np.asarray(archived_pressure_edges_bar),
+        "archived_wavelength_micron": np.asarray(archived_wavelength_micron),
+        "archived_extinction_tau": np.asarray(archived_extinction_tau),
+        "wavelength_micron": wavelength,
+        "pressure_edges_bar": pressure_edges,
+        "pressure_centers_bar": pressure_centers,
+        "prt_pressure_bar": pressure_centers,
+        "temperature_edges_by_profile_k": edge_temperature_by_profile,
+        "temperature_cells_by_profile_k": cell_temperature_by_profile,
+        "temperature_edges_k": edge_temperature_by_profile[case_profile_index],
+        "temperature_cells_k": cell_temperature_by_profile[case_profile_index],
+        "gas_vmr": np.broadcast_to(vmr, (case_ids.size, vmr.size)),
+        "native_include_cia": np.array(True),
+        "native_return_contribution": np.array(True),
         "emission_mu": mu,
         "legendre_weights": legendre,
         "disk_weights": disk,

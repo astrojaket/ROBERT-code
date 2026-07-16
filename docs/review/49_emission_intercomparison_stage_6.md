@@ -164,3 +164,6 @@ Stage 8 covers cloud scattering and solver order, and Stage 9 performs both
 cloud-free and cloudy directed cross-retrievals.  Stage-9 files and smoke runs
 are prepared locally before the full sampler matrix is pulled onto and run on
 Glamdring.
+
+Stage 7 absorbing-cloud methods, predeclared gates, pilot decision, and results
+are documented in `docs/review/50_emission_intercomparison_stage_7.md`.

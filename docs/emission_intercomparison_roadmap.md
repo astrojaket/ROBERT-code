@@ -46,6 +46,15 @@ stage reports spectra, eclipse depths, cloud contribution/response pressure
 metrics, vertical and spectral convergence, and timings.  Explicit Track-A
 gates are fixed before the full matrix runs.
 
+The frozen reference wavelength is `5 micron`.  Parametric decks use the
+established fractional-boundary, uniform-`d tau/d log(P)` placement below the
+cloud top.  The tabulated case is the versioned PICASO/Virga extinction field
+from the end-to-end cloud parity benchmark.  Stage 7 begins with a measured
+80-cell cross-framework pilot and proceeds only when its conservative complete
+matrix projection is at most two hours with comfortable memory margin.  The
+predeclared methods and numerical gates are recorded in
+`docs/review/50_emission_intercomparison_stage_7.md`.
+
 ## Stage 8: cloud scattering and solver order
 
 Stage 8 builds on the accepted Stage-7 extinction contracts in this order:

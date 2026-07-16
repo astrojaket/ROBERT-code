@@ -111,6 +111,64 @@ def test_stage_4_profiles_cover_requested_thermal_structures() -> None:
     assert np.ptp(retrieved_gradient) > 10.0
 
 
+def test_stage_7_deck_contract_conserves_reference_tau_and_fractional_top() -> None:
+    edges = np.array([1.0e-5, 1.0e-3, 1.0e-1, 10.0, 100.0])
+    wavelength = np.array([2.5, 5.0, 10.0])
+    tau = common.absorbing_cloud_tau(
+        edges,
+        wavelength,
+        optical_depth_at_reference=3.0,
+        cloud_top_pressure_bar=1.0e-2,
+        slope=-2.0,
+    )
+
+    assert np.all(tau[0] == 0.0)
+    assert tau[1, 1] > 0.0
+    np.testing.assert_allclose(np.sum(tau, axis=0), [12.0, 3.0, 0.75])
+    assert np.sum(tau[:, 1]) == pytest.approx(3.0)
+
+
+def test_stage_7_tabulated_regrid_conserves_column_optical_depth() -> None:
+    source_edges = np.array([1.0e-5, 1.0e-3, 1.0e-1])
+    source_wavelength = np.array([1.0, 2.0])
+    source_tau = np.array([[0.1, 0.2], [0.3, 0.4]])
+    target_edges = np.geomspace(1.0e-5, 1.0e-1, 9)
+
+    result = common.regrid_tabulated_cloud_tau(
+        source_edges,
+        source_wavelength,
+        source_tau,
+        target_edges,
+        source_wavelength,
+    )
+
+    np.testing.assert_allclose(np.sum(result, axis=0), np.sum(source_tau, axis=0))
+
+
+def test_stage_7_full_contract_covers_matrix_and_forces_absorption() -> None:
+    archived_edges = np.geomspace(1.0e-5, 100.0, 5)
+    archived_wavelength = np.array([1.0, 5.0, 12.0])
+    archived_tau = np.full((4, 3), 0.25)
+    contract = common.stage_7_contract(
+        40,
+        np.array([1.0, 5.0, 10.0]),
+        archived_pressure_edges_bar=archived_edges,
+        archived_wavelength_micron=archived_wavelength,
+        archived_extinction_tau=archived_tau,
+    )
+
+    expected_clouds = 1 + 4 * 3 * 4 + 1
+    assert contract["cloud_label"].size == expected_clouds
+    assert contract["case_id"].size == 4 * expected_clouds
+    assert contract["pressure_edges_bar"].shape == (41,)
+    assert contract["pressure_centers_bar"].shape == (40,)
+    assert contract["prt_pressure_bar"].shape == (40,)
+    assert np.all(contract["cloud_single_scattering_albedo"] == 0.0)
+    assert np.all(contract["cloud_asymmetry_factor"] == 0.0)
+    np.testing.assert_allclose(np.sum(contract["gas_vmr"], axis=1), 1.0)
+    assert set(contract["cloud_extinction_slope"][1:-1]) == {-4.0, -2.0, 0.0, 2.0}
+
+
 def test_stage_5_contract_has_symmetric_localized_temperature_cases() -> None:
     contract = common.stage_5_contract(80)
     n_profiles = len(common.STAGE_4_PROFILE_NAMES)

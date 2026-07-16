@@ -79,6 +79,7 @@ conda activate robert-exoplanets
 python examples/benchmark_emission_intercomparison_stage_4.py
 python examples/benchmark_emission_intercomparison_stage_5.py
 python examples/benchmark_emission_intercomparison_stage_6.py
+python examples/benchmark_emission_intercomparison_stage_7.py
 ```
 
 The launcher supplies 40/80/160 ROBERT cells, the matching cell edges as
@@ -101,6 +102,15 @@ opacity/CIA recomputation for Track B, and a primary-resolution finite-
 difference audit at 0.05, 0.10, and 0.20 dex.  Its absolute interpreters,
 package versions, warnings, contracts, checksums, and raw/summarized timings
 are recorded in `docs/data/emission_intercomparison/stage_6_report.json`.
+
+Stage 7 retains the same interpreters and vertical grids.  It runs a
+representative 80-cell resource pilot before the complete absorbing-cloud
+matrix, freezes cloud and Rayleigh scattering off, and records process-tree
+peak resident memory in addition to raw and summarized timings.  Track A
+exchanges only identical gas/cloud optical-depth NPZ contracts.  Track B uses
+ROBERT layer extinction, PICASO native cloud tables, and pRT native `cm2/g`
+additional absorption callbacks.  Its report and complete R=100 cloud arrays
+are written under `docs/data/emission_intercomparison/`.
 
 The canonical continuation through absorbing clouds, cloud scattering, and
 cloud-free plus cloudy cross-retrievals is documented in
