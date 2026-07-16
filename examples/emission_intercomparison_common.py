@@ -37,6 +37,11 @@ STAGE_4_PROFILE_NAMES = (
     "inverted",
     "retrieved_like",
 )
+STAGE_5_PERTURBATION_CENTERS_BAR = tuple(
+    float(value) for value in np.geomspace(1.0e-4, 10.0, 6)
+)
+STAGE_5_PERTURBATION_AMPLITUDE_K = 10.0
+STAGE_5_LOCALIZATION_SIGMA_DEX = 0.35
 
 
 def disk_quadrature(n_mu: int = 8) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -284,6 +289,130 @@ def stage_4_contract(n_cells: int, *, include_cia: bool = True) -> dict[str, np.
     }
 
 
+def temperature_localization(
+    pressure_bar: np.ndarray,
+    center_bar: float,
+    *,
+    sigma_dex: float = STAGE_5_LOCALIZATION_SIGMA_DEX,
+) -> np.ndarray:
+    """Return a unit-peak Gaussian temperature perturbation in log pressure."""
+
+    pressure = np.asarray(pressure_bar, dtype=float)
+    center = float(center_bar)
+    sigma = float(sigma_dex)
+    if np.any(~np.isfinite(pressure)) or np.any(pressure <= 0.0):
+        raise ValueError("pressure_bar must contain finite positive values")
+    if not np.isfinite(center) or center <= 0.0:
+        raise ValueError("center_bar must be finite and positive")
+    if not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("sigma_dex must be finite and positive")
+    offset = np.log10(pressure / center) / sigma
+    return np.exp(-0.5 * offset**2)
+
+
+def stage_5_contract(
+    n_cells: int,
+    *,
+    include_cia: bool = True,
+    amplitude_k: float = STAGE_5_PERTURBATION_AMPLITUDE_K,
+    sigma_dex: float = STAGE_5_LOCALIZATION_SIGMA_DEX,
+) -> dict[str, np.ndarray]:
+    """Build the Stage-5 localized-temperature finite-difference contract.
+
+    The first four cases are unperturbed baselines, one for each Stage-4
+    profile.  They are followed by symmetric minus/plus cases for every
+    profile and perturbation centre.  PICASO samples the continuous profile on
+    cell edges; ROBERT and pRT sample it at ROBERT geometric cell centres.
+    """
+
+    amplitude = float(amplitude_k)
+    sigma = float(sigma_dex)
+    if not np.isfinite(amplitude) or amplitude <= 0.0:
+        raise ValueError("amplitude_k must be finite and positive")
+    if not np.isfinite(sigma) or sigma <= 0.0:
+        raise ValueError("sigma_dex must be finite and positive")
+    pressure_edges, pressure_centers = pressure_grid(n_cells)
+    composition, _ = background_composition(STAGE_3_MOLECULAR_VMR)
+    mu, legendre, disk = disk_quadrature()
+    vmr = np.array(
+        [
+            composition["H2"],
+            composition["He"],
+            *(composition[name] for name in SPECIES),
+        ]
+    )
+    case_ids: list[str] = []
+    profile_indices: list[int] = []
+    center_indices: list[int] = []
+    signs: list[int] = []
+    edge_temperatures: list[np.ndarray] = []
+    cell_temperatures: list[np.ndarray] = []
+    for profile_index, profile_name in enumerate(STAGE_4_PROFILE_NAMES):
+        case_ids.append(f"{profile_name}_baseline_L{n_cells}")
+        profile_indices.append(profile_index)
+        center_indices.append(-1)
+        signs.append(0)
+        edge_temperatures.append(
+            stage_4_temperature_profile(pressure_edges, profile_name)
+        )
+        cell_temperatures.append(
+            stage_4_temperature_profile(pressure_centers, profile_name)
+        )
+    for profile_index, profile_name in enumerate(STAGE_4_PROFILE_NAMES):
+        baseline_edges = stage_4_temperature_profile(pressure_edges, profile_name)
+        baseline_cells = stage_4_temperature_profile(
+            pressure_centers, profile_name
+        )
+        for center_index, center in enumerate(STAGE_5_PERTURBATION_CENTERS_BAR):
+            edge_shape = temperature_localization(
+                pressure_edges, center, sigma_dex=sigma
+            )
+            cell_shape = temperature_localization(
+                pressure_centers, center, sigma_dex=sigma
+            )
+            for sign, label in ((-1, "minus"), (1, "plus")):
+                case_ids.append(
+                    f"{profile_name}_P{center:.0e}_{label}_L{n_cells}"
+                )
+                profile_indices.append(profile_index)
+                center_indices.append(center_index)
+                signs.append(sign)
+                edge_temperatures.append(
+                    baseline_edges + sign * amplitude * edge_shape
+                )
+                cell_temperatures.append(
+                    baseline_cells + sign * amplitude * cell_shape
+                )
+    case_count = len(case_ids)
+    contribution_mask = np.asarray(signs) == 0
+    return {
+        "schema_version": np.array(1),
+        "stage": np.array(5),
+        "case_id": np.asarray(case_ids),
+        "profile_name": np.asarray(STAGE_4_PROFILE_NAMES),
+        "profile_index": np.asarray(profile_indices, dtype=int),
+        "perturbation_center_index": np.asarray(center_indices, dtype=int),
+        "perturbation_sign": np.asarray(signs, dtype=int),
+        "perturbation_centers_bar": np.asarray(
+            STAGE_5_PERTURBATION_CENTERS_BAR
+        ),
+        "perturbation_amplitude_k": np.array(amplitude),
+        "localization_sigma_dex": np.array(sigma),
+        "pressure_edges_bar": pressure_edges,
+        "pressure_centers_bar": pressure_centers,
+        "prt_pressure_bar": pressure_centers,
+        "temperature_edges_k": np.asarray(edge_temperatures),
+        "temperature_cells_k": np.asarray(cell_temperatures),
+        "gas_vmr": np.broadcast_to(vmr, (case_count, vmr.size)),
+        "native_include_cia": np.array(include_cia),
+        "native_return_contribution": np.array(True),
+        "native_contribution_case_mask": contribution_mask,
+        "emission_mu": mu,
+        "legendre_weights": legendre,
+        "disk_weights": disk,
+    }
+
+
 def molecular_band_template(
     wavelength_micron: np.ndarray, species: str
 ) -> np.ndarray:
@@ -455,6 +584,100 @@ def pairwise_contribution_metrics(
             contributions[left], contributions[right], pressure_bar
         )
         for left, right in combinations(contributions, 2)
+    }
+
+
+def normalize_temperature_response(values: np.ndarray) -> np.ndarray:
+    """Normalize absolute temperature Jacobians over perturbation centres."""
+
+    response = np.abs(np.asarray(values, dtype=float))
+    if response.ndim != 2:
+        raise ValueError("temperature response must be centre by wavelength")
+    if np.any(~np.isfinite(response)):
+        raise ValueError("temperature response must be finite")
+    total = np.sum(response, axis=0, keepdims=True)
+    return np.divide(
+        response,
+        total,
+        out=np.zeros_like(response),
+        where=total > 0.0,
+    )
+
+
+def eclipse_jacobian_ppm_per_k(
+    flux_jacobian: np.ndarray, wavelength_micron: np.ndarray
+) -> np.ndarray:
+    """Convert a planet-flux temperature Jacobian to eclipse ppm/K."""
+
+    return eclipse_depth(flux_jacobian, wavelength_micron) * 1.0e6
+
+
+def temperature_jacobian_metrics(
+    left: np.ndarray,
+    right: np.ndarray,
+    wavelength_micron: np.ndarray,
+) -> dict[str, float]:
+    """Compare centre-by-wavelength temperature Jacobians.
+
+    Absolute spectral differences are scaled separately for each perturbation
+    centre by the larger peak absolute Jacobian of the pair.  This avoids
+    singular relative errors at physical sign changes while retaining a
+    dimensionless, pressure-local comparison.
+    """
+
+    left_values = np.asarray(left, dtype=float)
+    right_values = np.asarray(right, dtype=float)
+    if left_values.shape != right_values.shape or left_values.ndim != 2:
+        raise ValueError("Jacobian arrays must have matching centre-by-wavelength shapes")
+    wavelength = np.asarray(wavelength_micron, dtype=float)
+    if wavelength.shape != (left_values.shape[1],):
+        raise ValueError("wavelength_micron must match the Jacobian spectral axis")
+    if np.any(~np.isfinite(left_values)) or np.any(~np.isfinite(right_values)):
+        raise ValueError("Jacobian arrays must be finite")
+    peak = np.maximum(
+        np.max(np.abs(left_values), axis=1),
+        np.max(np.abs(right_values), axis=1),
+    )[:, None]
+    scaled = np.divide(
+        np.abs(left_values - right_values),
+        peak,
+        out=np.zeros_like(left_values),
+        where=peak > 0.0,
+    )
+    eclipse_difference = eclipse_jacobian_ppm_per_k(
+        left_values - right_values, wavelength
+    )
+    left_rms = float(np.sqrt(np.mean(left_values**2)))
+    right_rms = float(np.sqrt(np.mean(right_values**2)))
+    pair_rms = max(left_rms, right_rms, np.finfo(float).tiny)
+    return {
+        "median_abs_difference_over_pair_peak": float(np.median(scaled)),
+        "p95_abs_difference_over_pair_peak": float(
+            np.percentile(scaled, 95.0)
+        ),
+        "max_abs_difference_over_pair_peak": float(np.max(scaled)),
+        "relative_rms_difference": float(
+            np.sqrt(np.mean((left_values - right_values) ** 2)) / pair_rms
+        ),
+        "rms_eclipse_jacobian_difference_ppm_per_k": float(
+            np.sqrt(np.mean(eclipse_difference**2))
+        ),
+        "max_abs_eclipse_jacobian_difference_ppm_per_k": float(
+            np.max(np.abs(eclipse_difference))
+        ),
+    }
+
+
+def pairwise_temperature_jacobian_metrics(
+    jacobians: dict[str, np.ndarray], wavelength_micron: np.ndarray
+) -> dict[str, dict[str, float]]:
+    """Return temperature-Jacobian metrics for every pair of named models."""
+
+    return {
+        f"{left}__{right}": temperature_jacobian_metrics(
+            jacobians[left], jacobians[right], wavelength_micron
+        )
+        for left, right in combinations(jacobians, 2)
     }
 
 

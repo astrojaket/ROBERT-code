@@ -116,6 +116,15 @@ def _absorbing_formal_contribution(
     return _normalize_contribution(layer_contribution)
 
 
+def _shared_total_tau(contract: dict[str, np.ndarray]) -> np.ndarray:
+    """Return case-indexed shared optical depth for Track-A workers."""
+
+    if "shared_total_tau" in contract:
+        profile_index = np.asarray(contract["profile_index"], dtype=int)
+        return np.asarray(contract["shared_total_tau"], dtype=float)[profile_index]
+    return np.asarray(contract["component_tau"], dtype=float).sum(axis=1)
+
+
 def _shared_picaso(contract: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
     from picaso.fluxes import get_thermal_1d
 
@@ -125,7 +134,7 @@ def _shared_picaso(contract: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndar
     disk_weights = contract["disk_weights"]
     pressure = contract["pressure_edges_bar"].copy() * 1.0e6
     pressure[0] = 0.0
-    total_tau = contract["component_tau"].sum(axis=1)
+    total_tau = _shared_total_tau(contract)
     flux = np.empty((total_tau.shape[0], wavelength.size))
     runtime = np.empty(total_tau.shape[0])
     for case_index, tau in enumerate(total_tau):
@@ -163,7 +172,7 @@ def _shared_prt(contract: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray
     frequencies = c / (wavelength * 1.0e-6)
     mu = contract["emission_mu"]
     angle_weights = contract["legendre_weights"]
-    total_tau = contract["component_tau"].sum(axis=1)
+    total_tau = _shared_total_tau(contract)
     flux = np.empty((total_tau.shape[0], wavelength.size))
     runtime = np.empty(total_tau.shape[0])
     for case_index, tau in enumerate(total_tau):
@@ -200,7 +209,7 @@ def _mass_fractions(vmr: np.ndarray) -> tuple[dict[str, float], float]:
 
 def _native_prt(
     contract: dict[str, np.ndarray], input_data: Path
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     from petitRADTRANS.radtrans import Radtrans
 
     line_species = (
@@ -218,6 +227,13 @@ def _native_prt(
         "temperature_cells_k", contract["temperature_edges_k"]
     )
     return_contribution = bool(contract.get("native_return_contribution", False))
+    contribution_mask = np.asarray(
+        contract.get(
+            "native_contribution_case_mask",
+            np.full(contract["gas_vmr"].shape[0], return_contribution),
+        ),
+        dtype=bool,
+    )
     atmosphere = Radtrans(
         pressures=pressure,
         wavelength_boundaries=np.array([0.5, 12.0]),
@@ -231,6 +247,7 @@ def _native_prt(
     )
     output_flux = []
     output_contribution = []
+    contribution_case_index = []
     runtime = []
     wavelength = None
     for case_index, vmr in enumerate(contract["gas_vmr"]):
@@ -242,20 +259,23 @@ def _native_prt(
         mass_fractions["H2"] = np.full(pressure.size, fractions["H2"])
         mass_fractions["He"] = np.full(pressure.size, fractions["He"])
         started = perf_counter()
+        case_return_contribution = bool(
+            return_contribution and contribution_mask[case_index]
+        )
         result = atmosphere.calculate_flux(
             temperatures=temperatures[case_index],
             mass_fractions=mass_fractions,
             mean_molar_masses=np.full(pressure.size, mean_molar_mass),
             reference_gravity=1500.0,
             frequencies_to_wavelengths=True,
-            return_contribution=return_contribution,
+            return_contribution=case_return_contribution,
         )
         runtime.append(perf_counter() - started)
         native_wavelength = np.asarray(result[0], dtype=float) * 1.0e4
         order = np.argsort(native_wavelength)
         wavelength = native_wavelength[order]
         output_flux.append(np.asarray(result[1], dtype=float)[order] * 0.1)
-        if return_contribution:
+        if case_return_contribution:
             contribution = np.asarray(
                 result[2]["emission_contribution"], dtype=float
             )
@@ -267,17 +287,24 @@ def _native_prt(
                     f"{contribution.shape}; expected {(pressure.size, native_wavelength.size)}"
                 )
             output_contribution.append(_normalize_contribution(contribution[:, order]))
+            contribution_case_index.append(case_index)
     contribution_array = (
         np.asarray(output_contribution)
         if return_contribution
         else np.empty((len(output_flux), 0, 0))
     )
-    return wavelength, np.asarray(output_flux), np.asarray(runtime), contribution_array
+    return (
+        wavelength,
+        np.asarray(output_flux),
+        np.asarray(runtime),
+        contribution_array,
+        np.asarray(contribution_case_index, dtype=int),
+    )
 
 
 def _native_picaso(
     contract: dict[str, np.ndarray], reference: Path, database: Path, resample: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     os.environ["picaso_refdata"] = str(reference.resolve())
     import astropy.units as u
     import pandas as pd
@@ -291,8 +318,16 @@ def _native_picaso(
     )
     pressure = contract["pressure_edges_bar"]
     return_contribution = bool(contract.get("native_return_contribution", False))
+    contribution_mask = np.asarray(
+        contract.get(
+            "native_contribution_case_mask",
+            np.full(contract["gas_vmr"].shape[0], return_contribution),
+        ),
+        dtype=bool,
+    )
     output_flux = []
     output_contribution = []
+    contribution_case_index = []
     runtime = []
     wavelength = None
     for case_index, vmr in enumerate(contract["gas_vmr"]):
@@ -320,17 +355,20 @@ def _native_picaso(
             psingle_rayleigh="off",
         )
         started = perf_counter()
+        case_return_contribution = bool(
+            return_contribution and contribution_mask[case_index]
+        )
         result = case.spectrum(
             opacity,
             calculation="thermal",
-            full_output=return_contribution,
+            full_output=case_return_contribution,
         )
         runtime.append(perf_counter() - started)
         wavelength = 1.0e4 / np.asarray(result["wavenumber"], dtype=float)
         order = np.argsort(wavelength)
         wavelength = wavelength[order]
         output_flux.append(np.asarray(result["thermal"], dtype=float)[order] * 0.1)
-        if return_contribution:
+        if case_return_contribution:
             full_output = result["full_output"]
             native_tau = np.asarray(full_output["taugas"], dtype=float)
             native_tau += np.asarray(full_output["taucld"], dtype=float)
@@ -344,12 +382,19 @@ def _native_picaso(
                 contract["disk_weights"],
             )
             output_contribution.append(contribution[:, order])
+            contribution_case_index.append(case_index)
     contribution_array = (
         np.asarray(output_contribution)
         if return_contribution
         else np.empty((len(output_flux), 0, 0))
     )
-    return wavelength, np.asarray(output_flux), np.asarray(runtime), contribution_array
+    return (
+        wavelength,
+        np.asarray(output_flux),
+        np.asarray(runtime),
+        contribution_array,
+        np.asarray(contribution_case_index, dtype=int),
+    )
 
 
 def main() -> None:
@@ -374,7 +419,7 @@ def main() -> None:
     elif args.model == "picaso":
         if args.picaso_reference is None or args.picaso_database is None:
             parser.error("PICASO native mode requires reference and database paths")
-        wavelength, flux, runtime, contribution = _native_picaso(
+        wavelength, flux, runtime, contribution, contribution_case_index = _native_picaso(
             contract,
             args.picaso_reference,
             args.picaso_database,
@@ -383,7 +428,13 @@ def main() -> None:
     else:
         if args.input_data is None:
             parser.error("pRT native mode requires --input-data")
-        wavelength, flux, runtime, contribution = _native_prt(contract, args.input_data)
+        (
+            wavelength,
+            flux,
+            runtime,
+            contribution,
+            contribution_case_index,
+        ) = _native_prt(contract, args.input_data)
     metadata = {
         "model": args.model,
         "mode": args.mode,
@@ -412,6 +463,7 @@ def main() -> None:
             "prt_pressure_bar", contract["pressure_centers_bar"]
         )
         output["normalized_contribution"] = contribution
+        output["contribution_case_index"] = contribution_case_index
     np.savez_compressed(
         args.output,
         **output,

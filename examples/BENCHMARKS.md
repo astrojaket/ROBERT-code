@@ -31,6 +31,10 @@ files, local opacity paths, and smoke tests are documented in
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.
+- `benchmark_emission_intercomparison_stage_5.py`: localized thermal-response
+  and R=100 temperature-Jacobian comparison for the Stage-4 profiles, with a
+  shared-optical-depth RT track and a native temperature-dependent-opacity
+  track on the same 40/80/160 grids.
 
 ## petitRADTRANS
 

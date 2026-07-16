@@ -103,3 +103,6 @@ The versioned summary is
 common-grid NPZ artifacts are written beneath
 `examples/outputs/emission_intercomparison/stage_4/` and remain ignored by
 Git.
+
+Stage 5 localized thermal-response and temperature-Jacobian results are
+documented in `docs/review/48_emission_intercomparison_stage_5.md`.

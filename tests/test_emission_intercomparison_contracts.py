@@ -109,6 +109,84 @@ def test_stage_4_profiles_cover_requested_thermal_structures() -> None:
     assert np.ptp(retrieved_gradient) > 10.0
 
 
+def test_stage_5_contract_has_symmetric_localized_temperature_cases() -> None:
+    contract = common.stage_5_contract(80)
+    n_profiles = len(common.STAGE_4_PROFILE_NAMES)
+    n_centers = len(common.STAGE_5_PERTURBATION_CENTERS_BAR)
+
+    assert contract["case_id"].shape == (n_profiles * (1 + 2 * n_centers),)
+    assert contract["pressure_edges_bar"].shape == (81,)
+    assert contract["pressure_centers_bar"].shape == (80,)
+    np.testing.assert_allclose(
+        contract["prt_pressure_bar"], contract["pressure_centers_bar"]
+    )
+    np.testing.assert_allclose(
+        contract["perturbation_centers_bar"],
+        np.geomspace(1.0e-4, 10.0, 6),
+    )
+    assert np.count_nonzero(contract["native_contribution_case_mask"]) == 4
+    for profile_index in range(n_profiles):
+        baseline = contract["temperature_cells_k"][profile_index]
+        for center_index in range(n_centers):
+            selected = (
+                (contract["profile_index"] == profile_index)
+                & (contract["perturbation_center_index"] == center_index)
+            )
+            minus = np.flatnonzero(
+                selected & (contract["perturbation_sign"] == -1)
+            )
+            plus = np.flatnonzero(
+                selected & (contract["perturbation_sign"] == 1)
+            )
+            assert minus.size == plus.size == 1
+            np.testing.assert_allclose(
+                0.5
+                * (
+                    contract["temperature_cells_k"][minus[0]]
+                    + contract["temperature_cells_k"][plus[0]]
+                ),
+                baseline,
+            )
+
+
+def test_temperature_localization_is_unit_peak_and_log_symmetric() -> None:
+    center = 0.1
+    pressure = np.array([center / 10.0, center, center * 10.0])
+    localization = common.temperature_localization(
+        pressure, center, sigma_dex=0.35
+    )
+
+    assert localization[1] == 1.0
+    assert localization[0] == localization[2]
+    assert np.all(localization > 0.0)
+
+
+def test_temperature_jacobian_metrics_and_response_normalization() -> None:
+    wavelength = np.geomspace(0.8, 8.0, 5)
+    jacobian = np.arange(1.0, 16.0).reshape(3, 5)
+    identical = common.temperature_jacobian_metrics(
+        jacobian, jacobian.copy(), wavelength
+    )
+    response = common.normalize_temperature_response(jacobian)
+
+    assert all(value == 0.0 for value in identical.values())
+    np.testing.assert_allclose(np.sum(response, axis=0), 1.0)
+    np.testing.assert_allclose(
+        common.eclipse_jacobian_ppm_per_k(jacobian, wavelength),
+        common.eclipse_depth(jacobian, wavelength) * 1.0e6,
+    )
+
+
+def test_shared_tau_contract_expands_profiles_to_cases() -> None:
+    contract = common.stage_5_contract(40)
+    shared = np.arange(4 * 40 * 3, dtype=float).reshape(4, 40, 3)
+    contract["shared_total_tau"] = shared
+    expanded = worker._shared_total_tau(contract)
+
+    assert expanded.shape == (contract["case_id"].size, 40, 3)
+    np.testing.assert_array_equal(expanded, shared[contract["profile_index"]])
+
+
 def test_contribution_metrics_detect_identical_and_shifted_profiles() -> None:
     pressure = np.geomspace(1.0e-4, 10.0, 6)
     contribution = np.zeros((6, 3))
