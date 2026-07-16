@@ -1,0 +1,15 @@
+name: picaso
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy=1.26.4
+  # PyMieScatt 1.8.1.1 still imports scipy.integrate.trapz, removed in 1.14.
+  - scipy=1.13.1
+  # PICASO and pysynphot still import pkg_resources.
+  - setuptools=80.9.0
+  - pip:
+      - picaso==3.2.2
+      - virga-exo==0.4

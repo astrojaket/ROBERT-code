@@ -1,0 +1,12 @@
+name: petitradtrans-stable
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - fortran-compiler
+  - meson-python
+  - ninja
+  - pip:
+      - petitRADTRANS==3.3.3

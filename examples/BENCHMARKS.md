@@ -6,6 +6,11 @@ ROBERT and best-fitting model spectra use `mediumpurple`, related ROBERT curves
 use darker or lighter purples, and external reference spectra use neutral dark
 tones for contrast.
 
+Run each code in its dedicated Conda environment.  The required
+`robert-exoplanets`, `picaso`, and `petitradtrans-stable` separation, setup
+files, local opacity paths, and smoke tests are documented in
+`docs/emission_intercomparison_environments.md`.
+
 ## Stellar spectra
 
 - `benchmark_g_star_stellar_spectrum.py`: flux-conserving STScI PHOENIX
@@ -20,6 +25,9 @@ tones for contrast.
   assembly.
 - `benchmark_official_picaso_molecular_cloud_parity.py`: official
   molecular-opacity and cloudy-emission parity.
+- `benchmark_emission_intercomparison_stages_1_3.py`: staged ROBERT/PICASO/pRT
+  thermal-emission comparison.  Stages 1--2 share optical depth to isolate
+  radiative transfer; Stage 3 uses each code's native molecular opacity path.
 
 ## petitRADTRANS
 
