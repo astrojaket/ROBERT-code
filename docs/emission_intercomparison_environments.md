@@ -1,6 +1,7 @@
 # Emission intercomparison environment contract
 
-The emission intercomparison uses three isolated Conda environments.  Do not
+Version 2 uses three isolated Conda environments; the historical Version-1
+PICASO environment remains installed as a fourth, non-Version-2 environment.  Do not
 install PICASO or petitRADTRANS into the ROBERT environment, and do not run one
 code with another code's Python interpreter.  Process isolation is part of the
 benchmark contract: codes exchange only versioned NPZ/JSON inputs and outputs.
@@ -8,10 +9,12 @@ benchmark contract: codes exchange only versioned NPZ/JSON inputs and outputs.
 | Code | Conda environment | Reproducible definition |
 | --- | --- | --- |
 | ROBERT | `robert-exoplanets` | `environment.yml` |
-| PICASO 3.2.2 | `picaso` | `environment-picaso.yml` |
+| PICASO 4.0 (Version 2) | `picaso-v4` | Dedicated frozen environment recorded below |
+| PICASO 3.2.2 (Version 1 historical) | `picaso` | `environment-picaso.yml` |
 | stable petitRADTRANS 3.3.3 | `petitradtrans-stable` | `environment-petitradtrans-stable.yml` |
 
-Create or update the environments from the repository root:
+Create or update the repository-defined ROBERT, stable-pRT, and historical
+Version-1 PICASO environments from the repository root:
 
 ```bash
 conda env create -f environment.yml
@@ -20,26 +23,52 @@ conda env create -f environment-petitradtrans-stable.yml
 ```
 
 If an environment already exists, use `conda env update --prune -f FILE`
-instead.  A project-local ROBERT prefix such as `.conda` is also valid when it
+instead.  Do not use `environment-picaso.yml` to replace `picaso-v4`; its exact
+frozen installed versions are recorded below.  A project-local ROBERT prefix
+such as `.conda` is also valid when it
 was created from `environment.yml`; invoke `.conda/bin/python` explicitly so
 the interpreter remains unambiguous.
 
 ## Required local data
 
-The current work-laptop layout is:
+The current Version-2 work-laptop layout is:
+
+- PICASO 4 reference data:
+  `/Users/jaketaylor/Dropbox/picaso-v4/reference`
+- PICASO 4 resort-rebin molecular tables:
+  `/Users/jaketaylor/Dropbox/picaso/reference/opacities/resortrebin`
+- petitRADTRANS input data:
+  `/Users/jaketaylor/Dropbox/ROBERT-code/opacity_data/petitRADTRANS/input_data`
+
+The historical Version-1 layout is:
 
 - PICASO reference data:
   `opacity_data/picaso_official/reference_v3_2`
 - PICASO opacity database:
   `opacity_data/picaso_official/reference/opacities/opacities_0.3_15_R15000.db`
-- petitRADTRANS input data:
-  `opacity_data/petitRADTRANS/input_data`
 
-PICASO 3.2.2 currently uses reference-data configuration 3.2.1 and emits a
-minor-version warning.  This is recorded rather than hidden.  Its environment
-also pins SciPy 1.13.1 because PyMieScatt imports the removed
-`scipy.integrate.trapz`, and setuptools 80.9.0 because PICASO/pysynphot still
-use `pkg_resources`.
+Version 2 uses `/opt/miniconda3/envs/picaso-v4/bin/python`, with Python 3.11.15,
+PICASO 4.0, numpy 2.4.6, scipy 1.17.1, h5py 3.16.0, numba 0.66.0, virga-exo
+2.0.1, astropy 8.0.1, and pandas 3.0.3.  The official reference Version 4.0 at
+`/Users/jaketaylor/Dropbox/picaso-v4/reference` came from PICASO Git commit
+`0369089372f748609dd0233e6de9361af31a38cf`; its three frozen reference-file
+checksums are in the Version-2 common contract.
+
+An absolute interpreter invocation does not activate Conda configuration
+variables.  Before importing PICASO, every worker must explicitly set
+`picaso_refdata=/Users/jaketaylor/Dropbox/picaso-v4/reference` and writable
+task-local `NUMBA_CACHE_DIR=<temp>/picaso-v4-numba-cache` and
+`MPLCONFIGDIR=<temp>/picaso-v4-matplotlib`.
+
+The fixed-VMR resort-rebin correlated-k smoke loaded exactly H2O, CO, CO2, and
+CH4 with 661 bins and eight k points.  Forty layers produced `taugas` shape
+`(40, 661, 8)`, and all 583 bins over 0.8--12 micron had finite positive thermal
+flux with scattering, Rayleigh, and delta-Eddington disabled.  The optional
+Vega-spectrum warning is harmless because Version 2 supplies an explicit
+blackbody star; record it without downloading stellar grids or suppressing it.
+
+The historical `/opt/miniconda3/envs/picaso/bin/python` remains Python 3.10.20 /
+PICASO 3.2.2 for Version 1 only.  Version-2 molecular work must not use it.
 
 On managed machines PICASO's Numba and Matplotlib caches must be writable.  The
 environment smoke test configures temporary cache directories automatically;
@@ -53,12 +82,16 @@ the opacity location explicitly through `path_input_data`.
 
 ## Verification
 
-Run each check with its own interpreter:
+Run each Version-2 check with its own interpreter.  PICASO variables must be
+set explicitly before import; `<task-temp>` must be writable:
 
 ```bash
-conda run -n robert-exoplanets python examples/check_emission_intercomparison_environment.py robert
-conda run -n picaso python examples/check_emission_intercomparison_environment.py picaso
-conda run -n petitradtrans-stable python examples/check_emission_intercomparison_environment.py petitradtrans
+/opt/miniconda3/envs/robert-exoplanets/bin/python examples/check_emission_intercomparison_environment.py robert
+env picaso_refdata=/Users/jaketaylor/Dropbox/picaso-v4/reference \
+  NUMBA_CACHE_DIR=<task-temp>/picaso-v4-numba-cache \
+  MPLCONFIGDIR=<task-temp>/picaso-v4-matplotlib \
+  /opt/miniconda3/envs/picaso-v4/bin/python <stage-specific-picaso-worker>
+/opt/miniconda3/envs/petitradtrans-stable/bin/python examples/check_emission_intercomparison_environment.py petitradtrans
 ```
 
 For the work-laptop project-local ROBERT environment, use:
@@ -68,9 +101,21 @@ For the work-laptop project-local ROBERT environment, use:
 ```
 
 All ROBERT benchmark orchestration and analysis runs in `robert-exoplanets`.
-Only the external PICASO worker runs in `picaso`, and only the external pRT
+Only the external PICASO worker runs in `picaso-v4`, and only the external pRT
 worker runs in `petitradtrans-stable`.  The worker metadata must record the
 absolute Python executable and package version for every generated artifact.
+
+Version-2 Stage 1 is reproduced with:
+
+```bash
+PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
+  examples/benchmark_emission_intercomparison_v2_stage_1.py
+```
+
+The launcher invokes PICASO 4.0 and stable pRT only through the exact
+interpreter paths above, sets all PICASO configuration/cache variables before
+import, gives pRT a private ignored worker `HOME`, and records the optional
+Vega warning rather than suppressing it.
 
 Run Stages 4--6 from the ROBERT environment after the smoke tests:
 

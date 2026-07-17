@@ -39,6 +39,24 @@ scattering and retrieval work moves to Stages 8--9.
 The versioned Stage 1--7 reports under
 `docs/data/emission_intercomparison/` remain the source of numerical results.
 
+## Version-2 Stage 1: WASP-17b common contract and grey closure
+
+Version-2 Stage 1 is complete under
+`docs/data/emission_intercomparison/version_2/`.  It freezes one typed common
+contract for the WASP-17 system, 6550 K blackbody star, 40/80/160 grids, exact
+six-species mixture, PG14 arrays, and flux-conserving 0.8--12 micron R=100
+product.  The 80-cell pilot projected `44.60 s` and measured `0.674 GB` peak
+RSS, authorizing the full laptop run; total solver wall time was `20.91 s`.
+
+Eight of nine Stage-1 gates pass.  The continuous-angle analytic eclipse gate
+remains failed (`0.196897 ppm` versus `0.01 ppm`) even though the separately
+frozen angular relative gate passes.  The failure is a declared eight-angle
+representation limit, not a reason to tune the quadrature or threshold after
+inspection.  The compatible ROBERT/pRT shared-tensor subset and vertical
+convergence pass.  Stage 2 may use the accepted common contract, but claims
+requiring sub-`0.01 ppm` continuous-angle closure must not treat the eight-angle
+Stage-1 product as validated.
+
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures

@@ -225,6 +225,25 @@ opacity-sampling R=100 spectrum is not by itself evidence of a radiative-
 transfer solver failure, and an opacity-sampling/correlated-k difference is
 not a shared-opacity closure result.
 
+### PICASO molecular correlated-k decision
+
+From Stage 2 onward, the primary PICASO molecular representation is the
+official PICASO-4 resort-rebin correlated-k family from Zenodo
+`10.5281/zenodo.18644980`, Version 2.  The frozen H2O, CO, CO2, and CH4 asset
+filenames, SHA-256 checksums, common 661-bin/eight-double-Gauss representation,
+20-by-73 pressure-temperature coverage, and source provenance are serialized in
+`version_2/common_contract.json`.  PICASO opacity sampling remains a secondary,
+separately labelled representation diagnostic.
+
+Version 2 uses the process-isolated PICASO 4.0 / Python 3.11.15 interpreter at
+`/opt/miniconda3/envs/picaso-v4/bin/python`.  Its reference tree is
+`/Users/jaketaylor/Dropbox/picaso-v4/reference`.  Workers set `picaso_refdata`
+to that path and set writable task-local `NUMBA_CACHE_DIR` and `MPLCONFIGDIR`
+before importing PICASO.  The four-molecule resort-rebin correlated-k smoke
+passes over all 583 bins in the frozen domain.  The historical PICASO 3.2.2
+interpreter remains unchanged for Version 1 and must not be used for Version-2
+molecular work.
+
 ## Common comparison architecture
 
 Where a stage permits it, use two tracks:
@@ -248,7 +267,7 @@ ROBERT, PICASO, and pRT always execute in separate processes using:
 
 ```text
 ROBERT: /opt/miniconda3/envs/robert-exoplanets/bin/python
-PICASO: /opt/miniconda3/envs/picaso/bin/python
+PICASO: /opt/miniconda3/envs/picaso-v4/bin/python
 pRT:    /opt/miniconda3/envs/petitradtrans-stable/bin/python
 ```
 
@@ -271,6 +290,20 @@ control.  Compare analytic pure-absorption solutions and identical grey
 optical-depth tensors on 40/80/160 cells.  Build and integrity-test the common
 Version-2 system, composition, PG14, pressure, wavelength, and stellar
 contracts before later stages depend on them.
+
+Stage 1 was completed on the 40/80/160-cell ladder.  Eight of nine frozen
+scientific gates pass.  The one retained failure is the continuous-angle
+analytic eclipse gate: the eight-angle quadrature differs from the exact E3
+solution by at most `3.648947e-4` symmetrically, which passes its dedicated
+`5e-4` angular gate, but corresponds to `0.196897 ppm` and exceeds the
+independently frozen `0.01 ppm` analytic eclipse limit.  The limit was not
+relaxed after the matrix was seen.  On the genuinely compatible shared-tensor,
+blackbody-lower-boundary subset, ROBERT and stable pRT close to
+`6.75018e-7` symmetric relative difference and `0.00053724 ppm`; 80-to-160
+changes are at most `7.23e-12 ppm`.  PICASO's exact-`omega0=0` native probe is
+non-finite, so its independently implemented absorbing formal reference is
+retained under a separate label and is not presented as a native PICASO gate.
+See `docs/review/51_emission_intercomparison_v2_stage_1.md`.
 
 ### Stage 2 -- single-molecule closure
 
@@ -406,8 +439,13 @@ before viewing the complete matrix and never tune them afterward.
 
 Keep ROBERT, PICASO, and stable petitRADTRANS process-isolated with exactly:
 - /opt/miniconda3/envs/robert-exoplanets/bin/python
-- /opt/miniconda3/envs/picaso/bin/python
+- /opt/miniconda3/envs/picaso-v4/bin/python
 - /opt/miniconda3/envs/petitradtrans-stable/bin/python
+
+Every PICASO worker must also set, before importing PICASO:
+- picaso_refdata=/Users/jaketaylor/Dropbox/picaso-v4/reference
+- NUMBA_CACHE_DIR=<writable task temp>/picaso-v4-numba-cache
+- MPLCONFIGDIR=<writable task temp>/picaso-v4-matplotlib
 
 Never use or reactivate retired Dropbox Git metadata; Dropbox is only linked
 opacity-data/rollback storage. The untracked emission-intercomparison-paper/

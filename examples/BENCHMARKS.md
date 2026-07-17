@@ -28,6 +28,12 @@ files, local opacity paths, and smoke tests are documented in
 - `benchmark_emission_intercomparison_stages_1_3.py`: staged ROBERT/PICASO/pRT
   thermal-emission comparison.  Stages 1--2 share optical depth to isolate
   radiative transfer; Stage 3 uses each code's native molecular opacity path.
+- `benchmark_emission_intercomparison_v2_stage_1.py`: frozen WASP-17b
+  Version-2 common-contract bootstrap and grey/isothermal closure on 40/80/160
+  cells.  It runs the exact three interpreters, pilots resources at 80 cells,
+  preserves native/R=100 spectra and complete vertical arrays, probes PICASO's
+  exact-zero limitation without substituting a non-zero albedo, and retains the
+  one predeclared continuous-angle eclipse-gate failure.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.
