@@ -786,3 +786,45 @@ def write_version_2_common_contract(
         arrays[f"petitradtrans_nodes_{grid.n_cells}_bar"] = grid.petitradtrans_nodes_bar
     arrays.update(contract.temperature_profiles_k)
     np.savez_compressed(profiles_path, **arrays)
+
+
+def load_version_2_common_contract(path: Path) -> Version2CommonContract:
+    """Load the authoritative serialized Version-2 common contract."""
+
+    payload = json.loads(path.read_text())
+    if not isinstance(payload, dict):
+        raise RobertValidationError("common contract must be a JSON object")
+    return Version2CommonContract.from_dict(payload)
+
+
+def isolated_molecule_composition(
+    contract: Version2CommonContract, species: str, *, abundance_scale: float = 1.0
+) -> Mapping[str, float]:
+    """Return one frozen molecule plus the contract-derived H2/He background.
+
+    The background ratio is inferred from the serialized reference mixture so
+    later stages do not duplicate the frozen fill constants.
+    """
+
+    active_species = tuple(
+        name for name in contract.composition_vmr if name not in {"H2", "He"}
+    )
+    if species not in active_species:
+        raise RobertValidationError(f"unsupported frozen molecule: {species}")
+    scale = float(abundance_scale)
+    if not np.isfinite(scale) or scale <= 0.0:
+        raise RobertValidationError("abundance_scale must be finite and positive")
+    active = contract.composition_vmr[species] * scale
+    if active >= 1.0:
+        raise RobertValidationError("scaled molecular abundance must be below one")
+    background_total = contract.composition_vmr["H2"] + contract.composition_vmr["He"]
+    h2_fraction = contract.composition_vmr["H2"] / background_total
+    remainder = 1.0 - active
+    values = {
+        "H2": remainder * h2_fraction,
+        "He": remainder * (1.0 - h2_fraction),
+        **{name: active if name == species else 0.0 for name in active_species},
+    }
+    if not np.isclose(sum(values.values()), 1.0, rtol=0.0, atol=2.0e-16):
+        raise RobertValidationError("isolated-molecule composition must sum to one")
+    return MappingProxyType(values)

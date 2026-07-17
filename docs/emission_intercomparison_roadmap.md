@@ -57,6 +57,22 @@ convergence pass.  Stage 2 may use the accepted common contract, but claims
 requiring sub-`0.01 ppm` continuous-angle closure must not treat the eight-angle
 Stage-1 product as validated.
 
+## Version-2 Stage 2: frozen single-molecule closure
+
+Version-2 Stage 2 is complete for H2O, CO, CO2, and CH4 at the exact common-
+contract VMRs and H2/He fill rule.  The 80-cell pilot authorized the matrix at
+`804.38 s` projected wall time and `36.72%` of available memory; the post-pilot
+matrix took `160.93 s`.
+
+The matched ROBERT/pRT Track-A difference decreases by about fourfold per grid
+doubling but exceeds the frozen full-matrix and 80-to-160 limits, defining an
+out-of-tolerance vertical closure regime.  The 160-cell maximum is
+`0.636478 ppm`; the isothermal controls remain below `0.002510 ppm`.  Track B
+records native database, interpolation, and representation effects without
+classifying a framework as failed.  PICASO resort-rebin remains the primary
+molecular path, while its 819/1638-sample density comparison remains visibly
+finite-sampling limited and unsmoothed.
+
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures

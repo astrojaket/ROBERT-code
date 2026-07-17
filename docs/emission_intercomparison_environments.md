@@ -112,6 +112,19 @@ PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
   examples/benchmark_emission_intercomparison_v2_stage_1.py
 ```
 
+Version-2 Stage 2 is reproduced with the same process isolation using:
+
+```bash
+PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
+  examples/benchmark_emission_intercomparison_v2_stage_2.py
+```
+
+The Stage-2 launcher sets `picaso_refdata`, `NUMBA_CACHE_DIR`, and
+`MPLCONFIGDIR` before every PICASO import, uses only the `picaso-v4`
+interpreter for molecular work, and records the optional-Vega and exact-zero
+cloud/Rayleigh divide warnings.  Its detailed raw workers remain ignored
+beneath `examples/outputs/emission_intercomparison/version_2/stage_2/`.
+
 The launcher invokes PICASO 4.0 and stable pRT only through the exact
 interpreter paths above, sets all PICASO configuration/cache variables before
 import, gives pRT a private ignored worker `HOME`, and records the optional

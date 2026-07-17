@@ -16,6 +16,8 @@ from .emission_intercomparison_v2 import (
     Version2CommonContract,
     build_version_2_common_contract,
     flux_conserving_bin_mean,
+    isolated_molecule_composition,
+    load_version_2_common_contract,
     planck_surface_flux_w_m2_m,
     write_version_2_common_contract,
 )
@@ -39,6 +41,8 @@ __all__ = [
     "compare_opacity_arrays",
     "build_version_2_common_contract",
     "flux_conserving_bin_mean",
+    "isolated_molecule_composition",
+    "load_version_2_common_contract",
     "load_emission_benchmark_csv",
     "planck_radiance_wavelength",
     "planck_surface_flux_w_m2_m",

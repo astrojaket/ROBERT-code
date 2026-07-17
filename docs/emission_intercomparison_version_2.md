@@ -312,6 +312,16 @@ shared pressure-by-wavelength optical-depth inputs and native opacity paths,
 retain native and R=100 spectra, and quantify vertical and spectral convergence.
 Do not substitute `1e-4` or other round-number abundances.
 
+Stage 2 is complete.  The frozen matched ROBERT/pRT Track-A limits identify an
+out-of-tolerance, vertically converging closure regime: maximum eclipse-depth
+differences decrease from `10.083885 ppm` at 40 cells to `2.541600 ppm` at 80
+and `0.636478 ppm` at 160.  The isothermal analytic controls remain below
+`0.002510 ppm`.  Track B retains native opacity representation differences
+without cross-framework gates; PICASO resort-rebin is primary and its
+finite-sampling opacity-sampling diagnostic is preserved unsmoothed.  See
+`docs/review/52_emission_intercomparison_v2_stage_2.md` and
+`docs/data/emission_intercomparison/version_2/stage_2_report.json`.
+
 ### Stage 3 -- multi-species and CIA
 
 Combine the exact six-species mixture, then add H2--H2 and H2--He CIA in a

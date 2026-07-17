@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -15,6 +16,8 @@ from robert_exoplanets.diagnostics.emission_intercomparison_v2 import (
     Version2CommonContract,
     build_version_2_common_contract,
     flux_conserving_bin_mean,
+    isolated_molecule_composition,
+    load_version_2_common_contract,
     payload_sha256,
     planck_surface_flux_w_m2_m,
 )
@@ -219,3 +222,35 @@ def test_contract_is_deeply_immutable(contract: Version2CommonContract) -> None:
         contract.temperature_profiles_k["isothermal_80_cells"][0] = 1.0
     with pytest.raises(FrozenInstanceError):
         contract.isothermal_temperature_k = 1.0  # type: ignore[misc]
+
+
+def test_authoritative_contract_loader_and_isolated_molecule_fill() -> None:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "docs/data/emission_intercomparison/version_2/common_contract.json"
+    )
+    loaded = load_version_2_common_contract(path)
+    active_species = ("H2O", "CO", "CO2", "CH4")
+    reference_background_ratio = (
+        loaded.composition_vmr["H2"] / loaded.composition_vmr["He"]
+    )
+
+    for species in active_species:
+        composition = isolated_molecule_composition(loaded, species)
+        assert composition[species] == loaded.composition_vmr[species]
+        assert sum(composition.values()) == pytest.approx(1.0, abs=2e-16)
+        assert composition["H2"] / composition["He"] == pytest.approx(
+            reference_background_ratio
+        )
+        assert all(
+            composition[other] == 0.0
+            for other in active_species
+            if other != species
+        )
+        with pytest.raises(TypeError):
+            composition["H2"] = 0.0  # type: ignore[index]
+
+    with pytest.raises(RobertValidationError, match="unsupported frozen molecule"):
+        isolated_molecule_composition(loaded, "NH3")
+    with pytest.raises(RobertValidationError, match="finite and positive"):
+        isolated_molecule_composition(loaded, "H2O", abundance_scale=0.0)

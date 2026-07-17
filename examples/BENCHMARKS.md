@@ -34,6 +34,12 @@ files, local opacity paths, and smoke tests are documented in
   preserves native/R=100 spectra and complete vertical arrays, probes PICASO's
   exact-zero limitation without substituting a non-zero albedo, and retains the
   one predeclared continuous-angle eclipse-gate failure.
+- `benchmark_emission_intercomparison_v2_stage_2.py`: frozen single-molecule
+  H2O/CO/CO2/CH4 closure at exact common-contract VMRs.  It separates matched
+  ROBERT/pRT optical-depth closure from native opacity attribution, keeps
+  PICASO resort-rebin primary and opacity sampling secondary/unsmoothed,
+  preserves native/R=100 spectral, optical-depth, and vertical arrays, and
+  reports the measured out-of-tolerance vertical closure regime.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.
