@@ -1,5 +1,12 @@
 # Emission intercomparison roadmap
 
+> **Version notice:** this file records the completed Version-1 results and the
+> original Stage-8/9 outline.  New runs are governed by
+> [Emission intercomparison Version 2](emission_intercomparison_version_2.md),
+> which freezes the WASP-17 system, solar-like VMRs, PG14 profiles, blackbody
+> star, rerun plan, and common task preamble.  Version-1 artifacts remain
+> historical and must not be overwritten.
+
 This document is the canonical stage numbering for the ROBERT, PICASO, and
 petitRADTRANS thermal-emission intercomparison and its companion paper.  It
 supersedes the earlier seven-stage draft: temperature and composition
