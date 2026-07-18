@@ -42,10 +42,6 @@ PICASO_REFERENCE = Path("/Users/jaketaylor/Dropbox/picaso-v4/reference")
 PICASO_CK_DIRECTORY = Path(
     "/Users/jaketaylor/Dropbox/picaso/reference/opacities/resortrebin"
 )
-PICASO_SAMPLING_DATABASE = Path(
-    "/Users/jaketaylor/Dropbox/ROBERT-code/opacity_data/picaso_official/reference/"
-    "opacities/opacities_0.3_15_R15000.db"
-)
 PRT_INPUT_DATA = Path(
     "/Users/jaketaylor/Dropbox/ROBERT-code/opacity_data/petitRADTRANS/input_data"
 )
@@ -54,8 +50,6 @@ RESOLUTIONS = (40, 80, 160)
 PRIMARY_RESOLUTION = 80
 PROFILES = ("isothermal", "pg14_non_inverted")
 MOLECULAR_SPECIES = ("H2O", "CO", "CO2", "CH4")
-PRIMARY_SAMPLING_RESAMPLE = 50
-DENSITY_CHECK_RESAMPLE = 25
 FACTORIAL = (
     ("molecular_only", False, False),
     ("molecular_plus_h2_h2_cia", True, False),
@@ -273,7 +267,7 @@ def _run_robert_native(
         for species in MOLECULAR_SPECIES
     }
     first = tables["H2O"]
-    mask = (first.wavelength_micron >= 0.79) & (first.wavelength_micron <= 12.1)
+    mask = (first.wavelength_micron >= 0.3) & (first.wavelength_micron <= 12.1)
     wavelength = np.sort(first.wavelength_micron[mask])
     spectral_grid = SpectralGrid.from_array(
         wavelength, unit="micron", role="opacity", name="stage3-pRT-R1000"
@@ -558,21 +552,10 @@ def _run_external(
     mode: str,
     contract_path: Path,
     output_path: Path,
-    *,
-    sampling_resample: int = PRIMARY_SAMPLING_RESAMPLE,
 ) -> dict[str, np.ndarray]:
     command = [str(python), str(WORKER), mode, str(contract_path), str(output_path)]
     if mode == "picaso_ck":
         command.extend(["--picaso-ck-directory", str(PICASO_CK_DIRECTORY)])
-    elif mode == "picaso_sampling":
-        command.extend(
-            [
-                "--picaso-sampling-database",
-                str(PICASO_SAMPLING_DATABASE),
-                "--picaso-sampling-resample",
-                str(sampling_resample),
-            ]
-        )
     elif mode == "petitradtrans_native":
         command.extend(["--prt-input-data", str(PRT_INPUT_DATA)])
     environment = os.environ.copy()
@@ -590,10 +573,31 @@ def _run_external(
     return _load_npz(output_path)
 
 
+def _close_native_bin_edges(
+    wavelength: np.ndarray, values: np.ndarray, edges: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Close table-centre spectra to physical boundary edges without changing native data."""
+
+    output_wavelength = np.asarray(wavelength)
+    output_values = np.asarray(values)
+    if output_wavelength[0] > edges[0]:
+        output_wavelength = np.concatenate(([edges[0]], output_wavelength))
+        output_values = np.concatenate((output_values[..., :1], output_values), axis=-1)
+    if output_wavelength[-1] < edges[-1]:
+        output_wavelength = np.concatenate((output_wavelength, [edges[-1]]))
+        output_values = np.concatenate((output_values, output_values[..., -1:]), axis=-1)
+    return output_wavelength, output_values
+
+
 def _bin_flux(common: Version2CommonContract, payload: dict[str, np.ndarray]) -> np.ndarray:
-    return flux_conserving_bin_mean(
+    wavelength, flux = _close_native_bin_edges(
         payload["wavelength_micron"],
         payload["flux_w_m2_m"],
+        common.spectral.r100_edges_micron,
+    )
+    return flux_conserving_bin_mean(
+        wavelength,
+        flux,
         common.spectral.r100_edges_micron,
     )
 
@@ -601,9 +605,14 @@ def _bin_flux(common: Version2CommonContract, payload: dict[str, np.ndarray]) ->
 def _bin_contribution(
     common: Version2CommonContract, payload: dict[str, np.ndarray]
 ) -> np.ndarray:
-    binned = flux_conserving_bin_mean(
+    wavelength, vertical = _close_native_bin_edges(
         payload["wavelength_micron"],
         payload["normalized_vertical_diagnostic"],
+        common.spectral.r100_edges_micron,
+    )
+    binned = flux_conserving_bin_mean(
+        wavelength,
+        vertical,
         common.spectral.r100_edges_micron,
     )
     return _normalise_vertical(binned)
@@ -631,22 +640,6 @@ def _difference(
         "max_abs_eclipse_difference_ppm": float(np.max(np.abs(eclipse_ppm))),
         "rms_eclipse_difference_ppm": float(np.sqrt(np.mean(eclipse_ppm**2))),
     }
-
-
-def _sampling_diagnostics(
-    wavelength: np.ndarray, flux: np.ndarray, edges: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
-    counts = np.empty(edges.size - 1, dtype=int)
-    variance = np.empty((flux.shape[0], edges.size - 1))
-    for index, (lower, upper) in enumerate(zip(edges[:-1], edges[1:], strict=True)):
-        selected = (wavelength >= lower) & (
-            (wavelength < upper) if index < edges.size - 2 else (wavelength <= upper)
-        )
-        counts[index] = int(np.sum(selected))
-        variance[:, index] = (
-            np.var(flux[:, selected], axis=1) if counts[index] else np.nan
-        )
-    return counts, variance
 
 
 def _available_memory_bytes() -> int:
@@ -739,15 +732,6 @@ def _save_artifact(
     for name in optional:
         if name in payload:
             arrays[name] = payload[name]
-    if "opacity_sampling" in representation:
-        counts, variance = _sampling_diagnostics(
-            payload["wavelength_micron"],
-            payload["flux_w_m2_m"],
-            common.spectral.r100_edges_micron,
-        )
-        arrays["sample_count_per_r100_bin"] = counts
-        arrays["within_bin_flux_variance"] = variance
-        arrays["smoothing_applied"] = np.array(False)
     np.savez_compressed(path, **arrays)
 
 
@@ -764,12 +748,7 @@ def _integrity_manifest(paths: list[Path]) -> dict[str, Any]:
                     name: {
                         "shape": list(archive[name].shape),
                         "dtype": str(archive[name].dtype),
-                        "finite_policy": (
-                            "NaN_only_for_empty_opacity_sampling_bins_or_declared_unsupported_diagnostics"
-                            if np.issubdtype(archive[name].dtype, np.floating)
-                            and np.any(~np.isfinite(archive[name]))
-                            else "all_finite"
-                        ),
+                        "finite_policy": "all_finite",
                     }
                     for name in archive.files
                 }
@@ -932,12 +911,6 @@ def main() -> None:
             contract_path,
             resolution_root / "petitradtrans_native.npz",
         )
-        sampling = _run_external(
-            PICASO_PYTHON,
-            "picaso_sampling",
-            contract_path,
-            resolution_root / "picaso_sampling.npz",
-        )
         shared = _shared_contract(contract, robert)
         shared_contract_path = resolution_root / "shared_contract.npz"
         np.savez_compressed(shared_contract_path, **shared)
@@ -953,7 +926,6 @@ def main() -> None:
             "robert": robert,
             "picaso_correlated_k": picaso,
             "petitradtrans": prt,
-            "picaso_opacity_sampling": sampling,
             "robert_shared": robert_shared,
             "petitradtrans_shared": prt_shared,
             "shared_contract": shared,
@@ -966,11 +938,6 @@ def main() -> None:
                 "native_correlated_k_resort_rebin_opacity_with_absorbing_formal_reference",
             ),
             ("petitradtrans", prt, "native_correlated_k_plus_factorial_cia"),
-            (
-                "picaso_opacity_sampling",
-                sampling,
-                "native_opacity_sampling_unsmoothed_with_absorbing_formal_reference",
-            ),
             ("robert_shared", robert_shared, "track_a_identical_mean_tau"),
             (
                 "petitradtrans_shared",
@@ -1009,51 +976,6 @@ def main() -> None:
         artifact_paths.append(shared_path)
     matrix_wall = perf_counter() - matrix_started
 
-    density_contract = _subset_contract(primary_contract, pilot_selected)
-    density_contract_path = output_root / "sampling_density_contract.npz"
-    np.savez_compressed(density_contract_path, **density_contract)
-    density = _run_external(
-        PICASO_PYTHON,
-        "picaso_sampling",
-        density_contract_path,
-        output_root / "picaso_sampling_density.npz",
-        sampling_resample=DENSITY_CHECK_RESAMPLE,
-    )
-    primary_sampling = outputs[PRIMARY_RESOLUTION]["picaso_opacity_sampling"]
-    primary_index = int(np.flatnonzero(pilot_selected)[0])
-    counts_primary, variance_primary = _sampling_diagnostics(
-        primary_sampling["wavelength_micron"],
-        primary_sampling["flux_w_m2_m"][[primary_index]],
-        common.spectral.r100_edges_micron,
-    )
-    counts_density, variance_density = _sampling_diagnostics(
-        density["wavelength_micron"],
-        density["flux_w_m2_m"],
-        common.spectral.r100_edges_micron,
-    )
-    density_path = data_root / "stage_3_picaso_sampling_density_check.npz"
-    np.savez_compressed(
-        density_path,
-        case_id=density_contract["case_id"],
-        r100_edges_micron=common.spectral.r100_edges_micron,
-        r100_centers_micron=common.spectral.r100_centers_micron,
-        primary_resample=np.array(PRIMARY_SAMPLING_RESAMPLE),
-        density_resample=np.array(DENSITY_CHECK_RESAMPLE),
-        primary_native_wavelength_micron=primary_sampling["wavelength_micron"],
-        primary_native_flux_w_m2_m=primary_sampling["flux_w_m2_m"][primary_index],
-        primary_r100_flux_w_m2_m=_bin_flux(common, primary_sampling)[primary_index],
-        primary_sample_count_per_r100_bin=counts_primary,
-        primary_within_bin_flux_variance=variance_primary[0],
-        density_native_wavelength_micron=density["wavelength_micron"],
-        density_native_flux_w_m2_m=density["flux_w_m2_m"][0],
-        density_r100_flux_w_m2_m=_bin_flux(common, density)[0],
-        density_sample_count_per_r100_bin=counts_density,
-        density_within_bin_flux_variance=variance_density[0],
-        smoothing_applied=np.array(False),
-        density_metadata_json=density["metadata_json"],
-    )
-    artifact_paths.append(density_path)
-
     per_resolution: dict[str, Any] = {}
     track_a_metrics = []
     for n_cells in RESOLUTIONS:
@@ -1064,7 +986,6 @@ def main() -> None:
                 "robert",
                 "picaso_correlated_k",
                 "petitradtrans",
-                "picaso_opacity_sampling",
                 "robert_shared",
                 "petitradtrans_shared",
             )
@@ -1099,7 +1020,6 @@ def main() -> None:
                     "robert",
                     "picaso_correlated_k",
                     "petitradtrans",
-                    "picaso_opacity_sampling",
                 )
             },
             "raw_runtime_s": {
@@ -1116,7 +1036,6 @@ def main() -> None:
         "robert",
         "picaso_correlated_k",
         "petitradtrans",
-        "picaso_opacity_sampling",
         "robert_shared",
         "petitradtrans_shared",
     )
@@ -1166,11 +1085,6 @@ def main() -> None:
         for name, limit in STAGE_3_ACCEPTANCE_GATES.items()
         if name in observed
     }
-    density_metrics = _difference(
-        _bin_flux(common, primary_sampling)[[primary_index]],
-        _bin_flux(common, density),
-        common,
-    )
     frozen_mmw = float(
         outputs[PRIMARY_RESOLUTION]["contract"]["mean_molecular_weight_u"][0]
     )
@@ -1194,10 +1108,6 @@ def main() -> None:
         "picaso_cia_database": {
             "path": str(PICASO_CIA_DATABASE),
             "sha256": _sha256(PICASO_CIA_DATABASE),
-        },
-        "picaso_opacity_sampling_database": {
-            "path": str(PICASO_SAMPLING_DATABASE),
-            "sha256": _sha256(PICASO_SAMPLING_DATABASE),
         },
         "petitradtrans_assets": {
             name: {"path": str(path), "sha256": _sha256(path)}
@@ -1256,8 +1166,9 @@ def main() -> None:
                 "official PICASO-4 resort-rebin correlated-k opacity with selected "
                 "native CIA and an independently labelled absorbing-formal RT reference"
             ),
-            "picaso_secondary": (
-                "unsmoothed opacity-sampling with selected native CIA and sampling diagnostics"
+            "picaso_secondary": None,
+            "retired_representation": (
+                "opacity sampling is not run under the 0.3--12 micron contract"
             ),
             "robert": "independent pRT-HDF load/interpolation, random overlap, and CIA",
             "petitradtrans": "native stable-pRT correlated-k and selected CIA",
@@ -1268,15 +1179,6 @@ def main() -> None:
         "per_resolution": per_resolution,
         "vertical_convergence": convergence,
         "isothermal_analytic_control": iso_metrics,
-        "picaso_opacity_sampling_density_check": {
-            "case_id": str(density_contract["case_id"][0]),
-            "primary_resample": PRIMARY_SAMPLING_RESAMPLE,
-            "density_resample": DENSITY_CHECK_RESAMPLE,
-            "primary_native_samples": int(primary_sampling["wavelength_micron"].size),
-            "density_native_samples": int(density["wavelength_micron"].size),
-            "r100_difference": density_metrics,
-            "smoothing_applied": False,
-        },
         "pilot": pilot,
         "timings": {
             "pilot_wall_time_s": pilot_wall,
@@ -1319,7 +1221,7 @@ def main() -> None:
             "PICASO exact-omega0=0 native thermal probes remain capability evidence; separately labelled absorbing-formal spectra are the comparison products.",
             "PICASO vertical arrays are absorbing-formal diagnostics applied to native total gas optical depth, not native SH contribution definitions.",
             "Stable pRT does not expose native layer optical-depth tensors through the supported high-level flux interface; spectra and native emission contributions are retained.",
-            "Opacity-sampling output is preserved unsmoothed and is not treated as interchangeable with correlated-k.",
+            "Opacity sampling was retired and is not run under the 0.3--12 micron contract.",
             "Stage-1 continuous-angle sub-0.01 ppm claims remain restricted; its 0.196897 ppm eight-angle result is not reinterpreted.",
             "Stage-2's measured out-of-tolerance, vertically converging Track-A regime remains unchanged and is not reclassified.",
         ],

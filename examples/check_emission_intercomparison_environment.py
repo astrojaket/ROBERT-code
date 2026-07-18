@@ -42,11 +42,15 @@ def _check_robert() -> dict[str, object]:
     }
 
 
-def _check_picaso(reference: Path, database: Path) -> dict[str, object]:
+def _check_picaso(
+    reference: Path, database: Path, ck_directory: Path | None
+) -> dict[str, object]:
     if not reference.is_dir():
         raise FileNotFoundError(f"PICASO reference data not found: {reference}")
-    if not database.is_file():
+    if ck_directory is None and not database.is_file():
         raise FileNotFoundError(f"PICASO opacity database not found: {database}")
+    if ck_directory is not None and not ck_directory.is_dir():
+        raise FileNotFoundError(f"PICASO correlated-k directory not found: {ck_directory}")
     cache_root = Path(tempfile.gettempdir()) / "robert-picaso-cache"
     os.environ.setdefault("NUMBA_CACHE_DIR", str(cache_root / "numba"))
     os.environ.setdefault("MPLCONFIGDIR", str(cache_root / "matplotlib"))
@@ -56,12 +60,23 @@ def _check_picaso(reference: Path, database: Path) -> dict[str, object]:
     from picaso import justdoit as jdi
     from picaso.fluxes import get_thermal_1d
 
-    opacity = jdi.opannection(
-        filename_db=str(database.resolve()),
-        wave_range=[1.0, 1.1],
-        resample=100,
-        verbose=False,
-    )
+    if ck_directory is None:
+        opacity = jdi.opannection(
+            filename_db=str(database.resolve()),
+            wave_range=[1.0, 1.1],
+            resample=100,
+            verbose=False,
+        )
+        representation = "opacity_sampling_legacy_smoke"
+    else:
+        opacity = jdi.opannection(
+            method="resortrebin",
+            ck_db=str(ck_directory.resolve()),
+            preload_gases=["H2O", "CO", "CO2", "CH4"],
+            wave_range=[0.3, 12.0],
+            verbose=False,
+        )
+        representation = "correlated_k_resort_rebin"
     wavenumber = np.linspace(9900.0, 10000.0, 8)
     pressure_cgs = np.array([0.0, 1.0e2, 1.0e4, 1.0e6, 1.0e8])
     temperature_k = np.full(5, 1000.0)
@@ -87,6 +102,7 @@ def _check_picaso(reference: Path, database: Path) -> dict[str, object]:
         "code": "PICASO",
         "version": importlib.metadata.version("picaso"),
         "scipy_version": scipy.__version__,
+        "representation": representation,
         "queried_opacity_points": int(opacity.nwno),
         "finite_positive_thermal_intensity": bool(
             np.isfinite(point_intensity).all() and np.all(point_intensity > 0.0)
@@ -136,13 +152,16 @@ def main() -> None:
     parser.add_argument(
         "--picaso-database", type=Path, default=DEFAULT_PICASO_DATABASE
     )
+    parser.add_argument("--picaso-ck-directory", type=Path)
     parser.add_argument("--prt-input-data", type=Path, default=DEFAULT_PRT_INPUT_DATA)
     args = parser.parse_args()
 
     if args.code == "robert":
         result = _check_robert()
     elif args.code == "picaso":
-        result = _check_picaso(args.picaso_reference, args.picaso_database)
+        result = _check_picaso(
+            args.picaso_reference, args.picaso_database, args.picaso_ck_directory
+        )
     else:
         result = _check_petitradtrans(args.prt_input_data)
     if not all(value is not False for value in result.values()):

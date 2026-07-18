@@ -16,6 +16,11 @@ from typing import Any
 import numpy as np
 
 
+PICASO_PYTHON = Path("/opt/miniconda3/envs/picaso-v4/bin/python")
+PRT_PYTHON = Path("/opt/miniconda3/envs/petitradtrans-stable/bin/python")
+PICASO_REFERENCE = Path("/Users/jaketaylor/Dropbox/picaso-v4/reference")
+
+
 def _load(path: Path) -> dict[str, np.ndarray]:
     with np.load(path, allow_pickle=False) as archive:
         return {name: np.array(archive[name], copy=True) for name in archive.files}
@@ -107,37 +112,67 @@ def _molecular_only_get_opacities(opacity: Any) -> None:
     opacity.get_opacities = molecular_only
 
 
+def _restore_resort_rebin_absolute_vmr(opacity: Any) -> None:
+    """Restore the absolute line-gas VMR discarded by PICASO's mixer."""
+
+    original = opacity.mix_my_opacities_gasesfly
+
+    def absolute_vmr_mixer(atmosphere: Any, exclude_mol: Any = 1) -> Any:
+        result = original(atmosphere, exclude_mol=exclude_mol)
+        total_vmr = np.sum(
+            [
+                atmosphere.layer["mixingratios"][molecule].values
+                for molecule in atmosphere.molecules
+                if exclude_mol == 1 or exclude_mol[molecule] == 1
+            ],
+            axis=0,
+        )
+        opacity.molecular_opa *= total_vmr[:, None, None]
+        return result
+
+    opacity.mix_my_opacities_gasesfly = absolute_vmr_mixer
+
+
+def _validate_picaso_environment() -> dict[str, str]:
+    required = {
+        "picaso_refdata": PICASO_REFERENCE,
+        "NUMBA_CACHE_DIR": None,
+        "MPLCONFIGDIR": None,
+    }
+    resolved: dict[str, str] = {}
+    for name, expected in required.items():
+        raw = os.environ.get(name)
+        if not raw:
+            raise RuntimeError(f"PICASO requires explicit {name}")
+        path = Path(raw)
+        if expected is not None and path.resolve() != expected.resolve():
+            raise RuntimeError(f"{name} must be exactly {expected}")
+        if name != "picaso_refdata" and (not path.is_dir() or not os.access(path, os.W_OK)):
+            raise RuntimeError(f"{name} must name an existing writable directory")
+        resolved[name] = raw
+    return resolved
+
+
 def _picaso(
     contract: dict[str, np.ndarray],
     *,
-    representation: str,
     ck_directory: Path,
-    sampling_database: Path | None,
-    sampling_resample: int,
 ) -> dict[str, np.ndarray]:
+    _validate_picaso_environment()
     import astropy.units as u
     import pandas as pd
     from picaso import justdoit as jdi
 
     species = [str(value) for value in contract["species_name"]]
     preload = list(dict.fromkeys(species))
-    if representation == "correlated_k_resort_rebin":
-        opacity = jdi.opannection(
-            method="resortrebin",
-            ck_db=str(ck_directory),
-            preload_gases=preload,
-            wave_range=[0.79, 12.1],
-            verbose=False,
-        )
-    else:
-        if sampling_database is None:
-            raise ValueError("opacity sampling requires a database")
-        opacity = jdi.opannection(
-            filename_db=str(sampling_database),
-            wave_range=[0.79, 12.1],
-            resample=sampling_resample,
-            verbose=False,
-        )
+    opacity = jdi.opannection(
+        method="resortrebin",
+        ck_db=str(ck_directory),
+        preload_gases=preload,
+        wave_range=[0.3, 12.0],
+        verbose=False,
+    )
+    _restore_resort_rebin_absolute_vmr(opacity)
     _molecular_only_get_opacities(opacity)
     output_flux: list[np.ndarray] = []
     output_native_probe_flux: list[np.ndarray] = []
@@ -245,7 +280,7 @@ def _petitradtrans_native(
         line = line_names[molecule]
         atmosphere = Radtrans(
             pressures=contract["pressure_centers_bar"],
-            wavelength_boundaries=np.array([0.79, 12.1]),
+            wavelength_boundaries=np.array([0.3, 12.1]),
             line_species=[line],
             scattering_in_emission=False,
             emission_angle_grid=np.vstack(
@@ -335,15 +370,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "mode",
-        choices=("picaso_ck", "picaso_sampling", "petitradtrans_native", "petitradtrans_shared"),
+        choices=("picaso_ck", "petitradtrans_native", "petitradtrans_shared"),
     )
     parser.add_argument("contract", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--picaso-ck-directory", type=Path)
-    parser.add_argument("--picaso-sampling-database", type=Path)
-    parser.add_argument("--picaso-sampling-resample", type=int, default=50)
     parser.add_argument("--prt-input-data", type=Path)
     args = parser.parse_args()
+    expected_python = PICASO_PYTHON if args.mode == "picaso_ck" else PRT_PYTHON
+    if os.path.realpath(sys.executable) != os.path.realpath(expected_python):
+        raise RuntimeError(f"{args.mode} must run with {expected_python}")
     contract = _load(args.contract)
     started = perf_counter()
     if args.mode == "picaso_ck":
@@ -351,28 +387,11 @@ def main() -> None:
             parser.error("picaso_ck requires --picaso-ck-directory")
         output = _picaso(
             contract,
-            representation="correlated_k_resort_rebin",
             ck_directory=args.picaso_ck_directory,
-            sampling_database=None,
-            sampling_resample=args.picaso_sampling_resample,
         )
         package = "picaso"
         limitations = [
             "PICASO native resort-rebin opacity is used with an independently labelled absorbing-formal RT reference because the exact-omega0=0 native thermal probe is pathological; the raw native probe is retained separately."
-        ]
-    elif args.mode == "picaso_sampling":
-        if args.picaso_sampling_database is None:
-            parser.error("picaso_sampling requires --picaso-sampling-database")
-        output = _picaso(
-            contract,
-            representation="opacity_sampling",
-            ck_directory=Path("."),
-            sampling_database=args.picaso_sampling_database,
-            sampling_resample=args.picaso_sampling_resample,
-        )
-        package = "picaso"
-        limitations = [
-            "PICASO native opacity-sampling opacity is used with an independently labelled absorbing-formal RT reference because the exact-omega0=0 native thermal probe is pathological; the raw native probe is retained separately."
         ]
     elif args.mode == "petitradtrans_native":
         if args.prt_input_data is None:
@@ -405,6 +424,9 @@ def main() -> None:
         ),
         "limitations": limitations,
     }
+    if package == "picaso":
+        metadata["picaso_environment"] = _validate_picaso_environment()
+        metadata["absolute_line_vmr_restored_after_resort_rebin"] = True
     output["metadata_json"] = np.array(json.dumps(metadata, sort_keys=True))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.output, **output)

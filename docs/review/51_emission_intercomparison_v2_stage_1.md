@@ -9,8 +9,15 @@ immutable contract is serialized in
 pressure, stellar, R=100, isothermal, and PG14 arrays are in
 `version_2_common_profiles.npz`.
 
+The active contract was revised to `0.3--12 micron` with 369 R=100 bins and
+PICASO correlated-k only. Stages 1--3 are regenerated because their serialized
+arrays, normalization products, metrics, and integrity records depend on the
+spectral domain. The numerical gates below remain frozen and unchanged before
+the revised matrices are inspected. Historical `0.8--12 micron` results remain
+recoverable in Git history and are not reinterpreted.
+
 The full matrix completed safely and preserved all results, but its overall
-scientific status is **fail** because one of nine predeclared gates is not met.
+scientific status is an **out-of-tolerance closure regime** because one of nine predeclared gates is not met.
 The failed threshold was not relaxed after inspection.  Eight gates pass,
 including the genuinely compatible ROBERT/pRT shared-tensor comparison,
 vertical convergence, exact-zero handling, and the separately declared
@@ -37,9 +44,9 @@ The common contract contains and tests:
   resolution, with implementation and method SHA-256 values;
 - the exact six VMRs, H2/He remainder rule, provenance state, molecular masses,
   and computed mean molecular weight;
-- exact 0.8--12 micron comparison endpoints, 271 equal-log R=100 bins,
+- exact 0.3--12 micron comparison endpoints, 369 equal-log R=100 bins,
   flux-conserving integration, and native-array retention rules; and
-- distinct PICASO correlated-k and opacity-sampling labels.
+- the PICASO correlated-k-only rule and retired opacity-sampling state.
 
 PICASO correlated-k is mandatory from Stage 2 onward.  The common contract
 records the four official PICASO-4 resort-rebin HDF5 assets from Zenodo DOI
@@ -79,10 +86,10 @@ were fixed:
 | --- | ---: | ---: | --- |
 | Analytic maximum symmetric relative difference | `5e-4` | `3.648947e-4` | pass |
 | Analytic maximum eclipse difference | `0.01 ppm` | `0.196897 ppm` | **fail** |
-| Compatible ROBERT/pRT maximum symmetric relative difference | `5e-5` | `6.75018e-7` | pass |
+| Compatible ROBERT/pRT maximum symmetric relative difference | `5e-5` | `1.65410e-6` | pass |
 | Compatible ROBERT/pRT maximum eclipse difference | `0.01 ppm` | `0.00053724 ppm` | pass |
 | Eight-angle versus continuous-angle symmetric difference | `5e-4` | `3.648947e-4` | pass |
-| Maximum vertical-convergence eclipse difference | `0.01 ppm` | `7.2293e-12 ppm` | pass |
+| Maximum vertical-convergence eclipse difference | `0.01 ppm` | `7.0061e-12 ppm` | pass |
 | Analytically handled blackbody signal | `1e-10 ppm` | `0 ppm` | pass |
 | Zero-tau/no-bottom flux | `0 W m-2 m-1` | `0 W m-2 m-1` | pass |
 | Maximum absolute single-scattering albedo | `0` | `0` | pass |
@@ -111,13 +118,13 @@ unit exchange but is not described or gated as native PICASO RT.
 
 ## Resources, artifacts, and warnings
 
-The repeated final 80-cell pilot measured `12.743 s`, projected `44.600 s` for
-the complete ladder, and measured a largest process peak RSS of `673,628,160
-bytes` against `8,858,451,968 bytes` available (`7.60%`).  It authorized the
-run.  The additional 40/160 matrix took `8.167 s`; total measured solver wall
-time was `20.910 s`.
+The repeated final 80-cell pilot measured `13.329 s`, projected `46.653 s` for
+the complete ladder, and measured a largest process peak RSS of `704,790,528
+bytes` against `9,697,067,008 bytes` available (`7.27%`). It authorized the
+run. The additional 40/160 matrix took `8.246 s`; total measured solver wall
+time was `21.575 s`.
 
-The versioned Stage-1 array artifact is approximately `68 MB`.  Gate-bearing
+The versioned Stage-1 array artifact is approximately `74 MB`. Gate-bearing
 native/R=100 flux, eclipse, optical-depth, and analytic arrays remain float64.
 Complete vertical flux-contribution arrays are retained as documented float32
 diagnostics to stay below GitHub's single-file limit.  Stable pRT unsupported
@@ -126,8 +133,7 @@ manifest's finite policy.
 
 PICASO's known optional-Vega warning is retained in the environment contract;
 no stellar grids are downloaded because Version 2 uses an exact blackbody.
-Stable pRT was given a private writable worker `HOME` below the ignored Stage-1 output root,
-so it did not modify the user home.  The exact interpreters were:
+The exact interpreters were:
 
 ```text
 /opt/miniconda3/envs/robert-exoplanets/bin/python

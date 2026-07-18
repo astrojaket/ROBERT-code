@@ -36,7 +36,7 @@ def test_stage_2_checksums_and_integrity_match_committed_bytes() -> None:
     integrity = json.loads(INTEGRITY.read_text())["artifacts"]
     stage_2_names = {name for name in checksums if name.startswith("stage_2_")}
 
-    assert len(stage_2_names) == 33
+    assert len(stage_2_names) == 37
     for name in stage_2_names:
         path = DATA / name
         assert path.is_file()
@@ -82,7 +82,7 @@ def test_stage_2_shared_and_native_artifacts_retain_complete_fields(
 
     with np.load(DATA / f"stage_2_picaso_{n_cells}_cells.npz") as picaso:
         assert picaso["native_flux_w_m2_m"].shape == (expected_cases, 661)
-        assert picaso["r100_flux_w_m2_m"].shape == (expected_cases, 271)
+        assert picaso["r100_flux_w_m2_m"].shape == (expected_cases, 369)
         assert picaso["layer_tau"].shape == (expected_cases, n_cells, 661, 8)
         assert picaso["normalized_vertical_native"].shape == (
             expected_cases,
@@ -98,22 +98,9 @@ def test_stage_2_shared_and_native_artifacts_retain_complete_fields(
 
     with np.load(DATA / f"stage_2_petitradtrans_{n_cells}_cells.npz") as prt:
         assert prt["native_flux_w_m2_m"].shape[0] == expected_cases
-        assert prt["r100_flux_w_m2_m"].shape == (expected_cases, 271)
+        assert prt["r100_flux_w_m2_m"].shape == (expected_cases, 369)
         assert prt["normalized_vertical_native"].shape[1] == n_cells
         assert "layer_tau" not in prt.files
-
-
-@pytest.mark.parametrize("n_cells", RESOLUTIONS)
-def test_stage_2_opacity_sampling_is_unsmoothed_and_diagnosed(n_cells: int) -> None:
-    path = DATA / f"stage_2_picaso_opacity_sampling_{n_cells}_cells.npz"
-    with np.load(path) as archive:
-        assert archive["native_flux_w_m2_m"].shape == (12, 819)
-        assert archive["r100_flux_w_m2_m"].shape == (12, 271)
-        assert archive["sample_count_per_r100_bin"].shape == (271,)
-        assert archive["within_bin_flux_variance"].shape == (12, 271)
-        assert int(np.sum(archive["sample_count_per_r100_bin"])) == 813
-        assert archive["smoothing_applied"].item() is False
-        assert np.any(archive["within_bin_flux_variance"] > 0.0)
 
 
 def test_stage_2_exact_compositions_profiles_and_artifact_sharding() -> None:
@@ -139,12 +126,12 @@ def test_stage_2_exact_compositions_profiles_and_artifact_sharding() -> None:
             assert archive["pressure_centers_bar"].shape == (80,)
             assert archive["temperature_cells_k"].shape[1] == 80
     assert largest_robert_artifact < 100 * 1024 * 1024
+    for path in DATA.glob("stage_2_robert_*_160_cells.npz"):
+        assert path.stat().st_size < 100_000_000
 
 
-def test_stage_2_sampling_density_product_retains_both_native_spectra() -> None:
-    with np.load(DATA / "stage_2_picaso_sampling_density_check.npz") as archive:
-        assert archive["primary_native_wavelength_micron"].size == 819
-        assert archive["density_native_wavelength_micron"].size == 1638
-        assert archive["primary_r100_flux_w_m2_m"].shape == (271,)
-        assert archive["density_r100_flux_w_m2_m"].shape == (271,)
-        assert archive["smoothing_applied"].item() is False
+def test_stage_2_opacity_sampling_products_are_retired() -> None:
+    assert not list(DATA.glob("stage_2_picaso_opacity_sampling_*.npz"))
+    assert not (DATA / "stage_2_picaso_sampling_density_check.npz").exists()
+    report = json.loads(REPORT.read_text())
+    assert report["track_b_scope"]["picaso_secondary"] is None

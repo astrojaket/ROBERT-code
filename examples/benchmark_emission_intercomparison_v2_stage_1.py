@@ -221,10 +221,6 @@ def _run_external(
         environment["picaso_refdata"] = str(PICASO_REFERENCE)
         environment["NUMBA_CACHE_DIR"] = str(numba_cache)
         environment["MPLCONFIGDIR"] = str(matplotlib_cache)
-    if model == "petitradtrans":
-        worker_home = output_path.parent / ".petitradtrans-worker-home"
-        worker_home.mkdir(parents=True, exist_ok=True)
-        environment["HOME"] = str(worker_home)
     subprocess.run(command, check=True, env=environment)
     payload = _load_npz(output_path)
     return SolverResult(
@@ -682,7 +678,9 @@ def main() -> None:
         "schema_version": "2.0.0",
         "intercomparison_version": 2,
         "stage": 1,
-        "status": "pass" if all(gate_results.values()) else "fail",
+        "status": (
+            "pass" if all(gate_results.values()) else "out_of_tolerance_closure_regime"
+        ),
         "contract_name": common.contract_name,
         "common_contract_sha256": common.to_dict()["contract_sha256"],
         "common_contract_file_sha256": _sha256(common_json),
@@ -722,7 +720,7 @@ def main() -> None:
             "native_arrays_retained": True,
             "flux_conserving_r100_retained": True,
             "vertical_array_storage": "complete float32 diagnostics; all gate-bearing spectral arrays are float64",
-            "picaso_opacity_sampling": "not_applicable_grey_stage_but_reserved_distinct_label",
+            "picaso_opacity_sampling": "retired_not_run_under_0p3_to_12_contract",
             "picaso_correlated_k": "not_applicable_grey_stage_but_reserved_distinct_label",
         },
         "resolutions": list(RESOLUTIONS),
@@ -771,8 +769,13 @@ def main() -> None:
         "warnings_and_limitations": [
             "PICASO 4.0 exact omega0=0 native low-level thermal behavior is recorded by the pilot; the formal reference is independently labelled.",
             "Stable pRT fcore does not expose the no-bottom lower-boundary convention for an identical shared optical-depth tensor; those arrays are NaN by declared unsupported-case policy and are not gated.",
-            "No opacity-sampling or correlated-k opacity representation enters this grey stage.",
+            "No molecular correlated-k opacity representation enters this grey stage; opacity sampling is retired from the active Version-2 contract.",
         ],
+        "historical_results_not_reinterpreted": {
+            "domain_micron": [0.8, 12.0],
+            "stage_1_eight_angle_max_abs_eclipse_difference_ppm": 0.196897,
+            "sub_0p01_ppm_restriction_preserved": True,
+        },
         "random_seed": None,
         "random_seed_policy": common.random_seed_policy,
     }

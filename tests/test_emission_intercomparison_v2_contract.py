@@ -72,7 +72,7 @@ def test_derived_wasp17_quantities_are_frozen(contract: Version2CommonContract) 
 def test_blackbody_has_explicit_units_and_stable_limits(
     contract: Version2CommonContract,
 ) -> None:
-    wavelength = np.array([0.8, 12.0, 1.0e5])
+    wavelength = np.array([0.3, 12.0, 1.0e5])
     temperature = 6550.0
     flux = planck_surface_flux_w_m2_m(wavelength, temperature)
     rayleigh_jeans = (
@@ -151,8 +151,9 @@ def test_r100_grid_edges_and_flux_conservation(contract: Version2CommonContract)
     )
     widths = np.diff(spectral.r100_edges_micron)
 
-    assert spectral.r100_edges_micron[0] == 0.8
+    assert spectral.r100_edges_micron[0] == 0.3
     assert spectral.r100_edges_micron[-1] == 12.0
+    assert spectral.r100_centers_micron.size == 369
     assert np.all(np.diff(spectral.r100_edges_micron) > 0.0)
     assert np.sum(binned * widths) == pytest.approx(
         np.trapezoid(linear, wavelength), rel=2e-14
@@ -182,7 +183,7 @@ def test_picaso_correlated_k_assets_and_environment_are_frozen(
         "correlated_k_resort_rebin"
     )
     assert opacity["picaso_opacity_sampling_role"] == (
-        "secondary_representation_diagnostic_only"
+        "retired_not_run_under_0p3_to_12_contract"
     )
     assert opacity["asset_family"]["zenodo_doi"] == "10.5281/zenodo.18644980"
     assert opacity["asset_family"]["covers_version_2_domain"] is True
@@ -191,6 +192,9 @@ def test_picaso_correlated_k_assets_and_environment_are_frozen(
     assert environment["versions"]["picaso"] == "4.0"
     assert environment["correlated_k_smoke"]["status"] == "pass"
     assert environment["correlated_k_smoke"]["taugas_shape"] == [40, 661, 8]
+    assert environment["correlated_k_smoke"][
+        "finite_positive_bins_in_frozen_domain"
+    ] == 613
     assert environment["reference"]["official_git_commit"] == (
         "0369089372f748609dd0233e6de9361af31a38cf"
     )

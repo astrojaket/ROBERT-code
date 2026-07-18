@@ -52,11 +52,11 @@ def test_stage_1_checksums_and_manifest_match_committed_bytes() -> None:
         assert integrity["artifacts"][path.name]["sha256"] == _sha256(path)
 
 
-def test_stage_1_report_preserves_predeclared_failure_and_capability_limits() -> None:
+def test_stage_1_report_preserves_predeclared_gates_and_capability_limits() -> None:
     report = json.loads(REPORT.read_text())
     failed = [name for name, passed in report["gate_results"].items() if not passed]
 
-    assert report["status"] == "fail"
+    assert report["status"] == "out_of_tolerance_closure_regime"
     assert failed == ["analytic_max_abs_eclipse_difference_ppm"]
     assert report["observed_gate_values"][failed[0]] > report[
         "predeclared_acceptance_gates"

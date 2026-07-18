@@ -106,7 +106,7 @@ def test_stage_3_checksums_and_integrity_match_all_committed_bytes() -> None:
     integrity = json.loads(INTEGRITY.read_text())["artifacts"]
     stage_3_names = {name for name in checksums if name.startswith("stage_3_")}
 
-    assert len(stage_3_names) == 24
+    assert len(stage_3_names) == 20
     assert set(integrity) == stage_3_names - {INTEGRITY.name}
     for name in stage_3_names:
         path = DATA / name
@@ -159,33 +159,29 @@ def test_stage_3_archives_preserve_factorial_spectra_and_vertical_shapes(
     n_cells: int,
 ) -> None:
     archives = {
-        "robert_shared": (2728, DATA / f"stage_3_robert_shared_{n_cells}_cells.npz"),
+        "robert_shared": (3696, DATA / f"stage_3_robert_shared_{n_cells}_cells.npz"),
         "petitradtrans_shared": (
-            2728,
+            3696,
             DATA / f"stage_3_petitradtrans_shared_{n_cells}_cells.npz",
         ),
-        "robert": (2728, DATA / f"stage_3_robert_{n_cells}_cells.npz"),
+        "robert": (3696, DATA / f"stage_3_robert_{n_cells}_cells.npz"),
         "picaso": (661, DATA / f"stage_3_picaso_{n_cells}_cells.npz"),
         "petitradtrans": (
-            2728,
+            3697,
             DATA / f"stage_3_petitradtrans_{n_cells}_cells.npz",
-        ),
-        "picaso_sampling": (
-            819,
-            DATA / f"stage_3_picaso_opacity_sampling_{n_cells}_cells.npz",
         ),
     }
     for _name, (n_native, path) in archives.items():
         with np.load(path, allow_pickle=False) as archive:
             _assert_factorial_and_composition(archive, n_cells)
             assert archive["native_flux_w_m2_m"].shape == (8, n_native)
-            assert archive["r100_flux_w_m2_m"].shape == (8, 271)
+            assert archive["r100_flux_w_m2_m"].shape == (8, 369)
             assert archive["normalized_vertical_native"].shape == (
                 8,
                 n_cells,
                 n_native,
             )
-            assert archive["normalized_vertical_r100"].shape == (8, n_cells, 271)
+            assert archive["normalized_vertical_r100"].shape == (8, n_cells, 369)
 
 
 @pytest.mark.parametrize("n_cells", RESOLUTIONS)
@@ -196,17 +192,17 @@ def test_stage_3_shared_tau_reconstructs_from_frozen_components(n_cells: int) ->
         assert archive["molecular_layer_tau_by_profile"].shape == (
             2,
             n_cells,
-            2728,
+            3696,
         )
         assert archive["cia_h2_h2_layer_tau_by_profile"].shape == (
             2,
             n_cells,
-            2728,
+            3696,
         )
         assert archive["cia_h2_he_layer_tau_by_profile"].shape == (
             2,
             n_cells,
-            2728,
+            3696,
         )
         reconstructed = []
         for profile_index, _profile in enumerate(PROFILES):
@@ -235,18 +231,18 @@ def test_stage_3_robert_retains_full_component_tau_tensors(n_cells: int) -> None
         assert robert["molecular_layer_tau_by_profile"].shape == (
             2,
             n_cells,
-            2728,
+            3696,
             16,
         )
         assert robert["cia_h2_h2_layer_tau_by_profile"].shape == (
             2,
             n_cells,
-            2728,
+            3696,
         )
         assert robert["cia_h2_he_layer_tau_by_profile"].shape == (
             2,
             n_cells,
-            2728,
+            3696,
         )
         collapsed = np.sum(
             robert["molecular_layer_tau_by_profile"]
@@ -304,44 +300,11 @@ def test_stage_3_stable_prt_does_not_invent_native_tau(n_cells: int) -> None:
         )
 
 
-@pytest.mark.parametrize("n_cells", RESOLUTIONS)
-def test_stage_3_opacity_sampling_is_unsmoothed_and_diagnostic(n_cells: int) -> None:
-    with np.load(
-        DATA / f"stage_3_picaso_opacity_sampling_{n_cells}_cells.npz",
-        allow_pickle=False,
-    ) as archive:
-        assert archive["native_wavelength_micron"].shape == (819,)
-        assert archive["sample_count_per_r100_bin"].shape == (271,)
-        assert np.all(archive["sample_count_per_r100_bin"] > 0)
-        assert archive["within_bin_flux_variance"].shape == (8, 271)
-        assert np.all(np.isfinite(archive["within_bin_flux_variance"]))
-        assert np.all(archive["within_bin_flux_variance"] > 0.0)
-        assert not bool(archive["smoothing_applied"])
-        metadata = json.loads(str(archive["metadata_json"]))
-        assert metadata["representation"] == "secondary_opacity_sampling_unsmoothed"
-
-
-def test_stage_3_opacity_sampling_density_check_is_retained_unsmoothed() -> None:
-    with np.load(
-        DATA / "stage_3_picaso_sampling_density_check.npz", allow_pickle=False
-    ) as archive:
-        assert archive["case_id"].tolist() == [
-            "pg14_non_inverted_molecular_plus_h2_h2_and_h2_he_cia_80_cells"
-        ]
-        assert int(archive["primary_resample"]) == 50
-        assert int(archive["density_resample"]) == 25
-        assert archive["primary_native_wavelength_micron"].shape == (819,)
-        assert archive["density_native_wavelength_micron"].shape == (1638,)
-        assert archive["primary_sample_count_per_r100_bin"].shape == (271,)
-        assert archive["density_sample_count_per_r100_bin"].shape == (271,)
-        assert archive["primary_within_bin_flux_variance"].shape == (271,)
-        assert archive["density_within_bin_flux_variance"].shape == (271,)
-        assert not bool(archive["smoothing_applied"])
-
-    report = json.loads(REPORT.read_text())["picaso_opacity_sampling_density_check"]
-    assert report["primary_native_samples"] == 819
-    assert report["density_native_samples"] == 1638
-    assert report["smoothing_applied"] is False
+def test_stage_3_opacity_sampling_products_are_retired() -> None:
+    assert not list(DATA.glob("stage_3_picaso_opacity_sampling_*.npz"))
+    assert not (DATA / "stage_3_picaso_sampling_density_check.npz").exists()
+    report = json.loads(REPORT.read_text())
+    assert report["track_b_scope"]["picaso_secondary"] is None
 
 
 def test_stage_3_capability_boundaries_remain_explicit() -> None:
@@ -352,6 +315,6 @@ def test_stage_3_capability_boundaries_remain_explicit() -> None:
     assert any("exact-zero cloud/Rayleigh" in item for item in boundaries)
     assert any("exact-omega0=0 shared-tensor RT remains unsupported" in item for item in boundaries)
     assert any("Stable pRT does not expose native layer optical-depth" in item for item in boundaries)
-    assert any("preserved unsmoothed" in item for item in boundaries)
+    assert any("retired" in item for item in boundaries)
     assert any("0.196897 ppm" in item for item in boundaries)
     assert any("Stage-2's measured out-of-tolerance" in item for item in boundaries)

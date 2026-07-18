@@ -222,7 +222,7 @@ class SpectralContract:
     r100_centers_micron: NDArray[np.float64]
     native_reference_wavelength_micron: NDArray[np.float64]
     resolving_power: float = 100.0
-    wavelength_min_micron: float = 0.8
+    wavelength_min_micron: float = 0.3
     wavelength_max_micron: float = 12.0
 
     def __post_init__(self) -> None:
@@ -234,7 +234,9 @@ class SpectralContract:
         if edges.size != centers.size + 1:
             raise RobertValidationError("R=100 edges and centers have inconsistent shapes")
         if edges[0] != self.wavelength_min_micron or edges[-1] != self.wavelength_max_micron:
-            raise RobertValidationError("R=100 edges must cover exactly 0.8--12 micron")
+            raise RobertValidationError(
+                "R=100 edges must cover the exact declared wavelength domain"
+            )
         if not np.all(np.diff(edges) > 0.0) or not np.all(np.diff(native) > 0.0):
             raise RobertValidationError("wavelength arrays must be strictly increasing")
         np.testing.assert_allclose(centers, np.sqrt(edges[:-1] * edges[1:]), rtol=1e-14)
@@ -259,11 +261,15 @@ class SpectralContract:
             "binning": "piecewise-linear flux-conserving wavelength integration",
             "native_spectrum_retention_required": True,
             "native_vertical_array_retention_required": True,
-            "picaso_representations": {
-                "opacity_sampling": "picaso_opacity_sampling_native_and_flux_conserving_r100",
-                "correlated_k": "picaso_correlated_k_native_and_flux_conserving_r100",
-                "interchangeable": False,
+            "picaso_representation": {
+                "correlated_k": "picaso_4_resort_rebin_native_and_flux_conserving_r100",
+                "opacity_sampling": "retired_not_run_under_this_contract",
             },
+            "native_lower_edge_closure": (
+                "when a correlated-k table stores a first bin centre above 0.3 micron, "
+                "its first native value closes that bin to its physical 0.3 micron edge "
+                "for R=100 integration; no synthetic point is stored as native data"
+            ),
         }
 
     @classmethod
@@ -407,7 +413,7 @@ class Version2CommonContract:
             "spectral_contract": self.spectral.to_dict(),
             "opacity_contract": {
                 "picaso_primary_molecular_representation_from_stage_2": "correlated_k_resort_rebin",
-                "picaso_opacity_sampling_role": "secondary_representation_diagnostic_only",
+                "picaso_opacity_sampling_role": "retired_not_run_under_0p3_to_12_contract",
                 "picaso_correlated_k_assets": {
                     name: asset.to_dict()
                     for name, asset in self.picaso_correlated_k_assets.items()
@@ -462,7 +468,8 @@ class Version2CommonContract:
                         "k_points": 8,
                         "layers": 40,
                         "taugas_shape": [40, 661, 8],
-                        "finite_positive_bins_in_0p8_to_12_micron": 583,
+                        "frozen_domain_micron": [0.3, 12.0],
+                        "finite_positive_bins_in_frozen_domain": 613,
                         "scattering": False,
                         "rayleigh": False,
                         "delta_eddington": False,
@@ -591,9 +598,9 @@ def flux_conserving_bin_mean(
 
 
 def _r100_grid() -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    n_bins = int(np.ceil(100.0 * np.log(12.0 / 0.8)))
-    edges = np.geomspace(0.8, 12.0, n_bins + 1)
-    edges[0] = 0.8
+    n_bins = int(np.ceil(100.0 * np.log(12.0 / 0.3)))
+    edges = np.geomspace(0.3, 12.0, n_bins + 1)
+    edges[0] = 0.3
     edges[-1] = 12.0
     return edges, np.sqrt(edges[:-1] * edges[1:])
 
@@ -742,7 +749,7 @@ def build_version_2_common_contract() -> Version2CommonContract:
     }
     r100_edges, r100_centers = _r100_grid()
     native = np.unique(
-        np.concatenate((np.geomspace(0.8, 12.0, 4097), r100_edges))
+        np.concatenate((np.geomspace(0.3, 12.0, 4097), r100_edges))
     )
     spectral = SpectralContract(r100_edges, r100_centers, native)
     stellar_native = planck_surface_flux_w_m2_m(native, stellar_temperature)

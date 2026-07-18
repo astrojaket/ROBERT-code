@@ -15,6 +15,10 @@ from time import perf_counter
 import numpy as np
 
 
+PICASO_PYTHON = Path("/opt/miniconda3/envs/picaso-v4/bin/python")
+PRT_PYTHON = Path("/opt/miniconda3/envs/petitradtrans-stable/bin/python")
+PICASO_REFERENCE = Path("/Users/jaketaylor/Dropbox/picaso-v4/reference")
+
 _CACHE_ROOT = Path(tempfile.gettempdir()) / "robert-emission-intercomparison-v2"
 os.environ.setdefault("NUMBA_CACHE_DIR", str(_CACHE_ROOT / "numba"))
 os.environ.setdefault("MPLCONFIGDIR", str(_CACHE_ROOT / "matplotlib"))
@@ -107,6 +111,13 @@ def _petitradtrans(contract: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndar
 def _picaso_exact_zero_probe(contract: dict[str, np.ndarray]) -> dict[str, object]:
     """Probe, but do not use, the PICASO exact-zero scattering interface."""
 
+    if Path(os.environ.get("picaso_refdata", "")).resolve() != PICASO_REFERENCE:
+        raise RuntimeError(f"picaso_refdata must be exactly {PICASO_REFERENCE}")
+    for name in ("NUMBA_CACHE_DIR", "MPLCONFIGDIR"):
+        path = Path(os.environ.get(name, ""))
+        if not path.is_dir() or not os.access(path, os.W_OK):
+            raise RuntimeError(f"{name} must name an existing writable directory")
+
     from picaso.fluxes import get_thermal_1d
 
     selected = int(np.flatnonzero(contract["bottom_boundary"] == "blackbody")[0])
@@ -154,6 +165,9 @@ def main() -> None:
     parser.add_argument("output", type=Path)
     parser.add_argument("--probe-native-picaso", action="store_true")
     args = parser.parse_args()
+    expected_python = PICASO_PYTHON if args.model == "picaso" else PRT_PYTHON
+    if os.path.realpath(os.sys.executable) != os.path.realpath(expected_python):
+        raise RuntimeError(f"{args.model} must run with {expected_python}")
     contract = _load(args.contract)
     started = perf_counter()
     if args.model == "picaso":

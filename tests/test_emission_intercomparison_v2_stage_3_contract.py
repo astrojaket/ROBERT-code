@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -23,6 +24,13 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC is not None and SPEC.loader is not None
 stage_3 = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(stage_3)
+WORKER_SPEC = importlib.util.spec_from_file_location(
+    "run_emission_intercomparison_v2_stage_3_external",
+    ROOT / "examples/run_emission_intercomparison_v2_stage_3_external.py",
+)
+assert WORKER_SPEC is not None and WORKER_SPEC.loader is not None
+stage_3_worker = importlib.util.module_from_spec(WORKER_SPEC)
+WORKER_SPEC.loader.exec_module(stage_3_worker)
 
 RESOLUTIONS = (40, 80, 160)
 PROFILES = ("isothermal", "pg14_non_inverted")
@@ -139,3 +147,38 @@ def test_stage_3_acceptance_gates_are_frozen_before_matrix_execution() -> None:
         "pilot_projected_wall_time_max_s": 7200.0,
         "pilot_peak_rss_fraction_of_available_max": 0.60,
     }
+
+
+def test_picaso_resort_rebin_restores_absolute_four_molecule_vmr() -> None:
+    class FakeOpacity:
+        def __init__(self) -> None:
+            self.molecular_opa = np.empty((2, 3, 4))
+
+        def mix_my_opacities_gasesfly(
+            self, atmosphere: object, exclude_mol: object = 1
+        ) -> str:
+            self.molecular_opa.fill(1.0)
+            return "mixed"
+
+    vmr = {
+        "H2O": np.array([3.0e-4, 4.0e-4]),
+        "CO": np.array([4.0e-4, 5.0e-4]),
+        "CO2": np.array([2.0e-7, 3.0e-7]),
+        "CH4": np.array([1.0e-7, 2.0e-7]),
+    }
+    atmosphere = SimpleNamespace(
+        molecules=list(vmr),
+        layer={
+            "mixingratios": {
+                name: SimpleNamespace(values=values) for name, values in vmr.items()
+            }
+        },
+    )
+    opacity = FakeOpacity()
+    stage_3_worker._restore_resort_rebin_absolute_vmr(opacity)
+
+    assert opacity.mix_my_opacities_gasesfly(atmosphere) == "mixed"
+    expected = np.sum(list(vmr.values()), axis=0)
+    np.testing.assert_array_equal(
+        opacity.molecular_opa, expected[:, None, None] * np.ones((2, 3, 4))
+    )

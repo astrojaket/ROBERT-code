@@ -196,7 +196,7 @@ separately labelled attribution track.
 
 ## Spectral and opacity contract
 
-- Primary comparison range: `0.8--12 micron`.
+- Primary comparison range: `0.3--12 micron`.
 - Primary delivered grid: constant resolving power `R = 100`, with explicit
   edges and flux-conserving integration.
 - Native-resolution wavelength, spectrum, opacity, and contribution/response
@@ -207,23 +207,16 @@ separately labelled attribution track.
   genuinely shared opacity contract is possible.  Native opacity databases
   remain an attribution track rather than an agreement gate.
 
-### PICASO opacity-sampling warning
+The exact endpoints define 369 equal-log R=100 bins. For correlated-k tables
+whose first stored value is the centre of a bin bounded below by `0.3 micron`,
+that first native value closes only the R=100 integration to the physical
+lower edge. The stored native spectrum remains unchanged and no synthetic
+point is labelled as native data.
 
-PICASO opacity-sampling and correlated-k outputs are different numerical
-products and must never be presented as interchangeable.  In the established
-workflow, directly binning a finite PICASO opacity-sampling spectrum to R=100
-can leave strong jagged bin-to-bin fluctuations, whereas the corresponding
-correlated-k result is smooth.  Version 2 treats that behaviour as a declared
-representation/sampling diagnostic, not as noise to hide.
-
-For every PICASO opacity-sampling run, preserve the native sampled spectrum,
-the flux-conserving R=100 product, sample counts per output bin, within-bin
-variance where available, and at least one sampling-density convergence check
-for representative cases.  Do not smooth, spline away, or selectively omit
-the fluctuations.  Label correlated-k R=100 spectra independently.  A jagged
-opacity-sampling R=100 spectrum is not by itself evidence of a radiative-
-transfer solver failure, and an opacity-sampling/correlated-k difference is
-not a shared-opacity closure result.
+PICASO opacity sampling is retired from the active Version-2 contract. It is
+not run, plotted, gated, or used as an alternate molecular path. Historical
+opacity-sampling products remain recoverable from Git history but are not
+active artifacts under the `0.3--12 micron` contract.
 
 ### PICASO molecular correlated-k decision
 
@@ -232,15 +225,15 @@ official PICASO-4 resort-rebin correlated-k family from Zenodo
 `10.5281/zenodo.18644980`, Version 2.  The frozen H2O, CO, CO2, and CH4 asset
 filenames, SHA-256 checksums, common 661-bin/eight-double-Gauss representation,
 20-by-73 pressure-temperature coverage, and source provenance are serialized in
-`version_2/common_contract.json`.  PICASO opacity sampling remains a secondary,
-separately labelled representation diagnostic.
+`version_2/common_contract.json`. PICASO resort-rebin correlated-k is the only
+active PICASO molecular representation.
 
 Version 2 uses the process-isolated PICASO 4.0 / Python 3.11.15 interpreter at
 `/opt/miniconda3/envs/picaso-v4/bin/python`.  Its reference tree is
 `/Users/jaketaylor/Dropbox/picaso-v4/reference`.  Workers set `picaso_refdata`
 to that path and set writable task-local `NUMBA_CACHE_DIR` and `MPLCONFIGDIR`
 before importing PICASO.  The four-molecule resort-rebin correlated-k smoke
-passes over all 583 bins in the frozen domain.  The historical PICASO 3.2.2
+passes over all 613 native bins in the frozen domain. The historical PICASO 3.2.2
 interpreter remains unchanged for Version 1 and must not be used for Version-2
 molecular work.
 
@@ -314,11 +307,9 @@ Do not substitute `1e-4` or other round-number abundances.
 
 Stage 2 is complete.  The frozen matched ROBERT/pRT Track-A limits identify an
 out-of-tolerance, vertically converging closure regime: maximum eclipse-depth
-differences decrease from `10.083885 ppm` at 40 cells to `2.541600 ppm` at 80
-and `0.636478 ppm` at 160.  The isothermal analytic controls remain below
-`0.002510 ppm`.  Track B retains native opacity representation differences
-without cross-framework gates; PICASO resort-rebin is primary and its
-finite-sampling opacity-sampling diagnostic is preserved unsmoothed.  See
+differences decrease from `10.150094 ppm` at 40 cells to `2.558145 ppm` at 80
+and `0.640615 ppm` at 160. The isothermal analytic controls remain below
+`0.001044 ppm`. Track B uses PICASO resort-rebin correlated-k only. See
 `docs/review/52_emission_intercomparison_v2_stage_2.md` and
 `docs/data/emission_intercomparison/version_2/stage_2_report.json`.
 
@@ -334,29 +325,27 @@ their exact frozen solar-derived common-contract abundances in every case, while
 H2--He CIA form a `2 x 2` on/off factorial.  The frozen `1755 K` isothermal and
 PG14 non-inverted arrays were supplied identically on 40, 80, and 160 cells,
 with 80 cells primary.  The representative 80-cell line-plus-both-CIA pilot
-measured `12.825173 s`, projected `461.706212 s`, and used at most
-`3,952,787,456 bytes`, or `39.52%` of available memory, authorizing the full
-matrix.  The post-pilot matrix took `192.703337 s`.
+measured `12.215756 s`, projected `439.767203 s`, and used at most
+`4,149,035,008 bytes`, or `34.18%` of available memory, authorizing the full
+matrix. The post-pilot matrix took `166.935993 s`.
 
 The matched ROBERT/stable-pRT Track-A limits again identify an
 out-of-tolerance, vertically converging closure regime rather than a framework
-failure.  Maximum eclipse-depth differences decrease from `7.129640 ppm` at 40
-cells to `1.792972 ppm` at 80 and `0.448767 ppm` at 160; the largest Track-A
-80-to-160 change is `0.769169 ppm`.  The isothermal analytic controls remain
-below `0.002510 ppm`, and exact-zero scattering is preserved.  These results do
+failure. Maximum eclipse-depth differences decrease from `7.110565 ppm` at 40
+cells to `1.788100 ppm` at 80 and `0.447547 ppm` at 160; the largest Track-A
+80-to-160 change is `0.769349 ppm`. The isothermal analytic controls remain
+below `0.001044 ppm`, and exact-zero scattering is preserved. These results do
 not alter Stage 1's `0.196897 ppm` eight-angle result or permit sub-`0.01 ppm`
 continuous-angle claims, and they do not reinterpret Stage 2's measured
 out-of-tolerance vertical regime.
 
 Track B is native database/interpolation/representation attribution only and
 has no cross-framework gate.  At 80 cells the maximum native R=100 difference
-is `6.470394 ppm` between ROBERT and stable pRT and about `658.9 ppm` for pairs
-involving PICASO correlated-k.  The PG14 both-CIA versus molecular-only effect
-is `43.398931 ppm` in ROBERT, `43.674657 ppm` in stable pRT, and
-`0.000327 ppm` in PICASO, exposing a native CIA-representation effect rather
-than an RT failure.  PICASO resort-rebin remains primary; opacity sampling is
-secondary and unsmoothed, with its 819/1638-sample density check differing by
-`214.295213 ppm`.  PICASO's exact-`omega0=0` native probes and vertical arrays
+is `6.499018 ppm` between ROBERT and stable pRT and at most `74.539002 ppm` for
+pairs involving PICASO correlated-k. The PG14 both-CIA versus molecular-only
+effect is `43.387801 ppm` in ROBERT, `43.656935 ppm` in stable pRT, and
+`45.501171 ppm` in PICASO after restoring the absolute four-molecule VMR in
+PICASO's normalized resort-rebin mixer. PICASO's exact-`omega0=0` native probes and vertical arrays
 remain capability evidence and absorbing-formal diagnostics respectively;
 stable pRT still exposes no supported native layer optical-depth tensor.  See
 `docs/review/53_emission_intercomparison_v2_stage_3.md` and
@@ -431,9 +420,8 @@ Stage-7/8 maps and retrieves only parameters present in the injection.
 Use noiseless means plus deterministic noise ensembles at `30`, `60`, and
 `100 ppm`, frozen priors/transforms/likelihoods, and explicit failure reporting.
 Stage 9 is prepared and smoke-tested locally; the full sampler matrix is a
-cluster job after measured timing/memory pilots.  PICASO opacity-sampling and
-correlated-k injections are separate labelled experiments so sampling
-jaggedness cannot masquerade as retrieval bias from the RT solver.
+cluster job after measured timing/memory pilots. All active PICASO injections
+use the frozen resort-rebin correlated-k representation.
 
 ## Required products for every Version-2 stage
 
@@ -469,7 +457,7 @@ read the canonical roadmap, environment record, preceding Version-2 reviews,
 and the implementations/tests relevant to this stage. The Version-2 document
 is the controlling scientific contract. Do not change the frozen WASP-17
 system, blackbody star, solar-like VMRs, PG14 arrays/parameters, 40/80/160
-pressure grids, 0.8--12 micron comparison domain, or R=100 product definition
+pressure grids, 0.3--12 micron comparison domain, or R=100 product definition
 inside a stage. Propose any required contract revision separately before
 running results.
 
@@ -498,10 +486,8 @@ ROBERT worktree change. Preserve all Version-1 files and write Version-2 data
 only beneath the declared version_2 namespaces.
 
 Preserve native-resolution arrays as well as flux-conserving R=100 products.
-Keep PICASO opacity-sampling and correlated-k paths separately labelled. Never
-smooth away the known jagged R=100 appearance of finite opacity-sampling output;
-record sampling diagnostics and interpret it as a representation effect unless
-a matched test demonstrates an RT discrepancy.
+Use only the frozen PICASO-4 resort-rebin correlated-k path for active
+Version-2 molecular work. Do not regenerate opacity-sampling products.
 
 Record interpreter/package/data versions, known warnings, exact contracts and
 definitions, checksums, timings, and peak resident memory. Pilot any large
@@ -539,9 +525,9 @@ stages. It must contain and validate:
   plus versioned evaluated arrays and implementation/method checksums;
 - the exact six-species VMR mapping, sum-to-one/background-fill rule,
   provenance state, molecular masses, and mean molecular weight;
-- the 0.8--12 micron flux-conserving R=100 grid and native-spectrum retention
+- the 0.3--12 micron flux-conserving R=100 grid and native-spectrum retention
   requirements;
-- distinct PICASO opacity-sampling and correlated-k representation labels.
+- the PICASO correlated-k-only rule and retired opacity-sampling state.
 
 Add focused tests for source-to-SI values, derived quantities, blackbody limits
 and units, VMR sum/MMW, PG14 shape and reproducibility, pressure mappings,

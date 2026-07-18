@@ -221,6 +221,27 @@ def _filter_picaso_continuum(
     opacity.get_opacities = selected_continuum
 
 
+def _restore_resort_rebin_absolute_vmr(opacity: Any) -> None:
+    """Restore the absolute line-gas VMR discarded by PICASO's mixer."""
+
+    original = opacity.mix_my_opacities_gasesfly
+
+    def absolute_vmr_mixer(atmosphere: Any, exclude_mol: Any = 1) -> Any:
+        result = original(atmosphere, exclude_mol=exclude_mol)
+        total_vmr = np.sum(
+            [
+                atmosphere.layer["mixingratios"][molecule].values
+                for molecule in atmosphere.molecules
+                if exclude_mol == 1 or exclude_mol[molecule] == 1
+            ],
+            axis=0,
+        )
+        opacity.molecular_opa *= total_vmr[:, None, None]
+        return result
+
+    opacity.mix_my_opacities_gasesfly = absolute_vmr_mixer
+
+
 def _validate_picaso_environment() -> dict[str, str]:
     reference = os.environ.get("picaso_refdata")
     numba_cache = os.environ.get("NUMBA_CACHE_DIR")
@@ -246,33 +267,21 @@ def _validate_picaso_environment() -> dict[str, str]:
 def _picaso(
     contract: dict[str, np.ndarray],
     *,
-    representation: str,
     ck_directory: Path,
-    sampling_database: Path | None,
-    sampling_resample: int,
 ) -> dict[str, np.ndarray]:
     _validate_picaso_environment()
     import astropy.units as u
     import pandas as pd
     from picaso import justdoit as jdi
 
-    if representation == "correlated_k_resort_rebin":
-        opacity = jdi.opannection(
-            method="resortrebin",
-            ck_db=str(ck_directory),
-            preload_gases=list(MOLECULAR_SPECIES),
-            wave_range=[0.79, 12.1],
-            verbose=False,
-        )
-    else:
-        if sampling_database is None:
-            raise ValueError("opacity sampling requires a database")
-        opacity = jdi.opannection(
-            filename_db=str(sampling_database),
-            wave_range=[0.79, 12.1],
-            resample=sampling_resample,
-            verbose=False,
-        )
+    opacity = jdi.opannection(
+        method="resortrebin",
+        ck_db=str(ck_directory),
+        preload_gases=list(MOLECULAR_SPECIES),
+        wave_range=[0.3, 12.0],
+        verbose=False,
+    )
+    _restore_resort_rebin_absolute_vmr(opacity)
     output_flux: list[np.ndarray] = []
     output_native_probe_flux: list[np.ndarray] = []
     output_tau: list[np.ndarray] = []
@@ -392,7 +401,7 @@ def _petitradtrans_native(
         if key not in atmospheres:
             atmospheres[key] = Radtrans(
                 pressures=contract["pressure_centers_bar"],
-                wavelength_boundaries=np.array([0.79, 12.1]),
+                wavelength_boundaries=np.array([0.3, 12.1]),
                 line_species=list(PRT_LINE_SPECIES.values()),
                 gas_continuum_contributors=[
                     PRT_CIA_SPECIES[pair] for pair in requested_pairs
@@ -503,18 +512,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "mode",
-        choices=(
-            "picaso_ck",
-            "picaso_sampling",
-            "petitradtrans_native",
-            "petitradtrans_shared",
-        ),
+        choices=("picaso_ck", "petitradtrans_native", "petitradtrans_shared"),
     )
     parser.add_argument("contract", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--picaso-ck-directory", type=Path)
-    parser.add_argument("--picaso-sampling-database", type=Path)
-    parser.add_argument("--picaso-sampling-resample", type=int, default=50)
     parser.add_argument("--prt-input-data", type=Path)
     args = parser.parse_args()
     expected_python = _expected_python(args.mode)
@@ -528,10 +530,7 @@ def main() -> None:
             parser.error("picaso_ck requires --picaso-ck-directory")
         output = _picaso(
             contract,
-            representation="correlated_k_resort_rebin",
             ck_directory=args.picaso_ck_directory,
-            sampling_database=None,
-            sampling_resample=args.picaso_sampling_resample,
         )
         package = "picaso"
         representation = "primary_correlated_k_resort_rebin"
@@ -539,23 +538,6 @@ def main() -> None:
             "PICASO native taugas combines the four molecular absorbers and requested CIA; a separate native component tensor is not exposed by this supported high-level path.",
             "PICASO exact-omega0=0 native thermal probes are retained as pathological capability evidence; the separately labelled absorbing-formal flux is the scientific product.",
             "PICASO vertical arrays are absorbing-formal diagnostics applied to native taugas, not native SH contribution definitions.",
-        ]
-    elif args.mode == "picaso_sampling":
-        if args.picaso_sampling_database is None:
-            parser.error("picaso_sampling requires --picaso-sampling-database")
-        output = _picaso(
-            contract,
-            representation="opacity_sampling",
-            ck_directory=Path("."),
-            sampling_database=args.picaso_sampling_database,
-            sampling_resample=args.picaso_sampling_resample,
-        )
-        package = "picaso"
-        representation = "secondary_opacity_sampling_unsmoothed"
-        limitations = [
-            "PICASO native taugas combines the four molecular absorbers and requested CIA; a separate native component tensor is not exposed by this supported high-level path.",
-            "PICASO exact-omega0=0 native thermal probes are retained as pathological capability evidence; the separately labelled absorbing-formal flux is the scientific product.",
-            "PICASO opacity sampling is a secondary unsmoothed representation diagnostic and is not interchangeable with correlated-k.",
         ]
     elif args.mode == "petitradtrans_native":
         if args.prt_input_data is None:
@@ -603,6 +585,7 @@ def main() -> None:
     }
     if package == "picaso":
         metadata["picaso_environment"] = _validate_picaso_environment()
+        metadata["absolute_line_vmr_restored_after_resort_rebin"] = True
     output["metadata_json"] = np.array(json.dumps(metadata, sort_keys=True))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(args.output, **output)

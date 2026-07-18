@@ -44,7 +44,7 @@ The versioned Stage 1--7 reports under
 Version-2 Stage 1 is complete under
 `docs/data/emission_intercomparison/version_2/`.  It freezes one typed common
 contract for the WASP-17 system, 6550 K blackbody star, 40/80/160 grids, exact
-six-species mixture, PG14 arrays, and flux-conserving 0.8--12 micron R=100
+six-species mixture, PG14 arrays, and flux-conserving 0.3--12 micron R=100
 product.  The 80-cell pilot projected `44.60 s` and measured `0.674 GB` peak
 RSS, authorizing the full laptop run; total solver wall time was `20.91 s`.
 
@@ -61,17 +61,16 @@ Stage-1 product as validated.
 
 Version-2 Stage 2 is complete for H2O, CO, CO2, and CH4 at the exact common-
 contract VMRs and H2/He fill rule.  The 80-cell pilot authorized the matrix at
-`804.38 s` projected wall time and `36.72%` of available memory; the post-pilot
-matrix took `160.93 s`.
+`1052.01 s` projected wall time and `35.58%` of available memory; the post-pilot
+matrix took `167.72 s`.
 
 The matched ROBERT/pRT Track-A difference decreases by about fourfold per grid
 doubling but exceeds the frozen full-matrix and 80-to-160 limits, defining an
 out-of-tolerance vertical closure regime.  The 160-cell maximum is
-`0.636478 ppm`; the isothermal controls remain below `0.002510 ppm`.  Track B
+`0.640615 ppm`; the isothermal controls remain below `0.001044 ppm`. Track B
 records native database, interpolation, and representation effects without
-classifying a framework as failed.  PICASO resort-rebin remains the primary
-molecular path, while its 819/1638-sample density comparison remains visibly
-finite-sampling limited and unsmoothed.
+classifying a framework as failed. PICASO resort-rebin correlated-k is the
+only active PICASO molecular path; opacity sampling is retired.
 
 ## Version-2 Stage 3: frozen multi-species and CIA closure
 
@@ -81,17 +80,16 @@ molecular weight.
 The four line absorbers remain active throughout a `2 x 2` H2--H2/H2--He CIA
 factorial crossed with the frozen isothermal and PG14 non-inverted profiles on
 40/80/160 cells.  The representative 80-cell both-CIA pilot measured
-`12.83 s`, projected `461.71 s`, and reached `39.52%` of available memory, so
-the complete matrix was authorized; its post-pilot wall time was `192.70 s`.
+`12.22 s`, projected `439.77 s`, and reached `34.18%` of available memory, so
+the complete matrix was authorized; its post-pilot wall time was `166.94 s`.
 
-The matched ROBERT/stable-pRT Track-A maximum decreases from `7.129640 ppm` at
-40 cells to `1.792972 ppm` at 80 and `0.448767 ppm` at 160.  It therefore
+The matched ROBERT/stable-pRT Track-A maximum decreases from `7.110565 ppm` at
+40 cells to `1.788100 ppm` at 80 and `0.447547 ppm` at 160. It therefore
 preserves an out-of-tolerance, vertically converging regime without classifying
-either framework as failed.  The isothermal controls remain below
-`0.002510 ppm`.  Track B attributes native line/CIA database, interpolation,
+either framework as failed. The isothermal controls remain below
+`0.001044 ppm`. Track B attributes native line/CIA database, interpolation,
 and representation effects without cross-framework gates: PICASO resort-rebin
-is primary, while its opacity-sampling and 819/1638-sample density products are
-secondary, separately labelled, and unsmoothed.  PICASO's exact-zero native RT
+correlated-k is the only active PICASO molecular path. PICASO's exact-zero native RT
 and vertical-diagnostic boundaries and stable pRT's missing supported native
 optical-depth tensor remain explicit.  Stage 1's `0.196897 ppm` eight-angle
 result and sub-`0.01 ppm` restriction, and Stage 2's measured vertical regime,
@@ -163,7 +161,7 @@ propagate into posterior inference.  It has two equally explicit arms:
 
 Both arms use:
 
-- R=100 spectra over `0.8--12 micron`, a frozen stellar spectrum, and a frozen
+- R=100 spectra over `0.3--12 micron`, a frozen stellar spectrum, and a frozen
   instrument response; native JWST mode combinations are secondary tests;
 - constant eclipse-depth uncertainties of `30`, `60`, and `100 ppm`, also
   reported as fractions of the median eclipse depth;

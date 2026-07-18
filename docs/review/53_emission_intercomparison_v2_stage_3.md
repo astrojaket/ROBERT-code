@@ -1,5 +1,11 @@
 # Emission intercomparison Version 2: Stage 3
 
+> **Active contract revision:** this stage is regenerated over `0.3--12 micron`
+> on 369 R=100 bins using PICASO resort-rebin correlated-k only. Opacity
+> sampling is retired. The Stage-3 numerical gates are unchanged and remained
+> frozen before the revised matrix was inspected. Historical `0.8--12 micron`
+> values remain recoverable in Git history.
+
 ## Outcome
 
 The Version-2 Stage-3 scope, factorial design, numerical gates, and resource
@@ -49,7 +55,7 @@ The evaluated common-contract temperature arrays are supplied identically to
 every framework.  The pressure ladder is `40`, `80`, and `160` cells over the
 frozen `1e-5--100 bar` domain, with `80` cells primary.  The common-contract
 pressure-edge/centre mappings are unchanged.  All comparisons use the frozen
-`0.8--12 micron` domain, exact `6550 K` blackbody stellar normalization, and
+`0.3--12 micron` domain, exact `6550 K` blackbody stellar normalization, and
 flux-conserving `R=100` definition.
 
 ## Frozen CIA factorial
@@ -88,10 +94,10 @@ inspected:
 
 | Matched Track-A diagnostic | Frozen limit | Observed | Result |
 | --- | ---: | ---: | --- |
-| Maximum ROBERT/pRT symmetric relative difference | `5e-4` | `1.726821e-2` | exceeded |
-| Maximum ROBERT/pRT eclipse-depth difference | `0.1 ppm` | `7.129640 ppm` | exceeded |
-| Maximum Track-A 80-to-160 eclipse-depth change | `0.1 ppm` | `0.769169 ppm` | exceeded |
-| Maximum isothermal analytic-control eclipse difference | `0.1 ppm` | `0.002509 ppm` | met |
+| Maximum ROBERT/pRT symmetric relative difference | `5e-4` | `1.787356e-2` | exceeded |
+| Maximum ROBERT/pRT eclipse-depth difference | `0.1 ppm` | `7.110565 ppm` | exceeded |
+| Maximum Track-A 80-to-160 eclipse-depth change | `0.1 ppm` | `0.769349 ppm` | exceeded |
+| Maximum isothermal analytic-control eclipse difference | `0.1 ppm` | `0.001043 ppm` | met |
 | Maximum absolute single-scattering albedo | `0` | `0` | met |
 
 The maxima cover the declared Stage-3 Track-A cases unless the report records
@@ -103,16 +109,13 @@ remain explicit and are not replaced with invented values or acceptance tests.
 Track B holds the high-level physical cases fixed while ROBERT, PICASO, and
 stable petitRADTRANS construct their native line and CIA opacity
 representations.  Database choice, CIA source data, pressure-temperature
-interpolation, correlated-k construction, opacity sampling, unit conversion,
+interpolation, correlated-k construction, unit conversion,
 and native radiative-transfer representation are attribution effects.  Track B
 has no cross-framework acceptance gates.
 
-PICASO's mandatory primary molecular path is the official PICASO-4 resort-
-rebin correlated-k representation frozen in the common contract.  PICASO
-opacity sampling remains secondary, separately labelled, and unsmoothed.  Its
-native samples, flux-conserving R=100 product, sample counts, within-bin
-variance where available, and the declared sampling-density diagnostic are
-retained rather than treated as interchangeable with correlated-k.
+PICASO's only active molecular path is the official PICASO-4 resort-rebin
+correlated-k representation frozen in the common contract. Opacity sampling is
+retired and is not run or plotted.
 
 Native-resolution spectra, R=100 products, optical-depth components and totals,
 and pressure-resolved diagnostics are retained where genuinely supported.
@@ -132,9 +135,9 @@ continuous-angle closure must not use the eight-angle Stage-1 product as
 validated.
 
 Stage 2 identified an out-of-tolerance, vertically converging Track-A regime.
-Its maximum ROBERT/pRT eclipse-depth difference decreased from `10.083885 ppm`
-at 40 cells to `2.541600 ppm` at 80 and `0.636478 ppm` at 160, while the
-isothermal controls remained below `0.002510 ppm`.  Stage 3 preserves that
+Its maximum ROBERT/pRT eclipse-depth difference decreases from `10.150094 ppm`
+at 40 cells to `2.558145 ppm` at 80 and `0.640615 ppm` at 160, while the
+isothermal controls remain below `0.001044 ppm`. Stage 3 preserves that
 measured regime and its interpretation; it does not reinterpret it as a
 framework failure or tune the discretization, quadrature, opacity, or gates to
 force agreement.
@@ -161,29 +164,29 @@ stopped pilot with an unmeasured runtime or memory estimate.
 
 The representative
 `pg14_non_inverted_molecular_plus_h2_h2_and_h2_he_cia_80_cells` pilot took
-`12.825173 s`.  Applying the frozen workload multiplier of 36 projected
-`461.706212 s`, well below `7200 s`.  The largest process peak RSS was
-`3,952,787,456 bytes` against `10,001,924,096 bytes` available, or `39.5203%`,
+`12.215756 s`. Applying the frozen workload multiplier of 36 projected
+`439.767203 s`, well below `7200 s`. The largest process peak RSS was
+`4,149,035,008 bytes` against `12,140,036,096 bytes` available, or `34.1765%`,
 below the frozen `60%` limit.  Both resource gates therefore authorized the
 complete matrix.
 
-The report records `192.703337 s` for the post-pilot matrix and retains the raw
-per-case timings.  Pilot plus post-pilot matrix wall time was `205.528509 s`.
+The report records `166.935993 s` for the post-pilot matrix and retains the raw
+per-case timings. Pilot plus post-pilot matrix wall time was `179.151749 s`.
 
 ## Track-A results
 
 | Resolution | Maximum symmetric relative difference | Maximum eclipse difference |
 | ---: | ---: | ---: |
-| 40 cells | `1.726821e-2` | `7.129640 ppm` |
-| 80 cells | `4.352092e-3` | `1.792972 ppm` |
-| 160 cells | `1.089822e-3` | `0.448767 ppm` |
+| 40 cells | `1.787356e-2` | `7.110565 ppm` |
+| 80 cells | `4.504680e-3` | `1.788100 ppm` |
+| 160 cells | `1.128045e-3` | `0.447547 ppm` |
 
 The roughly fourfold decrease at each grid doubling is the same convergence
 signature localized in Stage 2.  The maximum 80-to-160 Track-A change is
-`0.769169 ppm`, so the shared calculation has not entered the frozen
+`0.769349 ppm`, so the shared calculation has not entered the frozen
 `0.1 ppm` vertical-convergence regime at 160 cells.  The isothermal controls
 remain much tighter: ROBERT's maximum analytic eclipse difference is
-`0.002509 ppm` and stable pRT's is `0.001975 ppm`.  All retained cloud,
+`0.001043 ppm` and stable pRT's is `0.000510 ppm`. All retained cloud,
 Rayleigh, and single-scattering-albedo arrays are exactly zero.
 
 ## CIA factorial and native attribution
@@ -196,36 +199,31 @@ only case changes the maximum eclipse depth by:
 
 | Representation | Both CIA pairs versus molecular only |
 | --- | ---: |
-| ROBERT shared mean-tau | `8.128949 ppm` |
-| stable-pRT shared mean-tau | `8.105700 ppm` |
-| ROBERT native random overlap | `43.398931 ppm` |
-| stable-pRT native correlated-k | `43.674657 ppm` |
-| PICASO correlated-k | `0.000327 ppm` |
-| PICASO opacity sampling | `51.574306 ppm` |
+| ROBERT shared mean-tau | `8.032818 ppm` |
+| stable-pRT shared mean-tau | `8.009978 ppm` |
+| ROBERT native random overlap | `43.387801 ppm` |
+| stable-pRT native correlated-k | `43.656935 ppm` |
+| PICASO correlated-k | `45.501171 ppm` |
 
 H2--H2 is the larger individual CIA effect in each representation that shows a
 resolved physical signal.  For example, the 80-cell native ROBERT effects are
-`37.766841 ppm` for H2--H2 and `9.473100 ppm` for H2--He with the other factor
-off; the corresponding native pRT values are `38.053224 ppm` and
-`9.500461 ppm`.  The native ROBERT and pRT factorial interactions are
-`3.841009 ppm` and `3.879028 ppm`, respectively.  The much smaller PICASO
-correlated-k CIA response and the larger opacity-sampling response are retained
-as database/interpolation/representation attribution, not forced into a
-shared-input agreement claim.
+`37.757077 ppm` for H2--H2 and `9.451185 ppm` for H2--He with the other factor
+off; the corresponding native pRT values are `38.037591 ppm` and
+`9.476857 ppm`. The native ROBERT and pRT factorial interactions are
+`3.820460 ppm` and `3.857513 ppm`, respectively. PICASO's `45.501171 ppm`
+response now agrees in scale and spectral shape with those native results
+after restoring the absolute four-molecule VMR in its resort-rebin mixer.
 
 Track B remains ungated.  At 80 cells its maximum native R=100 differences are
-`6.470394 ppm` for ROBERT versus stable pRT, `658.119872 ppm` for PICASO
-correlated-k versus stable pRT, and `658.872868 ppm` for ROBERT versus PICASO
+`6.499018 ppm` for ROBERT versus stable pRT, `74.539002 ppm` for PICASO
+correlated-k versus stable pRT, and `72.437689 ppm` for ROBERT versus PICASO
 correlated-k.  These values combine native database, interpolation,
 correlated-k, and RT-representation effects and do not rank the frameworks.
 
 Native vertical convergence also remains representation dependent.  The
-80-to-160 maximum changes are `0.876343 ppm` for ROBERT, `0.519259 ppm` for
-stable pRT, `0.016944 ppm` for PICASO correlated-k, and `8.252217 ppm` for the
-secondary PICASO opacity-sampling product.  The opacity-sampling density check
-increases the native grid from 819 to 1638 samples and changes the R=100 eclipse
-depth by as much as `214.295213 ppm`.  No smoothing was applied; the result is
-finite-sampling evidence, not a correlated-k or shared-RT gate.
+80-to-160 maximum changes are `0.876201 ppm` for ROBERT, `0.519907 ppm` for
+stable pRT, and `1.035230 ppm` for PICASO correlated-k. These are native
+representation convergence measurements, not cross-framework gates.
 
 The full-mixture mean molecular weight stays fixed at
 `2.321438174776293 u` in every case, so it cannot alias the CIA factorial.  No
@@ -251,12 +249,12 @@ boundaries and are not populated with invented products or gates.
 
 ## Artifacts, provenance, and warnings
 
-`stage_3_report.json` is accompanied by 22 numerical NPZ shards and
+`stage_3_report.json` is accompanied by 18 numerical NPZ shards and
 `stage_3_integrity.json`.  The shards cover shared optical depths, ROBERT and
-stable-pRT shared/native products, PICASO correlated-k, PICASO opacity sampling,
-and the opacity-sampling density check at the applicable resolutions.  The
+stable-pRT shared/native products, and PICASO correlated-k at the applicable
+resolutions. The
 integrity manifest records keys, shapes, dtypes, units, axes, finite policies,
-sizes, and SHA-256 values; the Version-2 checksum file currently has 24 Stage-3
+sizes, and SHA-256 values; the Version-2 checksum file currently has 20 Stage-3
 entries including the integrity manifest.  Final verification of these current
 artifacts is recorded below.
 
@@ -282,13 +280,13 @@ checksum records.
 
 Final verification used the exact isolated interpreters and frozen data paths:
 
-- focused Stage-3 contract and artifact tests: `32 passed`;
+- focused Version-2 contract and artifact tests: `53 passed`;
 - strict SHA-256 and integrity-manifest verification: passed as part of the
-  focused artifact suite for all 24 Stage-3 entries;
+  focused artifact suite for all 20 Stage-3 entries;
 - Ruff over the repository: passed;
 - exact-environment smoke tests: ROBERT `0.3.0`, PICASO `4.0`, and stable
   petitRADTRANS `3.3.3` all passed; and
-- complete ROBERT suite: `501 passed, 5 skipped`.
+- complete ROBERT suite: `496 passed, 5 skipped`.
 
 The PICASO smoke emitted the recorded harmless optional-Vega warning.  The
 scientific gate exceedances remain preserved measurements and were not treated

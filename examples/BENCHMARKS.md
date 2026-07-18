@@ -37,7 +37,7 @@ files, local opacity paths, and smoke tests are documented in
 - `benchmark_emission_intercomparison_v2_stage_2.py`: frozen single-molecule
   H2O/CO/CO2/CH4 closure at exact common-contract VMRs.  It separates matched
   ROBERT/pRT optical-depth closure from native opacity attribution, keeps
-  PICASO resort-rebin primary and opacity sampling secondary/unsmoothed,
+  PICASO resort-rebin correlated-k only over 0.3--12 micron,
   preserves native/R=100 spectral, optical-depth, and vertical arrays, and
   reports the measured out-of-tolerance vertical closure regime.
 - `benchmark_emission_intercomparison_v2_stage_3.py`: exact frozen solar-derived fixed-abundance
@@ -45,8 +45,8 @@ files, local opacity paths, and smoke tests are documented in
   the frozen isothermal and PG14 non-inverted profiles on 40/80/160 cells.  It
   retains the measured out-of-tolerance, vertically converging ROBERT/pRT
   shared-tau regime without classifying a framework as failed, treats native
-  differences as attribution only, keeps PICASO resort-rebin primary and
-  opacity sampling secondary/unsmoothed, and records unsupported native tensor
+  differences as attribution only, uses PICASO resort-rebin correlated-k only,
+  retires opacity sampling, and records unsupported native tensor
   and vertical-diagnostic interfaces explicitly.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,

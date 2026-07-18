@@ -62,7 +62,7 @@ task-local `NUMBA_CACHE_DIR=<temp>/picaso-v4-numba-cache` and
 
 The fixed-VMR resort-rebin correlated-k smoke loaded exactly H2O, CO, CO2, and
 CH4 with 661 bins and eight k points.  Forty layers produced `taugas` shape
-`(40, 661, 8)`, and all 583 bins over 0.8--12 micron had finite positive thermal
+`(40, 661, 8)`, and all 613 native bins over 0.3--12 micron had finite positive thermal
 flux with scattering, Rayleigh, and delta-Eddington disabled.  The optional
 Vega-spectrum warning is harmless because Version 2 supplies an explicit
 blackbody star; record it without downloading stellar grids or suppressing it.
@@ -90,7 +90,10 @@ set explicitly before import; `<task-temp>` must be writable:
 env picaso_refdata=/Users/jaketaylor/Dropbox/picaso-v4/reference \
   NUMBA_CACHE_DIR=<task-temp>/picaso-v4-numba-cache \
   MPLCONFIGDIR=<task-temp>/picaso-v4-matplotlib \
-  /opt/miniconda3/envs/picaso-v4/bin/python <stage-specific-picaso-worker>
+  /opt/miniconda3/envs/picaso-v4/bin/python \
+  examples/check_emission_intercomparison_environment.py picaso \
+  --picaso-reference /Users/jaketaylor/Dropbox/picaso-v4/reference \
+  --picaso-ck-directory /Users/jaketaylor/Dropbox/picaso/reference/opacities/resortrebin
 /opt/miniconda3/envs/petitradtrans-stable/bin/python examples/check_emission_intercomparison_environment.py petitradtrans
 ```
 
@@ -136,8 +139,8 @@ The Stage-3 launcher crosses the exact fixed-abundance H2O/CO/CO2/CH4 mixture
 with the `2 x 2` H2--H2/H2--He CIA factorial for the isothermal and PG14
 non-inverted profiles on 40/80/160 cells.  It sets `picaso_refdata`,
 `NUMBA_CACHE_DIR`, and `MPLCONFIGDIR` before every PICASO import.  PICASO 4.0
-resort-rebin remains the primary molecular representation; its opacity-sampling
-workers and 819/1638-sample density check remain secondary and unsmoothed.  The
+resort-rebin correlated-k is the only active PICASO molecular representation;
+opacity sampling is retired. The
 launcher records the harmless optional-Vega and exact-zero cloud/Rayleigh
 divide warnings without downloading or suppressing them.
 
