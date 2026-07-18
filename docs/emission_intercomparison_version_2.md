@@ -390,12 +390,31 @@ native flux path still exposes no layer optical-depth tensor. See
 
 ### Stage 5 -- temperature responses
 
-Apply the same pressure-localized symmetric temperature perturbations to both
-PG14 contract profiles and the isothermal control.  Compare complete signed
-and normalized temperature-response tensors, linearity, pressure metrics,
-band/window behaviour, and convergence.  Relate responses to Stage-4
-contribution functions without asserting that the two diagnostics are the
-same quantity.
+Stage 5 is complete. It applied the same six Gaussian log-pressure
+localizations at `1e-4` through `10 bar` with `0.35 dex` width and symmetric
+`+/-10 K` amplitude to the exact three Stage-4 profiles. A predeclared
+`+/-5/10/20 K` primary-grid ladder verified finite-difference linearity and
+symmetry. Exact-zero normalized responses remain exact zero without epsilons.
+
+Track A freezes the completed Stage-4 shared mean molecular-plus-both-CIA
+optical depth while perturbing the source in the compatible ROBERT and stable-
+pRT paths. All frozen gates pass: the primary Jacobian p95 difference is
+`0.00168817`, the primary eclipse-Jacobian RMS difference is
+`0.000786942 ppm/K`, the primary response-centroid RMS difference is
+`0.00174522 dex`, and response TV p95 is `0.00252234`. The corresponding
+80-to-160 values are `0.00151578`, `0.000648841 ppm/K`, `0.000829095 dex`,
+and `0.00207203`. The isothermal analytic control is `0.001043488 ppm`.
+
+Track B recomputes native opacity for every required perturbed temperature
+state and remains attribution-only. At 80 cells ROBERT/stable-pRT Jacobian p95
+differences reach `0.515848%`; pairs involving PICASO reach `4.05137%`.
+Complete signed native/R=100 states, response/Jacobian tensors, zero-signal
+masks, localization arrays, centroids, peaks, band/window diagnostics,
+linearity arrays, supported opacity tensors, and convergence are retained in
+154 sharded Stage-5 products. Contribution functions and temperature
+responses are compared but explicitly not treated as identical. See
+`docs/review/55_emission_intercomparison_v2_stage_5.md` and
+`docs/data/emission_intercomparison/version_2/stage_5_report.json`.
 
 ### Stage 6 -- composition responses
 

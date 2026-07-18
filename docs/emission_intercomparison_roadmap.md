@@ -119,6 +119,29 @@ peaks, band/window diagnostics, optical-depth tensors where supported, and
 40/80/160 convergence are retained. Capability boundaries for PICASO and
 stable pRT remain explicit rather than populated with invented products.
 
+## Version-2 Stage 5: localized temperature responses and Jacobians
+
+Version-2 Stage 5 is complete for the exact three Stage-4 profiles, fixed
+four-molecule H2/He mixture, and both CIA pairs. Six `0.35 dex` Gaussian
+localizations from `1e-4` to `10 bar` use symmetric `+/-10 K` perturbations;
+the 80-cell PG14 non-inverted case also retains a predeclared `+/-5/10/20 K`
+finite-difference audit.
+
+The compatible ROBERT/stable-pRT frozen-opacity/source-response Track A passes
+all predeclared gates. Its primary Jacobian p95 difference is `0.168817%`, and
+the 80-to-160 value is `0.151578%`. Primary and converged eclipse-Jacobian RMS,
+response-centroid, response-profile, isothermal analytic-control, linearity,
+symmetry, and exact-zero normalization gates also pass.
+
+Track B recomputes each framework's native line and CIA opacity for every
+required temperature state and remains attribution-only. Primary ROBERT/
+stable-pRT Jacobian p95 differences reach `0.515848%`; pairs involving PICASO
+4.0 resort-rebin correlated-k reach `4.05137%`. Complete state spectra,
+temperature responses/Jacobians, pressure diagnostics, band/window summaries,
+Stage-4 contribution relations, supported optical-depth tensors, and
+40/80/160 convergence are retained. PICASO and stable-pRT capability
+boundaries remain explicit, and opacity sampling remains retired.
+
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures

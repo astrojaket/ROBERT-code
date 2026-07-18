@@ -55,6 +55,18 @@ files, local opacity paths, and smoke tests are documented in
   optical-to-mid-IR band/window behavior, supported optical-depth tensors, and
   convergence while keeping Track-A gates separate from ungated native
   attribution.
+- `benchmark_emission_intercomparison_v2_stage_5.py`: exact Version-2
+  localized temperature responses for the three Stage-4 profiles, six
+  pressure centres, symmetric `+/-10 K` differences, and a predeclared
+  `+/-5/10/20 K` finite-difference audit. It limits the shared frozen-opacity
+  Track A to compatible ROBERT/stable-pRT definitions, recomputes native
+  opacity for every Track-B temperature state, retains complete signed native
+  and R=100 spectra/Jacobians/responses and supported opacity tensors, and
+  records Stage-4 contribution relations without treating contribution
+  functions as temperature derivatives.
+- `plot_emission_intercomparison_v2_stage_5.py`: Matplotlib-only full-domain
+  spectra/Jacobian, signed/normalized pressure-response, contribution-versus-
+  response, and convergence figures from committed Stage-5 products.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

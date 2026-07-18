@@ -193,13 +193,25 @@ PICASO levels, and the ROBERT geometric cell centres as the corresponding pRT
 pressure nodes.  When opacity data live outside the fresh clone, pass
 `--picaso-reference`, `--picaso-database`, and `--prt-input` explicitly.
 
-Stage 5 preserves this grid contract and adds six localized temperature
-perturbations from `1e-4` to `10 bar`.  Its launcher runs a
-shared-optical-depth source/RT track and a native-temperature-dependent-opacity
-track.  The latter recomputes opacity separately in every framework and
-finite-difference case.  The launcher records all three absolute interpreter
-paths and package versions in
-`docs/data/emission_intercomparison/stage_5_report.json`.
+Historical Version-1 Stage 5 preserves this grid contract and adds six
+localized temperature perturbations from `1e-4` to `10 bar`; its report remains
+under the Version-1 data namespace.
+
+Version-2 Stage 5 uses the same exact isolated interpreter paths as Stages
+1--4. Before every PICASO 4.0 import its worker sets `picaso_refdata` to the
+frozen reference tree and creates writable task-local `NUMBA_CACHE_DIR` and
+`MPLCONFIGDIR` paths beneath the ignored Version-2 Stage-5 output tree. It does
+not repurpose `HOME`. The only active PICASO molecular mode is resort-rebin
+correlated-k; opacity sampling remains retired.
+
+The launcher records ROBERT `0.3.0`, PICASO `4.0`, and stable pRT `3.3.3`, all
+input/source/output checksums, the optional-Vega and exact-zero warnings,
+per-case timings, peak RSS, and capability boundaries in
+`docs/data/emission_intercomparison/version_2/stage_5_report.json`. Raw worker
+products remain ignored beneath
+`examples/outputs/emission_intercomparison/version_2/stage_5/`; committed
+full-precision products and strict integrity metadata are sharded beneath the
+Version-2 data namespace.
 
 Stage 6 preserves the same 40/80/160 vertical-grid and process-isolation
 contracts.  It adds localized H2O, CO, CO2, and CH4 log10-VMR perturbations,
