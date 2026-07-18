@@ -80,6 +80,26 @@ files, local opacity paths, and smoke tests are documented in
   contribution/temperature/composition comparison, and convergence figures
   from locally generated Stage-4 through Stage-6 products. Stage-6 numerical
   products default to the ignored `examples/outputs/` tree rather than Git.
+- `benchmark_emission_intercomparison_v2_stage_7.py`: frozen exact-absorption
+  cloud placement/extinction contract for the clear control, 48 parametric
+  decks, and the archived physical extinction field on 40/80/160 cells. It
+  runs the mandatory cold/warm 80-cell three-framework resource pilot first,
+  restricts identical-tensor Track A to ROBERT/stable pRT, preserves native
+  Track B as attribution, and refuses the full matrix when either frozen
+  resource gate fails unless an explicit `--override-resource-gate`
+  authorization is supplied. The completed authorized matrix is an out-of-
+  tolerance characterized regime: exact-zero controls pass, while seven
+  extreme-placement Track-A comparison/convergence gates fail. Full-precision
+  products and the integrity index remain beneath the ignored Version-2
+  Stage-7 output root.
+- `plot_emission_intercomparison_v2_stage_7.py`: Matplotlib-only spectra and
+  eclipse effects, placement/extinction heatmaps, signed/normalized vertical
+  effects, Track-A/Track-B differences, band/window diagnostics, and complete-
+  matrix convergence. It imports the maintained manuscript style: ROBERT and
+  shared inputs use coordinated purples, external frameworks and analytic
+  references use distinguishable neutral tones and line styles, and no result
+  relies on colour alone. `--representative-pilot` renders the pilot without
+  pretending that unavailable convergence products exist.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

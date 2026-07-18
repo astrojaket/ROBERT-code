@@ -236,7 +236,7 @@ precision numerical products remain ignored under
 produces 767 checksum-indexed files, with a largest file of `50,898,616 bytes`;
 these remain local pending a Zenodo or equivalent paper-data release.
 
-Stage 7 retains the same interpreters and vertical grids.  It runs a
+Version-1 Stage 7 retains the same interpreters and vertical grids.  It runs a
 representative 80-cell resource pilot before the complete absorbing-cloud
 matrix, freezes cloud and Rayleigh scattering off, and records process-tree
 peak resident memory in addition to raw and summarized timings.  Track A
@@ -254,6 +254,38 @@ formal path because PICASO's low-level scattering routine returns NaNs at
 exact zero; native PICASO cloud calculations remain on the official native
 path.  This distinction and the unchanged failed full-domain gates are
 recorded in the report.
+
+Version-2 Stage 7 uses the same three absolute interpreters, but all generated
+workers and full-precision products default to the ignored
+`examples/outputs/emission_intercomparison/version_2/stage_7/` tree:
+
+```bash
+PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
+  examples/benchmark_emission_intercomparison_v2_stage_7.py --pilot-only
+
+PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
+  examples/plot_emission_intercomparison_v2_stage_7.py \
+  /absolute/path/to/task-visualization-workspace
+```
+
+The launcher sets `picaso_refdata` to
+`/Users/jaketaylor/Dropbox/picaso-v4/reference` before every PICASO import and
+uses writable task-local `NUMBA_CACHE_DIR` and `MPLCONFIGDIR` directories. It
+never repurposes `HOME`, never invokes the retired PICASO opacity-sampling
+interpreter, and retains exact-zero and optional-Vega warnings.
+
+The frozen pilot measured cold/warm seconds of `0.150034/0.144567` for Track-A
+ROBERT, `1.577178/1.574057` for Track-A stable pRT,
+`7.354453/4.301428` for Track-B ROBERT, `19.837954/19.256825` for Track-B
+PICASO, and `5.389817/4.770195` for Track-B stable pRT. Peak process-tree RSS
+was `4,272,816,128 bytes` (`45.333370%` of the available memory), while the
+complete projection was `8128.054204 s`, above the frozen `7200 s` limit. The
+user then authorized exceeding the projection without changing the science or
+gates. A repeated warmed pilot measured `42.664949 s`, projected
+`4906.158647 s`, and used `4,110,172,160 bytes` peak RSS. The complete launcher
+took `2371.303374 s`, including `2328.638425 s` for matrix/assembly, and reached
+`5,195,988,992 bytes` complete-matrix peak process-tree RSS. All 92 integrity-
+indexed numerical artifacts remain local and ignored.
 
 The canonical continuation through absorbing clouds, cloud scattering, and
 cloud-free plus cloudy cross-retrievals is documented in

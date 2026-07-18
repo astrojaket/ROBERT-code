@@ -169,7 +169,34 @@ set is reproducible from the benchmark and remains in the ignored local output
 tree pending a Zenodo or equivalent paper-data release; it is not stored in
 ordinary Git.
 
-## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
+## Version-2 Stage 7: absorbing-cloud placement and extinction (completed; extreme gates not accepted)
+
+The complete Version-2 contract is frozen and implemented for exact
+`omega0=0`, 40/80/160 cells, both PG14 profiles plus the exact isothermal
+control, 48 optical-depth/top/slope decks, the clear control, and the archived
+physical extinction case. Track A exchanges genuinely identical gas and cloud
+optical-depth tensors only between ROBERT and stable pRT. Track B keeps ROBERT,
+PICASO 4.0 resort-rebin correlated-k, and stable-pRT native parameterization
+and interpolation differences as attribution.
+
+The mandatory 80-cell moderate pilot passed the memory gate at
+`4,272,816,128 bytes`, `45.333370%` of available memory, but projected the
+complete required matrix at `8128.054204 s` (`2.258 h`) against the frozen
+`7200 s` limit. The user explicitly authorized continuing beyond that
+projection without changing the matrix, precision, definitions, or gates. The
+complete launcher then took `2371.303374 s`, and complete-matrix peak
+process-tree RSS was `5,195,988,992 bytes`.
+
+The representative moderate pilot passes matched Track-A gates, but the full
+extreme matrix does not. Primary absolute-spectrum p95, cloud-effect p95, and
+eclipse-effect RMS are `0.327970825`, `0.0517204233`, and `6.21989875 ppm`;
+the corresponding 80-to-160 values are `0.288476674`, `0.0540403749`, and
+`6.33828924 ppm`. The 80-to-160 cloud-response TV p95 is `0.644274045`.
+Exact-zero controls and contribution-profile convergence remain accepted.
+Stage 8 must therefore use the accepted moderate placement regime separately
+from the unresolved extreme high-tau/placement/discretization domain.
+
+## Version-1 Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures
 are allowed to differ.  Every cloud has single-scattering albedo `omega0=0`.

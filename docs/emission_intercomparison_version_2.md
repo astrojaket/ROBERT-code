@@ -454,12 +454,46 @@ equivalent archival release rather than ordinary Git. See
 
 ### Stage 7 -- absorbing-cloud placement and extinction
 
-Rerun the Version-1 cloud matrix against the fixed Version-2 gas, system, and
-PG14 profiles: grey optical depths `0.1`, `1`, `10`, and `100`; tops at `1`,
-`10`, and `100 mbar`; slopes `-4`, `-2`, `0`, and `+2`; and the shared archived
-physical extinction case.  Freeze `omega0 = 0`.  Preserve extreme placement/
-convergence failures as mapped regimes rather than trying to correct code
-behaviour until it agrees.
+The contract, implementation, and complete matrix are finished. The mandatory
+frozen resource pilot initially stopped execution before matrix inspection. The
+80-cell PG14 non-inverted clear/`tau=1`, 10-mbar, slope-0 pilot used
+`4,272,816,128 bytes` peak process-tree RSS, or `45.333370%` of the
+`9,425,321,984 bytes` available at the decision, and therefore passed the
+frozen 60% memory limit. Its projected complete wall time was
+`8128.054204 s` (`2.258 h`) against the frozen `7200 s` limit, so it failed the
+wall-time gate and set `continue_full_matrix=false`. The user subsequently
+authorized exceeding that wall-time projection. No threshold, definition,
+precision, or required case changed; the failed initial decision remains in the
+compact summary.
+
+The frozen matrix remains the Version-1 cloud design evaluated against the
+fixed Version-2 gas, system, and PG14 profiles: grey optical depths `0.1`, `1`,
+`10`, and `100`; tops at `1`, `10`, and `100 mbar`; slopes `-4`, `-2`, `0`, and
+`+2`; and the shared archived physical extinction case, all at exact
+`omega0=0`. Track A is restricted to genuinely identical ROBERT/stable-pRT
+gas-plus-cloud optical-depth inputs; Track B is native attribution, and no
+PICASO identical-tensor gate is invented.
+
+The complete launcher took `2371.303374 s`: `42.664949 s` for its repeated
+pilot and `2328.638425 s` for the matrix and assembly. Complete-matrix peak
+process-tree RSS was `5,195,988,992 bytes`. The repeated warmed pilot projected
+`4906.158647 s` and passed both resource limits; both pilot records are retained.
+
+Stage 7 is an out-of-tolerance characterized regime. Exact isothermal cloud
+effect and maximum `omega0` remain exactly zero, and all primary contribution-
+profile gates pass. However, primary Track-A absolute-spectrum p95 is
+`0.327970825`, cloud-effect p95 is `0.0517204233`, and eclipse-effect RMS is
+`6.21989875 ppm`; all exceed their frozen limits. The corresponding 80-to-160
+values are `0.288476674`, `0.0540403749`, and `6.33828924 ppm`; cloud-response
+TV p95 is `0.644274045`. The strongest discrepancies occur in extreme
+high-tau, high-altitude or short-wavelength-weighted placements, not the
+moderate pilot alone.
+
+Raw workers, 92 integrity-indexed full-precision products, the full report,
+and the integrity index remain ignored locally for a later archival release.
+See
+`docs/review/57_emission_intercomparison_v2_stage_7.md` and the compact
+`docs/data/emission_intercomparison/version_2/stage_7_summary.json`.
 
 ### Stage 8 -- cloud scattering and solver order
 
