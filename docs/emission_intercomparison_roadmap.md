@@ -73,6 +73,30 @@ classifying a framework as failed.  PICASO resort-rebin remains the primary
 molecular path, while its 819/1638-sample density comparison remains visibly
 finite-sampling limited and unsmoothed.
 
+## Version-2 Stage 3: frozen multi-species and CIA closure
+
+Version-2 Stage 3 is complete for the exact frozen solar-derived fixed-abundance
+H2O, CO, CO2, and CH4 mixture with the serialized H2/He background and mean
+molecular weight.
+The four line absorbers remain active throughout a `2 x 2` H2--H2/H2--He CIA
+factorial crossed with the frozen isothermal and PG14 non-inverted profiles on
+40/80/160 cells.  The representative 80-cell both-CIA pilot measured
+`12.83 s`, projected `461.71 s`, and reached `39.52%` of available memory, so
+the complete matrix was authorized; its post-pilot wall time was `192.70 s`.
+
+The matched ROBERT/stable-pRT Track-A maximum decreases from `7.129640 ppm` at
+40 cells to `1.792972 ppm` at 80 and `0.448767 ppm` at 160.  It therefore
+preserves an out-of-tolerance, vertically converging regime without classifying
+either framework as failed.  The isothermal controls remain below
+`0.002510 ppm`.  Track B attributes native line/CIA database, interpolation,
+and representation effects without cross-framework gates: PICASO resort-rebin
+is primary, while its opacity-sampling and 819/1638-sample density products are
+secondary, separately labelled, and unsmoothed.  PICASO's exact-zero native RT
+and vertical-diagnostic boundaries and stable pRT's missing supported native
+optical-depth tensor remain explicit.  Stage 1's `0.196897 ppm` eight-angle
+result and sub-`0.01 ppm` restriction, and Stage 2's measured vertical regime,
+are unchanged.
+
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures

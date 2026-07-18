@@ -40,6 +40,14 @@ files, local opacity paths, and smoke tests are documented in
   PICASO resort-rebin primary and opacity sampling secondary/unsmoothed,
   preserves native/R=100 spectral, optical-depth, and vertical arrays, and
   reports the measured out-of-tolerance vertical closure regime.
+- `benchmark_emission_intercomparison_v2_stage_3.py`: exact frozen solar-derived fixed-abundance
+  H2O/CO/CO2/CH4 mixture crossed with a `2 x 2` H2--H2/H2--He CIA factorial for
+  the frozen isothermal and PG14 non-inverted profiles on 40/80/160 cells.  It
+  retains the measured out-of-tolerance, vertically converging ROBERT/pRT
+  shared-tau regime without classifying a framework as failed, treats native
+  differences as attribution only, keeps PICASO resort-rebin primary and
+  opacity sampling secondary/unsmoothed, and records unsupported native tensor
+  and vertical-diagnostic interfaces explicitly.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

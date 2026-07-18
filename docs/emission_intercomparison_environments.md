@@ -125,7 +125,34 @@ interpreter for molecular work, and records the optional-Vega and exact-zero
 cloud/Rayleigh divide warnings.  Its detailed raw workers remain ignored
 beneath `examples/outputs/emission_intercomparison/version_2/stage_2/`.
 
-The launcher invokes PICASO 4.0 and stable pRT only through the exact
+Version-2 Stage 3 uses the same exact three interpreters and is reproduced with:
+
+```bash
+PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
+  examples/benchmark_emission_intercomparison_v2_stage_3.py
+```
+
+The Stage-3 launcher crosses the exact fixed-abundance H2O/CO/CO2/CH4 mixture
+with the `2 x 2` H2--H2/H2--He CIA factorial for the isothermal and PG14
+non-inverted profiles on 40/80/160 cells.  It sets `picaso_refdata`,
+`NUMBA_CACHE_DIR`, and `MPLCONFIGDIR` before every PICASO import.  PICASO 4.0
+resort-rebin remains the primary molecular representation; its opacity-sampling
+workers and 819/1638-sample density check remain secondary and unsmoothed.  The
+launcher records the harmless optional-Vega and exact-zero cloud/Rayleigh
+divide warnings without downloading or suppressing them.
+
+Track A exchanges identical molecular-plus-selected-CIA mean optical-depth
+arrays only between the compatible ROBERT and stable-pRT paths.  PICASO's
+exact-`omega0=0` native shared-tensor path remains unsupported, and stable pRT's
+supported native-flux interface still exposes no layer optical-depth tensor.
+Native spectra and genuinely supported vertical diagnostics are retained under
+their distinct definitions.  Detailed Stage-3 workers remain ignored beneath
+`examples/outputs/emission_intercomparison/version_2/stage_3/`; the report,
+integrity manifest, and committed array shards are under
+`docs/data/emission_intercomparison/version_2/`.  Stage 3 supplies the frozen
+pRT opacity path explicitly without overriding `HOME`.
+
+The Stage-2 launcher invokes PICASO 4.0 and stable pRT only through the exact
 interpreter paths above, sets all PICASO configuration/cache variables before
 import, gives pRT a private ignored worker `HOME`, and records the optional
 Vega warning rather than suppressing it.

@@ -329,6 +329,39 @@ factorial design.  Separate line-opacity, CIA, mean-molecular-weight, and native
 database effects.  Use the PG14 non-inverted profile as the headline physical
 case and retain the isothermal analytic control.
 
+Stage 3 is complete.  H2O, CO, CO2, and CH4 remain simultaneously active at
+their exact frozen solar-derived common-contract abundances in every case, while H2--H2 and
+H2--He CIA form a `2 x 2` on/off factorial.  The frozen `1755 K` isothermal and
+PG14 non-inverted arrays were supplied identically on 40, 80, and 160 cells,
+with 80 cells primary.  The representative 80-cell line-plus-both-CIA pilot
+measured `12.825173 s`, projected `461.706212 s`, and used at most
+`3,952,787,456 bytes`, or `39.52%` of available memory, authorizing the full
+matrix.  The post-pilot matrix took `192.703337 s`.
+
+The matched ROBERT/stable-pRT Track-A limits again identify an
+out-of-tolerance, vertically converging closure regime rather than a framework
+failure.  Maximum eclipse-depth differences decrease from `7.129640 ppm` at 40
+cells to `1.792972 ppm` at 80 and `0.448767 ppm` at 160; the largest Track-A
+80-to-160 change is `0.769169 ppm`.  The isothermal analytic controls remain
+below `0.002510 ppm`, and exact-zero scattering is preserved.  These results do
+not alter Stage 1's `0.196897 ppm` eight-angle result or permit sub-`0.01 ppm`
+continuous-angle claims, and they do not reinterpret Stage 2's measured
+out-of-tolerance vertical regime.
+
+Track B is native database/interpolation/representation attribution only and
+has no cross-framework gate.  At 80 cells the maximum native R=100 difference
+is `6.470394 ppm` between ROBERT and stable pRT and about `658.9 ppm` for pairs
+involving PICASO correlated-k.  The PG14 both-CIA versus molecular-only effect
+is `43.398931 ppm` in ROBERT, `43.674657 ppm` in stable pRT, and
+`0.000327 ppm` in PICASO, exposing a native CIA-representation effect rather
+than an RT failure.  PICASO resort-rebin remains primary; opacity sampling is
+secondary and unsmoothed, with its 819/1638-sample density check differing by
+`214.295213 ppm`.  PICASO's exact-`omega0=0` native probes and vertical arrays
+remain capability evidence and absorbing-formal diagnostics respectively;
+stable pRT still exposes no supported native layer optical-depth tensor.  See
+`docs/review/53_emission_intercomparison_v2_stage_3.md` and
+`docs/data/emission_intercomparison/version_2/stage_3_report.json`.
+
 ### Stage 4 -- PG14 structures and contribution functions
 
 Compare the isothermal, PG14 non-inverted, and PG14 inverted contract arrays.
