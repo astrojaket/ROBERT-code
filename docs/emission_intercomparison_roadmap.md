@@ -231,25 +231,37 @@ moderate absorbing-cloud subset separately from the unresolved extreme
 placement/discretization domain rather than assuming all Stage-7 cases are a
 validated scattering baseline.
 
-## Stage 8: cloud scattering and solver order
+## Stage 8: controlled isotropic grey-aerosol study
 
-Stage 8 builds on the accepted Stage-7 extinction contracts in this order:
+Stage 8 uses only the common capability demonstrated to complete in all three
+frameworks. The scenario fixes the accepted Stage-7 `10 mbar`, grey, `tau=1`
+placement and compares clear, exact-absorption (`omega0=0`), and exact-isotropic
+scattering (`omega0=0.9`, `g=0`) states. Each framework evaluates the analytic
+cloud on its native grid. No common cloud tensor and no material-specific cloud
+identity are introduced.
 
-1. `omega0=0` regression to Stage 7;
-2. isotropic scattering with `omega0=0.5`, `0.9`, and `0.99`;
-3. anisotropic cases with asymmetry parameter `g=0.3`, `0.6`, and `0.9`;
-4. wavelength-dependent `omega0(lambda)` and `g(lambda)`;
-5. shared physical Mie phase moments and native microphysical clouds.
+The selected native paths are ROBERT SH4/P3, PICASO SH4 four-stream, and
+stable-pRT Feautrier isotropic scattering. Delta-M/delta-Eddington is off where
+the switch exists. PG14 non-inverted runs at 40/80/160 cells establish vertical
+convergence; one 80-cell isothermal control checks closure. The matrix is three
+states times four profile/grid shards times three frameworks: 36 native cases.
+The primary cross-framework observable is the scattering increment relative to
+the matched absorbing cloud, with absolute/cloud-minus-clear spectra retained
+as supporting diagnostics.
 
-Each ladder spans cloud optical depths `0.1`, `1`, `10`, and `100`.  The
-comparison includes absorption-only and single-scattering diagnostics,
-Toon/two-stream, SH4/P3, and an independent high-order reference envelope such
-as a 16--32+ stream, adding/doubling, matrix-operator, or Monte Carlo solution.
-Delta-M scaling and phase-moment truncation are contract fields.
+The broad scattering ladders, anisotropy, delta-M, wavelength-dependent and
+MgSiO3/Mie clouds, native microphysics, and high-order envelope from the Stage-8
+timing pilots are explicitly deferred to a **future study**. The retained pilot
+results remain useful capability and resource evidence but are not production
+requirements for the controlled Stage-8 result.
 
-Both disk-integrated spectra and angle-resolved radiances are reported.  A
-high-order envelope is mandatory before claiming science validity for
-`omega0>=0.9`, `g>=0.6`, or scattering optical depth above one.
+The controlled matrix is complete: all 36 cases are finite, actual serial wall
+time is `355.572035 s`, and peak process-tree RSS is `8,827,633,664 bytes`.
+Scattering-minus-absorbing RMS amplitudes span `18.8105--26.6081 ppm` across the
+three native frameworks. The shared qualitative signature is accepted for this
+narrow scenario. Cross-framework amplitudes remain descriptive Track-B
+attribution, and stable-pRT's `7.2977%` 80-to-160 increment-difference metric is
+carried forward as an explicit convergence limitation.
 
 ## Stage 9: directed JWST-like cross-retrievals
 
@@ -312,6 +324,7 @@ count and memory request to be set from measurements rather than guesswork.
 The intercomparison is ready for submission when all nine stages have
 reproducible manifests and primary figures; shared-input discrepancies satisfy
 their predeclared gates or have a converged documented attribution; Stage 8
-has a high-order scattering envelope for the claimed cloud domain; and both
+has a converged controlled isotropic-scattering result without claims beyond
+that narrow cloud domain; and both
 cloud-free and cloudy Stage-9 directed retrievals report bias, coverage,
 convergence failures, and resource use at every declared uncertainty tier.

@@ -495,29 +495,46 @@ See
 `docs/review/57_emission_intercomparison_v2_stage_7.md` and the compact
 `docs/data/emission_intercomparison/version_2/stage_7_summary.json`.
 
-### Stage 8 -- cloud scattering and solver order
+### Stage 8 -- controlled isotropic grey-aerosol study
 
-Stage 8 is deliberately split into laptop-sized subtasks, each with its own
-pilot, report, complete arrays, and commit:
+Stage 8 now asks one deliberately narrow question: for the same moderate grey
+cloud, how much does enabling exact isotropic scattering change each code's
+native thermal-emission spectrum? It is a Track-B comparison of the simplest
+completed native scattering path in each framework, not a material-specific
+MgSiO3 or microphysical-cloud claim.
 
-1. **8A, contracts and absorption regression:** re-establish `omega0=0` against
-   Version-2 Stage 7; freeze phase-function, delta-M, boundary, angular, and
-   solver-order metadata; measure a cross-framework resource pilot.
-2. **8B, isotropic ladder:** `g=0`, `omega0=0.5`, `0.9`, and `0.99` over cloud
-   optical depths `0.1`, `1`, `10`, and `100`, starting with the accepted
-   moderate Stage-7 placements.  Unsupported pRT pathways remain explicit.
-3. **8C, anisotropy and delta-M:** `g=0.3`, `0.6`, and `0.9`, with delta-M off/on
-   as an explicit contract and Toon/two-stream versus SH4/P3 solver order where
-   supported.
-4. **8D, spectral and physical clouds:** wavelength-dependent `omega0(lambda)`
-   and `g(lambda)`, shared Mie phase moments, and native microphysical clouds.
-5. **8E, high-order envelope and synthesis:** representative 16--32+ stream,
-   adding/doubling, matrix-operator, or Monte Carlo references; angular and
-   vertical convergence; a regime map rather than a single pass/fail ranking.
+The common analytic cloud has a `10 mbar` top, `100 bar` bottom, grey column
+optical depth `tau=1` at `5 micron`, spectral slope zero, and exact `g=0`. Each
+framework evaluates this definition on its own native pressure and wavelength
+grid; no opacity, phase, or optical-depth tensor is shared. The three states
+are clear (`tau=0`), absorbing (`tau=1`, exact `omega0=0`), and scattering
+(`tau=1`, `omega0=0.9`). The primary diagnostic is scattering minus absorbing,
+which separates the scattering response from cloud extinction.
 
-The high-order envelope is required before making science-validity claims for
-`omega0 >= 0.9`, `g >= 0.6`, or scattering optical depth above one.  It is not
-required to describe how a code behaves when it lacks that capability.
+The only production solver paths are ROBERT SH4/P3 with delta-M off, PICASO
+SH4 four-stream with delta-Eddington off, and stable-pRT Feautrier isotropic
+scattering on the eight-angle grid. ROBERT and PICASO Toon are excluded because
+their frozen pilots failed or returned non-finite spectra. The matrix contains
+the three states for PG14 non-inverted at 40/80/160 cells plus an 80-cell
+isothermal control: 12 cases per framework and 36 native cases total.
+
+The previously piloted isotropic ladders, anisotropy, delta-M, wavelength-
+dependent/MgSiO3 clouds, native microphysics, and high-order reference envelope
+are retained as **future-study** resource evidence. They are not part of the
+current Stage-8 production contract and must not be needed to interpret this
+controlled comparison.
+
+The completed controlled run produced 36/36 finite cases in `355.572035 s`
+(`5.926201 min`) with peak process-tree RSS `8,827,633,664 bytes`. All three
+frameworks show the same broad scattering signature: small positive changes
+below about `2 micron` and reduced emission through most of `3--12 micron`.
+Primary scattering-minus-absorbing RMS amplitudes are `22.4420 ppm` (ROBERT),
+`26.6081 ppm` (PICASO), and `18.8105 ppm` (stable pRT). Native pairwise RMS
+differences are `4.5719--8.7637 ppm` and are descriptive, not gated. Stable
+pRT's 80-to-160 scattering-increment p95 difference is `7.2977%` of pair peak,
+larger than ROBERT/PICASO, so the controlled conclusion does not claim tighter
+pRT difference-signal convergence. See the compact Stage-8 summary and
+`docs/review/58_emission_intercomparison_v2_stage_8_pilots.md`.
 
 ### Stage 9 -- directed JWST-like cross-retrievals
 

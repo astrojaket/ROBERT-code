@@ -100,6 +100,21 @@ files, local opacity paths, and smoke tests are documented in
   references use distinguishable neutral tones and line styles, and no result
   relies on colour alone. `--representative-pilot` renders the pilot without
   pretending that unavailable convergence products exist.
+- `benchmark_emission_intercomparison_v2_stage_8_pilots.py`: cold/warm
+  Track-B capability and resource pilots for ROBERT, PICASO, and stable pRT.
+  The broad 8A--8E ladder is retained as **future-study** evidence. The current
+  Stage-8 contract instead selects only ROBERT SH4/P3, PICASO SH4 four-stream,
+  and stable-pRT Feautrier for the controlled clear/absorbing/isotropically-
+  scattering grey-aerosol study; no production matrix is launched here.
+- `benchmark_emission_intercomparison_v2_stage_8.py`: completed 36-case
+  controlled Track-B grey-aerosol production study. It runs ROBERT SH4/P3,
+  PICASO SH4, and stable-pRT Feautrier serially for clear, absorbing, and exact-
+  isotropic scattering states, records the user-authorized ROBERT memory-gate
+  override, assembles R=100 scattering increments and convergence metrics, and
+  leaves the broad future-study matrix untouched.
+- `plot_emission_intercomparison_v2_stage_8.py`: maintained-style primary
+  spectra/scattering-increment and 40/80/160 convergence figures from the
+  ignored controlled Stage-8 products.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

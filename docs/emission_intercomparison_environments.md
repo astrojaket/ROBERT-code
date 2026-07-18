@@ -287,6 +287,29 @@ took `2371.303374 s`, including `2328.638425 s` for matrix/assembly, and reached
 `5,195,988,992 bytes` complete-matrix peak process-tree RSS. All 92 integrity-
 indexed numerical artifacts remain local and ignored.
 
+The current Version-2 Stage-8 continuation is the controlled isotropic grey-
+aerosol study, not the broad scattering ladder. It runs only ROBERT SH4/P3,
+PICASO SH4 four-stream, and stable-pRT Feautrier isotropic scattering for clear,
+absorbing, and `omega0=0.9`, `g=0` states. PG14 non-inverted 40/80/160-cell
+shards and one 80-cell isothermal shard give 12 cases per framework. The broad
+anisotropy, delta-M, MgSiO3/Mie, microphysics, and high-order pilot matrix is
+retained as future-study evidence.
+
+Measured cold/warm pilots project `291.39423244283535 s` (`4.856570540713922`
+minutes) for the complete controlled study, including the frozen 25% plot and
+assembly allowance. PICASO and pRT remain comfortably below the 60%-available-
+memory rule. ROBERT projects `6,680,389,376 bytes`, or `60.5702016550128%` of
+the lowest pilot-available memory, so it is operationally feasible on the
+laptop but requires serial execution, no concurrent framework workers, and a
+memory preflight rather than an unconditional resource-gate pass.
+
+The completed run took `355.57203475001734 s` and reached
+`8,827,633,664 bytes` peak process-tree RSS. Four early ROBERT cases used the
+authorized conservative gate override; every case remained finite. The
+160-cell ROBERT scattering case established the true peak and completed with
+`13,887,717,376 bytes` available at launch. The PICASO optional-Vega warning is
+retained and irrelevant to the explicit Version-2 blackbody stellar input.
+
 The canonical continuation through absorbing clouds, cloud scattering, and
 cloud-free plus cloudy cross-retrievals is documented in
 `docs/emission_intercomparison_roadmap.md`.  Stage-9 implementation, contracts,
