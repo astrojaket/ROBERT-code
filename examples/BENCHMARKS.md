@@ -67,6 +67,18 @@ files, local opacity paths, and smoke tests are documented in
 - `plot_emission_intercomparison_v2_stage_5.py`: Matplotlib-only full-domain
   spectra/Jacobian, signed/normalized pressure-response, contribution-versus-
   response, and convergence figures from committed Stage-5 products.
+- `benchmark_emission_intercomparison_v2_stage_6.py`: exact Version-2
+  localized composition responses for H2O, CO, CO2, and CH4 on the two PG14
+  profiles and 40/80/160 cells. It recomputes the exact H2/He remainder, MMW,
+  both CIA pairs, and molecular opacity for every state; keeps Track A limited
+  to state-specific identical ROBERT/stable-pRT optical depths; retains native
+  Track B as attribution; and stores signed composition Jacobians, pressure
+  responses, own/cross-species fractions, linearity/symmetry diagnostics, and
+  supported full-precision opacity/tau tensors.
+- `plot_emission_intercomparison_v2_stage_6.py`: Matplotlib-only full-domain
+  composition-Jacobian, signed/normalized pressure-response, own/cross-species,
+  contribution/temperature/composition comparison, and convergence figures
+  from committed Stage-4 through Stage-6 products.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

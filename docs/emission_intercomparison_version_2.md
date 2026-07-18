@@ -418,10 +418,38 @@ responses are compared but explicitly not treated as identical. See
 
 ### Stage 6 -- composition responses
 
-Perturb each of H2O, CO, CO2, and CH4 about its frozen reference log-VMR using
-one declared renormalization rule for the H2/He remainder.  Report own- and
-cross-species responses, CIA/MMW coupling, finite-difference linearity,
-pressure metrics, complete tensors, and convergence for the PG14 profiles.
+Stage 6 is complete. Each of H2O, CO, CO2, and CH4 was perturbed independently
+with symmetric localized log10-VMR changes at the same six pressure centres,
+using `0.35 dex` Gaussian width and a primary `+/-0.10 dex` half-step. The
+exact Version-2 `0.8547:0.1453` H2/He remainder, complete six-species
+normalization, MMW, H2--H2 CIA, and H2--He CIA were recomputed for every state.
+The `0.05/0.10/0.20 dex` ladder was evaluated on both 80-cell PG14 profiles.
+
+Track A recomputes the shared molecular-plus-both-CIA optical depth for every
+composition state and is limited to compatible ROBERT/stable-pRT definitions.
+All primary and 80-to-160 cross-framework gates pass: primary signed-Jacobian
+p95 is `0.326129%`, eclipse-Jacobian RMS is `0.132753 ppm/dex`, pressure-
+centroid RMS is `0.00197857 dex`, response TV p95 is `0.00301641`, and cross-
+species-fraction TV p95 is `0.000157077`. The corresponding converged values
+are `0.215698%`, `0.0747847 ppm/dex`, `0.00894567 dex`, `0.0167956`, and
+`0.0000558249`.
+
+The `0.00217799` linearity p95 passes, while the `0.0266245` symmetry p95
+exceeds its frozen `0.02` gate. Stage 6 is therefore retained as an out-of-
+tolerance characterized regime, not a framework failure. The isothermal
+analytic composition response and all zero-signal normalizations are exactly
+zero.
+
+Track B remains attribution-only and recomputes native molecular opacity,
+mixing, CIA, composition conversion, and MMW for each state. Primary native
+ROBERT/stable-pRT Jacobian differences reach `0.815618%`; pairs involving
+PICASO correlated-k reach `4.071860%`. PICASO's state-dependent absolute
+summed-line-VMR restoration is verified per perturbation. Complete signed
+state spectra, composition responses/Jacobians, own/cross-species fractions,
+pressure diagnostics, supported optical-depth tensors, band/window summaries,
+and convergence are retained in 767 checksum-indexed products. See
+`docs/review/56_emission_intercomparison_v2_stage_6.md` and
+`docs/data/emission_intercomparison/version_2/stage_6_report.json`.
 
 ### Stage 7 -- absorbing-cloud placement and extinction
 

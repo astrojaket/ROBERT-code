@@ -94,7 +94,9 @@ env picaso_refdata=/Users/jaketaylor/Dropbox/picaso-v4/reference \
   examples/check_emission_intercomparison_environment.py picaso \
   --picaso-reference /Users/jaketaylor/Dropbox/picaso-v4/reference \
   --picaso-ck-directory /Users/jaketaylor/Dropbox/picaso/reference/opacities/resortrebin
-/opt/miniconda3/envs/petitradtrans-stable/bin/python examples/check_emission_intercomparison_environment.py petitradtrans
+/opt/miniconda3/envs/petitradtrans-stable/bin/python \
+  examples/check_emission_intercomparison_environment.py petitradtrans \
+  --prt-input-data /Users/jaketaylor/Dropbox/ROBERT-code/opacity_data/petitRADTRANS/input_data
 ```
 
 For the work-laptop project-local ROBERT environment, use:
@@ -219,7 +221,19 @@ case-specific shared optical depths for Track A, native composition-dependent
 opacity/CIA recomputation for Track B, and a primary-resolution finite-
 difference audit at 0.05, 0.10, and 0.20 dex.  Its absolute interpreters,
 package versions, warnings, contracts, checksums, and raw/summarized timings
-are recorded in `docs/data/emission_intercomparison/stage_6_report.json`.
+are recorded in
+`docs/data/emission_intercomparison/version_2/stage_6_report.json`. Before
+every PICASO import, the Stage-6 worker sets `picaso_refdata` to the frozen
+reference tree and uses writable task-local `NUMBA_CACHE_DIR` and
+`MPLCONFIGDIR` directories below the ignored Stage-6 output tree. It never
+repurposes `HOME` and never invokes opacity sampling.
+
+The production pilot measured `50.896305 s`, projected `2443.022646 s`, and
+used `4,310,876,160 bytes` peak RSS (`41.790554%` of available memory), so the
+frozen resource gates authorized the complete matrix. Raw workers remain
+ignored under `examples/outputs/emission_intercomparison/version_2/stage_6/`;
+full-precision committed products are split into 767 checksum-indexed files,
+with a largest file of `50,898,616 bytes`.
 
 Stage 7 retains the same interpreters and vertical grids.  It runs a
 representative 80-cell resource pilot before the complete absorbing-cloud

@@ -142,6 +142,30 @@ Stage-4 contribution relations, supported optical-depth tensors, and
 40/80/160 convergence are retained. PICASO and stable-pRT capability
 boundaries remain explicit, and opacity sampling remains retired.
 
+## Version-2 Stage 6: localized composition responses and Jacobians
+
+Version-2 Stage 6 is complete for the two PG14 profiles and 40/80/160 grids.
+Localized `+/-0.10 dex` H2O, CO, CO2, and CH4 perturbations use the frozen
+six-centre, `0.35 dex` design; the exact Version-2 H2/He remainder, MMW, and
+both CIA pairs are recomputed for every composition state. A complete
+`0.05/0.10/0.20 dex` audit is retained at 80 cells.
+
+All primary and 80-to-160 matched Track-A comparison/convergence gates pass.
+The primary signed-Jacobian p95 difference is `0.326129%`, and the converged
+value is `0.215698%`. The finite-difference linearity p95 is `0.00217799` and
+passes, but symmetry is `0.0266245` against the frozen `0.02` limit. The stage
+is therefore an out-of-tolerance characterized regime, without changing the
+frozen design or classifying a framework as failed. Analytic isothermal and
+zero-signal controls remain exactly zero.
+
+Native Track B remains ungated attribution. It reaches `0.815618%` for the
+primary ROBERT/stable-pRT Jacobian comparison and `4.071860%` for pairs
+involving PICASO. Complete state spectra, composition Jacobians and responses,
+pressure diagnostics, own/cross-species fractions, band/window summaries,
+supported opacity/tau arrays, and convergence are checksum-indexed. PICASO
+uses resort-rebin correlated-k only and verifies the state-dependent absolute
+summed-line-VMR correction on every perturbation.
+
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures
