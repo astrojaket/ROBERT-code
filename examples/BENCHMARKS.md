@@ -48,6 +48,13 @@ files, local opacity paths, and smoke tests are documented in
   differences as attribution only, uses PICASO resort-rebin correlated-k only,
   retires opacity sampling, and records unsupported native tensor
   and vertical-diagnostic interfaces explicitly.
+- `benchmark_emission_intercomparison_v2_stage_4.py`: exact frozen isothermal,
+  PG14 non-inverted, and PG14 inverted structures with the four-molecule plus
+  both-CIA state on 40/80/160 cells. It retains native and R=100 signed spectra,
+  eclipse depths, complete vertical diagnostics, centroids, peaks,
+  optical-to-mid-IR band/window behavior, supported optical-depth tensors, and
+  convergence while keeping Track-A gates separate from ungated native
+  attribution.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

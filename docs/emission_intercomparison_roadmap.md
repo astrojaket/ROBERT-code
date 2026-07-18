@@ -95,6 +95,30 @@ optical-depth tensor remain explicit.  Stage 1's `0.196897 ppm` eight-angle
 result and sub-`0.01 ppm` restriction, and Stage 2's measured vertical regime,
 are unchanged.
 
+## Version-2 Stage 4: frozen thermal structures and contribution functions
+
+Version-2 Stage 4 is complete for the exact `1755 K` isothermal, PG14
+non-inverted, and PG14 inverted common-contract arrays on 40/80/160 cells.
+Every case fixes H2O, CO, CO2, and CH4 at their exact reference VMRs with both
+H2--H2 and H2--He CIA enabled. PICASO 4.0 resort-rebin correlated-k remains its
+only active molecular path.
+
+The compatible ROBERT/stable-pRT shared-mean-tau spectra preserve an
+out-of-tolerance, vertically converging closure regime: the maximum eclipse
+difference decreases from `7.110565 ppm` at 40 cells to `1.788100 ppm` at 80
+and `0.447547 ppm` at 160. The largest shared 80-to-160 change is
+`1.206041 ppm`, while the isothermal controls remain below `0.001044 ppm` and
+the matched vertical diagnostic closes exactly to stored precision.
+
+Native database/interpolation/correlated-k/RT differences remain attribution
+only. At 80 cells the largest native ROBERT/stable-pRT difference is
+`9.873270 ppm`, the largest pair involving PICASO is `125.715939 ppm`, and the
+largest native pressure-centroid RMS difference is `0.129370 dex`. Complete
+native/R=100 spectra, eclipse depths, pressure-resolved arrays, centroids,
+peaks, band/window diagnostics, optical-depth tensors where supported, and
+40/80/160 convergence are retained. Capability boundaries for PICASO and
+stable pRT remain explicit rather than populated with invented products.
+
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 
 Stage 7 establishes cloud placement and extinction before scattering closures

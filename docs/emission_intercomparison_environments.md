@@ -155,12 +155,30 @@ integrity manifest, and committed array shards are under
 `docs/data/emission_intercomparison/version_2/`.  Stage 3 supplies the frozen
 pRT opacity path explicitly without overriding `HOME`.
 
+Version-2 Stage 4 uses the same process isolation and is reproduced with:
+
+```bash
+PYTHONPATH=src /opt/miniconda3/envs/robert-exoplanets/bin/python \
+  examples/benchmark_emission_intercomparison_v2_stage_4.py
+```
+
+The launcher supplies the exact common-contract isothermal, PG14 non-inverted,
+and PG14 inverted arrays on 40/80/160 cells with both frozen CIA pairs on. It
+sets the required PICASO reference and writable task-local Numba/Matplotlib
+caches before every PICASO import, uses resort-rebin correlated-k only, and
+preserves the absolute summed line-gas VMR restoration. Detailed workers stay
+ignored under `examples/outputs/emission_intercomparison/version_2/stage_4/`;
+the sharded numerical products, report, and integrity manifest are under
+`docs/data/emission_intercomparison/version_2/`. The launcher does not
+repurpose `HOME`.
+
 The Stage-2 launcher invokes PICASO 4.0 and stable pRT only through the exact
 interpreter paths above, sets all PICASO configuration/cache variables before
 import, gives pRT a private ignored worker `HOME`, and records the optional
 Vega warning rather than suppressing it.
 
-Run Stages 4--6 from the ROBERT environment after the smoke tests:
+Run historical Version-1 Stages 4--6 from the ROBERT environment after the
+smoke tests:
 
 ```bash
 conda activate robert-exoplanets

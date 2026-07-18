@@ -360,6 +360,34 @@ peak pressures, band/window behaviour, and 40/80/160 convergence.  Framework-
 native diagnostic definitions remain separately named; similar-looking
 contribution functions are not assumed identical.
 
+Stage 4 is complete using the fixed Stage-3 molecular-plus-H2--H2/H2--He CIA
+state. The exact common-contract isothermal, PG14 non-inverted, and PG14
+inverted arrays were supplied identically at 40, 80, and 160 cells. The
+initial cold-cache 80-cell three-framework pilot measured `24.917126 s`,
+projected `448.508267 s`, and used at most `4,127,260,672 bytes`, or `38.72%`
+of available memory, authorizing the matrix. The final reporting run retained
+a repeated `11.397582 s` pilot and `92.041606 s` post-pilot matrix timing.
+
+The matched ROBERT/stable-pRT Track-A spectra remain an out-of-tolerance,
+vertically converging closure regime. Maximum eclipse differences are
+`7.110565`, `1.788100`, and `0.447547 ppm` at 40/80/160 cells. The inverted
+profile has maximum symmetric relative differences of `1.865313e-2`,
+`4.717567e-3`, and `1.182411e-3`; the largest Track-A 80-to-160 change is
+`1.206041 ppm`. The isothermal analytic controls remain below `0.001044 ppm`.
+The matched Track-A vertical diagnostic agrees exactly to stored precision.
+
+Track B remains ungated native attribution. At 80 cells, the largest native
+ROBERT/stable-pRT difference is `9.873270 ppm`, and the largest pair involving
+PICASO correlated-k is `125.715939 ppm`, both for the inverted profile. The
+largest native pressure-centroid RMS difference is `0.129370 dex`; complete
+pressure-resolved diagnostics, centroids, peaks, seven optical-to-mid-IR
+band/window summaries, and convergence arrays are retained. PICASO's native
+total `taugas` and exact-`omega0=0` thermal probe remain separate from the
+absorbing-formal spectrum and vertical diagnostic. Stable pRT's supported
+native flux path still exposes no layer optical-depth tensor. See
+`docs/review/54_emission_intercomparison_v2_stage_4.md` and
+`docs/data/emission_intercomparison/version_2/stage_4_report.json`.
+
 ### Stage 5 -- temperature responses
 
 Apply the same pressure-localized symmetric temperature perturbations to both
