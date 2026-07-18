@@ -447,9 +447,10 @@ PICASO correlated-k reach `4.071860%`. PICASO's state-dependent absolute
 summed-line-VMR restoration is verified per perturbation. Complete signed
 state spectra, composition responses/Jacobians, own/cross-species fractions,
 pressure diagnostics, supported optical-depth tensors, band/window summaries,
-and convergence are retained in 767 checksum-indexed products. See
-`docs/review/56_emission_intercomparison_v2_stage_6.md` and
-`docs/data/emission_intercomparison/version_2/stage_6_report.json`.
+and convergence were retained in 767 locally generated checksum-indexed
+products. They default to the ignored Stage-6 output tree for later Zenodo or
+equivalent archival release rather than ordinary Git. See
+`docs/review/56_emission_intercomparison_v2_stage_6.md`.
 
 ### Stage 7 -- absorbing-cloud placement and extinction
 

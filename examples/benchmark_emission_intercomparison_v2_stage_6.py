@@ -29,6 +29,7 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 DATA_ROOT = REPOSITORY / "docs/data/emission_intercomparison/version_2"
 COMMON_CONTRACT = DATA_ROOT / "common_contract.json"
 DEFAULT_OUTPUT = REPOSITORY / "examples/outputs/emission_intercomparison/version_2/stage_6"
+DEFAULT_PRODUCT_ROOT = DEFAULT_OUTPUT / "products"
 WORKER = Path(__file__).with_name("run_emission_intercomparison_v2_stage_6_external.py")
 STAGE_3_PATH = Path(__file__).with_name("benchmark_emission_intercomparison_v2_stage_3.py")
 STAGE_4_PATH = Path(__file__).with_name("benchmark_emission_intercomparison_v2_stage_4.py")
@@ -1486,7 +1487,7 @@ def _run_complete_matrix(
     stage_3._write_json(integrity_path, _integrity_manifest(artifacts))
     artifacts.append(integrity_path)
     checksums_path = data_root / "checksums.json"
-    checksums = json.loads(checksums_path.read_text())
+    checksums = json.loads(checksums_path.read_text()) if checksums_path.exists() else {}
     for name in tuple(checksums):
         if name.startswith("stage_6_"):
             checksums.pop(name)
@@ -1506,13 +1507,22 @@ def _run_complete_matrix(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--data-root", type=Path, default=DATA_ROOT)
+    parser.add_argument(
+        "--product-root",
+        "--data-root",
+        dest="product_root",
+        type=Path,
+        default=DEFAULT_PRODUCT_ROOT,
+        help="local generated-product directory (the --data-root name is deprecated)",
+    )
     parser.add_argument("--pilot-only", action="store_true")
     args = parser.parse_args()
     if os.path.realpath(sys.executable) != os.path.realpath(ROBERT_PYTHON):
         raise RuntimeError(f"Stage 6 must run with {ROBERT_PYTHON}")
     output_root = args.output_root.resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    product_root = args.product_root.resolve()
+    product_root.mkdir(parents=True, exist_ok=True)
     common = load_version_2_common_contract(COMMON_CONTRACT)
     paths = stage_3._opacity_paths()
     for species, asset in common.picaso_correlated_k_assets.items():
@@ -1523,7 +1533,7 @@ def main() -> None:
         print(json.dumps(pilot, indent=2, sort_keys=True))
         return
     result = _run_complete_matrix(
-        common, output_root, args.data_root.resolve(), paths, pilot
+        common, output_root, product_root, paths, pilot
     )
     print(json.dumps({"pilot": pilot, **result}, indent=2, sort_keys=True))
 

@@ -151,8 +151,9 @@ paths. The projected full workload includes two profiles, four targets, three
 resolutions, and both additional linearity amplitudes. The full matrix is
 authorized only if projected wall time is at most `7200 s` and the largest
 process-tree peak RSS is below 60 per cent of memory available at the
-decision. All committed shards must be below `100,000,000 bytes` without
-reducing precision or dropping required tensors.
+decision. All generated shards must be below `100,000,000 bytes` without
+reducing precision or dropping required tensors, making the local set suitable
+for a later archival-data bundle.
 
 ## Preserved earlier-stage framing
 
@@ -214,21 +215,22 @@ native `taugas` is retained without relabelling absorbing-formal diagnostics
 as native SH contributions. Stable pRT's absent supported native layer-tau
 interface remains absent rather than being fabricated.
 
-The strict Stage-6 checksum index covers `767` files: `766` data/report shards
-plus the integrity manifest. Their aggregate size is `15,278,571,444 bytes`
+The strict local Stage-6 checksum index covers `767` files: `766` data/report
+shards plus the integrity manifest. Their aggregate size is `15,278,571,444 bytes`
 including the manifest, and the largest individual product is `50,898,616
 bytes`, safely below the `100,000,000-byte` object limit. Full precision and
 all required native tensors were retained. The optional-Vega and exact-zero
 cloud/Rayleigh warnings were recorded without downloads, suppression, or
 epsilon substitution.
 
-The canonical machine-readable results are
-`docs/data/emission_intercomparison/version_2/stage_6_report.json`, with
-per-file units, axes, sizes, and SHA-256 digests in
-`docs/data/emission_intercomparison/version_2/stage_6_integrity.json` and the
-Version-2 `checksums.json`. Stage-4 contribution functions, Stage-5 signed
-temperature responses, and these Stage-6 signed composition derivatives are
-compared as distinct diagnostics, never as interchangeable quantities.
+The machine-readable results, per-file units, axes, sizes, and SHA-256 digests
+remain under the ignored local
+`examples/outputs/emission_intercomparison/version_2/stage_6/products/` tree.
+The 15.28 GB set is intentionally excluded from ordinary Git and retained for
+a later Zenodo or equivalent paper-data release. Stage-4 contribution
+functions, Stage-5 signed temperature responses, and these Stage-6 signed
+composition derivatives are compared as distinct diagnostics, never as
+interchangeable quantities.
 
 Final verification used the exact isolated interpreters. The focused Stage-6
 suite passed `45` tests; the Stage-1 preservation plus Stage-6 strict checksum
@@ -239,3 +241,12 @@ declared skips in `311.02 s`. The ROBERT `0.3.0`, PICASO `4.0` 661-bin resort-
 rebin correlated-k, and stable-pRT `3.3.3` environment smokes all returned
 finite positive thermal output. The PICASO smoke retained the harmless
 optional-Vega warning and did not invoke opacity sampling.
+
+The publication branch intentionally retains code, contracts, tests, review,
+and plotting support but excludes the 15.28 GB generated tensor set from
+ordinary Git. The benchmark now defaults those products to the ignored local
+output tree; `--product-root` can direct a future archival build, and the old
+`--data-root` spelling remains a compatibility alias. After this repository-
+policy change, the code-only checkout passed `564` tests with `9` declared
+skips; four additional skips are the product-integrity tests that activate
+when a local Stage-6 product set is present.

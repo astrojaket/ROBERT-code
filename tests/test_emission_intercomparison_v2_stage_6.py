@@ -168,6 +168,13 @@ def test_stage_6_opacity_sampling_products_are_absent() -> None:
     assert not list(DATA.glob("stage_6_*sampling*.npz"))
 
 
+def test_stage_6_products_default_to_ignored_local_output() -> None:
+    assert stage_6.DEFAULT_PRODUCT_ROOT == stage_6.DEFAULT_OUTPUT / "products"
+    assert "examples/outputs" in stage_6.DEFAULT_PRODUCT_ROOT.as_posix()
+    gitignore = (ROOT / ".gitignore").read_text()
+    assert "docs/data/emission_intercomparison/version_2/stage_6_*" in gitignore
+
+
 def test_stage_6_picaso_correction_is_state_dependent_and_restores_sum() -> None:
     path = DATA / "stage_6_main_pg14_non_inverted_H2O_80_cells_picaso.npz"
     if not path.exists():

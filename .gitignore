@@ -33,6 +33,7 @@ retrieval_runs/
 opacity_data/
 opacities/
 input_data/
+docs/data/emission_intercomparison/version_2/stage_6_*
 
 # The historical, exo_k-binned HAT-P-32b tables remain versioned inside the
 # depreciated benchmark archive; arbitrary user opacity directories are ignored.

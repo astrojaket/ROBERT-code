@@ -164,7 +164,10 @@ involving PICASO. Complete state spectra, composition Jacobians and responses,
 pressure diagnostics, own/cross-species fractions, band/window summaries,
 supported opacity/tau arrays, and convergence are checksum-indexed. PICASO
 uses resort-rebin correlated-k only and verifies the state-dependent absolute
-summed-line-VMR correction on every perturbation.
+summed-line-VMR correction on every perturbation. The 15.28 GB full-precision
+set is reproducible from the benchmark and remains in the ignored local output
+tree pending a Zenodo or equivalent paper-data release; it is not stored in
+ordinary Git.
 
 ## Stage 7: absorbing clouds (completed; full-domain gates not accepted)
 

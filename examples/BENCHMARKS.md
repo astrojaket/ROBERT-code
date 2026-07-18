@@ -78,7 +78,8 @@ files, local opacity paths, and smoke tests are documented in
 - `plot_emission_intercomparison_v2_stage_6.py`: Matplotlib-only full-domain
   composition-Jacobian, signed/normalized pressure-response, own/cross-species,
   contribution/temperature/composition comparison, and convergence figures
-  from committed Stage-4 through Stage-6 products.
+  from locally generated Stage-4 through Stage-6 products. Stage-6 numerical
+  products default to the ignored `examples/outputs/` tree rather than Git.
 - `benchmark_emission_intercomparison_stage_4.py`: native-opacity thermal
   structure and contribution-function comparison for isothermal, monotonic,
   inverted, and retrieved-like profiles on 40/80/160 vertical grids.

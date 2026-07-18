@@ -11,7 +11,10 @@ import numpy as np
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
-DATA = REPOSITORY / "docs/data/emission_intercomparison/version_2"
+DATA = (
+    REPOSITORY
+    / "examples/outputs/emission_intercomparison/version_2/stage_6/products"
+)
 PROFILES = ("pg14_non_inverted", "pg14_inverted")
 MODELS = ("robert", "picaso", "petitradtrans")
 SPECIES = ("H2O", "CO", "CO2", "CH4")
@@ -235,9 +238,12 @@ def plot_convergence_and_differences(output: Path) -> None:
 
 
 def main() -> None:
+    global DATA
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--product-root", type=Path, default=DATA)
     args = parser.parse_args()
+    DATA = args.product_root.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
     plot_spectra_and_jacobians(args.output / "stage6-spectra-composition-jacobians.png")
     plot_pressure_responses(args.output / "stage6-pressure-responses.png")

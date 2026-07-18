@@ -221,8 +221,8 @@ case-specific shared optical depths for Track A, native composition-dependent
 opacity/CIA recomputation for Track B, and a primary-resolution finite-
 difference audit at 0.05, 0.10, and 0.20 dex.  Its absolute interpreters,
 package versions, warnings, contracts, checksums, and raw/summarized timings
-are recorded in
-`docs/data/emission_intercomparison/version_2/stage_6_report.json`. Before
+are recorded in the ignored local product tree at
+`examples/outputs/emission_intercomparison/version_2/stage_6/products/`. Before
 every PICASO import, the Stage-6 worker sets `picaso_refdata` to the frozen
 reference tree and uses writable task-local `NUMBA_CACHE_DIR` and
 `MPLCONFIGDIR` directories below the ignored Stage-6 output tree. It never
@@ -230,10 +230,11 @@ repurposes `HOME` and never invokes opacity sampling.
 
 The production pilot measured `50.896305 s`, projected `2443.022646 s`, and
 used `4,310,876,160 bytes` peak RSS (`41.790554%` of available memory), so the
-frozen resource gates authorized the complete matrix. Raw workers remain
-ignored under `examples/outputs/emission_intercomparison/version_2/stage_6/`;
-full-precision committed products are split into 767 checksum-indexed files,
-with a largest file of `50,898,616 bytes`.
+frozen resource gates authorized the complete matrix. Raw workers and full-
+precision numerical products remain ignored under
+`examples/outputs/emission_intercomparison/version_2/stage_6/`. A complete run
+produces 767 checksum-indexed files, with a largest file of `50,898,616 bytes`;
+these remain local pending a Zenodo or equivalent paper-data release.
 
 Stage 7 retains the same interpreters and vertical grids.  It runs a
 representative 80-cell resource pilot before the complete absorbing-cloud
