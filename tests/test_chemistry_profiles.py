@@ -190,6 +190,40 @@ def test_composition_mean_molecular_weight_can_preserve_raw_selected_species_sum
     np.testing.assert_allclose(mean_molecular_weight, np.full(2, expected))
 
 
+def test_composition_mean_molecular_weight_supports_fitted_phantom_gas_mass() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    model = CompositionMeanMolecularWeight(
+        molecular_mass_parameters={"phantom": "phantom_mmw"}
+    )
+    composition = {
+        "CO2": np.full(2, 0.2),
+        "phantom": np.full(2, 0.8),
+    }
+
+    mean_molecular_weight = model.evaluate(
+        composition,
+        grid,
+        parameters={"phantom_mmw": 60.0},
+    )
+
+    assert model.required_parameters() == ("phantom_mmw",)
+    np.testing.assert_allclose(mean_molecular_weight, np.full(2, 0.2 * 44.0095 + 48.0))
+
+
+def test_fitted_phantom_gas_mass_must_be_positive() -> None:
+    grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=2)
+    model = CompositionMeanMolecularWeight(
+        molecular_mass_parameters={"phantom": "phantom_mmw"}
+    )
+
+    with pytest.raises(ValueError, match="must be positive"):
+        model.evaluate(
+            {"phantom": np.ones(2)},
+            grid,
+            parameters={"phantom_mmw": 0.0},
+        )
+
+
 def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     pytest.importorskip("pyfastchem")
     fastchem_path = Path(__file__).parents[1] / "data" / "chemistry" / "fastchem"

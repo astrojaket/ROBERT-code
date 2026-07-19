@@ -127,6 +127,10 @@ atmosphere:
     # background_fractions: [0.8547, 0.1453]
     # fill_background: true
     # excess_policy: raise        # Alternative: normalize.
+    # Optional composition-agnostic filler. Make this the sole background gas;
+    # it has no opacity and its retrieved mass controls the bulk MMW.
+    # phantom_species: phantom
+    # phantom_mean_molecular_weight_parameter: phantom_mmw
 
 # =============================================================================
 # CLOUD PROPERTIES
@@ -245,6 +249,18 @@ parameters:
   # - {name: log_CH4, label: log10(CH4 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -6.0}
   # - {name: log_NH3, label: log10(NH3 VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -7.0}
   # - {name: log_HCN, label: log10(HCN VMR), prior: {type: uniform, lower: -12.0, upper: -1.0}, value: -8.0}
+
+  # --- Centered-log-ratio free chemistry alternative ---
+  # Use model: free, parameter_mode: log10, fill_background: true. Every
+  # retrieved abundance must use the same CLR group and bounds. The configured
+  # background is the final, symmetrically treated composition category.
+  # - {name: log_H2O, label: log10(H2O VMR), prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}, value: -3.0}
+  # - {name: log_CO2, label: log10(CO2 VMR), prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}, value: -3.0}
+  # - {name: log_CH4, label: log10(CH4 VMR), prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}, value: -3.0}
+
+  # --- Optional phantom-background mass (with phantom chemistry above) ---
+  # This is the molecular mass in atomic mass units, not a separate atmosphere MMW.
+  # - {name: phantom_mmw, label: Phantom molecular mass, unit: amu, prior: {type: uniform, lower: 2.3, upper: 100.0}, value: 28.0}
 
   # --- Optional transmission reference-radius scale ---
   # - {name: radius_scale, prior: {type: uniform, lower: 0.98, upper: 1.02}, value: 1.0}

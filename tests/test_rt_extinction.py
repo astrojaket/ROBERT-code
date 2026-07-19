@@ -89,6 +89,33 @@ def test_rayleigh_requires_composition_or_explicit_background_assumption() -> No
     assert assumed.metadata["composition_fallback"] == "explicit_H2/He"
 
 
+def test_phantom_background_has_zero_rayleigh_scattering() -> None:
+    gas_tau = _gas_tau(SpectralGrid.from_array([0.5], unit="micron", role="opacity"))
+    atmosphere = AtmosphereState(
+        pressure_grid=gas_tau.pressure_grid,
+        temperature=gas_tau.atmosphere.temperature,
+        composition={
+            "H2O": np.full(gas_tau.atmosphere.n_layers, 0.1),
+            "phantom": np.full(gas_tau.atmosphere.n_layers, 0.9),
+        },
+        mean_molecular_weight=25.0,
+        metadata={"opacity_free_species": "phantom"},
+    )
+    opacity = _evaluated_opacity(
+        gas_tau.pressure_grid,
+        gas_tau.spectral_grid,
+        np.zeros((1, gas_tau.atmosphere.n_layers, 1, 1)),
+    )
+    phantom = assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=10.0)
+
+    rayleigh = rayleigh_scattering_optical_depth(phantom)
+
+    np.testing.assert_allclose(rayleigh.tau, 0.0)
+    assert rayleigh.metadata["composition_fallback"] == (
+        "zero_H2/He_with_opacity_free_background"
+    )
+
+
 def test_cia_optical_depth_uses_h2_h2_and_h2_he_pairs() -> None:
     spectral_grid = SpectralGrid.from_array([5.0, 10.0], unit="micron", role="opacity")
     gas_tau = _gas_tau(spectral_grid)

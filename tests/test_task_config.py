@@ -41,6 +41,7 @@ CLOUDY_MULTISPECIES_TRANSMISSION = (
     / "configurations"
     / "synthetic_six_molecule_cloudy_transmission_injection_recovery_multinest.yaml"
 )
+L98_59B_CLR = ROOT / "configurations" / "l98_59b_clr_transmission_multinest.yaml"
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 
 
@@ -88,6 +89,24 @@ def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 40
     assert config.runtime.mpi_processes == 2
+
+
+def test_l98_59b_clr_retrieval_configuration_matches_requested_run() -> None:
+    config = load_task_config(L98_59B_CLR)
+
+    assert config.observations.loader == "bello_arufe2025_l9859b"
+    assert config.observations.datasets == ("nrs1", "nrs2")
+    assert config.radiative_transfer.model == "transmission"
+    assert config.atmosphere.temperature.parameter_name == "temperature"
+    assert config.atmosphere.chemistry.background_species == ("H2",)
+    assert config.opacity.species == ("SO2", "H2S", "CO2")
+    assert all(
+        parameter.prior.type == "centered_log_ratio"
+        for parameter in config.parameters[:3]
+    )
+    assert config.sampler.engine == "multinest"
+    assert config.sampler.live_points == 50
+    assert config.runtime.mpi_processes == 3
 
 
 def test_yaml_configures_six_molecule_transmission_recovery() -> None:
@@ -161,6 +180,111 @@ def test_transmission_radius_parameter_must_be_in_retrieval_parameters() -> None
     ]
 
     with pytest.raises(ValidationError, match="radius_scale"):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_configures_joint_centered_log_ratio_chemistry() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["background_species"] = ["H2"]
+    raw["atmosphere"]["chemistry"]["background_fractions"] = [1.0]
+    for parameter in raw["parameters"]:
+        if parameter["name"] == "log_H2O":
+            parameter["prior"] = {
+                "type": "centered_log_ratio",
+                "lower": -12.0,
+                "upper": 0.0,
+                "group": "atmosphere",
+            }
+
+    parsed = TaskConfig.model_validate(raw)
+
+    prior = parsed.parameters[0].prior
+    assert prior.type == "centered_log_ratio"
+    assert prior.group == "atmosphere"
+    assert parsed.atmosphere.chemistry.background_species == ("H2",)
+
+
+def test_yaml_configures_phantom_background_and_fitted_molecular_weight() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    chemistry = raw["atmosphere"]["chemistry"]
+    chemistry["background_species"] = ["phantom"]
+    chemistry["background_fractions"] = [1.0]
+    chemistry["phantom_species"] = "phantom"
+    chemistry["phantom_mean_molecular_weight_parameter"] = "phantom_mmw"
+    for parameter in raw["parameters"]:
+        if parameter["name"] == "log_H2O":
+            parameter["prior"] = {
+                "type": "centered_log_ratio",
+                "lower": -12.0,
+                "upper": 0.0,
+                "group": "atmosphere",
+            }
+    raw["parameters"] = (
+        *raw["parameters"],
+        {
+            "name": "phantom_mmw",
+            "prior": {"type": "uniform", "lower": 2.3, "upper": 100.0},
+        },
+    )
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.atmosphere.chemistry.phantom_species == "phantom"
+    assert (
+        parsed.atmosphere.chemistry.phantom_mean_molecular_weight_parameter
+        == "phantom_mmw"
+    )
+
+
+def test_clr_and_phantom_configuration_is_geometry_agnostic() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    chemistry = raw["atmosphere"]["chemistry"]
+    chemistry["background_species"] = ["phantom"]
+    chemistry["background_fractions"] = [1.0]
+    chemistry["phantom_species"] = "phantom"
+    chemistry["phantom_mean_molecular_weight_parameter"] = "phantom_mmw"
+    raw["parameters"] = [
+        parameter
+        for parameter in raw["parameters"]
+        if parameter["name"] != "radius_scale"
+    ]
+    raw["parameters"][0]["prior"] = {
+        "type": "centered_log_ratio",
+        "lower": -12.0,
+        "upper": 0.0,
+    }
+    raw["parameters"].append(
+        {
+            "name": "phantom_mmw",
+            "prior": {"type": "uniform", "lower": 2.3, "upper": 100.0},
+        }
+    )
+    raw["radiative_transfer"]["model"] = "emission"
+    raw["radiative_transfer"]["radius_scale_parameter"] = None
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.radiative_transfer.model == "emission"
+    assert parsed.atmosphere.chemistry.phantom_species == "phantom"
+    assert parsed.parameters[0].prior.type == "centered_log_ratio"
+
+
+def test_yaml_rejects_optimal_estimation_for_centered_log_ratio_prior() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["background_species"] = ["H2"]
+    raw["atmosphere"]["chemistry"]["background_fractions"] = [1.0]
+    raw["parameters"][0]["prior"] = {
+        "type": "centered_log_ratio",
+        "lower": -12.0,
+        "upper": 0.0,
+    }
+    raw["sampler"]["engine"] = "optimal_estimation"
+
+    with pytest.raises(ValidationError, match="direct nested sampling"):
         TaskConfig.model_validate(raw)
 
 

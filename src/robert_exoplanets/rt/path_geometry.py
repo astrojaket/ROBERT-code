@@ -168,7 +168,19 @@ def hydrostatic_path_geometry(
     reference_radius = _positive_float(reference_radius_m, "reference_radius_m")
     reference_pressure_pa = _positive_float(reference_pressure_pa, "reference_pressure")
     particle_mass_kg = np.asarray(atmosphere.mean_molecular_weight, dtype=float) * ATOMIC_MASS_KG
-    scale_height = BOLTZMANN_CONSTANT_J_K * atmosphere.temperature / (particle_mass_kg * gravity)
+    hydrostatic_denominator = particle_mass_kg * gravity
+    if (
+        not np.all(np.isfinite(hydrostatic_denominator))
+        or np.any(hydrostatic_denominator <= 0.0)
+    ):
+        raise RobertValidationError(
+            "hydrostatic particle-mass gravity product must be finite and positive"
+        )
+    scale_height = (
+        BOLTZMANN_CONSTANT_J_K
+        * atmosphere.temperature
+        / hydrostatic_denominator
+    )
     if not np.all(np.isfinite(scale_height)) or np.any(scale_height <= 0.0):
         raise RobertValidationError("hydrostatic scale heights must be finite and positive")
 

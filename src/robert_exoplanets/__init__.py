@@ -89,9 +89,11 @@ from .instruments import (
 )
 from .io import (
     AtmosphereModelSetup,
+    BELLO_ARUFE2025_EUREKA_SHA256,
     SCHLAWIN2024_SP_SHA256,
     WISER2025_SHA256,
     build_atmosphere_setup,
+    load_bello_arufe2025_l9859b,
     load_schlawin2024_wasp69b,
     load_wiser2025_wasp80b,
 )
@@ -145,6 +147,7 @@ from .postprocessing import (
     weighted_quantile,
 )
 from .retrieval import (
+    CenteredLogRatioPrior,
     LogUniformPrior,
     MultiDatasetRetrievalProblem,
     MultiNestRunConfig,
@@ -162,6 +165,7 @@ from .retrieval import (
     UniformPrior,
     UltraNestRunConfig,
     build_retrieval_problem,
+    centered_log_ratio_prior_transform,
     convert_emission_observation_table,
     load_emission_observation_npz,
     load_observation_npz,
@@ -275,6 +279,7 @@ __all__ = [
     "AtmosphereBuilder",
     "AbsorptionTransmissionResult",
     "AtmosphereModelSetup",
+    "BELLO_ARUFE2025_EUREKA_SHA256",
     "AtmosphereState",
     "BlackbodyStellarSpectrumModel",
     "BackgroundGasMixture",
@@ -335,6 +340,7 @@ __all__ = [
     "KtaHeader",
     "KtaTable",
     "CiaTable",
+    "CenteredLogRatioPrior",
     "Observation",
     "ObservationCollection",
     "ObservationDataset",
@@ -427,6 +433,7 @@ __all__ = [
     "compare_opacity_arrays",
     "convert_kta_to_robert_archive",
     "cia_optical_depth",
+    "centered_log_ratio_prior_transform",
     "disk_average_quadrature",
     "discover_retrieval_result_directories",
     "evaluate_injection_recovery",
@@ -452,6 +459,7 @@ __all__ = [
     "load_emission_benchmark_csv",
     "load_cloud_optical_properties_csv",
     "load_cloud_optical_properties_npz",
+    "load_bello_arufe2025_l9859b",
     "load_nemesispy_cia_table",
     "load_schlawin2024_wasp69b",
     "load_wiser2025_wasp80b",

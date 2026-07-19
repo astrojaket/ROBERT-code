@@ -397,14 +397,29 @@ def rayleigh_scattering_optical_depth(
     h2 = _composition_profile(atmosphere.composition, "H2", atmosphere.n_layers)
     he = _composition_profile(atmosphere.composition, "He", atmosphere.n_layers)
     h2_he_fraction = h2 + he
+    composition_fallback = "none"
     if not np.any(h2_he_fraction > 0.0):
-        if default_fraction is None:
+        opacity_free_species = tuple(
+            name.strip()
+            for name in atmosphere.metadata.get("opacity_free_species", "").split(",")
+            if name.strip()
+        )
+        opacity_free_background = any(
+            name in atmosphere.composition
+            and np.any(np.asarray(atmosphere.composition[name]) > 0.0)
+            for name in opacity_free_species
+        )
+        if default_fraction is None and not opacity_free_background:
             raise RobertValidationError(
                 "Rayleigh scattering requires explicit H2/He composition or an explicit "
                 "default_h2_fraction_of_h2_he"
             )
-        h2 = np.full(atmosphere.n_layers, default_fraction, dtype=float)
-        he = 1.0 - h2
+        if default_fraction is not None:
+            h2 = np.full(atmosphere.n_layers, default_fraction, dtype=float)
+            he = 1.0 - h2
+            composition_fallback = "explicit_H2/He"
+        else:
+            composition_fallback = "zero_H2/He_with_opacity_free_background"
 
     lambda_m = wavelength_micron * 1.0e-6
     inverse_micron = 1.0 / wavelength_micron
@@ -446,7 +461,7 @@ def rayleigh_scattering_optical_depth(
             "source": "H2/He refractivity model",
             "column_model": "species VMR times hydrostatic layer column",
             "mixture_rule": "number-weighted sum of molecular cross-sections",
-            "composition_fallback": "none" if default_fraction is None else "explicit_H2/He",
+            "composition_fallback": composition_fallback,
             "scattering_source_function": "not_included",
         },
     )

@@ -59,10 +59,14 @@ class MeanMolecularWeightModel(Protocol):
 
     unit: str
 
+    def required_parameters(self) -> tuple[str, ...]:
+        """Return parameters needed to evaluate molecular masses."""
+
     def evaluate(
         self,
         composition: Mapping[str, NDArray[np.float64]],
         pressure_grid: PressureGrid,
+        parameters: Mapping[str, float] | None = None,
     ) -> NDArray[np.float64]:
         """Evaluate mean molecular weight on a pressure grid."""
 
@@ -217,10 +221,15 @@ class FixedMeanMolecularWeight:
         self,
         composition: Mapping[str, NDArray[np.float64]],
         pressure_grid: PressureGrid,
+        parameters: Mapping[str, float] | None = None,
     ) -> NDArray[np.float64]:
         """Return a fixed mean molecular weight for every layer."""
 
+        del composition, parameters
         return _readonly_constant_profile(self.value, pressure_grid.n_layers)
+
+    def required_parameters(self) -> tuple[str, ...]:
+        return ()
 
 
 @dataclass(frozen=True)
@@ -237,6 +246,7 @@ class CompositionMeanMolecularWeight:
     molecular_masses: Mapping[str, float] = field(
         default_factory=lambda: dict(DEFAULT_MOLECULAR_MASSES)
     )
+    molecular_mass_parameters: Mapping[str, str] = field(default_factory=dict)
     normalization: str = "require"
     sum_tolerance: float = 1.0e-8
     unit: str = "amu"
@@ -258,13 +268,36 @@ class CompositionMeanMolecularWeight:
                 raise RobertValidationError("molecular masses must be finite and positive")
             masses[name] = mass
 
+        mass_parameters: dict[str, str] = {}
+        for species, parameter in self.molecular_mass_parameters.items():
+            name = _validate_species_name(species)
+            parameter_name = str(parameter).strip()
+            if not parameter_name:
+                raise RobertValidationError(
+                    "molecular-mass parameter names must not be empty"
+                )
+            mass_parameters[name] = parameter_name
+        if len(set(mass_parameters.values())) != len(mass_parameters):
+            raise RobertValidationError(
+                "molecular-mass parameter names must be unique"
+            )
+
         object.__setattr__(self, "molecular_masses", masses)
+        object.__setattr__(
+            self,
+            "molecular_mass_parameters",
+            immutable_mapping(mass_parameters),
+        )
         object.__setattr__(self, "sum_tolerance", tolerance)
+
+    def required_parameters(self) -> tuple[str, ...]:
+        return tuple(self.molecular_mass_parameters.values())
 
     def evaluate(
         self,
         composition: Mapping[str, NDArray[np.float64]],
         pressure_grid: PressureGrid,
+        parameters: Mapping[str, float] | None = None,
     ) -> NDArray[np.float64]:
         """Return composition-weighted mean molecular weight by layer."""
 
@@ -273,9 +306,22 @@ class CompositionMeanMolecularWeight:
 
         numerator = np.zeros(pressure_grid.n_layers, dtype=float)
         total = np.zeros(pressure_grid.n_layers, dtype=float)
+        parameter_values = {} if parameters is None else parameters
         for species, values in composition.items():
             name = _validate_species_name(species)
-            if name not in self.molecular_masses:
+            if name in self.molecular_mass_parameters:
+                molecular_mass = _parameter_value(
+                    parameter_values,
+                    self.molecular_mass_parameters[name],
+                    context=f"{name} molecular mass",
+                )
+                if molecular_mass <= 0.0:
+                    raise RobertValidationError(
+                        f"{name} molecular mass must be positive"
+                    )
+            elif name in self.molecular_masses:
+                molecular_mass = self.molecular_masses[name]
+            else:
                 raise RobertValidationError(f"missing molecular mass for species: {name}")
             profile = _readonly_layer_array(
                 values,
@@ -284,7 +330,7 @@ class CompositionMeanMolecularWeight:
             )
             if np.any(profile < 0.0):
                 raise RobertValidationError("composition values must be non-negative")
-            numerator += profile * self.molecular_masses[name]
+            numerator += profile * molecular_mass
             total += profile
 
         if np.any(total <= 0.0):

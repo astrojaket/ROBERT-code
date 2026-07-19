@@ -124,6 +124,32 @@ parameters:
 The configured K-table directory must contain an SO2 R1000 product before
 opacity preparation is run.
 
+Free-chemistry nested sampling also accepts a joint CLR prior. All retrieved
+abundances must use one shared group; the configured background gas is the
+derived final composition category:
+
+```yaml
+atmosphere:
+  chemistry:
+    model: free
+    species: [SO2, CO2, H2S]
+    parameter_mode: log10
+    parameter_names: {SO2: log_SO2, CO2: log_CO2, H2S: log_H2S}
+    background_species: [H2]
+    background_fractions: [1.0]
+    fill_background: true
+parameters:
+  - {name: log_SO2, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+  - {name: log_CO2, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+  - {name: log_H2S, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+```
+
+To avoid assuming a physical background gas, set the sole background species
+to a name such as `phantom`, configure
+`phantom_mean_molecular_weight_parameter`, and add that scalar mass parameter
+in amu. The phantom supplies closure and MMW but no opacity. See
+`docs/theory/chemistry.md` for the full semantics and validation constraints.
+
 Unknown fields and inconsistent molecule/parameter references are errors. To
 inspect the resolved choices without loading data or opacity, run:
 

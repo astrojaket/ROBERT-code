@@ -632,8 +632,9 @@ class CorrelatedKOpacityProvider:
         underscore. If multiple files map to one species, callers must choose
         explicitly with :meth:`from_kta_paths` so resolution/isotopologue
         selection is never implicit. When ``resolution`` is supplied, ROBERT
-        accepts either a parent containing an ``R<value>`` subdirectory or the
-        resolution directory itself, and only loads ``*_<resolution>.kta``.
+        accepts a parent containing an ``R<value>`` subdirectory, the
+        resolution directory itself, or a flat directory containing matching
+        ``*_<resolution>.kta`` files. Only that requested resolution is loaded.
         """
 
         root = Path(directory).expanduser()
@@ -642,7 +643,10 @@ class CorrelatedKOpacityProvider:
             resolution_directory = root / resolution_name
             if resolution_directory.is_dir():
                 root = resolution_directory
-            elif root.name.casefold() != resolution_name.casefold():
+            elif (
+                root.name.casefold() != resolution_name.casefold()
+                and not any(root.glob(f"*_{resolution_name}.kta"))
+            ):
                 raise RobertValidationError(
                     "ExoMol opacity root does not contain the requested "
                     f"resolution directory {resolution_name}: {root}"

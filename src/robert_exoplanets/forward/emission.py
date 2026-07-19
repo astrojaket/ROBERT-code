@@ -602,6 +602,10 @@ class ParameterizedEmissionForwardModel:
             *self.atmosphere_builder.temperature_profile.required_parameters(),
             *self.atmosphere_builder.chemistry_model.required_parameters(),
         ]
+        if self.atmosphere_builder.mean_molecular_weight_model is not None:
+            parameters.extend(
+                self.atmosphere_builder.mean_molecular_weight_model.required_parameters()
+            )
         if self.config.radius_scale_parameter is not None:
             parameters.append(self.config.radius_scale_parameter)
         if self.cloud_model is not None:

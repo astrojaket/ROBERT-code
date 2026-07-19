@@ -41,6 +41,7 @@ from robert_exoplanets.instruments import ObservationCollection, ObservationData
 from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
 from robert_exoplanets.opacity import CorrelatedKOpacityProvider, CorrelatedKTable
 from robert_exoplanets.retrieval import (
+    CenteredLogRatioPrior,
     LogUniformPrior,
     MultiDatasetRetrievalProblem,
     RetrievalParameter,
@@ -59,6 +60,7 @@ from robert_exoplanets.rt import (
 )
 
 from .task_config import ParameterConfig, TaskConfig, initialize_task_directories
+from .l9859b import load_bello_arufe2025_l9859b
 from .wasp69b import load_schlawin2024_wasp69b
 from .wasp80b import load_wiser2025_wasp80b
 
@@ -138,6 +140,7 @@ def load_observations(config: TaskConfig) -> ObservationCollection:
             metadata={"source_path": str(config.observations.path)},
         )
     loaders = {
+        "bello_arufe2025_l9859b": load_bello_arufe2025_l9859b,
         "schlawin2024_wasp69b": load_schlawin2024_wasp69b,
         "wiser2025_wasp80b": load_wiser2025_wasp80b,
     }
@@ -379,11 +382,20 @@ def _planet(config: TaskConfig) -> tuple[Planet, float]:
 def _parameters(items: tuple[ParameterConfig, ...]) -> RetrievalParameterSet:
     parameters = []
     for item in items:
-        prior_class = UniformPrior if item.prior.type == "uniform" else LogUniformPrior
+        if item.prior.type == "uniform":
+            prior = UniformPrior(item.prior.lower, item.prior.upper)
+        elif item.prior.type == "log_uniform":
+            prior = LogUniformPrior(item.prior.lower, item.prior.upper)
+        else:
+            prior = CenteredLogRatioPrior(
+                item.prior.lower,
+                item.prior.upper,
+                group=item.prior.group or "composition",
+            )
         parameters.append(
             RetrievalParameter(
                 item.name,
-                prior_class(item.prior.lower, item.prior.upper),
+                prior,
                 label=item.label,
                 unit=item.unit,
             )
@@ -495,7 +507,16 @@ def build_problem(
             excess_policy=chemistry_item.excess_policy,
         )
         mean_molecular_weight = CompositionMeanMolecularWeight(
-            normalization="require" if chemistry_item.fill_background else "normalize"
+            normalization="require" if chemistry_item.fill_background else "normalize",
+            molecular_mass_parameters=(
+                {}
+                if chemistry_item.phantom_species is None
+                else {
+                    chemistry_item.phantom_species: (
+                        chemistry_item.phantom_mean_molecular_weight_parameter
+                    )
+                }
+            ),
         )
     geometry_item = config.radiative_transfer.geometry
     geometry = (
@@ -619,6 +640,11 @@ def build_problem(
                 temperature_profile=temperature,
                 chemistry_model=chemistry,
                 mean_molecular_weight_model=mean_molecular_weight,
+                opacity_free_species=(
+                    ()
+                    if chemistry_item.phantom_species is None
+                    else (chemistry_item.phantom_species,)
+                ),
                 pressure_grid=pressure,
                 cia_table=cia,
                 opacity_source=provider,
@@ -637,6 +663,11 @@ def build_problem(
                 temperature_profile=temperature,
                 chemistry_model=chemistry,
                 mean_molecular_weight_model=mean_molecular_weight,
+                opacity_free_species=(
+                    ()
+                    if chemistry_item.phantom_species is None
+                    else (chemistry_item.phantom_species,)
+                ),
                 pressure_grid=pressure,
                 cia_table=cia,
                 geometry=geometry,
@@ -859,11 +890,15 @@ def run_forward_task(config: TaskConfig, source: Path) -> Path:
     observations = load_observations(config)
     problem = build_problem(config, observations)
     values = {}
-    for configured, parameter in zip(
-        config.parameters, problem.parameters.parameters, strict=True
+    midpoint = problem.parameters.midpoint_vector()
+    for configured, parameter, midpoint_value in zip(
+        config.parameters,
+        problem.parameters.parameters,
+        midpoint,
+        strict=True,
     ):
         values[parameter.name] = (
-            parameter.midpoint if configured.value is None else configured.value
+            float(midpoint_value) if configured.value is None else configured.value
         )
     spectra = problem.model_spectra(values)
     write_config_snapshot(config, source)

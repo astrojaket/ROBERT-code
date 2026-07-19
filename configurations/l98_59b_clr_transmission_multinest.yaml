@@ -1,0 +1,127 @@
+schema_version: 2
+
+run:
+  name: l98-59b-clr-transmission-multinest
+  description: >-
+    ROBERT transmission retrieval of the 0.01 micron Eureka! spectrum from
+    Bello-Arufe et al. (2025), using a four-category CLR composition prior for
+    SO2, H2S, CO2, and derived H2. This is the requested 50-live-point
+    ROBERT/POSEIDON Figure 8 comparison run, not a reproduction of the paper's
+    full 11-parameter, 2,000-live-point POSEIDON retrieval: planet mass and the
+    1-bar lower boundary are fixed, and only the requested gases are included.
+
+bodies:
+  planet:
+    name: L 98-59 b
+    radius_m: 5415350.0       # 0.85 R_earth
+    mass_kg: 2.806934e24      # 0.47 M_earth, Rajpaul et al. (2024)
+  star:
+    name: L 98-59
+    radius_m: 210797100.0     # 0.303 R_sun, Demangeon et al. (2021)
+    effective_temperature_k: 3415.0
+    log_g_cgs: 4.86
+    metallicity_dex: -0.46
+    spectrum_model: blackbody
+
+observations:
+  loader: bello_arufe2025_l9859b
+  path: ../data/observations/l98_59b_bello_arufe2025
+  datasets: [nrs1, nrs2]
+  verify_checksum: true
+  miri_offset_parameter: nrs2_offset
+  dataset_options: {}
+
+atmosphere:
+  pressure:
+    bottom_bar: 1.0
+    top_bar: 1.0e-7
+    layers: 80
+  temperature:
+    model: isothermal
+    temperature_k: null
+    parameter_name: temperature
+  chemistry:
+    model: free
+    species: [SO2, H2S, CO2]
+    parameter_mode: log10
+    parameter_names: {SO2: log_SO2, H2S: log_H2S, CO2: log_CO2}
+    fixed_mixing_ratios: {}
+    background_species: [H2]
+    background_fractions: [1.0]
+    fill_background: true
+    excess_policy: raise
+
+clouds:
+  model: none
+
+opacity:
+  format: exomol_kta
+  path: /Users/jaketaylor/Dropbox/ktables_exomol
+  resolution: R1000
+  species: [SO2, H2S, CO2]
+  cache_directory: ../examples/outputs/l98_59b_clr_transmission/opacity_cache
+  binning:
+    num: 100
+    use_rebin: false
+    remove_zeros: true
+    g_points: 8
+
+radiative_transfer:
+  model: transmission
+  include_rayleigh: true
+  gas_combination: random_overlap
+  reference_pressure_bar: 1.0
+  radius_scale_parameter: radius_scale
+  gravity_model: inverse_square
+  impact_quadrature_order: 8
+
+likelihood:
+  model: gaussian
+  include_normalization: true
+
+parameters:
+  # H2 is the fourth CLR category and is derived from unit-sum closure.
+  - {name: log_SO2, label: log10 SO2 VMR, value: -0.6020599913, prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}}
+  - {name: log_H2S, label: log10 H2S VMR, value: -0.6020599913, prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}}
+  - {name: log_CO2, label: log10 CO2 VMR, value: -0.6020599913, prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}}
+  - {name: temperature, label: Isothermal temperature, unit: K, value: 596.0, prior: {type: uniform, lower: 100.0, upper: 800.0}}
+  - {name: radius_scale, label: 1-bar reference-radius scale, value: 1.0, prior: {type: uniform, lower: 0.85, upper: 1.15}}
+  - {name: nrs2_offset, label: NRS2 relative offset, unit: transit_depth, value: 0.0, prior: {type: uniform, lower: -2.0e-4, upper: 2.0e-4}}
+
+sampler:
+  engine: multinest
+  live_points: 50
+  multinest_max_iterations: 0
+  dlogz: 0.5
+  sampling_efficiency: 0.8
+  importance_nested_sampling: true
+  multimodal: true
+  iterations_before_update: 50
+  resume: overwrite
+  show_status: true
+  seed: 20260719
+  invalid_loglike_floor: -1.0e100
+
+outputs:
+  directory: ../examples/outputs/l98_59b_clr_transmission
+
+plotting:
+  enabled: true
+  retrieval: true
+  forward: true
+  style: default
+  image_format: png
+  dpi: 180
+  max_posterior_samples: 20000
+  dataset_colors: {nrs1: "#365c8d", nrs2: "#e76f51"}
+  parameter_labels:
+    log_SO2: log10 SO2 VMR
+    log_H2S: log10 H2S VMR
+    log_CO2: log10 CO2 VMR
+    temperature: Isothermal temperature (K)
+    radius_scale: 1-bar reference-radius scale
+    nrs2_offset: NRS2 relative offset
+
+runtime:
+  mpi_processes: 3
+  scratch_directory: ../examples/outputs/l98_59b_clr_transmission/scratch

@@ -240,6 +240,24 @@ def test_provider_accepts_exact_resolution_directory(tmp_path: Path) -> None:
     assert provider.species == ("CO",)
 
 
+def test_provider_accepts_flat_directory_with_resolution_filenames(
+    tmp_path: Path,
+) -> None:
+    _write_synthetic_kta(tmp_path / "CO_R1000.kta")
+    _write_synthetic_kta(tmp_path / "CO_R15000.kta")
+
+    provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+        tmp_path,
+        species=("CO",),
+        resolution="R1000",
+    )
+
+    assert provider.species == ("CO",)
+    assert provider.tables["CO"].metadata["source_path"].endswith(
+        "CO_R1000.kta"
+    )
+
+
 def test_provider_reports_missing_resolution_directory(tmp_path: Path) -> None:
     with pytest.raises(RobertValidationError, match="R1000"):
         CorrelatedKOpacityProvider.from_exomol_kta_directory(

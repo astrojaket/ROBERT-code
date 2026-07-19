@@ -175,6 +175,16 @@ def test_hydrostatic_geometry_rejects_reference_pressure_outside_grid() -> None:
         )
 
 
+def test_hydrostatic_geometry_rejects_underflowing_mass_gravity_product() -> None:
+    with pytest.raises(RobertValidationError, match="particle-mass gravity"):
+        hydrostatic_path_geometry(
+            _isothermal_atmosphere(),
+            gravity_m_s2=1.0e-300,
+            reference_radius_m=1.0e8,
+            reference_pressure=1.0,
+        )
+
+
 def test_emission_with_normal_spherical_path_matches_plane_parallel() -> None:
     atmosphere = _isothermal_atmosphere()
     spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")

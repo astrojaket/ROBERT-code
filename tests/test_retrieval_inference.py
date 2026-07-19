@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from robert_exoplanets import (
+    CenteredLogRatioPrior,
     LogUniformPrior,
     Observation,
     RetrievalParameter,
@@ -14,6 +15,7 @@ from robert_exoplanets import (
     RetrievalProblem,
     Spectrum,
     UniformPrior,
+    centered_log_ratio_prior_transform,
     load_emission_observation_npz,
     load_observation_npz,
     run_optimal_estimation,
@@ -62,6 +64,85 @@ def test_parameter_set_transforms_unit_cube_and_log_prior() -> None:
     assert parameters.vector_to_mapping(vector) == {"offset": 0.5, "scale": pytest.approx(1.0e-2)}
     assert np.isfinite(parameters.log_prior_from_vector(vector))
     assert parameters.parameters[1].midpoint == pytest.approx(1.0e-2)
+
+
+def test_centered_log_ratio_prior_closes_composition_without_privileged_gas() -> None:
+    free_log_vmr = centered_log_ratio_prior_transform(
+        [0.25, 0.50, 0.75], lower_log10_vmr=-12.0
+    )
+    free_vmr = 10.0**free_log_vmr
+    derived_vmr = 1.0 - float(np.sum(free_vmr))
+
+    assert np.all(free_log_vmr >= -12.0)
+    assert np.all(free_log_vmr <= 0.0)
+    assert derived_vmr >= 1.0e-12
+    assert derived_vmr + float(np.sum(free_vmr)) == pytest.approx(1.0)
+
+
+def test_centered_log_ratio_prior_rejects_cube_outside_simplex() -> None:
+    transformed = centered_log_ratio_prior_transform(
+        [1.0, 1.0, 1.0], lower_log10_vmr=-12.0
+    )
+
+    np.testing.assert_allclose(transformed, np.full(3, -50.0))
+
+
+@pytest.mark.parametrize(
+    ("cube", "poseidon_free_log10_vmr"),
+    [
+        ([0.25], [-6.000000434294265]),
+        (
+            [0.25, 0.50, 0.75],
+            [-8.82109965230034, -4.410559887560278, -2.0122820214138306e-05],
+        ),
+    ],
+)
+def test_centered_log_ratio_matches_poseidon_reference_vectors(
+    cube, poseidon_free_log10_vmr
+) -> None:
+    """Values frozen from POSEIDON CLR_Prior at commit d1632214c9f3."""
+
+    np.testing.assert_allclose(
+        centered_log_ratio_prior_transform(cube),
+        poseidon_free_log10_vmr,
+        rtol=0.0,
+        atol=2.0e-14,
+    )
+
+
+def test_parameter_set_applies_named_centered_log_ratio_group_jointly() -> None:
+    parameters = RetrievalParameterSet(
+        (
+            RetrievalParameter("temperature", UniformPrior(200.0, 800.0)),
+            RetrievalParameter(
+                "log_SO2", CenteredLogRatioPrior(-12.0, 0.0, "atmosphere")
+            ),
+            RetrievalParameter(
+                "log_CO2", CenteredLogRatioPrior(-12.0, 0.0, "atmosphere")
+            ),
+        )
+    )
+
+    vector = parameters.transform([0.5, 0.25, 0.75])
+    mapping = parameters.vector_to_mapping(vector)
+
+    assert mapping["temperature"] == pytest.approx(500.0)
+    assert 10.0 ** mapping["log_SO2"] + 10.0 ** mapping["log_CO2"] < 1.0
+    np.testing.assert_allclose(
+        parameters.midpoint_vector(), parameters.transform([0.5, 0.5, 0.5])
+    )
+
+
+def test_parameter_set_rejects_invalid_centered_log_ratio_sentinel() -> None:
+    parameters = RetrievalParameterSet(
+        (
+            RetrievalParameter("log_A", CenteredLogRatioPrior()),
+            RetrievalParameter("log_B", CenteredLogRatioPrior()),
+        )
+    )
+
+    with pytest.raises(ValueError, match="composition simplex"):
+        parameters.vector_to_mapping([-50.0, -50.0])
 
 
 def test_load_emission_observation_npz_reads_hat_p_32b_style_keys(tmp_path) -> None:

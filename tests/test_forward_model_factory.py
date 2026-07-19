@@ -9,6 +9,8 @@ import numpy as np
 import pytest
 
 from robert_exoplanets import (
+    BackgroundGasMixture,
+    CompositionMeanMolecularWeight,
     EmissionFactoryConfig,
     EmissionModelConfig,
     CorrelatedKOpacityProvider,
@@ -254,6 +256,42 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
         "runtime_temperature_and_chemistry"
     )
     assert np.all(hot.values > cool.values)
+
+
+def test_parameterized_emission_supports_opacity_free_phantom_with_fitted_mass() -> None:
+    config = ParameterizedEmissionFactoryConfig(
+        planet=Planet(name="Phantom b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Phantom star", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+            background=BackgroundGasMixture({"phantom": 1.0}),
+        ),
+        mean_molecular_weight_model=CompositionMeanMolecularWeight(
+            molecular_mass_parameters={"phantom": "phantom_mmw"}
+        ),
+        opacity_free_species=("phantom",),
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=True,
+            thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
+        ),
+    )
+    model = build_parameterized_emission_model(
+        config,
+        spectral_grid=_spectral_grid(),
+    )
+
+    spectrum = model({"T_iso": 900.0, "log_h2o": -1.0, "phantom_mmw": 30.0})
+
+    assert model.required_parameters == ("T_iso", "log_h2o", "phantom_mmw")
+    assert model.manifest_metadata["factory_opacity_free_species"] == "phantom"
+    assert np.all(np.isfinite(spectrum.values))
 
 
 def test_parameterized_emission_uses_shared_deck_haze_model() -> None:

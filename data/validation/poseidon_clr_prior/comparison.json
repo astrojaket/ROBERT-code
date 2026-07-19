@@ -1,0 +1,34 @@
+{
+  "all_cases_identical": true,
+  "cases": {
+    "1": {
+      "accepted": 10000,
+      "maximum_absolute_log10_vmr_difference": 1.7763568394002505e-15,
+      "samples": 10000,
+      "total_composition_categories": 2
+    },
+    "2": {
+      "accepted": 5744,
+      "maximum_absolute_log10_vmr_difference": 1.7763568394002505e-15,
+      "samples": 10000,
+      "total_composition_categories": 3
+    },
+    "3": {
+      "accepted": 3102,
+      "maximum_absolute_log10_vmr_difference": 1.7763568394002505e-15,
+      "samples": 10000,
+      "total_composition_categories": 4
+    },
+    "6": {
+      "accepted": 485,
+      "maximum_absolute_log10_vmr_difference": 1.7763568394002505e-15,
+      "samples": 10000,
+      "total_composition_categories": 7
+    }
+  },
+  "comparison": "ROBERT centered_log_ratio_prior_transform vs POSEIDON CLR_Prior",
+  "lower_log10_vmr": -12.0,
+  "poseidon_commit": "d1632214c9f3087e367a8d752454f3668fc30e18",
+  "poseidon_retrieval_source_sha256": "04d4df30bff5a98af5c6bd647a16fce6c401e74c0cf837a0bcdb78ed29200f11",
+  "seed": 20260719
+}

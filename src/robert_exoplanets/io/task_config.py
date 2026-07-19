@@ -68,6 +68,7 @@ class DatasetNuisanceConfig(ConfigModel):
 class ObservationsConfig(ConfigModel):
     loader: Literal[
         "robert_npz",
+        "bello_arufe2025_l9859b",
         "schlawin2024_wasp69b",
         "wiser2025_wasp80b",
     ]
@@ -208,6 +209,8 @@ class FreeChemistryConfig(ConfigModel):
     background_fractions: tuple[PositiveFloat, ...] | None = None
     fill_background: bool = True
     excess_policy: Literal["raise", "normalize"] = "raise"
+    phantom_species: str | None = None
+    phantom_mean_molecular_weight_parameter: str | None = None
 
     @model_validator(mode="after")
     def validate_species(self) -> "FreeChemistryConfig":
@@ -231,6 +234,26 @@ class FreeChemistryConfig(ConfigModel):
             raise ValueError(
                 "free chemistry species must not overlap background_species"
             )
+        phantom_values = (
+            self.phantom_species,
+            self.phantom_mean_molecular_weight_parameter,
+        )
+        if (phantom_values[0] is None) != (phantom_values[1] is None):
+            raise ValueError(
+                "phantom_species and phantom_mean_molecular_weight_parameter "
+                "must be configured together"
+            )
+        if self.phantom_species is not None:
+            if not self.fill_background:
+                raise ValueError("phantom chemistry requires fill_background=true")
+            if self.background_species != (self.phantom_species,):
+                raise ValueError(
+                    "phantom_species must be the sole background species"
+                )
+            if not self.phantom_mean_molecular_weight_parameter:
+                raise ValueError(
+                    "phantom_mean_molecular_weight_parameter must be non-empty"
+                )
         return self
 
 
@@ -418,9 +441,10 @@ class RadiativeTransferConfig(ConfigModel):
 
 
 class PriorConfig(ConfigModel):
-    type: Literal["uniform", "log_uniform"]
+    type: Literal["uniform", "log_uniform", "centered_log_ratio"]
     lower: float
     upper: float
+    group: str | None = None
 
     @model_validator(mode="after")
     def validate_bounds(self) -> "PriorConfig":
@@ -428,6 +452,15 @@ class PriorConfig(ConfigModel):
             raise ValueError("prior upper must exceed lower")
         if self.type == "log_uniform" and self.lower <= 0.0:
             raise ValueError("log_uniform prior lower must be positive")
+        if self.type == "centered_log_ratio":
+            if self.lower >= 0.0 or self.upper != 0.0:
+                raise ValueError(
+                    "centered_log_ratio prior requires lower < 0 and upper = 0"
+                )
+            if self.group is not None and not self.group.strip():
+                raise ValueError("centered_log_ratio prior group must be non-empty")
+        elif self.group is not None:
+            raise ValueError("prior group is only valid for centered_log_ratio")
         return self
 
 
@@ -586,6 +619,10 @@ class TaskConfig(ConfigModel):
                 for species in chemistry_config.species
                 if species not in chemistry_config.fixed_mixing_ratios
             )
+            if chemistry_config.phantom_mean_molecular_weight_parameter is not None:
+                required.add(
+                    chemistry_config.phantom_mean_molecular_weight_parameter
+                )
         temperature = self.atmosphere.temperature
         if temperature.model == "parmentier_guillot_2014":
             required.update({"kappa_IR", "gamma1", "gamma2", "T_irr", "alpha"})
@@ -642,6 +679,47 @@ class TaskConfig(ConfigModel):
                 )
             if radiative_transfer.radius_scale_parameter is not None:
                 required.add(radiative_transfer.radius_scale_parameter)
+        clr_parameters = {
+            item.name: item.prior
+            for item in self.parameters
+            if item.prior.type == "centered_log_ratio"
+        }
+        if clr_parameters:
+            if chemistry_config.model != "free":
+                raise ValueError(
+                    "centered_log_ratio priors require free chemistry"
+                )
+            if chemistry_config.parameter_mode != "log10":
+                raise ValueError(
+                    "centered_log_ratio priors require chemistry parameter_mode=log10"
+                )
+            if not chemistry_config.fill_background:
+                raise ValueError(
+                    "centered_log_ratio priors require a background closure category"
+                )
+            chemistry_parameters = {
+                chemistry_config.parameter_names.get(species, species)
+                for species in chemistry_config.species
+                if species not in chemistry_config.fixed_mixing_ratios
+            }
+            if set(clr_parameters) != chemistry_parameters:
+                raise ValueError(
+                    "all and only retrieved free-chemistry abundances must use "
+                    "centered_log_ratio priors"
+                )
+            groups = {
+                prior.group or "composition" for prior in clr_parameters.values()
+            }
+            if len(groups) != 1:
+                raise ValueError(
+                    "free-chemistry centered_log_ratio priors must share one group"
+                )
+            if self.sampler.engine == "optimal_estimation" or self.sampler.engine.startswith(
+                "optimal_estimation_to_"
+            ):
+                raise ValueError(
+                    "centered_log_ratio priors currently require direct nested sampling"
+                )
         missing_parameters = sorted(required - set(names))
         if missing_parameters:
             raise ValueError(

@@ -64,6 +64,76 @@ more than one. `excess_policy="normalize"` exists for controlled comparison
 workflows, but it changes the meaning of the active abundance parameters and
 should not be used silently in retrieval production runs.
 
+### Centered-log-ratio priors
+
+For nested-sampling free-chemistry retrievals, ROBERT supports joint
+centered-log-ratio (CLR) priors with the same transform used by POSEIDON. With
+`N` retrieved gases, the remaining background abundance is the `(N + 1)`th
+composition category. The transform samples `N` independent CLR coordinates,
+constructs the omitted coordinate from the zero-sum constraint, and maps the
+result to a strictly positive, unit-sum composition. A lower limit of `-12`
+therefore means every category, including the derived background, must have
+`VMR >= 10^-12`.
+
+All retrieved abundance parameters in a CLR configuration must use
+`type: centered_log_ratio`, identical bounds, and the same `group`. Free
+chemistry must use `parameter_mode: log10` and `fill_background: true`. This
+prior is intrinsically joint, so it is supported by direct nested sampling and
+is intentionally rejected for optimal estimation and hybrid retrievals.
+
+```yaml
+atmosphere:
+  chemistry:
+    model: free
+    species: [SO2, CO2, H2S]
+    parameter_mode: log10
+    parameter_names: {SO2: log_SO2, CO2: log_CO2, H2S: log_H2S}
+    background_species: [H2]
+    background_fractions: [1.0]
+    fill_background: true
+parameters:
+  - {name: log_SO2, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+  - {name: log_CO2, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+  - {name: log_H2S, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+```
+
+The composition and MMW implementation is shared by the transmission and
+emission forward models. The CLR path is first being scientifically validated
+for transmission; its availability in emission should not be read as an
+emission validation claim.
+
+### Phantom background gas
+
+A phantom (or ghost) molecule can replace an assumed physical background gas.
+It fills the VMR left by retrieved gases, contributes no line or continuum
+opacity of its own, and has a retrieved molecular mass. Its contribution to
+the atmospheric mean molecular weight is therefore
+`VMR_phantom * phantom_mmw`. This separates scale-height information from an
+assumption such as an H2/He or N2 background.
+
+Configure the phantom as the sole background species and provide its mass
+parameter:
+
+```yaml
+atmosphere:
+  chemistry:
+    model: free
+    species: [CO2, CH4]
+    parameter_mode: log10
+    parameter_names: {CO2: log_CO2, CH4: log_CH4}
+    background_species: [phantom]
+    background_fractions: [1.0]
+    fill_background: true
+    phantom_species: phantom
+    phantom_mean_molecular_weight_parameter: phantom_mmw
+parameters:
+  - {name: phantom_mmw, unit: amu, prior: {type: uniform, lower: 2.3, upper: 100.0}}
+```
+
+When combined with CLR priors, the phantom is the derived final CLR category.
+It is deliberately absent from opacity species, Rayleigh scattering, and CIA
+pairs; only its fitted mass affects MMW and hence hydrostatic structure.
+
 ## Mean Molecular Weight
 
 ROBERT can now derive mean molecular weight from the evaluated composition:
@@ -82,6 +152,10 @@ species molecular masses. The built-in mass table covers the common gases used
 in the current free-chemistry workflow, including H2, He, H2O, CO, CO2, CH4,
 NH3, HCN, SO2, and H2S. Additional or renamed species should be supplied through
 the `molecular_masses` mapping.
+
+For a phantom species, `molecular_mass_parameters` maps the species name to a
+retrieval parameter. Static and retrieved species masses may coexist in the
+same `CompositionMeanMolecularWeight` model.
 
 The default normalization policy is strict: `normalization="require"` checks
 that the VMRs sum to one in every layer. This is deliberate. A trace-only

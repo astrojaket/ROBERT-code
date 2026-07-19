@@ -304,6 +304,7 @@ class ParameterizedEmissionFactoryConfig:
     pressure_grid: PressureGrid | None = None
     mean_molecular_weight: float = 2.3
     mean_molecular_weight_model: MeanMolecularWeightModel | None = None
+    opacity_free_species: tuple[str, ...] = ()
     opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
     geometry: DiscGeometry | None = None
     cloud_model: ParameterizedCloudModel | None = None
@@ -359,6 +360,7 @@ class ParameterizedTransmissionFactoryConfig:
     pressure_grid: PressureGrid | None = None
     mean_molecular_weight: float = 2.3
     mean_molecular_weight_model: MeanMolecularWeightModel | None = None
+    opacity_free_species: tuple[str, ...] = ()
     opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
     cloud_model: ParameterizedCloudModel | None = None
 
@@ -491,6 +493,7 @@ def build_parameterized_emission_model(
         chemistry_model=config.chemistry_model,
         mean_molecular_weight=config.mean_molecular_weight,
         mean_molecular_weight_model=config.mean_molecular_weight_model,
+        opacity_free_species=config.opacity_free_species,
     )
     model_config = replace(
         config.model,
@@ -546,6 +549,7 @@ def build_parameterized_transmission_model(
         chemistry_model=config.chemistry_model,
         mean_molecular_weight=config.mean_molecular_weight,
         mean_molecular_weight_model=config.mean_molecular_weight_model,
+        opacity_free_species=config.opacity_free_species,
     )
     model_config = replace(
         config.model,
@@ -732,6 +736,7 @@ def _parameterized_factory_manifest_metadata(
         "factory_pressure_grid_source": (
             "explicit" if config.pressure_grid is not None else "opacity_centers"
         ),
+        "factory_opacity_free_species": ",".join(config.opacity_free_species),
     }
     if isinstance(config.opacity_source, ExoKOpacitySource):
         metadata["factory_opacity_source_type"] = (

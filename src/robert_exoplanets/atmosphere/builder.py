@@ -8,6 +8,7 @@ from typing import Mapping
 import numpy as np
 
 from robert_exoplanets.core import PressureGrid
+from robert_exoplanets.core import RobertValidationError
 
 from .chemistry import ChemistryModel, MeanMolecularWeightModel
 from .state import AtmosphereState
@@ -23,6 +24,20 @@ class AtmosphereBuilder:
     chemistry_model: ChemistryModel
     mean_molecular_weight: float = 2.3
     mean_molecular_weight_model: MeanMolecularWeightModel | None = None
+    opacity_free_species: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        names = tuple(str(species).strip() for species in self.opacity_free_species)
+        if any(not name for name in names) or len(set(names)) != len(names):
+            raise RobertValidationError(
+                "opacity_free_species must contain unique, non-empty names"
+            )
+        missing = tuple(name for name in names if name not in self.chemistry_model.species)
+        if missing:
+            raise RobertValidationError(
+                "opacity-free species missing from chemistry: " + ", ".join(missing)
+            )
+        object.__setattr__(self, "opacity_free_species", names)
 
     @property
     def species(self) -> tuple[str, ...]:
@@ -51,6 +66,7 @@ class AtmosphereBuilder:
             mean_molecular_weight = self.mean_molecular_weight_model.evaluate(
                 composition,
                 self.pressure_grid,
+                parameters=parameter_values,
             )
             mean_molecular_weight_unit = self.mean_molecular_weight_model.unit
 
@@ -61,6 +77,9 @@ class AtmosphereBuilder:
             composition=composition,
             mean_molecular_weight=mean_molecular_weight,
             mean_molecular_weight_unit=mean_molecular_weight_unit,
+            metadata={
+                "opacity_free_species": ",".join(self.opacity_free_species),
+            },
         )
 
 
