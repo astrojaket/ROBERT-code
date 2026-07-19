@@ -27,6 +27,11 @@ plotting:
   parameter_labels:
     metallicity: "[M/H]"
     CtoO: "C/O"
+  leave_one_out:
+    enabled: false
+    max_posterior_draws: 2000
+    seed: 0
+    pareto_k_threshold: null
 ```
 
 After successful inference, MPI rank 0 post-processes every completed phase.
@@ -55,6 +60,14 @@ ROBERT discovers each completed phase and writes beneath `outputs/plots/`:
 - `posterior_marginals.png` or `optimal_estimation_parameters.png`;
 - `parameter_correlation.png`; and
 - `plot_manifest.json`.
+
+When `plotting.leave_one_out.enabled` is true for a nested-sampling result,
+ROBERT additionally writes `leave_one_out.json`,
+`leave_one_out_arrays.npz`, and `leave_one_out.png`. This PSIS-LOO diagnostic
+reports expected out-of-sample predictive accuracy and Pareto-k reliability at
+individual wavelength resolution. See
+[Bayesian leave-one-out cross-validation](leave_one_out.md) for method,
+configuration, comparison, and interpretation details.
 
 Fit diagnostics include total and per-dataset chi-squared, reduced
 chi-squared, degrees of freedom, chi-squared survival probability, RMSE,

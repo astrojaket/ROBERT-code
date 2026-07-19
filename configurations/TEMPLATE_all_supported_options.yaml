@@ -358,6 +358,11 @@ plotting:
     f444w: "#ef5675"
     lrs: "#2ca25f"
   parameter_labels: {}           # Optional parameter-name to display-label mapping.
+  leave_one_out:
+    enabled: false               # PSIS-LOO pointwise predictive diagnostic for retrievals.
+    max_posterior_draws: 2000    # Forward-model evaluations; weighted chains are reproducibly resampled.
+    seed: 0                      # Seed for equal-weight posterior resampling/subsampling.
+    pareto_k_threshold: null     # null uses ArviZ's sample-size threshold; 0.7 reproduces Welbanks et al. (2023).
 
 runtime:
   mpi_processes: auto

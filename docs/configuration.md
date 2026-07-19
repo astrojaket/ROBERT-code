@@ -71,7 +71,8 @@ The major sections are intentionally explicit:
   either nested sampler), convergence/iteration controls, resume policy, and
   seed;
 - `plotting`: optional automatic retrieval/forward post-processing, image
-  format, Matplotlib style, sampling display limit, colours, and labels;
+  format, Matplotlib style, sampling display limit, colours, labels, and the
+  optional PSIS leave-one-out diagnostic;
 - `outputs`: a project directory outside the source checkout; and
 - `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise,
   while `scratch_directory` controls runtime caches.
@@ -197,6 +198,10 @@ Set `plotting.enabled: true` to generate fit statistics and figures on rank 0
 after a successful retrieval or forward run. Plotting is disabled by default;
 it can always be run later with `postprocess_retrieval.py` or
 `postprocess_forward.py`. See [Post-processing and plotting](postprocessing.md).
+Set `plotting.leave_one_out.enabled: true` to compute pointwise PSIS-LOO after
+nested sampling; see
+[Bayesian leave-one-out cross-validation](leave_one_out.md) for the Pareto-k
+reliability rules and model-comparison API.
 
 Every executed task copies the input YAML and writes a fully resolved YAML to
 the output directory. A retrieval's UltraNest checkpoints live in the

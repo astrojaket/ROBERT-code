@@ -127,6 +127,23 @@ class MultiDatasetRetrievalProblem:
             return float(self.invalid_loglike)
         return float(loglike)
 
+    def pointwise_log_likelihood_from_vector(
+        self,
+        vector: ArrayLike,
+    ) -> NDArray[np.float64]:
+        """Evaluate pointwise terms in dataset and masked-row order."""
+
+        parameters = self.parameter_mapping(vector)
+        prediction = self.predict(parameters)
+        terms = self.likelihood.pointwise_loglike(
+            prediction,
+            self.observations,
+            parameters,
+        )
+        output = np.array(terms, dtype=float, copy=True)
+        output.setflags(write=False)
+        return output
+
     def log_prior_from_vector(self, vector: ArrayLike) -> float:
         try:
             return self.parameters.log_prior_from_vector(vector)

@@ -127,6 +127,23 @@ class RetrievalProblem:
             return float(self.invalid_loglike)
         return float(loglike)
 
+    def pointwise_log_likelihood_from_vector(
+        self,
+        vector: ArrayLike,
+    ) -> NDArray[np.float64]:
+        """Evaluate one Gaussian log-likelihood term per unmasked observation."""
+
+        parameters = self.parameter_mapping(vector)
+        prediction = self.predict(parameters)
+        terms = self.likelihood.pointwise_loglike(
+            prediction,
+            self.observation,
+            parameters,
+        )
+        output = np.array(terms, dtype=float, copy=True)
+        output.setflags(write=False)
+        return output
+
     def log_prior_from_vector(self, vector: ArrayLike) -> float:
         """Evaluate the summed log prior density."""
 

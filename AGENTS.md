@@ -10,6 +10,11 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
 
 ## Working Guidelines
 
+- Always run Python, tests, package installation, retrievals, examples, and
+  scientific validation in the `robert-exoplanets` Conda environment. Prefer
+  explicit commands such as `conda run -n robert-exoplanets python ...` and
+  `conda run -n robert-exoplanets python -m pytest ...`; do not rely on the
+  currently activated shell environment.
 - Keep physics-facing APIs explicit and typed so later scientific implementations can replace stubs without changing user-facing examples.
 - Prefer small, well-tested modules over broad framework code.
 - Do not add numerical approximations that look like real retrieval physics unless they are clearly labeled as placeholders.
@@ -31,9 +36,9 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
 ## Useful Commands
 
 ```bash
-python -m pip install -e ".[dev,opacity,retrieval]"
-pytest
-python examples/stub_emission_retrieval.py
+conda run -n robert-exoplanets python -m pip install -e ".[dev,opacity,retrieval]"
+conda run -n robert-exoplanets python -m pytest
+conda run -n robert-exoplanets python examples/stub_emission_retrieval.py
 ```
 
 ## Current Scope Boundaries

@@ -518,6 +518,21 @@ class OutputsConfig(ConfigModel):
     directory: Path
 
 
+class LeaveOneOutConfig(ConfigModel):
+    """Optional PSIS-LOO retrieval diagnostic controls."""
+
+    enabled: bool = False
+    max_posterior_draws: PositiveInt = 2_000
+    seed: NonNegativeInt = 0
+    pareto_k_threshold: float | None = Field(default=None, gt=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_draw_count(self) -> "LeaveOneOutConfig":
+        if self.max_posterior_draws < 20:
+            raise ValueError("plotting.leave_one_out.max_posterior_draws must be at least 20")
+        return self
+
+
 class PlottingConfig(ConfigModel):
     """Optional automatic and manual post-processing controls."""
 
@@ -530,6 +545,7 @@ class PlottingConfig(ConfigModel):
     max_posterior_samples: PositiveInt = 20_000
     dataset_colors: dict[str, str] = Field(default_factory=dict)
     parameter_labels: dict[str, str] = Field(default_factory=dict)
+    leave_one_out: LeaveOneOutConfig = LeaveOneOutConfig()
 
     @model_validator(mode="after")
     def validate_plot_mappings(self) -> "PlottingConfig":

@@ -52,6 +52,10 @@ def postprocess_retrieval_output(
     image_format: str = "png",
     dpi: int = 180,
     max_posterior_samples: int = 20_000,
+    leave_one_out: bool = False,
+    loo_max_posterior_draws: int = 2_000,
+    loo_seed: int = 0,
+    loo_pareto_k_threshold: float | None = None,
 ) -> dict[str, Any]:
     """Calculate diagnostics and plot one serialized retrieval phase."""
 
@@ -95,6 +99,43 @@ def postprocess_retrieval_output(
 
     destination = Path(plot_dir).expanduser()
     destination.mkdir(parents=True, exist_ok=True)
+    diagnostics["leave_one_out"] = {"enabled": bool(leave_one_out)}
+    if leave_one_out:
+        samples = arrays.get("samples")
+        if samples is None:
+            diagnostics["leave_one_out"].update(
+                {
+                    "status": "not_available",
+                    "reason": "PSIS-LOO requires nested-sampling posterior draws",
+                }
+            )
+        else:
+            from robert_exoplanets.diagnostics import (
+                plot_leave_one_out_result,
+                run_psis_leave_one_out,
+                write_leave_one_out_result,
+            )
+
+            loo = run_psis_leave_one_out(
+                problem,
+                samples,
+                weights=arrays.get("weights"),
+                max_posterior_draws=loo_max_posterior_draws,
+                seed=loo_seed,
+                pareto_k_threshold=loo_pareto_k_threshold,
+            )
+            write_leave_one_out_result(loo, destination)
+            plot_leave_one_out_result(
+                loo,
+                destination / f"leave_one_out.{image_format}",
+                style=style,
+                dpi=dpi,
+            )
+            loo_mapping = loo.to_mapping()
+            loo_mapping.pop("points")
+            diagnostics["leave_one_out"].update(
+                {"status": "complete", **loo_mapping}
+            )
     _write_json(destination / "fit_statistics.json", diagnostics)
     _write_json(destination / "posterior_summary.json", posterior)
     _plot_fit(

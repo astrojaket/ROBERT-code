@@ -102,5 +102,56 @@ class MultiDatasetGaussianLikelihood:
             )
         return output
 
+    def pointwise_loglike_by_dataset(
+        self,
+        prediction: Any,
+        observations: ObservationCollection,
+        parameters: Mapping[str, float] | None = None,
+    ) -> dict[str, np.ndarray]:
+        """Return pointwise terms while retaining deterministic dataset identity."""
+
+        spectra = _prediction_mapping(prediction)
+        if set(spectra) != set(observations.names):
+            raise RobertValidationError(
+                "prediction dataset names must match observation collection"
+            )
+        output: dict[str, np.ndarray] = {}
+        for dataset in observations.datasets:
+            likelihood = GaussianLikelihood(
+                include_normalization=self.include_normalization,
+                offset_parameter=dataset.offset_parameter,
+                jitter_parameter=dataset.jitter_parameter,
+                uncertainty_scale_parameter=dataset.uncertainty_scale_parameter,
+                uncertainty_scale=dataset.uncertainty_scale,
+                invalid_model_loglike=self.invalid_model_loglike,
+                coordinate_rtol=self.coordinate_rtol,
+                coordinate_atol=self.coordinate_atol,
+            )
+            output[dataset.name] = likelihood.pointwise_loglike(
+                spectra[dataset.name],
+                dataset.observation,
+                parameters,
+            )
+        return output
+
+    def pointwise_loglike(
+        self,
+        prediction: Any,
+        observations: ObservationCollection,
+        parameters: Mapping[str, float] | None = None,
+    ) -> np.ndarray:
+        """Return all pointwise terms in observation-collection order."""
+
+        by_dataset = self.pointwise_loglike_by_dataset(
+            prediction,
+            observations,
+            parameters,
+        )
+        output = np.concatenate(
+            [by_dataset[dataset.name] for dataset in observations.datasets]
+        )
+        output.setflags(write=False)
+        return output
+
 
 __all__ = ["MultiDatasetGaussianLikelihood"]

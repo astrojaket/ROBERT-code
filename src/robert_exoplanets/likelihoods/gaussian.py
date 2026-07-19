@@ -71,6 +71,38 @@ class GaussianLikelihood:
             loglike -= 0.5 * np.sum(np.log(2.0 * np.pi * variance))
         return float(loglike)
 
+    def pointwise_loglike(
+        self,
+        prediction: Spectrum | Any,
+        observation: Observation,
+        parameters: Mapping[str, float] | None = None,
+    ) -> np.ndarray:
+        """Return one independent Gaussian log-likelihood term per valid datum.
+
+        The returned terms use the same mask, nuisance parameters, uncertainty
+        scaling, and optional normalization as :meth:`loglike`. Their sum is
+        therefore the scalar likelihood for every finite model prediction.
+        """
+
+        selected_model, selected_data, selected_uncertainty = self.effective_inputs(
+            prediction,
+            observation,
+            parameters,
+        )
+        if not np.all(np.isfinite(selected_model)):
+            output = np.full(selected_model.shape, self.invalid_model_loglike, dtype=float)
+            output.setflags(write=False)
+            return output
+
+        variance = np.square(selected_uncertainty)
+        residual = selected_data - selected_model
+        terms = -0.5 * np.square(residual) / variance
+        if self.include_normalization:
+            terms -= 0.5 * np.log(2.0 * np.pi * variance)
+        output = np.array(terms, dtype=float, copy=True)
+        output.setflags(write=False)
+        return output
+
     def effective_inputs(
         self,
         prediction: Spectrum | Any,

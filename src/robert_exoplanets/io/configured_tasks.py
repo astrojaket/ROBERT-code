@@ -958,6 +958,14 @@ def _postprocess_retrieval_outputs(
             image_format=config.plotting.image_format,
             dpi=config.plotting.dpi,
             max_posterior_samples=config.plotting.max_posterior_samples,
+            leave_one_out=config.plotting.leave_one_out.enabled,
+            loo_max_posterior_draws=(
+                config.plotting.leave_one_out.max_posterior_draws
+            ),
+            loo_seed=config.plotting.leave_one_out.seed,
+            loo_pareto_k_threshold=(
+                config.plotting.leave_one_out.pareto_k_threshold
+            ),
         )
         print(
             f"Retrieval plots written to {plot_root / result_dir.name}",

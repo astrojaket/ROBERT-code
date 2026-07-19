@@ -14,6 +14,8 @@ dependencies:
   - scipy>=1.14
   - numba=0.61.2
   - matplotlib=3.10.3
+  # PSIS leave-one-out retrieval diagnostics and pointwise ELPD comparison.
+  - arviz>=0.21,<2
   - h5py>=3.12
   # Conda-forge MultiNest is built against MPICH; keep mpi4py on the same ABI.
   - mpich>=4.3,<5
