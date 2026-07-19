@@ -313,6 +313,26 @@ retained and irrelevant to the explicit Version-2 blackbody stellar input.
 The canonical continuation through absorbing clouds, cloud scattering, and
 cloud-free plus cloudy cross-retrievals is documented in
 `docs/emission_intercomparison_roadmap.md`.  Stage-9 implementation, contracts,
-synthetic inputs, and smoke tests are prepared locally; the full posterior
-matrix is then pulled from GitHub and executed on Glamdring, with DiRAC kept as
-a fallback target.
+directory tooling, and non-science structural tests are prepared locally. The
+native inputs, pilots, and full posterior matrix are then executed only on
+Glamdring after approval.
+
+## Version-2 Stage-9 Glamdring environments
+
+Stage 9 does not use the laptop framework interpreters. Glamdring receives
+three isolated prefixes created by
+`scripts/install_emission_intercomparison_v2_stage_9_glamdring.sh`:
+
+- `robert-stage9`, from `environment.yml`;
+- `robert-stage9-picaso-v4`, from `environment-stage9-picaso-v4.yml`, with
+  Python 3.11.15, PICASO 4.0, and Virga 2.0.1;
+- `robert-stage9-petitradtrans`, from
+  `environment-stage9-petitradtrans.yml`, with petitRADTRANS 3.3.3.
+
+All three contain MPICH 4.3, mpi4py 4.1.2, MultiNest 3.10, and PyMultiNest
+2.12. The installer adds the same ROBERT checkout to each prefix with
+`--no-deps`; this supplies only the shared manifest, likelihood, sampler, and
+binning harness. It does not replace a framework's native opacity or RT path.
+PICASO reference/resort-rebin data and pRT input data are staged once and
+integrity indexed; run directories refer to those shared trees rather than
+duplicating them.

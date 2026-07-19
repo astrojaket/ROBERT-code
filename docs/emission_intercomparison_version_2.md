@@ -541,14 +541,23 @@ pRT difference-signal convergence. See the compact Stage-8 summary and
 Generate injections from the exact Version-2 contracts and perform all six
 directed injection/retrieval code pairs plus self-retrieval controls.  The
 cloud-free arm retrieves the two PG14 families, four molecular abundances, and
-radius/normalization.  The cloudy arm uses only cloud regimes supported by the
-Stage-7/8 maps and retrieves only parameters present in the injection.
+no area or radius normalization.  The cloudy arm uses only the grey regimes
+supported by the Stage-7/8 maps and natively retrieves cloud optical depth and
+cloud-top pressure; the isotropic-scattering case also retrieves single-
+scattering albedo.
 
-Use noiseless means plus deterministic noise ensembles at `30`, `60`, and
-`100 ppm`, frozen priors/transforms/likelihoods, and explicit failure reporting.
-Stage 9 is prepared and smoke-tested locally; the full sampler matrix is a
-cluster job after measured timing/memory pilots. All active PICASO injections
-use the frozen resort-rebin correlated-k representation.
+Use noiseless means plus exactly five deterministic Gaussian-noise seeds at
+`30`, `60`, and `100 ppm`, frozen priors/transforms/Gaussian likelihood, and
+explicit failure reporting. MultiNest 3.10/PyMultiNest 2.12 runs at 400 live
+points with 12 MPI ranks and one thread per rank. Stage 9 is prepared and
+structurally tested locally; all native injection, pilot, and retrieval science
+execution occurs only on Glamdring after explicit approval. All active PICASO
+injections use the frozen resort-rebin correlated-k representation.
+
+The frozen setup is
+`docs/data/emission_intercomparison/version_2/stage_9_retrieval_contract.json`;
+operational details are recorded in
+`docs/review/59_emission_intercomparison_v2_stage_9_setup.md`.
 
 ## Required products for every Version-2 stage
 

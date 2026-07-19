@@ -279,15 +279,18 @@ Both arms use:
 - constant eclipse-depth uncertainties of `30`, `60`, and `100 ppm`, also
   reported as fractions of the median eclipse depth;
 - exact noiseless spectral means for the primary directed comparisons;
-- at least 20 deterministic noise seeds per uncertainty tier for coverage;
+- exactly five deterministic Gaussian-noise seeds per uncertainty tier, with
+  coverage reported descriptively as `x/5` plus an exact binomial interval;
 - all six directed cross-code injection/retrieval pairs;
 - self-retrievals at `60 ppm` as sampler and parameterization controls;
 - frozen priors, parameter transforms, likelihood, live-point/effective-sample
   targets, and termination criteria.
 
-The cloud-free arm retrieves temperature-profile parameters, H2O, CO, CO2,
-and CH4 abundances, and radius ratio or normalization.  The cloudy arm adds
-only the cloud parameters present in its frozen injection contract.
+The cloud-free arm retrieves temperature-profile parameters and H2O, CO, CO2,
+and CH4 abundances. No area-scale or radius-normalization parameter is present;
+the common physical radii determine eclipse normalization. The cloudy arm
+additionally retrieves grey optical depth and cloud-top pressure, plus single-
+scattering albedo in the isotropic-scattering scenario.
 
 Primary outputs are posterior median bias, bias divided by posterior standard
 deviation, 68 and 95 per cent truth coverage, posterior width ratios,
@@ -301,13 +304,13 @@ incomplete, and multimodal runs remain visible.
 Stage 9 is prepared locally but its complete sampler matrix is not a laptop
 benchmark.
 
-Local work includes implementation, unit/contract tests, frozen synthetic
-inputs, retrieval configurations, manifests, plotting/summary tools, and small
-end-to-end smoke retrievals.  These files are committed and pushed to the
-normal GitHub branch.  Glamdring is the primary execution target: the cluster
-checkout is created or updated from GitHub, and immutable commit hashes and
-input checksums are recorded before submission.  DiRAC remains a fallback
-rather than the default target.
+Local work includes implementation, non-science unit/contract tests, retrieval
+configurations, manifests, and plotting/summary tools. Native injections,
+forward-model smoke calculations, timing pilots, and retrievals are not run on
+the laptop. These files are committed and pushed to the normal GitHub branch.
+Glamdring is the sole Stage-9 execution target: the cluster checkout is created
+or updated from GitHub, and immutable commit hashes and input checksums are
+recorded before submission.
 
 Large chains, checkpoints, and raw per-run products remain on managed cluster
 storage with checksums.  Small posterior summaries, convergence records,
@@ -315,9 +318,10 @@ manifests, and paper products are brought back to the development repository
 and versioned.  No cluster-only manual edit may be required to reproduce a
 run.
 
-The full Stage-9 matrix is launched only after a local pilot records
-steady-state likelihood time and peak memory, allowing the Glamdring process
-count and memory request to be set from measurements rather than guesswork.
+The full Stage-9 matrix is launched only after an explicitly approved
+Glamdring preflight and pilot record steady-state likelihood time and peak
+memory. Each retrieval is frozen to 12 MPI ranks; the pilot confirms or revises
+the provisional per-shard RAM and wall-time requests before production.
 
 ## Publication stopping criterion
 

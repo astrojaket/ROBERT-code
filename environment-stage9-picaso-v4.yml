@@ -1,0 +1,25 @@
+name: robert-stage9-picaso-v4
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11.15
+  - pip
+  - numpy=2.4.6
+  - scipy=1.17.1
+  - h5py=3.16
+  - numba=0.66
+  - astropy=8.0.1
+  - pandas=3.0.3
+  - pydantic>=2.7
+  - pyyaml>=6.0
+  - synphot>=1.6
+  - stsynphot>=1.4
+  - matplotlib
+  - mpich=4.3
+  - mpi4py=4.1.2
+  - multinest=3.10
+  - pymultinest=2.12
+  - pip:
+      - picaso==4.0
+      - virga-exo==2.0.1
