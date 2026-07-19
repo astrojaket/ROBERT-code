@@ -133,3 +133,9 @@ points and 200 iterations, changes the problem name, refuses any output below
 the production `runs/` tree, and writes a `PILOT_ONLY` marker. Repeating the
 same command exercises MultiNest resume; production settings and directories
 remain untouched.
+
+All approved non-production cluster tasks use the committed generic addqueue
+entry point `scripts/submit_emission_intercomparison_v2_stage_9_task.sh` with
+`STAGE9_TASK` set to `preflight`, `injection`, `forward-pilot`, or
+`retrieval-pilot`. This keeps environment activation and data/cache paths
+identical to production without requiring a cluster-only launch script.
