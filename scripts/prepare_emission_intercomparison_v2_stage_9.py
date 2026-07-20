@@ -71,9 +71,91 @@ def _ensure_directory(path: Path, *, verify_only: bool) -> None:
     path.mkdir(parents=True, exist_ok=False)
 
 
-def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
+def _refresh_execution_deployment(
+    root: Path,
+    *,
+    frozen: dict[str, object],
+    integrity: dict[str, object],
+) -> None:
+    """Refresh only pre-science execution metadata after a launcher correction."""
+
+    deployed_contract_path = root / "contracts" / "stage_9_retrieval_contract.json"
+    deployed_manifest_path = root / "integrity" / "setup_manifest.json"
+    if not deployed_contract_path.is_file() or not deployed_manifest_path.is_file():
+        raise RuntimeError(
+            "execution refresh requires an existing prepared Stage-9 deployment"
+        )
+    science_products = tuple(
+        path
+        for pattern in (
+            "injections/**/native_mean.npz",
+            "runs/**/result.json",
+            "runs/**/result_arrays.npz",
+            "runs/**/diagnostic_spectra.npz",
+            "runs/**/posterior_summary.json",
+            "runs/**/chains/*",
+            "pilots/**/*",
+            "diagnostics/resource/forward-pilot-*.json",
+        )
+        for path in root.glob(pattern)
+        if path.is_file()
+    )
+    if science_products:
+        raise RuntimeError(
+            "refusing execution refresh after Stage-9 science products exist: "
+            f"{science_products[0]}"
+        )
+
+    deployed_contract = json.loads(
+        deployed_contract_path.read_text(encoding="utf-8")
+    )
+    deployed_science = dict(deployed_contract)
+    expected_science = dict(frozen)
+    deployed_science.pop("execution", None)
+    expected_science.pop("execution", None)
+    if deployed_science != expected_science:
+        raise RuntimeError(
+            "refusing refresh because deployed Stage-9 science content changed"
+        )
+
+    deployed_manifest = json.loads(
+        deployed_manifest_path.read_text(encoding="utf-8")
+    )
+    if deployed_manifest.get("stage_9_contract_repository_sha256") != _sha256(
+        deployed_contract_path
+    ):
+        raise RuntimeError(
+            "refusing refresh because the deployed contract hash does not match"
+        )
+    comparable_manifest = dict(deployed_manifest)
+    comparable_integrity = dict(integrity)
+    comparable_manifest.pop("stage_9_contract_repository_sha256", None)
+    comparable_integrity.pop("stage_9_contract_repository_sha256", None)
+    if comparable_manifest != comparable_integrity:
+        raise RuntimeError(
+            "refusing refresh because the deployed setup manifest changed"
+        )
+
+    deployed_contract_path.write_text(
+        _canonical_json(frozen), encoding="utf-8"
+    )
+    deployed_manifest_path.write_text(
+        _canonical_json(integrity), encoding="utf-8"
+    )
+
+
+def prepare(
+    root: Path,
+    *,
+    verify_only: bool = False,
+    refresh_execution_contract: bool = False,
+) -> dict[str, object]:
     """Create or verify a complete, idempotent Stage-9 project tree."""
 
+    if verify_only and refresh_execution_contract:
+        raise RuntimeError(
+            "--verify-only and --refresh-execution-contract are mutually exclusive"
+        )
     root = root.expanduser().resolve()
     common = json.loads(COMMON_CONTRACT.read_text(encoding="utf-8"))
     common_sha = _sha256(COMMON_CONTRACT)
@@ -84,6 +166,17 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
             "committed Stage-9 contract does not match the Stage-9 source of truth"
         )
     runs = build_run_matrix()
+    integrity = {
+        "schema_version": "1.0",
+        "common_contract_repository_sha256": common_sha,
+        "stage_9_contract_repository_sha256": _sha256(FROZEN_CONTRACT),
+        "run_count": len(runs),
+        "shard_count": len({run.shard_id for run in runs}),
+        "noise_vector_count": 0,
+        "injection_mean_count_required": len(FRAMEWORKS) * len(SCENARIOS),
+    }
+    if refresh_execution_contract:
+        _refresh_execution_deployment(root, frozen=frozen, integrity=integrity)
 
     directories = (
         root,
@@ -201,15 +294,8 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
         _canonical_json(injection_index),
         verify_only=verify_only,
     )
-    integrity = {
-        "schema_version": "1.0",
-        "common_contract_repository_sha256": common_sha,
-        "stage_9_contract_repository_sha256": _sha256(FROZEN_CONTRACT),
-        "run_count": len(runs),
-        "shard_count": len(by_shard),
-        "noise_vector_count": 0,
-        "injection_mean_count_required": len(FRAMEWORKS) * len(SCENARIOS),
-    }
+    if integrity["shard_count"] != len(by_shard):
+        raise RuntimeError("Stage-9 shard count changed while preparing deployment")
     _ensure_text(
         root / "integrity" / "setup_manifest.json",
         _canonical_json(integrity),
@@ -222,8 +308,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project_root", type=Path)
     parser.add_argument("--verify-only", action="store_true")
+    parser.add_argument("--refresh-execution-contract", action="store_true")
     args = parser.parse_args()
-    summary = prepare(args.project_root, verify_only=args.verify_only)
+    summary = prepare(
+        args.project_root,
+        verify_only=args.verify_only,
+        refresh_execution_contract=args.refresh_execution_contract,
+    )
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 

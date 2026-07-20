@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (
     GAUSSIAN_NOISE_SEEDS,
@@ -26,6 +27,16 @@ CONTRACT = (
 )
 PREPARE = ROOT / "scripts/prepare_emission_intercomparison_v2_stage_9.py"
 NATIVE = ROOT / "examples/emission_intercomparison_v2_stage_9_native.py"
+MPI_LAUNCHER = (
+    ROOT / "scripts/launch_emission_intercomparison_v2_stage_9_mpi.sh"
+)
+TASK_LAUNCHER = ROOT / "scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
+PRODUCTION_LAUNCHER = (
+    ROOT / "scripts/submit_emission_intercomparison_v2_stage_9.sh"
+)
+SHARD_SUBMITTER = (
+    ROOT / "scripts/queue_emission_intercomparison_v2_stage_9_shard.sh"
+)
 
 
 def _load_prepare_module():
@@ -119,6 +130,9 @@ def test_committed_stage_9_contract_matches_source_of_truth() -> None:
         "fabricated shared opacity or cloud tensors",
     ]
     assert expected["execution"]["scheduler_queue"] == "redwood"
+    assert expected["execution"]["addqueue_allocation"] == "single_wrapper_1x12"
+    assert expected["execution"]["mpi_launcher"] == "conda_mpich_hydra_fork"
+    assert expected["execution"]["single_node_required"] is True
     assert expected["noise"]["spectral_points_randomized"] is False
     assert (
         expected["fixed"]["picaso_r100_projection"]
@@ -138,3 +152,76 @@ def test_directory_generator_creates_and_verifies_complete_tree(tmp_path: Path) 
     assert not (project / "noise").exists()
     assert len(list((project / "injections").glob("*/*"))) >= 12
     module.prepare(project, verify_only=True)
+
+
+def test_execution_contract_refresh_preserves_pre_science_deployment(
+    tmp_path: Path,
+) -> None:
+    module = _load_prepare_module()
+    project = tmp_path / "stage9"
+    expected_manifest = module.prepare(project)
+
+    contract_path = project / "contracts" / "stage_9_retrieval_contract.json"
+    old_contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    old_contract["execution"] = {
+        "cluster": "glamdring",
+        "scheduler_queue": "redwood",
+        "mpi_ranks_per_retrieval": 12,
+        "threads_per_rank": 1,
+        "nested_mpirun_forbidden_under_addqueue": True,
+    }
+    contract_path.write_text(
+        json.dumps(old_contract, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    manifest_path = project / "integrity" / "setup_manifest.json"
+    old_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    old_manifest["stage_9_contract_repository_sha256"] = hashlib.sha256(
+        contract_path.read_bytes()
+    ).hexdigest()
+    manifest_path.write_text(
+        json.dumps(old_manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    refreshed = module.prepare(project, refresh_execution_contract=True)
+    assert refreshed == expected_manifest
+    assert json.loads(contract_path.read_text(encoding="utf-8")) == json.loads(
+        CONTRACT.read_text(encoding="utf-8")
+    )
+    assert json.loads(manifest_path.read_text(encoding="utf-8")) == expected_manifest
+
+    injection = (
+        project
+        / "injections"
+        / "robert"
+        / "clear_non_inverted"
+        / "native_mean.npz"
+    )
+    injection.touch()
+    contract_path.write_text(
+        json.dumps(old_contract, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="science products exist"):
+        module.prepare(project, refresh_execution_contract=True)
+
+
+def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
+    assert MPI_LAUNCHER.stat().st_mode & 0o111
+    mpi_text = MPI_LAUNCHER.read_text(encoding="utf-8")
+    assert 'PMI*|PMIX*) unset "$name"' in mpi_text
+    assert "export HYDRA_LAUNCHER=fork" in mpi_text
+    assert "export HYDRA_RMK=user" in mpi_text
+    assert "-rmk user" in mpi_text
+    assert "-launcher fork" in mpi_text
+
+    task_text = TASK_LAUNCHER.read_text(encoding="utf-8")
+    production_text = PRODUCTION_LAUNCHER.read_text(encoding="utf-8")
+    assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in task_text
+    assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in production_text
+
+    shard_text = SHARD_SUBMITTER.read_text(encoding="utf-8")
+    assert "addqueue -q redwood -s" in shard_text
+    assert "-n 1x12" in shard_text
+    assert "-n 12" not in shard_text

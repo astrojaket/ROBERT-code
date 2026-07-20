@@ -333,6 +333,11 @@ All three contain MPICH 4.3, mpi4py 4.1.2, MultiNest 3.10, and PyMultiNest
 2.12. The installer adds the same ROBERT checkout to each prefix with
 `--no-deps`; this supplies only the shared manifest, likelihood, sampler, and
 binning harness. It does not replace a framework's native opacity or RT path.
+For Glamdring, each 12-rank job uses `addqueue -s -n 1x12` to reserve one
+12-core node and start one wrapper. The wrapper clears the outer Slurm PMIx
+client variables and starts the matching Conda MPICH stack through Hydra's
+local `fork` launcher. The environments must not be mixed with Glamdring's
+OpenMPI module at runtime.
 PICASO reference/resort-rebin data and pRT input data are staged once and
 integrity indexed; run directories refer to those shared trees rather than
 duplicating them. Stage-9 allocations use Glamdring's `redwood` queue; that

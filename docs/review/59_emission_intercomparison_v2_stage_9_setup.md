@@ -39,8 +39,10 @@ Every retrieval uses MultiNest 3.10/PyMultiNest 2.12 with 400 live points,
 evidence tolerance 0.5, sampling efficiency 0.8, importance nested sampling
 and multimodality enabled, update interval 100, unlimited iterations, exact
 resume, and invalid likelihood floor `-1e100`. A retrieval uses 12 MPI ranks
-and one numerical-library thread per rank. Glamdring `addqueue` starts those
-ranks on the `redwood` queue; nested `mpirun` or `srun` is forbidden.
+and one numerical-library thread per rank. Glamdring `addqueue -s -n 1x12`
+starts one wrapper in a single-node, 12-core `redwood` allocation. The wrapper
+removes the outer PMIx variables and starts the pinned Conda MPICH world with
+Hydra's local `fork` launcher, avoiding an OpenMPI/MPICH ABI mixture.
 
 ## Files and operation
 
@@ -50,13 +52,17 @@ The immutable science contract is
 all 72 run directories, twelve 6-run shard files, twelve injection slots,
 no noise-vector products, cache/reference/archive/integrity trees,
 and exact run JSON files. Re-running is idempotent; changed definitions fail.
+An already prepared pre-science tree can accept the audited Glamdring launcher
+correction with `--refresh-execution-contract`. The refresh compares all
+non-execution contract content and refuses to run after any injection, pilot,
+or retrieval product exists.
 
 Install the three Glamdring environments with:
 
 ```bash
 scripts/install_emission_intercomparison_v2_stage_9_glamdring.sh \
   /mnt/users/jaketaylor/ROBERT-code \
-  /mnt/users/jaketaylor/anaconda3/envs
+  /mnt/users/jaketaylor/stage9-environments
 ```
 
 The PICASO and pRT definitions are
@@ -145,8 +151,9 @@ the production `runs/` tree, and writes a `PILOT_ONLY` marker. Repeating the
 same command exercises MultiNest resume; production settings and directories
 remain untouched.
 
-All approved non-production cluster tasks use the committed generic addqueue
+All approved non-production cluster tasks use the committed single-wrapper addqueue
 entry point `scripts/submit_emission_intercomparison_v2_stage_9_task.sh` with
 `STAGE9_TASK` set to `preflight`, `injection`, `forward-pilot`, or
-`retrieval-pilot`. This keeps environment activation and data/cache paths
-identical to production without requiring a cluster-only launch script.
+`retrieval-pilot`. MPI tasks pass through the committed Conda MPICH/Hydra
+launcher; injections remain direct single-process jobs. This keeps environment
+activation and data/cache paths identical to production.

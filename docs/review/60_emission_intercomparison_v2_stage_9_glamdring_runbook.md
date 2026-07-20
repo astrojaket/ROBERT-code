@@ -10,8 +10,9 @@ filesystem path.
 ```bash
 export STAGE9_USER_ROOT=/mnt/users/jaketaylor
 export STAGE9_REPOSITORY="$STAGE9_USER_ROOT/ROBERT-code"
-export STAGE9_ENVIRONMENT_PARENT="$STAGE9_USER_ROOT/anaconda3/envs"
-export STAGE9_PROJECT_ROOT="$STAGE9_USER_ROOT/emission-intercomparison-v2-stage9"
+export STAGE9_ENVIRONMENT_PARENT="$STAGE9_USER_ROOT/stage9-environments"
+export STAGE9_PROJECT_ROOT="$STAGE9_USER_ROOT/ROBERT-stage9"
+export STAGE9_REFERENCE_SOURCE="$STAGE9_USER_ROOT/stage9-reference-source"
 
 cd "$STAGE9_REPOSITORY"
 git fetch origin
@@ -20,8 +21,9 @@ git pull --ff-only origin codex/emission-intercomparison-v2-stage-9-setup
 git log -1 --oneline
 ```
 
-Use a new project directory if a pre-72-run Stage-9 tree was generated. The
-setup command deliberately refuses to overwrite mismatched frozen run files.
+For a deployment prepared before the Glamdring MPI-launch correction, retain
+the project tree and use the execution-only refresh in the next section. It
+refuses to run if any injection, pilot, or retrieval science product exists.
 
 ## 2. Prepare and stage shared data
 
@@ -30,10 +32,10 @@ already-staged source tree uses a different name; keep it below
 `$STAGE9_USER_ROOT`.
 
 ```bash
-export SOURCE_PICASO_REFDATA="$STAGE9_USER_ROOT/reference-data/picaso"
-export SOURCE_PICASO_CK="$STAGE9_USER_ROOT/reference-data/picaso/opacities/resortrebin"
-export SOURCE_PRT_INPUT_DATA="$STAGE9_USER_ROOT/reference-data/petitradtrans/input_data"
-export SOURCE_ROBERT_OPACITY="$STAGE9_USER_ROOT/reference-data/robert/opacity"
+export SOURCE_PICASO_REFDATA="$STAGE9_REFERENCE_SOURCE/picaso-refdata"
+export SOURCE_PICASO_CK="$STAGE9_REFERENCE_SOURCE/picaso-resortrebin"
+export SOURCE_PRT_INPUT_DATA="$STAGE9_REFERENCE_SOURCE/petitradtrans-input-data"
+export SOURCE_ROBERT_OPACITY="$SOURCE_PRT_INPUT_DATA"
 
 for source in \
   "$SOURCE_PICASO_REFDATA" \
@@ -47,19 +49,27 @@ for source in \
   }
 done
 
-"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
-  "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
-  "$STAGE9_PROJECT_ROOT"
+if [[ -f "$STAGE9_PROJECT_ROOT/integrity/setup_manifest.json" ]]; then
+  "$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+    "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
+    "$STAGE9_PROJECT_ROOT" --refresh-execution-contract
+else
+  "$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+    "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
+    "$STAGE9_PROJECT_ROOT"
+fi
 
 export STAGE9_CLUSTER=glamdring
-"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
-  "$STAGE9_REPOSITORY/scripts/stage_emission_intercomparison_v2_stage_9_reference_data.py" \
-  "$STAGE9_PROJECT_ROOT" \
-  --picaso-refdata "$SOURCE_PICASO_REFDATA" \
-  --picaso-ck "$SOURCE_PICASO_CK" \
-  --prt-input-data "$SOURCE_PRT_INPUT_DATA" \
-  --robert-opacity "$SOURCE_ROBERT_OPACITY" \
-  --mode symlink
+if [[ ! -f "$STAGE9_PROJECT_ROOT/integrity/reference_data_manifest.json" ]]; then
+  "$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+    "$STAGE9_REPOSITORY/scripts/stage_emission_intercomparison_v2_stage_9_reference_data.py" \
+    "$STAGE9_PROJECT_ROOT" \
+    --picaso-refdata "$SOURCE_PICASO_REFDATA" \
+    --picaso-ck "$SOURCE_PICASO_CK" \
+    --prt-input-data "$SOURCE_PRT_INPUT_DATA" \
+    --robert-opacity "$SOURCE_ROBERT_OPACITY" \
+    --mode symlink
+fi
 
 export STAGE9_PICASO_REFDATA="$STAGE9_PROJECT_ROOT/reference/picaso/refdata"
 export STAGE9_PICASO_CK_DIRECTORY="$STAGE9_PROJECT_ROOT/reference/picaso/resortrebin"
@@ -71,33 +81,39 @@ export STAGE9_PRT_INPUT_DATA="$STAGE9_PROJECT_ROOT/reference/petitradtrans/input
 ```
 
 The staging script inventories and links or copies existing reference trees;
-it does not download or populate them. If an existing source layout uses
-`$STAGE9_USER_ROOT/stage9_reference_source`, point the four `SOURCE_*`
-variables at its populated leaf directories before running the validation
-loop. An empty source must be populated with the validated reference data
-before staging.
+it does not download or populate them. An empty source must be populated with
+the validated reference data before staging.
 
 The setup manifest must report 72 runs, 12 shards, zero noise vectors, and 12
 required injection means.
 
 ## 3. Queue preflights
 
-Exported Stage-9 paths above must remain in the submission shell. Submit one
-12-rank preflight for each framework:
+Exported Stage-9 paths above must remain in the submission shell. Glamdring's
+`-s -n 1x12` pattern starts one wrapper in a one-node, 12-core allocation. The
+wrapper then starts one self-contained 12-rank Conda MPICH/Hydra world. Submit
+one preflight for each framework:
+
+```bash
+module list
+```
+
+If an OpenMPI module is listed, run `module unload openmpi` before submission.
+The launcher rejects a loaded OpenMPI module instead of risking an ABI mixture.
 
 ```bash
 export STAGE9_TASK=preflight
 
 export STAGE9_FRAMEWORK=picaso
-addqueue -q redwood -c s9-preflight-picaso -n 12 -m 32 \
+addqueue -q redwood -s -c s9-preflight-picaso -n 1x12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=petitradtrans
-addqueue -q redwood -c s9-preflight-prt -n 12 -m 64 \
+addqueue -q redwood -s -c s9-preflight-prt -n 1x12 -m 64 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=robert
-addqueue -q redwood -c s9-preflight-robert -n 12 -m 96 \
+addqueue -q redwood -s -c s9-preflight-robert -n 1x12 -m 96 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -154,7 +170,7 @@ export STAGE9_FRAMEWORK=picaso
 export STAGE9_SCENARIO=clear_non_inverted
 export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/diagnostics/resource/forward-pilot-picaso-clear_non_inverted.json"
 
-addqueue -q redwood -c s9-fwdpilot-picaso-clear -n 12 -m 32 \
+addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 1x12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -181,7 +197,7 @@ export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/pilots/picaso/clear_non_inverte
 export STAGE9_PILOT_LIVE_POINTS=50
 export STAGE9_PILOT_MAX_ITER=200
 
-addqueue -q redwood -c s9-retpilot-picaso -n 12 -m 32 \
+addqueue -q redwood -s -c s9-retpilot-picaso -n 1x12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 

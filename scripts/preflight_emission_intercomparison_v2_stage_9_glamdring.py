@@ -67,9 +67,24 @@ def main() -> None:
     communicator = MPI.COMM_WORLD
     rank = int(communicator.Get_rank())
     size = int(communicator.Get_size())
+    mpi_library_version = MPI.Get_library_version()
+    if "MPICH" not in mpi_library_version.upper():
+        raise RuntimeError(
+            "Stage-9 environments must use their pinned Conda MPICH library; "
+            f"observed {mpi_library_version}"
+        )
     if size != 12:
         raise RuntimeError(
             f"Stage-9 preflight requires exactly 12 MPI ranks, observed {size}"
+        )
+    hydra = {
+        "HYDRA_LAUNCHER": os.environ.get("HYDRA_LAUNCHER"),
+        "HYDRA_RMK": os.environ.get("HYDRA_RMK"),
+    }
+    if hydra != {"HYDRA_LAUNCHER": "fork", "HYDRA_RMK": "user"}:
+        raise RuntimeError(
+            "Stage-9 preflight requires the pinned single-node Hydra launcher: "
+            f"{hydra}"
         )
     threads = {
         name: os.environ.get(name)
@@ -130,18 +145,26 @@ def main() -> None:
         "hostname": platform.node(),
         "python": os.path.realpath(sys.executable),
         "versions": versions,
-        "mpi_library_version": MPI.Get_library_version(),
+        "mpi_library_version": mpi_library_version,
+        "hydra": hydra,
         "threads": threads,
         "paths": required_paths,
     }
     gathered: list[dict[str, Any]] | None = communicator.gather(local, root=0)
     if rank == 0:
         assert gathered is not None
+        hostnames = {item["hostname"] for item in gathered}
+        if len(hostnames) != 1:
+            raise RuntimeError(
+                "Stage-9 Glamdring allocation must keep all 12 ranks on one node: "
+                f"{sorted(hostnames)}"
+            )
         report = {
             "schema_version": "1.0",
             "science_executed": False,
             "framework": args.framework,
             "mpi_world_size": size,
+            "single_node": True,
             "ranks": gathered,
             "matrix_retrievals": len(matrix),
             "matrix_shards": len({item.shard_id for item in matrix}),

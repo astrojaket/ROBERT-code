@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generic addqueue entry point for approved Stage-9 setup, injection, and pilots.
+# Single-wrapper addqueue entry point for approved Stage-9 setup and pilots.
 set -euo pipefail
 
 for required in STAGE9_TASK STAGE9_FRAMEWORK STAGE9_PROJECT_ROOT STAGE9_REPOSITORY STAGE9_ENVIRONMENT_PARENT STAGE9_PICASO_REFDATA STAGE9_PICASO_CK_DIRECTORY STAGE9_PRT_INPUT_DATA; do
@@ -29,9 +29,10 @@ export NUMBA_CACHE_DIR="$STAGE9_PROJECT_ROOT/cache/picaso/numba"
 export picaso_refdata="$STAGE9_PICASO_REFDATA"
 
 python_executable="$environment_prefix/bin/python"
+mpi_launcher="$STAGE9_REPOSITORY/scripts/launch_emission_intercomparison_v2_stage_9_mpi.sh"
 case "$STAGE9_TASK" in
   preflight)
-    exec "$python_executable" \
+    exec "$mpi_launcher" "$environment_prefix" 12 "$python_executable" \
       "$STAGE9_REPOSITORY/scripts/preflight_emission_intercomparison_v2_stage_9_glamdring.py" \
       "$STAGE9_FRAMEWORK" "$STAGE9_PROJECT_ROOT"
     ;;
@@ -44,7 +45,7 @@ case "$STAGE9_TASK" in
   forward-pilot)
     : "${STAGE9_SCENARIO:?STAGE9_SCENARIO is required for forward-pilot}"
     : "${STAGE9_PILOT_OUTPUT:?STAGE9_PILOT_OUTPUT is required for forward-pilot}"
-    exec "$python_executable" \
+    exec "$mpi_launcher" "$environment_prefix" 12 "$python_executable" \
       "$STAGE9_REPOSITORY/examples/pilot_emission_intercomparison_v2_stage_9_forward.py" \
       "$STAGE9_FRAMEWORK" "$STAGE9_SCENARIO" "$STAGE9_PROJECT_ROOT" \
       "$STAGE9_PILOT_OUTPUT" --approved --evaluations "${STAGE9_PILOT_EVALUATIONS:-2}"
@@ -52,7 +53,7 @@ case "$STAGE9_TASK" in
   retrieval-pilot)
     : "${STAGE9_RUN_CONFIG:?STAGE9_RUN_CONFIG is required for retrieval-pilot}"
     : "${STAGE9_PILOT_OUTPUT:?STAGE9_PILOT_OUTPUT is required for retrieval-pilot}"
-    exec "$python_executable" \
+    exec "$mpi_launcher" "$environment_prefix" 12 "$python_executable" \
       "$STAGE9_REPOSITORY/examples/run_emission_intercomparison_v2_stage_9_retrieval.py" \
       "$STAGE9_RUN_CONFIG" --pilot-output "$STAGE9_PILOT_OUTPUT" \
       --pilot-max-iter "${STAGE9_PILOT_MAX_ITER:-200}" \
