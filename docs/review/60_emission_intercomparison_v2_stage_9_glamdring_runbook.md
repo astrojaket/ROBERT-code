@@ -1,14 +1,14 @@
 # Emission intercomparison V2 Stage-9 Glamdring runbook
 
 This runbook launches the frozen 72-retrieval matrix in four atmospheric-
-scenario batches. All filesystem paths live below `/mnt/zfsusers/jaketaylor/`.
+scenario batches. All filesystem paths live below `/mnt/users/jaketaylor/`.
 The `redwood` name is a scheduler queue argument only; it is not part of a
 filesystem path.
 
 ## 1. Fixed paths and checkout
 
 ```bash
-export STAGE9_USER_ROOT=/mnt/zfsusers/jaketaylor
+export STAGE9_USER_ROOT=/mnt/users/jaketaylor
 export STAGE9_REPOSITORY="$STAGE9_USER_ROOT/ROBERT-code"
 export STAGE9_ENVIRONMENT_PARENT="$STAGE9_USER_ROOT/anaconda3/envs"
 export STAGE9_PROJECT_ROOT="$STAGE9_USER_ROOT/emission-intercomparison-v2-stage9"
@@ -35,6 +35,18 @@ export SOURCE_PICASO_CK="$STAGE9_USER_ROOT/reference-data/picaso/opacities/resor
 export SOURCE_PRT_INPUT_DATA="$STAGE9_USER_ROOT/reference-data/petitradtrans/input_data"
 export SOURCE_ROBERT_OPACITY="$STAGE9_USER_ROOT/reference-data/robert/opacity"
 
+for source in \
+  "$SOURCE_PICASO_REFDATA" \
+  "$SOURCE_PICASO_CK" \
+  "$SOURCE_PRT_INPUT_DATA" \
+  "$SOURCE_ROBERT_OPACITY"; do
+  test -d "$source" || { echo "Missing reference directory: $source"; exit 1; }
+  test -n "$(find "$source" -type f -print -quit)" || {
+    echo "Reference directory contains no files: $source"
+    exit 1
+  }
+done
+
 "$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
   "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
   "$STAGE9_PROJECT_ROOT"
@@ -57,6 +69,13 @@ export STAGE9_PRT_INPUT_DATA="$STAGE9_PROJECT_ROOT/reference/petitradtrans/input
   "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
   "$STAGE9_PROJECT_ROOT" --verify-only
 ```
+
+The staging script inventories and links or copies existing reference trees;
+it does not download or populate them. If an existing source layout uses
+`$STAGE9_USER_ROOT/stage9_reference_source`, point the four `SOURCE_*`
+variables at its populated leaf directories before running the validation
+loop. An empty source must be populated with the validated reference data
+before staging.
 
 The setup manifest must report 72 runs, 12 shards, zero noise vectors, and 12
 required injection means.
