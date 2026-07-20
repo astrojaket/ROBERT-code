@@ -5,8 +5,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-import numpy as np
-
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (
     GAUSSIAN_NOISE_SEEDS,
     MULTINEST_SETTINGS,
@@ -36,20 +34,21 @@ def _load_prepare_module():
 
 def test_frozen_stage_9_matrix_counts_and_resources() -> None:
     runs = build_run_matrix()
-    assert len(runs) == 504
-    assert len({run.run_id for run in runs}) == 504
+    assert len(runs) == 72
+    assert len({run.run_id for run in runs}) == 72
     assert len({run.shard_id for run in runs}) == 12
     assert {
         sum(item.shard_id == shard for item in runs)
         for shard in {item.shard_id for item in runs}
-    } == {42}
-    assert sum(run.control == "directed_cross_framework" for run in runs) == 432
-    assert sum(run.control == "self_retrieval_control" for run in runs) == 72
+    } == {6}
+    assert sum(run.control == "directed_cross_framework" for run in runs) == 72
+    assert sum(run.control == "self_retrieval_control" for run in runs) == 0
     assert {run.mpi_ranks for run in runs} == {12}
     assert {run.threads_per_rank for run in runs} == {1}
     assert MULTINEST_SETTINGS["n_live_points"] == 400
     assert MULTINEST_SETTINGS["mpi_nprocs"] == 12
-    assert len(GAUSSIAN_NOISE_SEEDS) == 5
+    assert len(GAUSSIAN_NOISE_SEEDS) == 0
+    assert {run.noise_id for run in runs} == {"mean"}
 
 
 def test_stage_9_parameters_exclude_area_and_retrieve_clouds() -> None:
@@ -85,22 +84,19 @@ def test_committed_stage_9_contract_matches_source_of_truth() -> None:
         "high-order scattering methods",
         "fabricated shared opacity or cloud tensors",
     ]
+    assert expected["execution"]["scheduler_queue"] == "redwood"
+    assert expected["noise"]["spectral_points_randomized"] is False
 
 
 def test_directory_generator_creates_and_verifies_complete_tree(tmp_path: Path) -> None:
     module = _load_prepare_module()
     project = tmp_path / "stage9"
     summary = module.prepare(project)
-    assert summary["run_count"] == 504
+    assert summary["run_count"] == 72
     assert summary["shard_count"] == 12
-    assert summary["noise_vector_count"] == 60
-    assert len(list((project / "runs").glob("*/*/*/run.json"))) == 504
+    assert summary["noise_vector_count"] == 0
+    assert len(list((project / "runs").glob("*/*/*/run.json"))) == 72
     assert len(list((project / "shards").glob("*.json"))) == 12
-    assert len(list((project / "noise").glob("*/*/*.npz"))) == 60
+    assert not (project / "noise").exists()
     assert len(list((project / "injections").glob("*/*"))) >= 12
     module.prepare(project, verify_only=True)
-
-    first = next((project / "noise").glob("*/*/*.npz"))
-    with np.load(first, allow_pickle=False) as archive:
-        assert archive["standard_normal"].ndim == 1
-        assert archive["standard_normal"].size > 100

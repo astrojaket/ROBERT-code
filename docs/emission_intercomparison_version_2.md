@@ -539,20 +539,23 @@ pRT difference-signal convergence. See the compact Stage-8 summary and
 ### Stage 9 -- directed JWST-like cross-retrievals
 
 Generate injections from the exact Version-2 contracts and perform all six
-directed injection/retrieval code pairs plus self-retrieval controls.  The
+directed injection/retrieval code pairs, without self-retrievals.  The
 cloud-free arm retrieves the two PG14 families, four molecular abundances, and
 no area or radius normalization.  The cloudy arm uses only the grey regimes
 supported by the Stage-7/8 maps and natively retrieves cloud optical depth and
 cloud-top pressure; the isotropic-scattering case also retrieves single-
 scattering albedo.
 
-Use noiseless means plus exactly five deterministic Gaussian-noise seeds at
-`30`, `60`, and `100 ppm`, frozen priors/transforms/Gaussian likelihood, and
-explicit failure reporting. MultiNest 3.10/PyMultiNest 2.12 runs at 400 live
-points with 12 MPI ranks and one thread per rank. Stage 9 is prepared and
-structurally tested locally; all native injection, pilot, and retrieval science
-execution occurs only on Glamdring after explicit approval. All active PICASO
-injections use the frozen resort-rebin correlated-k representation.
+Following Barstow et al. (2020), use one unperturbed synthetic spectrum per
+injector/scenario and do not add Gaussian random draws or self-retrievals.
+Apply `30`, `60`, and `100 ppm` uncertainty envelopes in the Gaussian
+likelihood, with frozen priors/transforms and explicit failure reporting. This
+gives 72 science retrievals. MultiNest 3.10/PyMultiNest 2.12 runs at 400 live
+points with 12 MPI ranks and one thread per rank on Glamdring's `redwood`
+queue. Stage 9 is prepared and structurally tested locally; all native
+injection, pilot, and retrieval science execution occurs only on Glamdring
+after explicit approval. All active PICASO injections use the frozen
+resort-rebin correlated-k representation.
 
 The frozen setup is
 `docs/data/emission_intercomparison/version_2/stage_9_retrieval_contract.json`;

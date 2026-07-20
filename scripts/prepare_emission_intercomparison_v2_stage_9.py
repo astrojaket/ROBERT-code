@@ -16,20 +16,14 @@ from pathlib import Path
 import sys
 from typing import Any
 
-import numpy as np
-
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (  # noqa: E402
     FRAMEWORKS,
-    GAUSSIAN_NOISE_SEEDS,
-    NOISE_TIERS_PPM,
     SCENARIOS,
     build_run_matrix,
     frozen_contract_payload,
-    noise_vector_key,
 )
 
 
@@ -77,52 +71,6 @@ def _ensure_directory(path: Path, *, verify_only: bool) -> None:
     path.mkdir(parents=True, exist_ok=False)
 
 
-def _build_noise_vectors(root: Path, n_bins: int, *, verify_only: bool) -> None:
-    """Write 60 shared standard-normal vectors, never full observations."""
-
-    if n_bins <= 0:
-        raise ValueError("n_bins must be positive")
-    for scenario in SCENARIOS:
-        for tier in NOISE_TIERS_PPM:
-            for noise_id, seed in GAUSSIAN_NOISE_SEEDS.items():
-                key = noise_vector_key(scenario.name, tier, noise_id)
-                assert key is not None
-                path = (
-                    root
-                    / "noise"
-                    / scenario.name
-                    / f"{tier:03d}ppm"
-                    / f"{noise_id}.npz"
-                )
-                expected = np.random.default_rng(seed).standard_normal(n_bins)
-                if path.exists():
-                    with np.load(path, allow_pickle=False) as archive:
-                        observed = np.asarray(archive["standard_normal"], dtype=float)
-                        observed_key = str(archive["noise_key"])
-                        observed_seed = int(archive["seed"])
-                    if (
-                        observed.shape != (n_bins,)
-                        or not np.array_equal(observed, expected)
-                        or observed_key != key
-                        or observed_seed != seed
-                    ):
-                        raise RuntimeError(
-                            f"existing noise vector differs from frozen definition: {path}"
-                        )
-                    continue
-                if verify_only:
-                    raise RuntimeError(
-                        f"required Stage-9 noise vector is missing: {path}"
-                    )
-                path.parent.mkdir(parents=True, exist_ok=True)
-                np.savez_compressed(
-                    path,
-                    standard_normal=expected,
-                    noise_key=np.array(key),
-                    seed=np.array(seed, dtype=np.int64),
-                )
-
-
 def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
     """Create or verify a complete, idempotent Stage-9 project tree."""
 
@@ -141,7 +89,6 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
         root,
         root / "contracts",
         root / "injections",
-        root / "noise",
         root / "runs",
         root / "shards",
         root / "logs",
@@ -186,9 +133,6 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
                 }
             )
 
-    n_bins = len(common["spectral_contract"]["r100_centers_micron"])
-    _build_noise_vectors(root, n_bins, verify_only=verify_only)
-
     by_shard: dict[str, list[dict[str, object]]] = {}
     run_index: list[dict[str, object]] = []
     for run in runs:
@@ -204,17 +148,7 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
             "injection_product": str(
                 root / "injections" / run.injector / run.scenario / "native_mean.npz"
             ),
-            "noise_vector": (
-                None
-                if run.noise_id == "mean"
-                else str(
-                    root
-                    / "noise"
-                    / run.scenario
-                    / f"{run.noise_ppm:03d}ppm"
-                    / f"{run.noise_id}.npz"
-                )
-            ),
+            "noise_vector": None,
             "common_contract": str(root / "contracts" / "common_contract.json"),
             "frozen_contract": str(
                 root / "contracts" / "stage_9_retrieval_contract.json"
@@ -248,6 +182,7 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
             "run_count": len(rows),
             "mpi_ranks_per_retrieval": 12,
             "threads_per_rank": 1,
+            "scheduler_queue": "redwood",
             "preliminary_memory_gb": request_gb,
             "preliminary_walltime": "48:00:00",
             "execution_order": [row["run_config"] for row in rows],
@@ -272,9 +207,7 @@ def prepare(root: Path, *, verify_only: bool = False) -> dict[str, object]:
         "stage_9_contract_repository_sha256": _sha256(FROZEN_CONTRACT),
         "run_count": len(runs),
         "shard_count": len(by_shard),
-        "noise_vector_count": len(SCENARIOS)
-        * len(NOISE_TIERS_PPM)
-        * len(GAUSSIAN_NOISE_SEEDS),
+        "noise_vector_count": 0,
         "injection_mean_count_required": len(FRAMEWORKS) * len(SCENARIOS),
     }
     _ensure_text(

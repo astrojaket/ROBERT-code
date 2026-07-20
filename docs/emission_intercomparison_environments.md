@@ -335,4 +335,5 @@ All three contain MPICH 4.3, mpi4py 4.1.2, MultiNest 3.10, and PyMultiNest
 binning harness. It does not replace a framework's native opacity or RT path.
 PICASO reference/resort-rebin data and pRT input data are staged once and
 integrity indexed; run directories refer to those shared trees rather than
-duplicating them.
+duplicating them. Stage-9 allocations use Glamdring's `redwood` queue; that
+queue is frozen in both the science contract and production launcher.

@@ -1,7 +1,7 @@
 """Frozen run-matrix helpers for emission intercomparison V2 Stage 9.
 
 This module is deliberately free of forward-model imports.  It defines and
-validates the Stage-9 science matrix, deterministic noise identifiers, priors,
+validates the Stage-9 science matrix, uncertainty tiers, priors,
 and scheduler shards without executing any science workload.
 """
 
@@ -22,20 +22,13 @@ STAGE = 9
 TRACK = "track_b_native_retrieval"
 FRAMEWORKS = ("robert", "picaso", "petitradtrans")
 NOISE_TIERS_PPM = (30, 60, 100)
-NOISE_REALIZATIONS = ("mean", "seed_01", "seed_02", "seed_03", "seed_04", "seed_05")
-SELF_RETRIEVAL_NOISE_PPM = 60
+NOISE_REALIZATIONS = ("mean",)
 MPI_RANKS_PER_RETRIEVAL = 12
 THREADS_PER_RANK = 1
 
-# Five explicit, stable Gaussian-noise seeds.  They are shared across every
-# matched injector/scenario/tier combination.  ``mean`` never consumes an RNG.
-GAUSSIAN_NOISE_SEEDS = {
-    "seed_01": 910_001,
-    "seed_02": 910_002,
-    "seed_03": 910_003,
-    "seed_04": 910_004,
-    "seed_05": 910_005,
-}
+# Barstow et al. (2020) did not randomize the synthetic spectral points.  Keep
+# this exported mapping empty so downstream code cannot silently add a draw.
+GAUSSIAN_NOISE_SEEDS: dict[str, int] = {}
 
 MULTINEST_SETTINGS = {
     "n_live_points": 400,
@@ -227,7 +220,7 @@ def _run_id(
 
 
 def build_run_matrix() -> tuple[RunDefinition, ...]:
-    """Build the frozen 504-run matrix in deterministic scheduler order."""
+    """Build the frozen 72-run matrix in deterministic scheduler order."""
 
     runs: list[RunDefinition] = []
     for scenario in SCENARIOS:
@@ -254,28 +247,6 @@ def build_run_matrix() -> tuple[RunDefinition, ...]:
                                 _sampler_seed((run_id, "multinest")),
                             )
                         )
-            injector = retriever
-            for noise_id in NOISE_REALIZATIONS:
-                run_id = _run_id(
-                    scenario.name,
-                    injector,
-                    retriever,
-                    SELF_RETRIEVAL_NOISE_PPM,
-                    noise_id,
-                )
-                runs.append(
-                    RunDefinition(
-                        run_id,
-                        scenario.name,
-                        injector,
-                        retriever,
-                        SELF_RETRIEVAL_NOISE_PPM,
-                        noise_id,
-                        "self_retrieval_control",
-                        shard,
-                        _sampler_seed((run_id, "multinest")),
-                    )
-                )
     validate_run_matrix(runs)
     return tuple(runs)
 
@@ -284,8 +255,8 @@ def validate_run_matrix(runs: Iterable[RunDefinition]) -> None:
     """Enforce the frozen counts and boundaries."""
 
     values = tuple(runs)
-    if len(values) != 504 or len({item.run_id for item in values}) != 504:
-        raise RobertValidationError("Stage 9 requires exactly 504 unique retrievals")
+    if len(values) != 72 or len({item.run_id for item in values}) != 72:
+        raise RobertValidationError("Stage 9 requires exactly 72 unique retrievals")
     shard_counts: dict[str, int] = {}
     for run in values:
         shard_counts[run.shard_id] = shard_counts.get(run.shard_id, 0) + 1
@@ -296,25 +267,25 @@ def validate_run_matrix(runs: Iterable[RunDefinition]) -> None:
         names = {item.name for item in parameter_definitions(run.scenario)}
         if "area_scale" in names or "log10_area_scale" in names:
             raise RobertValidationError("area scale is excluded from Stage 9")
-        if run.control == "self_retrieval_control" and run.noise_ppm != 60:
-            raise RobertValidationError("self controls are frozen at 60 ppm")
-    if len(shard_counts) != 12 or set(shard_counts.values()) != {42}:
-        raise RobertValidationError("Stage 9 requires twelve 42-retrieval shards")
+        if run.control != "directed_cross_framework":
+            raise RobertValidationError(
+                "Stage 9 contains directed cross-retrievals only"
+            )
+        if run.noise_id != "mean":
+            raise RobertValidationError("Stage 9 uses unperturbed spectral means only")
+    if len(shard_counts) != 12 or set(shard_counts.values()) != {6}:
+        raise RobertValidationError("Stage 9 requires twelve 6-retrieval shards")
 
 
-def noise_vector_key(scenario: str, noise_ppm: int, noise_id: str) -> str | None:
-    """Return the shared noise-vector key, or ``None`` for the noiseless mean."""
+def noise_vector_key(scenario: str, noise_ppm: int, noise_id: str) -> None:
+    """Validate the Barstow-style mean realization and return no noise key."""
 
     scenario_by_name(scenario)
     if noise_ppm not in NOISE_TIERS_PPM:
         raise RobertValidationError(f"unsupported Stage-9 noise tier: {noise_ppm}")
     if noise_id == "mean":
         return None
-    if noise_id not in GAUSSIAN_NOISE_SEEDS:
-        raise RobertValidationError(
-            f"unsupported Stage-9 noise realization: {noise_id}"
-        )
-    return f"{scenario}__{noise_ppm:03d}ppm__{noise_id}"
+    raise RobertValidationError(f"unsupported Stage-9 noise realization: {noise_id}")
 
 
 def frozen_contract_payload(*, common_contract_sha256: str) -> dict[str, object]:
@@ -340,22 +311,26 @@ def frozen_contract_payload(*, common_contract_sha256: str) -> dict[str, object]
             "tiers_ppm": list(NOISE_TIERS_PPM),
             "realizations": list(NOISE_REALIZATIONS),
             "gaussian_seeds": GAUSSIAN_NOISE_SEEDS,
-            "matched_vectors_shared_across_injectors": True,
-            "coverage_denominator_per_noisy_cell": 5,
+            "spectral_points_randomized": False,
+            "data_realization": "unperturbed_native_mean",
+            "interpretation": "nonzero error envelopes enter the Gaussian likelihood",
+            "protocol_reference": (
+                "Barstow et al. 2020, MNRAS 493, 4884; doi:10.1093/mnras/staa548"
+            ),
         },
         "matrix": {
             "directed_cross_framework_pairs": [
                 list(item) for item in directed_cross_framework_pairs()
             ],
-            "self_controls": [[item, item] for item in FRAMEWORKS],
-            "self_control_noise_ppm": SELF_RETRIEVAL_NOISE_PPM,
-            "retrieval_count": 504,
+            "self_controls": [],
+            "retrieval_count": 72,
             "shard_count": 12,
-            "retrievals_per_shard": 42,
+            "retrievals_per_shard": 6,
         },
         "sampler": {"engine": "multinest", **MULTINEST_SETTINGS},
         "execution": {
             "cluster": "glamdring",
+            "scheduler_queue": "redwood",
             "mpi_ranks_per_retrieval": MPI_RANKS_PER_RETRIEVAL,
             "threads_per_rank": THREADS_PER_RANK,
             "nested_mpirun_forbidden_under_addqueue": True,
@@ -385,7 +360,7 @@ def frozen_contract_payload(*, common_contract_sha256: str) -> dict[str, object]
         ],
         "retention": {
             "native_injection_means": 12,
-            "standard_normal_noise_vectors": 60,
+            "standard_normal_noise_vectors": 0,
             "per_likelihood_spectra": False,
             "all_posterior_predictive_spectra": False,
             "canonical_posterior_compressed": True,
@@ -425,7 +400,7 @@ def matrix_summary(runs: Iterable[RunDefinition] | None = None) -> Mapping[str, 
             item.control == "self_retrieval_control" for item in values
         ),
         "shards": len({item.shard_id for item in values}),
-        "retrievals_per_shard": 42,
+        "retrievals_per_shard": 6,
     }
 
 
@@ -439,7 +414,6 @@ __all__ = [
     "ParameterDefinition",
     "RunDefinition",
     "SCENARIOS",
-    "SELF_RETRIEVAL_NOISE_PPM",
     "ScenarioDefinition",
     "build_run_matrix",
     "directed_cross_framework_pairs",

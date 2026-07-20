@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Submit one frozen 42-run shard through Glamdring's addqueue wrapper.
+# Submit one frozen 6-run shard through Glamdring's addqueue wrapper.
 set -euo pipefail
 
 if [[ "${HOSTNAME:-}" != *"glamdring"* ]]; then
@@ -44,5 +44,5 @@ for relative_config in "${run_configs[@]}"; do
     printf 'exec %q\n' "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9.sh"
   } > "$launcher"
   chmod 750 "$launcher"
-  addqueue -q planet -c "s9-${retriever}-${scenario}-${run_id}" -n 12 -m "$memory_gb" -r "$launcher"
+  addqueue -q redwood -c "s9-${retriever}-${scenario}-${run_id}" -n 12 -m "$memory_gb" -r "$launcher"
 done

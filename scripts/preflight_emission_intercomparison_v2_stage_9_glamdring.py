@@ -84,11 +84,11 @@ def main() -> None:
         raise RuntimeError(f"every numerical thread limit must be one: {threads}")
     project = args.project_root.expanduser().resolve()
     matrix = build_run_matrix()
-    if len(matrix) != 504 or len({item.shard_id for item in matrix}) != 12:
+    if len(matrix) != 72 or len({item.shard_id for item in matrix}) != 12:
         raise RuntimeError("frozen Stage-9 matrix validation failed")
     run_index = json.loads((project / "run_index.json").read_text(encoding="utf-8"))
-    if len(run_index) != 504:
-        raise RuntimeError("deployed run index does not contain 504 retrievals")
+    if len(run_index) != 72:
+        raise RuntimeError("deployed run index does not contain 72 retrievals")
     versions = {name: _version(name) for name in SHARED}
     versions.update({name: _version(name) for name in EXPECTED[args.framework]})
     for name, expected in {**SHARED, **EXPECTED[args.framework]}.items():

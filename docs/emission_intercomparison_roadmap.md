@@ -278,11 +278,10 @@ Both arms use:
   instrument response; native JWST mode combinations are secondary tests;
 - constant eclipse-depth uncertainties of `30`, `60`, and `100 ppm`, also
   reported as fractions of the median eclipse depth;
-- exact noiseless spectral means for the primary directed comparisons;
-- exactly five deterministic Gaussian-noise seeds per uncertainty tier, with
-  coverage reported descriptively as `x/5` plus an exact binomial interval;
+- one unperturbed synthetic spectral mean per injector/scenario, with no
+  Gaussian random draw, following Barstow et al. (2020);
 - all six directed cross-code injection/retrieval pairs;
-- self-retrievals at `60 ppm` as sampler and parameterization controls;
+- no self-retrievals, following the same published protocol;
 - frozen priors, parameter transforms, likelihood, live-point/effective-sample
   targets, and termination criteria.
 
@@ -293,7 +292,7 @@ additionally retrieves grey optical depth and cloud-top pressure, plus single-
 scattering albedo in the isotropic-scattering scenario.
 
 Primary outputs are posterior median bias, bias divided by posterior standard
-deviation, 68 and 95 per cent truth coverage, posterior width ratios,
+deviation, single-run 68 and 95 per cent truth inclusion, posterior width ratios,
 pairwise distribution distances, best-fit residuals, reduced chi-square,
 evidence differences when sampler uncertainty permits, likelihood evaluation
 counts, wall time, peak resident memory, and effective sample size.  Failed,
@@ -318,10 +317,12 @@ manifests, and paper products are brought back to the development repository
 and versioned.  No cluster-only manual edit may be required to reproduce a
 run.
 
-The full Stage-9 matrix is launched only after an explicitly approved
+The 72-run Stage-9 matrix is launched only after an explicitly approved
 Glamdring preflight and pilot record steady-state likelihood time and peak
 memory. Each retrieval is frozen to 12 MPI ranks; the pilot confirms or revises
 the provisional per-shard RAM and wall-time requests before production.
+Production uses the `redwood` queue unless an explicitly approved deployment
+change is recorded.
 
 ## Publication stopping criterion
 
@@ -330,5 +331,5 @@ reproducible manifests and primary figures; shared-input discrepancies satisfy
 their predeclared gates or have a converged documented attribution; Stage 8
 has a converged controlled isotropic-scattering result without claims beyond
 that narrow cloud domain; and both
-cloud-free and cloudy Stage-9 directed retrievals report bias, coverage,
+cloud-free and cloudy Stage-9 directed retrievals report bias, truth inclusion,
 convergence failures, and resource use at every declared uncertainty tier.

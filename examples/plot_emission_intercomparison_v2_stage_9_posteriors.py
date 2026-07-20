@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot Stage-9 posterior overlays and five-seed coverage counts."""
+"""Plot Stage-9 posterior overlays and single-run truth-recovery diagnostics."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ from typing import Any
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
-from scipy.stats import beta
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,7 +59,7 @@ def _weighted_histogram(
 
 
 def posterior_pdf(project: Path, runs: list[dict[str, Any]], output: Path) -> None:
-    """Write overlays pooled with equal weight per completed noise realization."""
+    """Write posterior overlays for completed directed retrievals."""
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with PdfPages(output) as pdf:
@@ -128,130 +127,84 @@ def posterior_pdf(project: Path, runs: list[dict[str, Any]], output: Path) -> No
                     plt.close(fig)
 
 
-def coverage_products(
-    project: Path, runs: list[dict[str, Any]], csv_path: Path, plot_path: Path
+def truth_recovery_products(
+    runs: list[dict[str, Any]], csv_path: Path, plot_path: Path
 ) -> None:
-    """Report coverage as x/5; do not interpret five seeds as precise calibration."""
+    """Report per-run truth inclusion and bias without claiming coverage."""
 
     records: list[dict[str, Any]] = []
-    for scenario in SCENARIOS:
-        for tier in NOISE_TIERS_PPM:
-            for injector in FRAMEWORKS:
-                for retriever in FRAMEWORKS:
-                    selected = [
-                        run
-                        for run in runs
-                        if run["scenario"] == scenario.name
-                        and run["noise_ppm"] == tier
-                        and run["injector"] == injector
-                        and run["retriever"] == retriever
-                        and run["noise_id"].startswith("seed_")
-                    ]
-                    summaries = [
-                        json.loads(
-                            Path(run["posterior_summary"]).read_text(encoding="utf-8")
-                        )
-                        for run in selected
-                    ]
-                    for parameter in parameter_definitions(scenario):
-                        for interval in (68, 95):
-                            covered = sum(
-                                bool(
-                                    summary["credible_intervals"][parameter.name][
-                                        f"truth_covered_{interval}"
-                                    ]
-                                )
-                                for summary in summaries
-                            )
-                            completed = len(summaries)
-                            lower = (
-                                0.0
-                                if covered == 0
-                                else float(
-                                    beta.ppf(0.025, covered, completed - covered + 1)
-                                )
-                            )
-                            upper = (
-                                1.0
-                                if covered == completed
-                                else float(
-                                    beta.ppf(0.975, covered + 1, completed - covered)
-                                )
-                            )
-                            biases = [
-                                summary["credible_intervals"][parameter.name][
-                                    "median_bias"
-                                ]
-                                for summary in summaries
-                            ]
-                            standardized = [
-                                summary["credible_intervals"][parameter.name][
-                                    "median_bias_posterior_sigma"
-                                ]
-                                for summary in summaries
-                                if summary["credible_intervals"][parameter.name][
-                                    "median_bias_posterior_sigma"
-                                ]
-                                is not None
-                            ]
-                            records.append(
-                                {
-                                    "scenario": scenario.name,
-                                    "noise_ppm": tier,
-                                    "injector": injector,
-                                    "retriever": retriever,
-                                    "parameter": parameter.name,
-                                    "credible_interval_percent": interval,
-                                    "covered": covered,
-                                    "completed": completed,
-                                    "frozen_denominator": 5,
-                                    "coverage_fraction": covered / completed
-                                    if completed
-                                    else "",
-                                    "binomial_95_lower": lower if completed else "",
-                                    "binomial_95_upper": upper if completed else "",
-                                    "mean_median_bias": float(np.mean(biases))
-                                    if biases
-                                    else "",
-                                    "mean_bias_posterior_sigma": (
-                                        float(np.mean(standardized))
-                                        if standardized
-                                        else ""
-                                    ),
-                                }
-                            )
+    for run in runs:
+        if run["noise_id"] != "mean":
+            continue
+        summary = json.loads(Path(run["posterior_summary"]).read_text(encoding="utf-8"))
+        intervals = summary["credible_intervals"]
+        for parameter in parameter_definitions(run["scenario"]):
+            values = intervals[parameter.name]
+            records.append(
+                {
+                    "run_id": run["run_id"],
+                    "scenario": run["scenario"],
+                    "noise_ppm": run["noise_ppm"],
+                    "injector": run["injector"],
+                    "retriever": run["retriever"],
+                    "parameter": parameter.name,
+                    "truth": parameter.truth,
+                    "posterior_median": values["q50"],
+                    "median_bias": values["median_bias"],
+                    "median_bias_posterior_sigma": values[
+                        "median_bias_posterior_sigma"
+                    ],
+                    "truth_within_central_68": values["truth_covered_68"],
+                    "truth_within_central_95": values["truth_covered_95"],
+                    "central_68_width": values["q84"] - values["q16"],
+                    "central_95_width": values["q975"] - values["q025"],
+                }
+            )
+    fieldnames = [
+        "run_id",
+        "scenario",
+        "noise_ppm",
+        "injector",
+        "retriever",
+        "parameter",
+        "truth",
+        "posterior_median",
+        "median_bias",
+        "median_bias_posterior_sigma",
+        "truth_within_central_68",
+        "truth_within_central_95",
+        "central_68_width",
+        "central_95_width",
+    ]
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(records[0]))
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(records)
 
-    complete = [
-        item
-        for item in records
-        if item["completed"] == 5 and item["credible_interval_percent"] == 68
-    ]
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
     for axis, scenario in zip(axes.flat, SCENARIOS, strict=True):
-        selected = [item for item in complete if item["scenario"] == scenario.name]
-        if selected:
-            values = np.asarray([item["covered"] for item in selected], dtype=float)
-            axis.hist(
-                values,
-                bins=np.arange(-0.5, 6.0, 1.0),
-                color="#56B4E9",
-                edgecolor="black",
-            )
+        values = np.asarray(
+            [
+                item["median_bias_posterior_sigma"]
+                for item in records
+                if item["scenario"] == scenario.name
+                and item["median_bias_posterior_sigma"] is not None
+            ],
+            dtype=float,
+        )
+        if values.size:
+            axis.hist(values, bins=25, color="#56B4E9", edgecolor="black")
+        axis.axvline(0.0, color="black", lw=1.2)
+        axis.axvline(-1.0, color="black", lw=1.0, ls="--", alpha=0.6)
+        axis.axvline(1.0, color="black", lw=1.0, ls="--", alpha=0.6)
         axis.set(
-            xticks=range(6),
-            xlabel="truth within central 68% interval (x/5)",
-            ylabel="parameter/pair/tier cells",
+            xlabel="posterior median bias / posterior standard deviation",
+            ylabel="completed parameter/run cells",
             title=scenario.name,
         )
         axis.grid(axis="y", alpha=0.2)
-    fig.suptitle(
-        "Stage 9 five-seed coverage counts (descriptive, not precision calibration)"
-    )
+    fig.suptitle("Stage 9 single-realization truth-recovery diagnostics")
     fig.savefig(plot_path, dpi=180)
     plt.close(fig)
 
@@ -264,11 +217,10 @@ def main() -> None:
     runs = _load_runs(project)
     output = project / "diagnostics" / "posterior"
     posterior_pdf(project, runs, output / "posterior_comparisons.pdf")
-    coverage_products(
-        project,
+    truth_recovery_products(
         runs,
-        output / "coverage_counts.csv",
-        output / "coverage_counts.png",
+        output / "truth_recovery.csv",
+        output / "truth_recovery.png",
     )
     print(f"posterior diagnostics used {len(runs)} completed retrievals")
 
