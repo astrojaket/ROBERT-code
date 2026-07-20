@@ -80,6 +80,8 @@ def main() -> None:
         "evaluation_seconds": timings,
         "peak_rss_bytes": _rss_bytes(),
         "spectrum_sha256": hashlib.sha256(spectrum.tobytes()).hexdigest(),
+        "native_binning_method": forward.native_binning_method,
+        "native_bin_support_count": int(forward.last_native_bin_lower_micron.size),
     }
     gathered = communicator.gather(local, root=0)
     if rank == 0:
@@ -88,6 +90,12 @@ def main() -> None:
             raise RuntimeError(
                 "MPI ranks did not produce identical native truth spectra"
             )
+        if args.framework == "picaso" and any(
+            item["native_binning_method"] != "picaso_native_bin_support_overlap"
+            or item["native_bin_support_count"] <= 0
+            for item in gathered
+        ):
+            raise RuntimeError("PICASO pilot did not retain native bin support")
         payload = {
             "schema_version": "1.0",
             "pilot_only": True,

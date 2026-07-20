@@ -342,12 +342,16 @@ def frozen_contract_payload(*, common_contract_sha256: str) -> dict[str, object]
             "asymmetry_factor": 0.0,
             "delta_m": False,
             "cloud_parameters_retrieved_natively": True,
+            "picaso_cloud_grid": "native_opacity_wavenumber_bins",
         },
         "fixed": {
             "internal_temperature_k": 100.0,
             "normalization_parameters_retrieved": [],
             "radii_gravity_and_eclipse_normalization": "version_2_common_contract",
             "likelihood": "independent Gaussian with fixed ppm uncertainty",
+            "picaso_r100_projection": (
+                "native_wavenumber_bin_support_overlap_no_center_interpolation"
+            ),
         },
         "scope_exclusions": [
             "Track A shared-tensor retrievals",

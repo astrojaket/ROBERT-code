@@ -97,6 +97,9 @@ def main() -> None:
         eclipse_depth=eclipse,
         native_wavelength_micron=forward.last_native_wavelength,
         native_flux_w_m2_m=forward.last_native_flux,
+        native_bin_lower_micron=forward.last_native_bin_lower_micron,
+        native_bin_upper_micron=forward.last_native_bin_upper_micron,
+        native_binning_method=np.array(forward.native_binning_method),
         metadata_json=np.array(json.dumps(metadata, sort_keys=True)),
     )
     checksum = _sha256(destination)

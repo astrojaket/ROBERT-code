@@ -276,6 +276,7 @@ def main() -> None:
             "noise_ppm": str(run["noise_ppm"]),
             "noise_id": run["noise_id"],
             "normalization_parameters_retrieved": "none",
+            "native_binning_method": forward.native_binning_method,
         },
         opacity_identifiers={
             "retriever_native_opacity": run["retriever"],

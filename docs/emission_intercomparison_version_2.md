@@ -555,7 +555,9 @@ points with 12 MPI ranks and one thread per rank on Glamdring's `redwood`
 queue. Stage 9 is prepared and structurally tested locally; all native
 injection, pilot, and retrieval science execution occurs only on Glamdring
 after explicit approval. All active PICASO injections use the frozen
-resort-rebin correlated-k representation.
+resort-rebin correlated-k representation. Stage 9 supplies grey clouds on the
+PICASO opacity grid and projects native `wno`/`delta_wno` bin support onto the
+common R=100 bins without interpolating native bin centres.
 
 The frozen setup is
 `docs/data/emission_intercomparison/version_2/stage_9_retrieval_contract.json`;

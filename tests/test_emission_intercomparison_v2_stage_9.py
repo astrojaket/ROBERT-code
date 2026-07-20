@@ -4,6 +4,9 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import sys
+
+import numpy as np
 
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (
     GAUSSIAN_NOISE_SEEDS,
@@ -22,12 +25,23 @@ CONTRACT = (
     / "docs/data/emission_intercomparison/version_2/stage_9_retrieval_contract.json"
 )
 PREPARE = ROOT / "scripts/prepare_emission_intercomparison_v2_stage_9.py"
+NATIVE = ROOT / "examples/emission_intercomparison_v2_stage_9_native.py"
 
 
 def _load_prepare_module():
     spec = importlib.util.spec_from_file_location("stage9_prepare_for_tests", PREPARE)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_native_module():
+    spec = importlib.util.spec_from_file_location("stage9_native_for_tests", NATIVE)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -71,6 +85,26 @@ def test_stage_9_parameters_exclude_area_and_retrieve_clouds() -> None:
             assert "cloud_single_scattering_albedo" in names
 
 
+def test_picaso_projection_uses_native_bin_support_without_interpolation() -> None:
+    module = _load_native_module()
+    projected = module._native_bin_overlap_mean(
+        np.array([0.0, 1.0]),
+        np.array([1.0, 3.0]),
+        np.array([2.0, 4.0]),
+        np.array([0.0, 2.0, 3.0]),
+    )
+    np.testing.assert_allclose(projected, [3.0, 4.0])
+
+    center, lower, upper, order = module._picaso_native_wavelength_support(
+        np.array([1000.0, 2000.0]),
+        np.array([1000.0, 1000.0]),
+    )
+    np.testing.assert_allclose(center, [5.0, 10.0])
+    np.testing.assert_allclose(lower, [4.0, 1.0e4 / 1500.0])
+    np.testing.assert_allclose(upper, [1.0e4 / 1500.0, 20.0])
+    np.testing.assert_array_equal(order, [1, 0])
+
+
 def test_committed_stage_9_contract_matches_source_of_truth() -> None:
     sha = hashlib.sha256(COMMON.read_bytes()).hexdigest()
     expected = frozen_contract_payload(common_contract_sha256=sha)
@@ -86,6 +120,10 @@ def test_committed_stage_9_contract_matches_source_of_truth() -> None:
     ]
     assert expected["execution"]["scheduler_queue"] == "redwood"
     assert expected["noise"]["spectral_points_randomized"] is False
+    assert (
+        expected["fixed"]["picaso_r100_projection"]
+        == "native_wavenumber_bin_support_overlap_no_center_interpolation"
+    )
 
 
 def test_directory_generator_creates_and_verifies_complete_tree(tmp_path: Path) -> None:

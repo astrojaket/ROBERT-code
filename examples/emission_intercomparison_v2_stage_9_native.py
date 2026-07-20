@@ -176,6 +176,93 @@ def _close_edges(
     return x, y
 
 
+def _native_bin_overlap_mean(
+    native_lower_micron: NDArray[np.float64],
+    native_upper_micron: NDArray[np.float64],
+    values: NDArray[np.float64],
+    target_edges_micron: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Average native spectral-density bins by their physical overlap."""
+
+    lower = np.asarray(native_lower_micron, dtype=float)
+    upper = np.asarray(native_upper_micron, dtype=float)
+    spectra = np.asarray(values, dtype=float)
+    targets = np.asarray(target_edges_micron, dtype=float)
+    if (
+        lower.ndim != 1
+        or upper.shape != lower.shape
+        or spectra.shape[-1] != lower.size
+        or targets.ndim != 1
+    ):
+        raise ValueError("native-bin projection axes are inconsistent")
+    if (
+        np.any(~np.isfinite(lower))
+        or np.any(~np.isfinite(upper))
+        or np.any(upper <= lower)
+        or np.any(np.diff(lower) <= 0.0)
+        or np.any(np.diff(targets) <= 0.0)
+    ):
+        raise ValueError("native-bin projection requires finite ordered supports")
+    scale = max(float(np.max(np.abs(targets))), 1.0)
+    tolerance = 1.0e-10 * scale
+    if np.any(lower[1:] < upper[:-1] - tolerance):
+        raise ValueError("native spectral-bin supports overlap")
+
+    flat = spectra.reshape((-1, lower.size))
+    output = np.empty((flat.shape[0], targets.size - 1), dtype=float)
+    for index, (target_lower, target_upper) in enumerate(
+        zip(targets[:-1], targets[1:], strict=True)
+    ):
+        overlap = np.maximum(
+            0.0,
+            np.minimum(upper, target_upper) - np.maximum(lower, target_lower),
+        )
+        covered = float(np.sum(overlap))
+        target_width = float(target_upper - target_lower)
+        if not np.isclose(covered, target_width, rtol=2.0e-6, atol=tolerance):
+            raise ValueError(
+                "PICASO native bins do not fully and uniquely cover an R=100 bin"
+            )
+        output[:, index] = np.sum(flat * overlap[None, :], axis=1) / covered
+    return output.reshape((*spectra.shape[:-1], output.shape[-1]))
+
+
+def _picaso_native_wavelength_support(
+    wavenumber_cm1: NDArray[np.float64],
+    delta_wavenumber_cm1: NDArray[np.float64],
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.int64],
+]:
+    """Convert PICASO native wavenumber centres and widths to bin supports."""
+
+    wavenumber = np.asarray(wavenumber_cm1, dtype=float)
+    widths = np.asarray(delta_wavenumber_cm1, dtype=float)
+    if (
+        wavenumber.ndim != 1
+        or widths.shape != wavenumber.shape
+        or np.any(~np.isfinite(wavenumber))
+        or np.any(~np.isfinite(widths))
+        or np.any(widths <= 0.0)
+        or np.any(wavenumber - 0.5 * widths <= 0.0)
+    ):
+        raise ValueError("invalid PICASO native wavenumber-bin definition")
+    wavenumber_lower = wavenumber - 0.5 * widths
+    wavenumber_upper = wavenumber + 0.5 * widths
+    wavelength_lower = 1.0e4 / wavenumber_upper
+    wavelength_upper = 1.0e4 / wavenumber_lower
+    wavelength_center = 1.0e4 / wavenumber
+    order = np.argsort(wavelength_center)
+    return (
+        wavelength_center[order],
+        wavelength_lower[order],
+        wavelength_upper[order],
+        order.astype(np.int64),
+    )
+
+
 class NativeForward:
     """Base class for a persistent native Stage-9 forward model."""
 
@@ -194,6 +281,9 @@ class NativeForward:
         self.area_ratio = float(common["derived_quantities"]["projected_area_ratio"])
         self.last_native_wavelength = np.empty(0)
         self.last_native_flux = np.empty(0)
+        self.last_native_bin_lower_micron = np.empty(0)
+        self.last_native_bin_upper_micron = np.empty(0)
+        self.native_binning_method = "piecewise_linear_center_integration"
 
     def native_flux(
         self, values: Mapping[str, float]
@@ -467,6 +557,18 @@ class PicasoNativeForward(NativeForward):
             verbose=False,
         )
         _patch_picaso_opacity(self.opacity)
+        self._picaso_wavenumber = np.asarray(self.opacity.wno, dtype=float)
+        self._picaso_delta_wavenumber = np.asarray(self.opacity.delta_wno, dtype=float)
+        (
+            self._picaso_wavelength,
+            self._picaso_bin_lower_micron,
+            self._picaso_bin_upper_micron,
+            self._picaso_wavelength_order,
+        ) = _picaso_native_wavelength_support(
+            self._picaso_wavenumber,
+            self._picaso_delta_wavenumber,
+        )
+        self.native_binning_method = "picaso_native_bin_support_overlap"
 
     def native_flux(
         self, values: Mapping[str, float]
@@ -500,7 +602,7 @@ class PicasoNativeForward(NativeForward):
         if self.scenario.cloudy:
             tau = power_law_cloud_tau(
                 self.pressure.edges,
-                self.r100_centers,
+                1.0e4 / self._picaso_wavenumber,
                 optical_depth_at_reference=state.cloud_tau_5um,
                 cloud_top_pressure_bar=state.cloud_top_pressure_bar,
                 extinction_slope=0.0,
@@ -508,13 +610,13 @@ class PicasoNativeForward(NativeForward):
             rows = [
                 (
                     self.pressure.centers[layer],
-                    1.0e4 / self.r100_centers[wave],
+                    self._picaso_wavenumber[wave],
                     tau[layer, wave],
                     state.cloud_single_scattering_albedo,
                     0.0,
                 )
                 for layer in range(self.pressure.n_layers)
-                for wave in range(self.r100_centers.size)
+                for wave in range(self._picaso_wavenumber.size)
             ]
             case.clouds(
                 df=pd.DataFrame(
@@ -522,11 +624,34 @@ class PicasoNativeForward(NativeForward):
                 )
             )
         result = case.spectrum(self.opacity, calculation="thermal", full_output=False)
-        wavelength = 1.0e4 / np.asarray(result["wavenumber"], dtype=float)
-        order = np.argsort(wavelength)
-        return wavelength[order], np.asarray(result["thermal"], dtype=float)[
-            order
-        ] * 0.1
+        result_wavenumber = np.asarray(result["wavenumber"], dtype=float)
+        if result_wavenumber.shape != self._picaso_wavenumber.shape or not np.allclose(
+            result_wavenumber, self._picaso_wavenumber, rtol=0.0, atol=1.0e-12
+        ):
+            raise RuntimeError(
+                "PICASO output grid differs from its native opacity-bin grid"
+            )
+        native_flux = np.asarray(result["thermal"], dtype=float) * 0.1
+        return (
+            self._picaso_wavelength,
+            native_flux[self._picaso_wavelength_order],
+        )
+
+    def eclipse_depth(self, values: Mapping[str, float]) -> NDArray[np.float64]:
+        """Project PICASO's native bins without interpolating their centres."""
+
+        wavelength, native_flux = self.native_flux(values)
+        binned = _native_bin_overlap_mean(
+            self._picaso_bin_lower_micron,
+            self._picaso_bin_upper_micron,
+            native_flux,
+            self.r100_edges,
+        )
+        self.last_native_wavelength = np.asarray(wavelength, dtype=float)
+        self.last_native_flux = np.asarray(native_flux, dtype=float)
+        self.last_native_bin_lower_micron = self._picaso_bin_lower_micron.copy()
+        self.last_native_bin_upper_micron = self._picaso_bin_upper_micron.copy()
+        return np.asarray(binned / self.stellar_r100 * self.area_ratio, dtype=float)
 
 
 class PetitRadtransNativeForward(NativeForward):
