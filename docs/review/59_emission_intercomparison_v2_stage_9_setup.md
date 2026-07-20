@@ -54,8 +54,8 @@ no noise-vector products, cache/reference/archive/integrity trees,
 and exact run JSON files. Re-running is idempotent; changed definitions fail.
 An already prepared pre-science tree can accept the audited Glamdring launcher
 correction with `--refresh-execution-contract`. The refresh compares all
-non-execution contract content and refuses to run after any injection, pilot,
-or retrieval product exists.
+non-execution contract content byte-for-byte before updating only the audited
+execution metadata and its integrity hash.
 
 Install the three Glamdring environments with:
 
@@ -155,5 +155,6 @@ All approved non-production cluster tasks use the committed single-wrapper addqu
 entry point `scripts/submit_emission_intercomparison_v2_stage_9_task.sh` with
 `STAGE9_TASK` set to `preflight`, `injection`, `forward-pilot`, or
 `retrieval-pilot`. MPI tasks pass through the committed Conda MPICH/Hydra
-launcher; injections remain direct single-process jobs. This keeps environment
-activation and data/cache paths identical to production.
+launcher. Injections use the same launcher with one rank because native
+framework imports may initialize MPI even for a single-process calculation.
+This keeps environment activation and data/cache paths identical to production.

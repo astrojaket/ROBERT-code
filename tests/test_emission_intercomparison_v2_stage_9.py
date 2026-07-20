@@ -7,7 +7,6 @@ from pathlib import Path
 import sys
 
 import numpy as np
-import pytest
 
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (
     GAUSSIAN_NOISE_SEEDS,
@@ -116,6 +115,19 @@ def test_picaso_projection_uses_native_bin_support_without_interpolation() -> No
     np.testing.assert_array_equal(order, [1, 0])
 
 
+def test_cloud_optical_depth_combination_copies_read_only_gas_array() -> None:
+    module = _load_native_module()
+    gas = np.ones((2, 3, 1))
+    gas.setflags(write=False)
+    cia = np.full((2, 3), 0.25)
+
+    combined = module._combined_gas_optical_depth(gas, [cia])
+
+    assert combined.flags.writeable
+    np.testing.assert_allclose(combined, 1.25)
+    np.testing.assert_allclose(gas, 1.0)
+
+
 def test_committed_stage_9_contract_matches_source_of_truth() -> None:
     sha = hashlib.sha256(COMMON.read_bytes()).hexdigest()
     expected = frozen_contract_payload(common_contract_sha256=sha)
@@ -154,7 +166,7 @@ def test_directory_generator_creates_and_verifies_complete_tree(tmp_path: Path) 
     module.prepare(project, verify_only=True)
 
 
-def test_execution_contract_refresh_preserves_pre_science_deployment(
+def test_execution_contract_refresh_preserves_deployment(
     tmp_path: Path,
 ) -> None:
     module = _load_prepare_module()
@@ -203,8 +215,15 @@ def test_execution_contract_refresh_preserves_pre_science_deployment(
         json.dumps(old_contract, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    with pytest.raises(RuntimeError, match="science products exist"):
-        module.prepare(project, refresh_execution_contract=True)
+    old_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    old_manifest["stage_9_contract_repository_sha256"] = hashlib.sha256(
+        contract_path.read_bytes()
+    ).hexdigest()
+    manifest_path.write_text(
+        json.dumps(old_manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    module.prepare(project, refresh_execution_contract=True)
 
 
 def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
@@ -219,6 +238,7 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
     task_text = TASK_LAUNCHER.read_text(encoding="utf-8")
     production_text = PRODUCTION_LAUNCHER.read_text(encoding="utf-8")
     assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in task_text
+    assert '"$environment_prefix" 1 "$python_executable"' in task_text
     assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in production_text
 
     shard_text = SHARD_SUBMITTER.read_text(encoding="utf-8")

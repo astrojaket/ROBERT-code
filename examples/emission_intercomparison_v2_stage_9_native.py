@@ -316,6 +316,18 @@ def _find_one(root: Path, pattern: str) -> Path:
     return matches[0]
 
 
+def _combined_gas_optical_depth(
+    gas_total_tau: NDArray[np.float64],
+    additions: list[NDArray[np.float64]],
+) -> NDArray[np.float64]:
+    """Return a mutable gas-plus-continuum optical-depth array."""
+
+    total = np.array(gas_total_tau, dtype=float, copy=True)
+    for addition in additions:
+        total += np.asarray(addition, dtype=float)[..., None]
+    return total
+
+
 class RobertNativeForward(NativeForward):
     """ROBERT native RORR correlated-k/CIA and SH4 grey-cloud path."""
 
@@ -455,9 +467,9 @@ class RobertNativeForward(NativeForward):
             )
             return self.wavelength, np.pi * np.asarray(result.radiance.values)
 
-        total_gas = np.asarray(gas.total_tau, dtype=float)
-        total_gas += sum(
-            np.asarray(item.tau, dtype=float)[..., None] for item in additions
+        total_gas = _combined_gas_optical_depth(
+            gas.total_tau,
+            [np.asarray(item.tau, dtype=float) for item in additions],
         )
         cloud = power_law_cloud_tau(
             self.pressure.edges,

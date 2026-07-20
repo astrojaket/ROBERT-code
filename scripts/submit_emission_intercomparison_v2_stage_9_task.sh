@@ -38,7 +38,7 @@ case "$STAGE9_TASK" in
     ;;
   injection)
     : "${STAGE9_SCENARIO:?STAGE9_SCENARIO is required for injection}"
-    exec "$python_executable" \
+    exec "$mpi_launcher" "$environment_prefix" 1 "$python_executable" \
       "$STAGE9_REPOSITORY/examples/generate_emission_intercomparison_v2_stage_9_injection.py" \
       "$STAGE9_FRAMEWORK" "$STAGE9_SCENARIO" "$STAGE9_PROJECT_ROOT" --approved
     ;;

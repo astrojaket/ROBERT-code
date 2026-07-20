@@ -15,10 +15,13 @@ if [[ "${STAGE9_CLUSTER:-}" != "glamdring" ]]; then
   echo "STAGE9_CLUSTER=glamdring is required for the Stage-9 MPI launcher" >&2
   exit 2
 fi
-if [[ "$mpi_ranks" != "12" ]]; then
-  echo "Stage-9 retrieval and MPI pilot jobs require exactly 12 ranks" >&2
-  exit 2
-fi
+case "$mpi_ranks" in
+  1|12) ;;
+  *)
+    echo "Stage-9 jobs require exactly 1 injection rank or 12 retrieval/pilot ranks" >&2
+    exit 2
+    ;;
+esac
 if [[ "${LOADEDMODULES:-}" == *openmpi* ]]; then
   echo "Unload Glamdring's OpenMPI module before using the pinned Conda MPICH stack" >&2
   exit 2

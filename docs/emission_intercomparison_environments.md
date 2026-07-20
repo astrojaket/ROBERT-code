@@ -338,6 +338,8 @@ For Glamdring, each 12-rank job uses `addqueue -s -n 12` to reserve one
 client variables and starts the matching Conda MPICH stack through Hydra's
 local `fork` launcher. The environments must not be mixed with Glamdring's
 OpenMPI module at runtime.
+Single-rank native injections use the same sanitized Hydra wrapper because a
+framework import can initialize MPI before evaluating a spectrum.
 PICASO reference/resort-rebin data and pRT input data are staged once and
 integrity indexed; run directories refer to those shared trees rather than
 duplicating them. Stage-9 allocations use Glamdring's `redwood` queue; that

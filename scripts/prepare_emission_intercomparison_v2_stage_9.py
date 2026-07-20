@@ -77,7 +77,7 @@ def _refresh_execution_deployment(
     frozen: dict[str, object],
     integrity: dict[str, object],
 ) -> None:
-    """Refresh only pre-science execution metadata after a launcher correction."""
+    """Refresh only audited execution metadata after a launcher correction."""
 
     deployed_contract_path = root / "contracts" / "stage_9_retrieval_contract.json"
     deployed_manifest_path = root / "integrity" / "setup_manifest.json"
@@ -85,27 +85,6 @@ def _refresh_execution_deployment(
         raise RuntimeError(
             "execution refresh requires an existing prepared Stage-9 deployment"
         )
-    science_products = tuple(
-        path
-        for pattern in (
-            "injections/**/native_mean.npz",
-            "runs/**/result.json",
-            "runs/**/result_arrays.npz",
-            "runs/**/diagnostic_spectra.npz",
-            "runs/**/posterior_summary.json",
-            "runs/**/chains/*",
-            "pilots/**/*",
-            "diagnostics/resource/forward-pilot-*.json",
-        )
-        for path in root.glob(pattern)
-        if path.is_file()
-    )
-    if science_products:
-        raise RuntimeError(
-            "refusing execution refresh after Stage-9 science products exist: "
-            f"{science_products[0]}"
-        )
-
     deployed_contract = json.loads(
         deployed_contract_path.read_text(encoding="utf-8")
     )

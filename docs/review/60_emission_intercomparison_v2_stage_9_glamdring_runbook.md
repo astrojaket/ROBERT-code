@@ -23,7 +23,7 @@ git log -1 --oneline
 
 For a deployment prepared before the Glamdring MPI-launch correction, retain
 the project tree and use the execution-only refresh in the next section. It
-refuses to run if any injection, pilot, or retrieval science product exists.
+requires all non-execution science-contract content to remain identical.
 
 ## 2. Prepare and stage shared data
 
@@ -131,15 +131,15 @@ export STAGE9_TASK=injection
 export STAGE9_SCENARIO=clear_non_inverted
 
 export STAGE9_FRAMEWORK=picaso
-addqueue -q redwood -c "s9-inj-picaso-$STAGE9_SCENARIO" -n 1 -m 32 \
+addqueue -q redwood -s -c "s9-inj-picaso-$STAGE9_SCENARIO" -n 1 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=petitradtrans
-addqueue -q redwood -c "s9-inj-prt-$STAGE9_SCENARIO" -n 1 -m 64 \
+addqueue -q redwood -s -c "s9-inj-prt-$STAGE9_SCENARIO" -n 1 -m 64 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=robert
-addqueue -q redwood -c "s9-inj-robert-$STAGE9_SCENARIO" -n 1 -m 96 \
+addqueue -q redwood -s -c "s9-inj-robert-$STAGE9_SCENARIO" -n 1 -m 96 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
