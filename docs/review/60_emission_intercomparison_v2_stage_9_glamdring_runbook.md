@@ -90,7 +90,7 @@ required injection means.
 ## 3. Queue preflights
 
 Exported Stage-9 paths above must remain in the submission shell. Glamdring's
-`-s -n 1x12` pattern starts one wrapper in a one-node, 12-core allocation. The
+`-s -n 12` pattern starts one wrapper in a one-node, 12-core allocation. The
 wrapper then starts one self-contained 12-rank Conda MPICH/Hydra world. Submit
 one preflight for each framework:
 
@@ -105,15 +105,15 @@ The launcher rejects a loaded OpenMPI module instead of risking an ABI mixture.
 export STAGE9_TASK=preflight
 
 export STAGE9_FRAMEWORK=picaso
-addqueue -q redwood -s -c s9-preflight-picaso -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-preflight-picaso -n 12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=petitradtrans
-addqueue -q redwood -s -c s9-preflight-prt -n 1x12 -m 64 \
+addqueue -q redwood -s -c s9-preflight-prt -n 12 -m 64 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=robert
-addqueue -q redwood -s -c s9-preflight-robert -n 1x12 -m 96 \
+addqueue -q redwood -s -c s9-preflight-robert -n 12 -m 96 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -170,7 +170,7 @@ export STAGE9_FRAMEWORK=picaso
 export STAGE9_SCENARIO=clear_non_inverted
 export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/diagnostics/resource/forward-pilot-picaso-clear_non_inverted.json"
 
-addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -197,7 +197,7 @@ export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/pilots/picaso/clear_non_inverte
 export STAGE9_PILOT_LIVE_POINTS=50
 export STAGE9_PILOT_MAX_ITER=200
 
-addqueue -q redwood -s -c s9-retpilot-picaso -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-retpilot-picaso -n 12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 

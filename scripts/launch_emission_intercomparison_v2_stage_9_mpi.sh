@@ -34,7 +34,7 @@ if ! "$mpiexec_executable" -version 2>&1 | grep -qi 'HYDRA'; then
   exit 2
 fi
 
-# addqueue -s starts this wrapper once in a one-node, 12-core allocation.  Its
+# addqueue -s -n 12 starts this wrapper once in a 12-core allocation.  Its
 # outer Slurm step uses PMIx, whereas the pinned Conda MPICH stack uses Hydra's
 # PMI implementation.  Remove the outer PMI/PMIx variables before Hydra starts
 # a fresh, internally consistent MPI world.  Keep SLURM_* allocation metadata.

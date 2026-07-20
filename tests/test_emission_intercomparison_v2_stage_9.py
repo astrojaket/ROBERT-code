@@ -130,7 +130,7 @@ def test_committed_stage_9_contract_matches_source_of_truth() -> None:
         "fabricated shared opacity or cloud tensors",
     ]
     assert expected["execution"]["scheduler_queue"] == "redwood"
-    assert expected["execution"]["addqueue_allocation"] == "single_wrapper_1x12"
+    assert expected["execution"]["addqueue_allocation"] == "single_wrapper_n12"
     assert expected["execution"]["mpi_launcher"] == "conda_mpich_hydra_fork"
     assert expected["execution"]["single_node_required"] is True
     assert expected["noise"]["spectral_points_randomized"] is False
@@ -223,5 +223,5 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
 
     shard_text = SHARD_SUBMITTER.read_text(encoding="utf-8")
     assert "addqueue -q redwood -s" in shard_text
-    assert "-n 1x12" in shard_text
-    assert "-n 12" not in shard_text
+    assert "-n 12" in shard_text
+    assert "1x12" not in shard_text

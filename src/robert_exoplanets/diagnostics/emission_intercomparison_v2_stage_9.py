@@ -331,7 +331,7 @@ def frozen_contract_payload(*, common_contract_sha256: str) -> dict[str, object]
         "execution": {
             "cluster": "glamdring",
             "scheduler_queue": "redwood",
-            "addqueue_allocation": "single_wrapper_1x12",
+            "addqueue_allocation": "single_wrapper_n12",
             "mpi_launcher": "conda_mpich_hydra_fork",
             "mpi_ranks_per_retrieval": MPI_RANKS_PER_RETRIEVAL,
             "single_node_required": True,

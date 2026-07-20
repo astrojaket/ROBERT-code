@@ -39,7 +39,7 @@ Every retrieval uses MultiNest 3.10/PyMultiNest 2.12 with 400 live points,
 evidence tolerance 0.5, sampling efficiency 0.8, importance nested sampling
 and multimodality enabled, update interval 100, unlimited iterations, exact
 resume, and invalid likelihood floor `-1e100`. A retrieval uses 12 MPI ranks
-and one numerical-library thread per rank. Glamdring `addqueue -s -n 1x12`
+and one numerical-library thread per rank. Glamdring `addqueue -s -n 12`
 starts one wrapper in a single-node, 12-core `redwood` allocation. The wrapper
 removes the outer PMIx variables and starts the pinned Conda MPICH world with
 Hydra's local `fork` launcher, avoiding an OpenMPI/MPICH ABI mixture.
