@@ -82,6 +82,9 @@ Responsibilities:
   contamination models.
 - Supply effective temperature, log surface gravity, and metallicity to a
   selected stellar-spectrum model, or carry an explicitly prepared spectrum.
+- Supply immutable photosphere, active-region, and optional transit-chord
+  spectra to a stellar-contamination component without embedding its arithmetic
+  in the transmission solver.
 
 Ownership:
 

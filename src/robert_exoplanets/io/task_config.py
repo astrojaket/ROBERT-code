@@ -56,6 +56,73 @@ class BodiesConfig(ConfigModel):
     star: StarConfig
 
 
+class StellarContaminationRegionConfig(ConfigModel):
+    """One fixed-temperature active region in the visible stellar disk."""
+
+    name: str = Field(min_length=1)
+    kind: Literal["spot", "facula", "heterogeneity"]
+    temperature_k: PositiveFloat
+    covering_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
+    covering_fraction_parameter: str | None = None
+    log_g_cgs: float | None = None
+    metallicity_dex: float | None = None
+
+    @model_validator(mode="after")
+    def require_one_fraction_source(self) -> "StellarContaminationRegionConfig":
+        if (self.covering_fraction is None) == (
+            self.covering_fraction_parameter is None
+        ):
+            raise ValueError(
+                "provide exactly one of covering_fraction or covering_fraction_parameter"
+            )
+        if (
+            self.covering_fraction_parameter is not None
+            and not self.covering_fraction_parameter.strip()
+        ):
+            raise ValueError("covering_fraction_parameter must be non-empty")
+        return self
+
+
+class StellarContaminationConfig(ConfigModel):
+    """Rackham/POSEIDON stellar-contamination transform configuration."""
+
+    model: Literal["poseidon_rackham"] = "poseidon_rackham"
+    regions: tuple[StellarContaminationRegionConfig, ...] = ()
+    transit_chord_temperature_k: PositiveFloat | None = None
+    transit_chord_log_g_cgs: float | None = None
+    transit_chord_metallicity_dex: float | None = None
+
+    @model_validator(mode="after")
+    def validate_regions(self) -> "StellarContaminationConfig":
+        names = tuple(region.name for region in self.regions)
+        if len(set(names)) != len(names):
+            raise ValueError("stellar contamination region names must be unique")
+        parameters = tuple(
+            region.covering_fraction_parameter
+            for region in self.regions
+            if region.covering_fraction_parameter is not None
+        )
+        if len(set(parameters)) != len(parameters):
+            raise ValueError(
+                "stellar covering-fraction parameter names must be unique"
+            )
+        fixed_total = sum(
+            region.covering_fraction or 0.0 for region in self.regions
+        )
+        if fixed_total > 1.0:
+            raise ValueError(
+                "fixed stellar heterogeneity fractions must sum to at most one"
+            )
+        if self.transit_chord_temperature_k is None and (
+            self.transit_chord_log_g_cgs is not None
+            or self.transit_chord_metallicity_dex is not None
+        ):
+            raise ValueError(
+                "transit chord log_g/metallicity require transit_chord_temperature_k"
+            )
+        return self
+
+
 class DatasetNuisanceConfig(ConfigModel):
     """Calibration and uncertainty controls for one named dataset."""
 
@@ -584,6 +651,7 @@ class TaskConfig(ConfigModel):
     schema_version: Literal[2]
     run: RunConfig
     bodies: BodiesConfig
+    stellar_contamination: StellarContaminationConfig | None = None
     observations: ObservationsConfig
     atmosphere: AtmosphereConfig
     clouds: CloudsConfig = CloudFreeConfig()
@@ -619,6 +687,24 @@ class TaskConfig(ConfigModel):
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")
         required: set[str] = set()
+        stellar_contamination = self.stellar_contamination
+        if stellar_contamination is not None:
+            if self.radiative_transfer.model != "transmission":
+                raise ValueError(
+                    "stellar_contamination is only supported for transmission"
+                )
+            photosphere_temperature = self.bodies.star.effective_temperature_k
+            for region in stellar_contamination.regions:
+                if region.kind == "spot" and region.temperature_k >= photosphere_temperature:
+                    raise ValueError(
+                        "stellar spot temperature must be cooler than the photosphere"
+                    )
+                if region.kind == "facula" and region.temperature_k <= photosphere_temperature:
+                    raise ValueError(
+                        "stellar facula temperature must be hotter than the photosphere"
+                    )
+                if region.covering_fraction_parameter is not None:
+                    required.add(region.covering_fraction_parameter)
         if chemistry_config.model == "fastchem_equilibrium":
             required.update(
                 {
@@ -742,6 +828,26 @@ class TaskConfig(ConfigModel):
                 "required model parameters are missing: "
                 + ", ".join(missing_parameters)
             )
+        if stellar_contamination is not None:
+            parameter_configs = {item.name: item for item in self.parameters}
+            maximum_fraction = sum(
+                region.covering_fraction or 0.0
+                for region in stellar_contamination.regions
+            )
+            for region in stellar_contamination.regions:
+                parameter_name = region.covering_fraction_parameter
+                if parameter_name is None:
+                    continue
+                prior = parameter_configs[parameter_name].prior
+                if prior.type != "uniform" or prior.lower < 0.0 or prior.upper > 1.0:
+                    raise ValueError(
+                        "stellar covering-fraction parameters require uniform priors within [0, 1]"
+                    )
+                maximum_fraction += prior.upper
+            if maximum_fraction > 1.0:
+                raise ValueError(
+                    "stellar covering-fraction prior upper bounds and fixed fractions must sum to at most one"
+                )
         clouds = self.clouds
         if clouds.model == "deck_haze":
             cloud_parameters = {

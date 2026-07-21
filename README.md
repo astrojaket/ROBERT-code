@@ -4,7 +4,9 @@ ROBERT is an early-stage JWST exoplanet atmospheric retrieval code, initially
 focused on emission. It provides typed domain objects, modular atmosphere and
 chemistry components, opacity preparation, cloud-free and cloudy emission,
 absorption-dominated transmission, optimal estimation, and optional UltraNest
-and MultiNest adapters. Its physical forward models are ready for controlled
+and MultiNest adapters. Transmission can include a typed Rackham/POSEIDON
+transit light source transform for unocculted spots and faculae. Its physical
+forward models are ready for controlled
 validation analyses within the regimes described below. ROBERT is not yet a
 general-purpose production science model: calibrated pipeline-product
 ingestion, broader atmospheric parameterizations, independent science-opacity
@@ -115,6 +117,10 @@ ignored by git.
   inverse-square gravity, correlated-k/CIA/Rayleigh extinction, and annulus
   diagnostics, strict YAML retrieval integration, and synthetic
   injection-recovery coverage. Scattering-return physics remains future work.
+- Spectrum-based stellar contamination for homogeneous, cool-spot,
+  hot-facula, and mixed disks, applied before instrument response with strict
+  YAML fraction/temperature/mixture validation. The transform has POSEIDON
+  v1.4 parity; this does not validate stellar atmosphere grids or surface maps.
 - Shared-atmosphere, multi-instrument forward modelling with instrument-aware
   binning and Gaussian likelihood support for masks, offsets, and jitter.
 - Optimal-estimation, UltraNest, MultiNest, and OE-to-nested inference through
@@ -138,3 +144,7 @@ ignored by git.
 - End-to-end PICASO/Virga parity using independent science molecular-opacity
   databases, plus high-stream validation beyond the matched SH4 closure.
 - Long-run posterior diagnostics and science-grade validation suites.
+
+The TSLE equations, POSEIDON benchmark, explicit-chord extension, degeneracies,
+and validation boundary are documented in [Transit light source effect and
+stellar contamination](docs/theory/stellar_contamination.md).

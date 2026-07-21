@@ -28,6 +28,7 @@ from robert_exoplanets.opacity import (
     OpacitySamplingProvider,
 )
 from robert_exoplanets.rt import CiaTable, DiscGeometry
+from robert_exoplanets.stellar import StellarContaminationModel
 
 from .emission import (
     EmissionForwardModel,
@@ -363,6 +364,7 @@ class ParameterizedTransmissionFactoryConfig:
     opacity_free_species: tuple[str, ...] = ()
     opacity_binning: ExoKTableBinning | None = field(default_factory=ExoKTableBinning)
     cloud_model: ParameterizedCloudModel | None = None
+    stellar_contamination: StellarContaminationModel | None = None
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -567,6 +569,7 @@ def build_parameterized_transmission_model(
         config=model_config,
         cia_table=config.cia_table,
         cloud_model=config.cloud_model,
+        stellar_contamination=config.stellar_contamination,
     )
 
 

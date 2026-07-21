@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added typed transit light source effect / stellar-contamination support for
+  transmission: immutable disk/chord/factor outputs, PHOENIX-backed
+  spot/facula preparation, fixed or retrieved projected covering fractions,
+  native-before-instrument application, strict schema-v2 YAML and manifest
+  provenance, an explicit-chord extension, and exact POSEIDON v1.4 transform
+  parity across homogeneous, spot, facula, and mixed JWST-range cases. The
+  validation claim is limited to the transform, not stellar grids or surface
+  evolution.
+
 - Fixed the bundled L 98-59 b Eureka! spectrum integrity check by recording the
   SHA-256 of the repository-normalized text while retaining upstream Zenodo
   checksum provenance.

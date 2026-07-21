@@ -15,6 +15,9 @@ advanced substantially beyond the published `0.3.0` version number:
   caching, fused random-overlap kernels, and maintained benchmarks;
 - substantial transmission, shared aerosol, PHOENIX, multi-dataset, and
   post-processing work was delivered ahead of the original sequence;
+- the transmission path now includes a typed Rackham/POSEIDON stellar-
+  contamination transform with strict YAML and transform-level parity, while
+  stellar-grid and evolving-surface validation remain future work;
 - the v0.8 plugin registry and entry-point discovery remain unimplemented;
 - the v0.10 release-quality validation matrix, covariance likelihood,
   independent science-opacity cloudy validation, and API-freeze work remain

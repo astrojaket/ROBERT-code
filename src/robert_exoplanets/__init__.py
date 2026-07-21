@@ -195,7 +195,12 @@ from .retrieval import (
 from .stellar import (
     BlackbodyStellarSpectrumModel,
     PhoenixStellarSpectrumModel,
+    StellarContaminationModel,
+    StellarContaminationResult,
+    StellarHeterogeneity,
+    StellarHeterogeneityDefinition,
     StellarSpectrumModel,
+    prepare_stellar_contamination_model,
     prepare_stellar_spectrum,
 )
 from .rt import (
@@ -409,6 +414,10 @@ __all__ = [
     "SpectralGrid",
     "Spectrum",
     "Star",
+    "StellarContaminationModel",
+    "StellarContaminationResult",
+    "StellarHeterogeneity",
+    "StellarHeterogeneityDefinition",
     "StellarSpectrumModel",
     "TabulatedTemperatureProfile",
     "TemperatureProfile",
@@ -497,6 +506,7 @@ __all__ = [
     "posterior_summary",
     "psis_leave_one_out",
     "prepare_stellar_spectrum",
+    "prepare_stellar_contamination_model",
     "postprocess_forward_output",
     "postprocess_retrieval_output",
     "pressure_grid_from_opacity",

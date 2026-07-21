@@ -30,6 +30,7 @@ from robert_exoplanets.rt import (
     inverse_square_hydrostatic_path_geometry,
     solve_absorption_transmission,
 )
+from robert_exoplanets.stellar import StellarContaminationModel
 
 from ._atmospheric import (
     evaluate_additional_optical_depths,
@@ -137,6 +138,7 @@ class ParameterizedTransmissionForwardModel:
     config: ParameterizedTransmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     cloud_model: ParameterizedCloudModel | None = None
+    stellar_contamination: StellarContaminationModel | None = None
     prepared_opacity: PreparedOpacity = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -183,7 +185,7 @@ class ParameterizedTransmissionForwardModel:
             )
         if len(set(self.required_parameters)) != len(self.required_parameters):
             raise RobertValidationError(
-                "temperature, chemistry, and radius parameter names must be unique"
+                "temperature, chemistry, radius, cloud, and stellar-contamination parameter names must be unique"
             )
         prepared = self.opacity_provider.prepare(
             self.spectral_grid,
@@ -218,6 +220,8 @@ class ParameterizedTransmissionForwardModel:
             parameters.append(self.config.radius_scale_parameter)
         if self.cloud_model is not None:
             parameters.extend(self.cloud_model.required_parameters)
+        if self.stellar_contamination is not None:
+            parameters.extend(self.stellar_contamination.required_parameters)
         return tuple(parameters)
 
     @property
@@ -288,6 +292,11 @@ class ParameterizedTransmissionForwardModel:
                     {}
                     if self.cloud_model is None
                     else dict(self.cloud_model.manifest_metadata)
+                ),
+                **(
+                    {"stellar_contamination": "disabled"}
+                    if self.stellar_contamination is None
+                    else dict(self.stellar_contamination.manifest_metadata)
                 ),
                 **dict(self.config.metadata),
             }
@@ -384,7 +393,7 @@ class ParameterizedTransmissionForwardModel:
             additional_optical_depths=additional_optical_depths,
             impact_quadrature_order=self.config.impact_quadrature_order,
         )
-        forward_metadata = {
+        forward_metadata: dict[str, str] = {
             **dict(result.metadata),
             "forward_model": "parameterized_transmission",
             "gravity_model": self.config.gravity_model,
@@ -393,13 +402,22 @@ class ParameterizedTransmissionForwardModel:
             ),
             "reference_gravity_m_s2": f"{reference_gravity:.17g}",
         }
-        transit_depth = Spectrum(
+        uncontaminated_transit_depth = Spectrum(
             spectral_grid=result.transit_depth.spectral_grid,
             values=result.transit_depth.values,
             unit=result.transit_depth.unit,
             observable=result.transit_depth.observable,
             metadata=forward_metadata,
         )
+        transit_depth = (
+            uncontaminated_transit_depth
+            if self.stellar_contamination is None
+            else self.stellar_contamination.apply(
+                uncontaminated_transit_depth,
+                parameter_values,
+            )
+        )
+        forward_metadata = dict(transit_depth.metadata)
         return AbsorptionTransmissionResult(
             transit_depth=transit_depth,
             effective_radius_m=result.effective_radius_m,

@@ -148,12 +148,15 @@ Public API:
 - `StellarSpectrumModel`.
 - `PhoenixStellarSpectrumModel`.
 - `BlackbodyStellarSpectrumModel`.
+- `StellarContaminationModel` and immutable contamination results.
 
 Internal implementation:
 
 - Stellar-atmosphere catalog interpolation and coverage validation.
 - Flux-conserving preparation on immutable spectral grids.
 - Explicit surface-flux and radiance conventions.
+- Disk-mixture and transit-chord stellar-contamination transforms prepared on
+  native forward-model grids.
 
 Allowed dependencies:
 

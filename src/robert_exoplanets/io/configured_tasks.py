@@ -58,6 +58,10 @@ from robert_exoplanets.rt import (
     normal_emission_geometry,
     OpticalConstantsCatalog,
 )
+from robert_exoplanets.stellar import (
+    StellarHeterogeneityDefinition,
+    prepare_stellar_contamination_model,
+)
 
 from .task_config import ParameterConfig, TaskConfig, initialize_task_directories
 from .l9859b import load_bello_arufe2025_l9859b
@@ -103,7 +107,8 @@ def describe_config(config: TaskConfig) -> str:
             f"Opacity: {config.opacity.resolution} [{', '.join(config.opacity.species)}]",
             (
                 f"Transmission: reference={config.radiative_transfer.reference_pressure_bar:g} bar, "
-                f"gravity={config.radiative_transfer.gravity_model}"
+                f"gravity={config.radiative_transfer.gravity_model}, "
+                f"stellar_contamination={'enabled' if config.stellar_contamination is not None else 'disabled'}"
                 if config.radiative_transfer.model == "transmission"
                 else f"Geometry: {config.radiative_transfer.geometry.model}"
             ),
@@ -551,6 +556,9 @@ def build_problem(
     spectral_grids = {}
     clouds = config.clouds
     shared_cloud_model = None
+    stellar_contamination_metadata: dict[str, str] = {
+        "stellar_contamination": "disabled"
+    }
     if clouds.model == "deck_haze":
         shared_cloud_model = ParameterizedDeckHazeCloudModel(
             log10_cloud_top_pressure_bar_parameter=(
@@ -634,6 +642,42 @@ def build_problem(
         )
         spectral_grids[dataset.name] = dataset.observation.spectral_grid
         if rt.model == "transmission":
+            contamination_model = None
+            if config.stellar_contamination is not None:
+                contamination = config.stellar_contamination
+                contamination_model = prepare_stellar_contamination_model(
+                    star,
+                    dataset.observation.spectral_grid,
+                    heterogeneities=tuple(
+                        StellarHeterogeneityDefinition(
+                            name=region.name,
+                            kind=region.kind,
+                            temperature_k=region.temperature_k,
+                            covering_fraction=region.covering_fraction,
+                            covering_fraction_parameter=(
+                                region.covering_fraction_parameter
+                            ),
+                            log_g_cgs=region.log_g_cgs,
+                            metallicity_dex=region.metallicity_dex,
+                        )
+                        for region in contamination.regions
+                    ),
+                    transit_chord_temperature_k=(
+                        contamination.transit_chord_temperature_k
+                    ),
+                    transit_chord_log_g_cgs=(
+                        contamination.transit_chord_log_g_cgs
+                    ),
+                    transit_chord_metallicity_dex=(
+                        contamination.transit_chord_metallicity_dex
+                    ),
+                    spectrum_model=star_item.spectrum_model,
+                    metadata={"configured_model": contamination.model},
+                )
+                if stellar_contamination_metadata.get("stellar_contamination") == "disabled":
+                    stellar_contamination_metadata = dict(
+                        contamination_model.manifest_metadata
+                    )
             factory = ParameterizedTransmissionFactoryConfig(
                 planet=planet,
                 star=star,
@@ -651,6 +695,7 @@ def build_problem(
                 opacity_binning=None,
                 model=model_config,
                 cloud_model=shared_cloud_model,
+                stellar_contamination=contamination_model,
             )
             cloud_models[dataset.name] = build_parameterized_transmission_model(
                 factory,
@@ -708,6 +753,7 @@ def build_problem(
             "cloud_model": config.clouds.model,
             "geometry": geometry_item.model,
             "radiative_transfer_model": rt.model,
+            **stellar_contamination_metadata,
         },
         opacity_identifiers=opacity_ids,
     )

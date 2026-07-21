@@ -18,7 +18,10 @@ from robert_exoplanets import (
     Planet,
     PressureGrid,
     SpectralGrid,
+    Spectrum,
     Star,
+    StellarContaminationModel,
+    StellarHeterogeneity,
     build_parameterized_transmission_model,
 )
 from robert_exoplanets.core import RobertValidationError
@@ -145,6 +148,71 @@ def test_transmission_depth_responds_to_abundance_and_reference_radius() -> None
 
     assert np.all(high_abundance.values > low_abundance.values)
     assert np.all(larger_radius.values > low_abundance.values)
+
+
+def test_transmission_factory_applies_parameterized_stellar_contamination() -> None:
+    grid = _spectral_grid()
+    photosphere = Spectrum(
+        spectral_grid=grid,
+        values=np.array([4.0, 4.0]),
+        unit="W m^-3 sr^-1",
+        observable="stellar_spectral_radiance",
+    )
+    spot = StellarHeterogeneity(
+        name="spot",
+        kind="spot",
+        spectrum=Spectrum(
+            spectral_grid=grid,
+            values=np.array([1.0, 3.0]),
+            unit="W m^-3 sr^-1",
+            observable="stellar_spectral_radiance",
+        ),
+        covering_fraction_parameter="f_spot",
+    )
+    component = StellarContaminationModel(photosphere, (spot,))
+    clear = build_parameterized_transmission_model(
+        _factory(),
+        spectral_grid=grid,
+    )
+    contaminated = build_parameterized_transmission_model(
+        replace(_factory(), stellar_contamination=component),
+        spectral_grid=grid,
+    )
+    shared = {
+        "temperature": 1000.0,
+        "log_h2o": -3.0,
+        "radius_scale": 1.0,
+    }
+
+    clear_spectrum = clear(shared)
+    contaminated_spectrum = contaminated({**shared, "f_spot": 0.2})
+    epsilon = component.evaluate({"f_spot": 0.2}).contamination_factor.values
+
+    np.testing.assert_allclose(contaminated_spectrum.values, clear_spectrum.values * epsilon)
+    assert contaminated.required_parameters[-1] == "f_spot"
+    assert contaminated.manifest_metadata["stellar_contamination"] == "enabled"
+    assert contaminated_spectrum.metadata["stellar_contamination_application_order"] == (
+        "native_transit_depth_before_instrument_response"
+    )
+
+
+def test_disabled_stellar_contamination_preserves_transmission_exactly() -> None:
+    first = build_parameterized_transmission_model(
+        _factory(),
+        spectral_grid=_spectral_grid(),
+    )
+    second = build_parameterized_transmission_model(
+        replace(_factory(), stellar_contamination=None),
+        spectral_grid=_spectral_grid(),
+    )
+    parameters = {
+        "temperature": 1000.0,
+        "log_h2o": -3.0,
+        "radius_scale": 1.0,
+    }
+
+    np.testing.assert_array_equal(first(parameters).values, second(parameters).values)
+    assert first(parameters).metadata == second(parameters).metadata
 
 
 def test_transmission_uses_shared_parameterized_deck_haze_model() -> None:

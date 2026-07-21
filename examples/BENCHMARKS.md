@@ -11,6 +11,22 @@ tones for contrast.
 - `benchmark_g_star_stellar_spectrum.py`: flux-conserving STScI PHOENIX
   profile for a Sun-like G2V star versus the explicit blackbody fallback,
   including the resulting secondary-eclipse normalization difference.
+- `stellar_contamination_transmission.py`: runnable synthetic spot+facula TSLE
+  example, using a controlled blackbody approximation by default or external
+  STScI PHOENIX data when requested.
+- `benchmark_poseidon_stellar_contamination.py`: commit-verified execution of
+  the official POSEIDON v1.4 TSLE function bodies for homogeneous, spot,
+  facula, and mixed cases. This isolates the transform and does not validate a
+  stellar atmosphere grid. Run it with an official checkout outside ROBERT:
+
+  ```bash
+  python examples/benchmark_poseidon_stellar_contamination.py \
+    --poseidon-source /path/to/POSEIDON
+  ```
+
+  Products are written beneath ignored `examples/outputs/`; the compact oracle
+  and validation boundary are documented in
+  `docs/theory/stellar_contamination.md`.
 
 ## PICASO
 

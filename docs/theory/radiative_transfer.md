@@ -238,6 +238,10 @@ opacity once and evaluates temperature, chemistry, opacity, and RT for every
 parameter vector. The name uses *transmission* because it predicts a
 transmission spectrum/transit depth; *transit model* would more naturally imply
 a time-dependent light-curve calculation, which ROBERT does not perform here.
+An optional stellar-contamination component multiplies the native planet-only
+depth before instrument response; its disk/chord flux convention, POSEIDON
+benchmark, and limitations are defined in [Transit light source effect and
+stellar contamination](stellar_contamination.md).
 
 The planetary radius is an explicit reference radius at a configured reference
 pressure. Reference pressures outside the atmospheric grid are rejected rather

@@ -66,6 +66,9 @@ The major sections are intentionally explicit:
   molecules, target-bin preparation, and an external cache directory;
 - `radiative_transfer`: emission geometry/backend or transmission reference
   pressure, radius parameter, gravity law, and impact quadrature;
+- `stellar_contamination`: optional transmission-only Rackham/POSEIDON disk
+  mixture, fixed stellar-region temperatures, retrieved or fixed projected
+  covering fractions, and an optional explicit transit chord;
 - `parameters`: ordered retrieval priors and optional forward-model values;
 - `sampler`: inference engine (OE, UltraNest, MultiNest, or OE followed by
   either nested sampler), convergence/iteration controls, resume policy, and
@@ -106,6 +109,37 @@ spectral bins during model construction, so no stellar file I/O occurs during
 likelihood evaluation. ROBERT converts the tabulated surface flux to radiance
 as `F_lambda / pi` and normalizes the finite atlas integral to
 `sigma * T_eff**4`; both choices are recorded in spectrum and run metadata.
+
+Transmission TSLE uses the same `bodies.star.spectrum_model` selection. A
+complete spot-plus-facula example is:
+
+```yaml
+stellar_contamination:
+  model: poseidon_rackham
+  regions:
+    - name: cool_spot
+      kind: spot
+      temperature_k: 4000.0
+      covering_fraction_parameter: f_spot
+    - name: hot_facula
+      kind: facula
+      temperature_k: 5200.0
+      covering_fraction_parameter: f_fac
+parameters:
+  - {name: f_spot, prior: {type: uniform, lower: 0.0, upper: 0.4}}
+  - {name: f_fac, prior: {type: uniform, lower: 0.0, upper: 0.4}}
+```
+
+Omitting `stellar_contamination` leaves transmission output unchanged. Each
+region chooses exactly one fixed `covering_fraction` or
+`covering_fraction_parameter`. Fraction priors must be uniform within `[0, 1]`,
+and fixed fractions plus all prior upper bounds must sum to at most one. Spot
+temperatures must be cooler and facular temperatures hotter than
+`bodies.star.effective_temperature_k`. The default omitted chord is the
+immaculate photosphere and matches POSEIDON; `transit_chord_temperature_k`
+enables ROBERT's broader explicit-chord extension. See [Transit light source
+effect and stellar contamination](theory/stellar_contamination.md) for the
+equations, assumptions, preparation order, degeneracies, and validation scope.
 
 The WASP-69 benchmark opacity set follows the molecules named in Schlawin et
 al.: H2O, CO2, CO, CH4, NH3, and SO2. The first five use FastChem equilibrium

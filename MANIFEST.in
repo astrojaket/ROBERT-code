@@ -5,6 +5,7 @@ recursive-include docs *.md
 recursive-include examples *.py *.ipynb
 recursive-include data/chemistry/fastchem *
 recursive-include data/validation *.md *.json *.csv
+recursive-include tests/fixtures *.json
 recursive-include slurm *.sbatch
 global-exclude .DS_Store
 global-exclude *.py[cod]

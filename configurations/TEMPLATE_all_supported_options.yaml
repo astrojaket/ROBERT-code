@@ -35,6 +35,32 @@ bodies:
     spectrum_model: phoenix    # Alternative: blackbody
 
 # =============================================================================
+# STELLAR CONTAMINATION / TRANSIT LIGHT SOURCE EFFECT (transmission only)
+# Omit this entire block to disable TSLE exactly. PHOENIX uses the stellar
+# coordinates above; region temperatures are fixed while fractions may be
+# retrieved. Fixed fractions plus fraction-prior upper bounds must sum to <= 1.
+# =============================================================================
+# stellar_contamination:
+#   model: poseidon_rackham
+#   regions:
+#     - name: cool_spot
+#       kind: spot
+#       temperature_k: 4000.0
+#       covering_fraction_parameter: f_spot
+#       # covering_fraction: 0.10   # Fixed alternative; choose exactly one.
+#       # log_g_cgs: 4.5            # Defaults to the photosphere.
+#       # metallicity_dex: 0.0      # Defaults to the photosphere.
+#     - name: hot_facula
+#       kind: facula
+#       temperature_k: 5200.0
+#       covering_fraction_parameter: f_fac
+#   # POSEIDON parity uses an immaculate chord (omit these fields). Setting a
+#   # chord temperature enables ROBERT's generalized, separately scoped model.
+#   # transit_chord_temperature_k: 4750.0
+#   # transit_chord_log_g_cgs: 4.5
+#   # transit_chord_metallicity_dex: 0.0
+
+# =============================================================================
 # DATA PROPERTIES
 # `loader` selects a supported published data reader. `datasets` must be
 # statistically independent likelihood terms. Do not include WASP-69b `avg`
@@ -226,6 +252,10 @@ parameters:
 
   # --- Isothermal alternative: remove the five PG14 parameters above ---
   # - {name: temperature, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}
+
+  # --- Stellar contamination fractions (transmission-only example above) ---
+  # - {name: f_spot, prior: {type: uniform, lower: 0.0, upper: 0.4}, value: 0.15}
+  # - {name: f_fac, prior: {type: uniform, lower: 0.0, upper: 0.4}, value: 0.10}
 
   # --- Madhusudhan-Seager 2009 alternative: remove the PG14 parameters ---
   # - {name: P1, label: log10(P1/bar), prior: {type: uniform, lower: -6.0, upper: 1.5}, value: -3.0}

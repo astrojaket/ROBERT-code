@@ -56,6 +56,15 @@ Invariants:
 - Output grid and units are explicit.
 - Invalid physical states fail deterministically.
 
+## 2.1 Stellar Contamination
+
+Stellar contamination is a separate prepared transform owned by `stellar` and
+orchestrated by `forward`; it is not radiative-transfer solver arithmetic. Its
+typed interface evaluates disk-integrated, transit-chord, and multiplicative
+factor spectra from covering-fraction parameters, then applies that factor to
+native transmission depth before instrument response. Stellar grid access and
+spectral preparation must occur before likelihood evaluation.
+
 ## 3. Chemistry Engines
 
 Purpose:

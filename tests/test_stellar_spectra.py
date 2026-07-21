@@ -90,3 +90,31 @@ def test_phoenix_loader_requires_stsci_reference_root(monkeypatch) -> None:
 
     with pytest.raises(RobertConfigError, match="PYSYN_CDBS"):
         stellar_spectra._load_phoenix_source_spectrum(5778.0, 0.0, 4.44)
+
+
+def test_phoenix_preparation_rejects_spectral_extrapolation(monkeypatch) -> None:
+    from astropy import units as u
+
+    class FakePhoenixSpectrum:
+        waveset = np.linspace(1.0e4, 3.0e4, 21) * u.AA
+
+        def __call__(self, wavelength, *, flux_unit):
+            return np.ones_like(wavelength.to_value(u.AA)) * flux_unit
+
+    monkeypatch.setattr(
+        stellar_spectra,
+        "_load_phoenix_source_spectrum",
+        lambda *_: FakePhoenixSpectrum(),
+    )
+    star = Star(
+        name="G2V",
+        effective_temperature_k=5778.0,
+        metallicity_dex=0.0,
+        log_g_cgs=4.44,
+    )
+
+    with pytest.raises(RobertValidationError, match="outside PHOENIX coverage"):
+        PhoenixStellarSpectrumModel(bolometric_normalization=False).prepare(
+            star,
+            SpectralGrid.from_array([0.5, 2.0], unit="micron"),
+        )

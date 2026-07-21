@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from robert_exoplanets.io.configured_tasks import (
+    build_problem,
     load_observations as load_configured_observations,
     prepare_opacity,
 )
@@ -23,6 +24,7 @@ from robert_exoplanets.instruments import (
     ObservationCollection,
     ObservationDataset,
 )
+from robert_exoplanets.opacity import CorrelatedKTable
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +91,222 @@ def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 40
     assert config.runtime.mpi_processes == 2
+
+
+def test_yaml_configures_poseidon_rackham_stellar_contamination() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {
+        "model": "poseidon_rackham",
+        "regions": [
+            {
+                "name": "cool_spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            },
+            {
+                "name": "hot_facula",
+                "kind": "facula",
+                "temperature_k": 5700.0,
+                "covering_fraction": 0.1,
+            },
+        ],
+        "transit_chord_temperature_k": 5250.0,
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.5},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+    round_trip = TaskConfig.model_validate(parsed.model_dump(mode="python"))
+
+    assert parsed.stellar_contamination is not None
+    assert parsed.stellar_contamination.regions[0].kind == "spot"
+    assert parsed.stellar_contamination.regions[1].covering_fraction == 0.1
+    assert parsed.stellar_contamination.transit_chord_temperature_k == 5250.0
+    assert round_trip == parsed
+
+
+def test_stellar_contamination_requires_valid_temperature_and_fraction_priors() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {
+        "regions": [
+            {
+                "name": "cool_spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            }
+        ]
+    }
+    with pytest.raises(ValidationError, match="f_spot"):
+        TaskConfig.model_validate(raw)
+
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": -0.1, "upper": 0.5},
+        },
+    ]
+    with pytest.raises(ValidationError, match=r"within \[0, 1\]"):
+        TaskConfig.model_validate(raw)
+
+    raw["parameters"][-1]["prior"] = {
+        "type": "uniform",
+        "lower": 0.0,
+        "upper": 0.5,
+    }
+    raw["stellar_contamination"]["regions"][0]["temperature_k"] = 6000.0
+    with pytest.raises(ValidationError, match="cooler than the photosphere"):
+        TaskConfig.model_validate(raw)
+
+
+def test_stellar_contamination_mixture_prior_must_close() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {
+        "regions": [
+            {
+                "name": "spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            },
+            {
+                "name": "facula",
+                "kind": "facula",
+                "temperature_k": 5700.0,
+                "covering_fraction_parameter": "f_fac",
+            },
+        ]
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.7},
+        },
+        {
+            "name": "f_fac",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.4},
+        },
+    ]
+
+    with pytest.raises(ValidationError, match="sum to at most one"):
+        TaskConfig.model_validate(raw)
+
+
+def test_stellar_contamination_is_rejected_for_emission() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {"regions": []}
+
+    with pytest.raises(ValidationError, match="only supported for transmission"):
+        TaskConfig.model_validate(raw)
+
+
+def test_configured_multi_dataset_tsle_parameter_changes_each_spectrum(
+    monkeypatch,
+) -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["bodies"]["star"]["spectrum_model"] = "blackbody"
+    raw["stellar_contamination"] = {
+        "regions": [
+            {
+                "name": "spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            }
+        ]
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.3},
+        },
+    ]
+    parsed = TaskConfig.model_validate(raw)
+    observations = ObservationCollection(
+        datasets=(
+            ObservationDataset(
+                name="blue",
+                observation=Observation.from_arrays(
+                    [1.0, 1.5],
+                    [0.01, 0.01],
+                    [1.0e-4, 1.0e-4],
+                    wavelength_bin_edges=[0.9, 1.2, 1.8],
+                    flux_unit="transit_depth",
+                    observable="transit_depth",
+                ),
+            ),
+            ObservationDataset(
+                name="red",
+                observation=Observation.from_arrays(
+                    [3.0, 4.0],
+                    [0.01, 0.01],
+                    [1.0e-4, 1.0e-4],
+                    wavelength_bin_edges=[2.5, 3.5, 4.5],
+                    flux_unit="transit_depth",
+                    observable="transit_depth",
+                ),
+            ),
+        )
+    )
+
+    def fake_table(_config, dataset_name, species):
+        wavelength = (
+            np.array([1.0, 1.5])
+            if dataset_name == "blue"
+            else np.array([3.0, 4.0])
+        )
+        return CorrelatedKTable(
+            species=species,
+            pressure_bar=np.array([1.0e-6, 100.0]),
+            temperature_K=np.array([500.0, 2000.0]),
+            wavenumber_cm_inverse=10000.0 / wavelength,
+            g_samples=np.array([0.5]),
+            g_weights=np.array([1.0]),
+            kcoeff=np.full((2, 2, 2, 1), 1.0e-24),
+            metadata={"checksum_sha256": f"{dataset_name}-{species}"},
+        )
+
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks._load_cached_table",
+        fake_table,
+    )
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks.load_nemesispy_cia_table",
+        lambda: None,
+    )
+    problem = build_problem(parsed, observations)
+    baseline = problem.parameters.vector_to_mapping(problem.parameters.midpoint_vector())
+    baseline["f_spot"] = 0.0
+    spotted = {**baseline, "f_spot": 0.2}
+
+    homogeneous_spectra = problem.model_spectra(baseline)
+    spotted_spectra = problem.model_spectra(spotted)
+
+    assert set(spotted_spectra) == {"blue", "red"}
+    assert all(
+        np.all(spotted_spectra[name].values > homogeneous_spectra[name].values)
+        for name in spotted_spectra
+    )
+    assert problem.metadata["stellar_contamination"] == "enabled"
+    assert problem.metadata["stellar_contamination_required_parameters"] == "f_spot"
+    assert problem.opacity_identifiers == {
+        "blue:H2O": "blue-H2O",
+        "red:H2O": "red-H2O",
+    }
 
 
 def test_l98_59b_clr_retrieval_configuration_matches_requested_run() -> None:
