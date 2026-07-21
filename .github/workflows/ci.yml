@@ -20,7 +20,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install development package
-        run: python -m pip install -e ".[dev,perf,opacity]"
+        run: python -m pip install -e ".[dev,perf,opacity,diagnostics]"
 
       - name: Lint
         run: ruff check .

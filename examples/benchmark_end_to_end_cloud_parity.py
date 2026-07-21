@@ -51,7 +51,12 @@ from robert_exoplanets.diagnostics.benchmark_style import (
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "examples" / "outputs" / "end_to_end_cloud_parity"
 EXTERNAL_RUNNER = Path(__file__).with_name("run_picaso_virga_cloud_parity.py")
-OPTICAL_CONSTANTS = ROOT / "data" / "optical_constants" / "exo_skryer"
+OPTICAL_CONSTANTS = Path(
+    os.environ.get(
+        "ROBERT_OPTICAL_CONSTANTS",
+        ROOT / "data" / "optical_constants" / "exo_skryer",
+    )
+).expanduser()
 GAS_SPECIES = ("H2O", "CO", "CO2", "CH4")
 
 

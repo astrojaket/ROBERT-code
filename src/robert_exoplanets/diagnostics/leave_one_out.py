@@ -164,8 +164,9 @@ class LeaveOneOutResult:
                 + (
                     "The Gaussian normalization is included."
                     if self.likelihood_normalized
-                    else "The Gaussian normalization is omitted, so absolute ELPD is shifted; "
-                    "same-data model differences and Pareto-k diagnostics are unchanged."
+                    else "The Gaussian normalization is omitted, so absolute ELPD is not a "
+                    "normalized predictive density. Comparisons are valid only when the "
+                    "omitted term is constant across posterior draws and models."
                 )
             ),
         }
@@ -348,6 +349,16 @@ def run_psis_leave_one_out(
         raise RobertValidationError("max_posterior_draws must be at least 20")
     if isinstance(seed, bool) or int(seed) < 0:
         raise RobertValidationError("LOO seed must be a non-negative integer")
+    variable_uncertainty = _variable_uncertainty_parameters(problem)
+    likelihood = getattr(problem, "likelihood", None)
+    if variable_uncertainty and not bool(
+        getattr(likelihood, "include_normalization", False)
+    ):
+        raise RobertConfigError(
+            "PSIS-LOO requires likelihood normalization when uncertainty nuisance "
+            "parameters are retrieved; enable include_normalization for: "
+            + ", ".join(variable_uncertainty)
+        )
 
     draws, selected_indices, effective_sample_size, resampled = _equal_weight_draws(
         sample_array,
@@ -571,6 +582,29 @@ def _observation_metadata(
         wavelength = np.arange(len(ids), dtype=float)
         wavelength_unit = "point_index"
     return tuple(ids), tuple(datasets), wavelength, wavelength_unit
+
+
+def _variable_uncertainty_parameters(
+    problem: PointwiseRetrievalProblem,
+) -> tuple[str, ...]:
+    """Return retrieved nuisance parameters that change Gaussian normalization."""
+
+    parameter_names = {
+        str(name) for name in getattr(problem, "parameter_names", ())
+    }
+    candidates: set[str] = set()
+    likelihood = getattr(problem, "likelihood", None)
+    for attribute in ("jitter_parameter", "uncertainty_scale_parameter"):
+        value = getattr(likelihood, attribute, None)
+        if value:
+            candidates.add(str(value))
+    observations = getattr(problem, "observations", None)
+    for dataset in getattr(observations, "datasets", ()):
+        for attribute in ("jitter_parameter", "uncertainty_scale_parameter"):
+            value = getattr(dataset, attribute, None)
+            if value:
+                candidates.add(str(value))
+    return tuple(sorted(parameter_names & candidates))
 
 
 def _valid_indices(observation: Any) -> NDArray[np.int64]:

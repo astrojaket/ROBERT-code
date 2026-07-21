@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from robert_exoplanets import Planet, Star, load_wiser2025_wasp80b
@@ -9,7 +10,12 @@ from robert_exoplanets import Planet, Star, load_wiser2025_wasp80b
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET_SLUG = "wasp80b"
-DATA_DIRECTORY = ROOT / "data" / "wasp80b_wiser2025"
+DATA_DIRECTORY = Path(
+    os.environ.get(
+        "ROBERT_WASP80B_DATA",
+        ROOT / "data" / "wasp80b_wiser2025",
+    )
+).expanduser()
 CACHE_DIRECTORY = ROOT / "opacity_data" / "wasp80b_observation_bins"
 GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 JUPITER_MASS_KG = 1.89813e27

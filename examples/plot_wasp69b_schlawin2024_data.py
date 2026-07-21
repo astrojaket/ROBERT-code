@@ -17,7 +17,12 @@ import matplotlib.pyplot as plt
 from robert_exoplanets import load_schlawin2024_wasp69b
 
 ROOT = Path(__file__).resolve().parents[1]
-DATA = ROOT / "data" / "wasp69b_schlawin2024"
+DATA = Path(
+    os.environ.get(
+        "ROBERT_WASP69B_DATA",
+        ROOT / "data" / "wasp69b_schlawin2024",
+    )
+).expanduser()
 OUTPUT = Path(__file__).resolve().parent / "outputs" / "wasp69b_schlawin2024_data.png"
 
 

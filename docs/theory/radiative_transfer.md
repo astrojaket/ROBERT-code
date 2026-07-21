@@ -342,9 +342,9 @@ writes a tau heatmap and a wavelength-averaged weighting profile over a
 synthetic P-T profile.
 
 Current forward-model validation uses the maintained PICASO and
-petitRADTRANS comparisons listed in `examples/BENCHMARKS.md`. The superseded
-pre-YAML checks are retained under `examples/Depreciated_Benchmarks/` and are
-not part of the active validation workflow.
+petitRADTRANS comparisons listed in `examples/BENCHMARKS.md`. Superseded
+pre-YAML checks and their generated artifacts are not part of the active
+validation workflow or Git history.
 
 The standalone synthetic scattering example:
 

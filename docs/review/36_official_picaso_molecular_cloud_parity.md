@@ -24,7 +24,9 @@ The independently calculated cloud mass extinction still agrees to
 cloud-only parity result while replacing the analytic validation gas opacity
 with two real, separately sourced molecular databases.
 
-![Official PICASO molecular-opacity cloud benchmark](../../data/validation/official_picaso_molecular_cloud_parity/official_picaso_molecular_cloud_parity.png)
+The compact acceptance and sampling reports remain versioned as test oracles.
+Generated arrays and the plot are excluded from Git and will be included in the
+ROBERT benchmark Zenodo deposit described in `docs/data_policy.md`.
 
 These spectral residuals are not treated as code-parity failures. The
 calculation intentionally compares different opacity databases and, for some

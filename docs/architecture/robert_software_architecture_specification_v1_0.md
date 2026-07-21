@@ -106,7 +106,7 @@ Directory responsibilities:
 | `docs/theory/` | Equations, assumptions, citations | Implementation details not tied to equations |
 | `docs/developer/` | Contribution, release, and testing guides | User-facing science tutorials |
 | `examples/configs/` | Small runnable retrieval configs | Production science outputs |
-| `examples/data/` | Tiny fixture data only | Real JWST products or large opacity tables |
+| `examples/data/` | Tiny required fixture or reference data | Large opacity tables or generated outputs |
 | `examples/scripts/` | Python scripts using public APIs | Private-module imports |
 | `examples/notebooks/` | Tutorial notebooks using public APIs | Required test-only logic |
 | `schemas/` | Versioned config schemas | Runtime-generated schemas without review |

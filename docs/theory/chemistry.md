@@ -31,7 +31,7 @@ stored solar elemental abundances before applying these parameters, so calls do
 not inherit elemental abundances from the previous sample.
 
 The Conda environment installs `pyfastchem`, and the repository bundles the
-required FastChem inputs under `data/chemistry/fastchem`. Together
+required lightweight FastChem inputs under `data/chemistry/fastchem`. Together
 they pass a real smoke test, including repeated calls separated by a different
 metallicity and C/O state. The FastChem path, parameter names, species mapping,
 and elemental-abundance source are recorded in model provenance. FastChem

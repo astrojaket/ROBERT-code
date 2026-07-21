@@ -19,7 +19,10 @@ def test_l9859b_loader_splits_detectors_and_converts_ppm() -> None:
     collection = load_bello_arufe2025_l9859b(DATA)
 
     assert collection.names == ("nrs1", "nrs2")
-    assert [dataset.observation.n_points for dataset in collection.datasets] == [84, 134]
+    assert [dataset.observation.n_points for dataset in collection.datasets] == [
+        84,
+        134,
+    ]
     assert collection.n_points == 218
     assert collection.datasets[1].offset_parameter is None
     first = collection.datasets[0].observation

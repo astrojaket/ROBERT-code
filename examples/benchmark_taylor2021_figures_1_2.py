@@ -48,7 +48,12 @@ from robert_exoplanets import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-REFERENCE_DIR = ROOT / "data" / "taylor2021_cloud_paper"
+REFERENCE_DIR = Path(
+    os.environ.get(
+        "ROBERT_TAYLOR2021_DATA",
+        ROOT / "data" / "taylor2021_cloud_paper",
+    )
+).expanduser()
 PRT_DATA = ROOT / "opacity_data" / "petitRADTRANS" / "input_data"
 OUTPUT_DIR = Path(__file__).resolve().parent / "outputs" / "taylor2021_figures_1_2"
 PAPER_DOI = "https://doi.org/10.1093/mnras/stab1854"

@@ -1,14 +1,14 @@
 # ROBERT
 
-ROBERT is a JWST exoplanet emission retrieval code with typed core domain
-objects, modular atmosphere and chemistry components, opacity import/archive
-helpers, RT-facing optical-depth objects, cloud-free and cloudy emission solvers,
-optimal estimation, and optional UltraNest and MultiNest adapters. The physical forward
-model is ready for controlled science analyses within the validated cloud-free
-and benchmarked cloudy-emission regimes described below. It is not yet a
-general-purpose production retrieval: calibrated pipeline-product ingestion,
-broader atmospheric parameterizations, independent end-to-end cloudy
-validation, and long-run posterior validation remain planned.
+ROBERT is an early-stage JWST exoplanet atmospheric retrieval code, initially
+focused on emission. It provides typed domain objects, modular atmosphere and
+chemistry components, opacity preparation, cloud-free and cloudy emission,
+absorption-dominated transmission, optimal estimation, and optional UltraNest
+and MultiNest adapters. Its physical forward models are ready for controlled
+validation analyses within the regimes described below. ROBERT is not yet a
+general-purpose production science model: calibrated pipeline-product
+ingestion, broader atmospheric parameterizations, independent science-opacity
+cloud validation, and long-run posterior validation remain planned.
 
 The Python distribution name is `robert-exoplanets` to avoid colliding with the existing `robert` package on PyPI.
 
@@ -20,6 +20,9 @@ uses Python 3.12, while CI tests every supported version.
 ## Architecture
 
 The project architecture is governed by [RFC-0001: ROBERT Architectural Specification](docs/rfcs/0001-robert-architectural-specification.md), with companion documents listed in [docs/architecture](docs/architecture/README.md). Future substantial contributions should follow that document suite.
+
+The latest repository-wide capability and risk assessment is the
+[2026-07-21 detailed audit](docs/review/47_repository_audit_2026-07-21.md).
 
 ## Quick Start
 
@@ -69,6 +72,8 @@ python run_retrieval.py \
 See [Configuring and running ROBERT](docs/configuration.md) for portable paths,
 directory initialization, opacity preparation, forward modelling, retrievals,
 128-rank nested-sampler Slurm submission, and automatic or manual plotting.
+Scientific inputs and benchmark products are external by policy; see
+[Scientific data and benchmark artifacts](docs/data_policy.md).
 
 Completed configured runs can be post-processed without rerunning inference:
 
@@ -83,8 +88,8 @@ plot products, YAML automation, and colour/style overrides.
 
 The maintained [forward-model benchmark suite](examples/BENCHMARKS.md) uses
 PICASO and petitRADTRANS as independent gold-standard comparisons. Superseded
-pre-YAML checks are retained under `examples/Depreciated_Benchmarks/` for
-historical reference only.
+benchmark artifacts are removed from Git history and will be archived with
+future benchmark releases on Zenodo.
 
 The plotting example writes local figures under `examples/outputs/`, which is
 ignored by git.
@@ -120,6 +125,9 @@ ignored by git.
 - General retrieval and forward-model post-processing with fit statistics,
   residuals, posterior/OE diagnostics, sampler comparisons, and optional
   automatic plotting controlled by YAML.
+- Optional ArviZ-backed PSIS leave-one-out diagnostics with pointwise ELPD,
+  Pareto-k reliability checks, aligned multi-dataset metadata, and guarded
+  treatment of retrieved uncertainty nuisance parameters.
 - Unit, integration, regression, injection-recovery, and scientific benchmark
   tests, including independent forward-model comparisons with pRT and PICASO.
 

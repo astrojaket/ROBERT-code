@@ -479,7 +479,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/validation/transmission_convergence"),
+        default=Path("examples/outputs/transmission_convergence"),
     )
     args = parser.parse_args()
     report = run_benchmark(args.source, args.output)

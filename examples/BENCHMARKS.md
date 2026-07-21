@@ -32,5 +32,6 @@ tones for contrast.
 - `benchmark_native_hdf_emission_convergence.py`: native-grid emission
   convergence.
 
-The archived HAT-P-32b checks under `Depreciated_Benchmarks/` predate ROBERT's
-YAML task workflow and are not maintained or run in CI.
+Superseded pre-YAML HAT-P-32b checks and their generated products have been
+removed from Git. Released benchmark products belong in the Zenodo archive
+described by `docs/data_policy.md`.

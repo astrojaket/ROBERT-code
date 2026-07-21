@@ -100,10 +100,12 @@ examples/
 
 Rules:
 
-- Example data must be tiny.
+- Example data must be lightweight, redistributable, and required to run a
+  maintained example; large opacity inputs remain external.
 - Examples must not import private modules.
 - Examples must be runnable from a fresh editable install.
-- Notebooks are educational, not the production API.
+- Notebooks are educational, not the production API, and are committed without
+  execution output.
 
 ## 5. `schemas/`
 

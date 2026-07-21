@@ -70,7 +70,12 @@ from retrieve_wasp69b_nircam_cloud_free import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ROOT / "data" / "optical_constants" / "exo_skryer"
+CATALOG = Path(
+    os.environ.get(
+        "ROBERT_OPTICAL_CONSTANTS",
+        ROOT / "data" / "optical_constants" / "exo_skryer",
+    )
+).expanduser()
 OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_mie_cloud"
 DIRECT_NK_NODES_MICRON = (2.4, 4.0, 5.5, 7.0, 9.0, 12.0)
 

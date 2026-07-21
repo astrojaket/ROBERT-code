@@ -33,7 +33,8 @@ to:
 Across all 40,000 points, the largest absolute difference in a free `log10`
 VMR was `1.7764e-15`. Frozen POSEIDON vectors are also part of the normal
 pytest suite. The generated record is
-`data/validation/poseidon_clr_prior/comparison.json`.
+The generated comparison JSON is excluded from Git under the repository data
+policy and will be archived with the benchmark release on Zenodo.
 
 ## Phantom molecule
 

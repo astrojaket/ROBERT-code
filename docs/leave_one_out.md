@@ -123,10 +123,13 @@ LOO-CV complements Bayesian evidence; it does not replace it. In particular:
   wrong.
 - The ELPD difference divided by its standard error is not a Gaussian
   detection significance.
-- If `likelihood.include_normalization` is false, absolute ELPD is shifted by
-  a data-dependent constant. Same-data model differences, point rankings, and
-  Pareto-\(k\) diagnostics are unchanged. Enable normalization when absolute
-  predictive densities will be reported.
+- If `likelihood.include_normalization` is false, absolute ELPD is not a
+  normalized predictive density. With fixed uncertainties, the omitted term is
+  constant across posterior draws, so same-data model differences and
+  Pareto-\(k\) diagnostics are unchanged. If jitter or an uncertainty scale is
+  retrieved, however, the omitted term changes with the parameters and affects
+  PSIS itself; ROBERT rejects that combination. Enable normalization whenever
+  uncertainty nuisance parameters or absolute predictive densities are used.
 - Correlated measurements cannot be treated as independently leaveable
   points without defining scientifically valid likelihood units. ROBERT's
   present function is therefore limited to independent Gaussian terms.

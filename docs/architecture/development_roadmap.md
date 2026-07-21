@@ -3,6 +3,29 @@
 This roadmap stages ROBERT from architecture skeleton to stable scientific
 release.
 
+## Status rebaseline (2026-07-21)
+
+The version sections below preserve the original architectural sequence; they
+are not a literal description of the current implementation. Development has
+advanced substantially beyond the published `0.3.0` version number:
+
+- the v0.4-v0.7 RT, instrument, retrieval, and validation foundations exist,
+  using UltraNest and MultiNest rather than the originally proposed dynesty;
+- much of the v0.9 performance work exists through Numba, optional JAX,
+  caching, fused random-overlap kernels, and maintained benchmarks;
+- substantial transmission, shared aerosol, PHOENIX, multi-dataset, and
+  post-processing work was delivered ahead of the original sequence;
+- the v0.8 plugin registry and entry-point discovery remain unimplemented;
+- the v0.10 release-quality validation matrix, covariance likelihood,
+  independent science-opacity cloudy validation, and API-freeze work remain
+  incomplete.
+
+Current priorities and acceptance criteria are tracked in the
+[2026-07-21 repository audit](../review/47_repository_audit_2026-07-21.md#prioritized-next-step-plan).
+The next release-planning pass should replace the historical version mapping
+with outcome-based milestones and assign a version consistent with the actual
+public API and validation maturity.
+
 ## v0.1 - Architecture and Infrastructure
 
 Objectives:
@@ -235,7 +258,7 @@ Success criteria:
 
 ## Post-v1.0 Candidates
 
-Possible future features:
+The original candidates were:
 
 - Transmission retrievals.
 - Patchy/column atmospheres.
@@ -246,3 +269,8 @@ Possible future features:
 - Additional sampler adapters.
 
 These should not destabilize the v1.0 emission architecture.
+
+Transmission and an optional JAX backend have since been implemented ahead of
+this sequence. Patchy/two-region emission and multiple chemistry backends also
+exist in limited forms. Phase curves, reflection spectroscopy, a general plugin
+system, and broader sampler support remain future work.

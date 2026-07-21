@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "robert-exoplanets"
 version = "0.3.0"
-description = "Foundation for JWST exoplanet emission retrievals."
+description = "Foundation for JWST exoplanet atmospheric retrievals."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

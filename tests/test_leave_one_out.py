@@ -25,6 +25,7 @@ from robert_exoplanets import (
     run_psis_leave_one_out,
     write_leave_one_out_result,
 )
+from robert_exoplanets.core import RobertConfigError
 from robert_exoplanets.io.task_config import LeaveOneOutConfig
 
 
@@ -138,6 +139,28 @@ def test_retrieval_loo_resamples_weighted_nested_posterior_reproducibly(
     assert payload["method"] == "psis-loo"
     assert payload["number_observations"] == 3
     assert "pointwise_log_likelihood" in np.load(arrays_path)
+
+
+def test_retrieval_loo_requires_normalization_for_retrieved_jitter() -> None:
+    base = _problem()
+    problem = RetrievalProblem(
+        name="variable-uncertainty",
+        observation=base.observation,
+        parameters=RetrievalParameterSet(
+            (
+                RetrievalParameter("level", UniformPrior(0.5, 1.5)),
+                RetrievalParameter("jitter", UniformPrior(0.001, 0.1)),
+            )
+        ),
+        forward_model=base.forward_model,
+        likelihood=GaussianLikelihood(include_normalization=False),
+    )
+    samples = np.column_stack(
+        (np.linspace(0.9, 1.1, 40), np.linspace(0.01, 0.05, 40))
+    )
+
+    with pytest.raises(RobertConfigError, match="requires likelihood normalization"):
+        run_psis_leave_one_out(problem, samples)
 
 
 def test_leave_one_out_config_validates_draw_count() -> None:

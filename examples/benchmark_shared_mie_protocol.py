@@ -88,9 +88,13 @@ def main(output_dir: Path = DEFAULT_OUTPUT) -> dict[str, object]:
     )
     gravity = 8.42
     gas = assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=gravity)
-    index = OpticalConstantsCatalog(
-        ROOT / "data" / "optical_constants" / "exo_skryer"
-    ).load("MgSiO3")
+    optical_constants = Path(
+        os.environ.get(
+            "ROBERT_OPTICAL_CONSTANTS",
+            ROOT / "data" / "optical_constants" / "exo_skryer",
+        )
+    ).expanduser()
+    index = OpticalConstantsCatalog(optical_constants).load("MgSiO3")
     model = ParameterizedMieCloudModel(
         refractive_index_wavelength_micron=(),
         real_index_parameter_names=(),

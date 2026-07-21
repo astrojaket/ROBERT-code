@@ -28,3 +28,10 @@ def test_ci_validates_the_generalized_yaml_workflow() -> None:
     assert "python run_retrieval.py" in text
     assert "configurations/wasp69b_cloud_free_R1000.yaml" in text
     assert "--validate-only" in text
+
+
+def test_ci_quality_job_exercises_optional_diagnostics() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    quality_job = text.split("  test:", maxsplit=1)[0]
+    assert "[dev,perf,opacity,diagnostics]" in quality_job

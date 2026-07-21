@@ -11,7 +11,9 @@ extinction agrees to **1.60e-6 RMS**, and the maximum difference in the cloud's
 effect on eclipse depth is **0.00115 ppm**. All predeclared acceptance gates
 pass.
 
-![Independent MgSiO3 cloud parity](../../data/validation/end_to_end_cloud_parity/end_to_end_cloud_parity.png)
+The compact acceptance report remains versioned as a test oracle. Generated
+arrays and the plot are excluded from Git and will be included in the ROBERT
+benchmark Zenodo deposit described in `docs/data_policy.md`.
 
 This closes the previous shared-optical-depth limitation. Neither framework
 receives gas or cloud optical depth from the other. They receive only one

@@ -1,4 +1,4 @@
-"""ROBERT: a foundation for JWST exoplanet emission retrievals."""
+"""ROBERT: a foundation for JWST exoplanet atmospheric retrievals."""
 
 from ._version import __version__
 

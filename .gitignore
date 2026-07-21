@@ -29,12 +29,25 @@ outputs/
 ROBERT_output/
 retrieval_runs/
 
-# Large scientific data should be referenced, not committed.
+# Heavy scientific inputs and generated results live outside Git. See
+# docs/data_policy.md for the archive and path conventions. Lightweight,
+# required reference data may be versioned under data/ or package data.
+external_data/
 opacity_data/
 opacities/
 input_data/
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.fits
+*.fit
 
-# The historical, exo_k-binned HAT-P-32b tables remain versioned inside the
-# depreciated benchmark archive; arbitrary user opacity directories are ignored.
-!examples/Depreciated_Benchmarks/HAT_P_32b/data/hat_p_32b/opacities/
-!examples/Depreciated_Benchmarks/HAT_P_32b/data/hat_p_32b/opacities/*.robert-opacity.npz
+# Generated benchmark and validation products are archived externally. Compact
+# text summaries remain trackable as regression-test oracles.
+data/validation/**
+!data/validation/**/
+!data/validation/**/*.json
+!data/validation/**/*.csv
+!data/validation/**/README.md
+docs/data/emission_intercomparison/

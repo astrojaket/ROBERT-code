@@ -17,7 +17,7 @@ from robert_exoplanets.instruments import (
 
 
 BELLO_ARUFE2025_EUREKA_SHA256 = (
-    "84abfa9108ecfcdee9f181b2b1a2c4abc5b8167cae649e0d7d67de44e1f7f298"
+    "fb423903613e2ac8d729c31cbfb40b66f4441080e381c5e9d49451227673d672"
 )
 _FILENAME = "L9859b_combined_spectrum_eureka.txt"
 _EXPECTED_POINTS = 218

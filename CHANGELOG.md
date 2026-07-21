@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Fixed the bundled L 98-59 b Eureka! spectrum integrity check by recording the
+  SHA-256 of the repository-normalized text while retaining upstream Zenodo
+  checksum provenance.
+- Made PSIS leave-one-out reject unnormalized Gaussian likelihoods when
+  retrieved jitter or uncertainty scaling makes the omitted normalization
+  parameter-dependent, and added the diagnostics extra to the CI coverage job.
+- Rebaselined the package description and development roadmap against the
+  implemented transmission, JAX, retrieval, and validation capabilities and
+  added a repository-wide capability, risk, and next-step audit.
+- Defined a repository data policy that retains required lightweight inputs and
+  compact benchmark test oracles while excluding heavy opacity tables,
+  generated arrays, plots, chains, and notebook output from Git.
 - Added a geometry-independent parameterized grey cloud deck plus well-mixed
   power-law haze model, shared CIA/Rayleigh/cloud extinction assembly for
   emission and transmission, and schema-v2 YAML integration for both modes.

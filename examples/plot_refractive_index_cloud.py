@@ -19,7 +19,12 @@ from robert_exoplanets import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ROOT / "data" / "optical_constants" / "exo_skryer"
+CATALOG = Path(
+    os.environ.get(
+        "ROBERT_OPTICAL_CONSTANTS",
+        ROOT / "data" / "optical_constants" / "exo_skryer",
+    )
+).expanduser()
 OUTPUT = Path(__file__).resolve().parent / "outputs" / "refractive_index_cloud"
 
 

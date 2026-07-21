@@ -10,6 +10,7 @@ separate science inputs and must also be reviewed for a new target.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from robert_exoplanets import Planet, Star, load_schlawin2024_wasp69b
@@ -21,7 +22,12 @@ JUPITER_MASS_KG = 1.89813e27
 SOLAR_RADIUS_M = 6.957e8
 ROOT = Path(__file__).resolve().parents[1]
 TARGET_SLUG = "wasp69b"
-DATA_DIRECTORY = ROOT / "data" / "wasp69b_schlawin2024"
+DATA_DIRECTORY = Path(
+    os.environ.get(
+        "ROBERT_WASP69B_DATA",
+        ROOT / "data" / "wasp69b_schlawin2024",
+    )
+).expanduser()
 CACHE_DIRECTORY = ROOT / "opacity_data" / "wasp69b_nircam_observation_bins"
 
 PLANET = Planet(

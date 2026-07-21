@@ -72,7 +72,12 @@ TARGET_SLUG = TARGET.TARGET_SLUG
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = TARGET.DATA_DIRECTORY
-FASTCHEM = ROOT / "data" / "chemistry" / "fastchem"
+FASTCHEM = Path(
+    os.environ.get(
+        "ROBERT_FASTCHEM_DATA",
+        ROOT / "data" / "chemistry" / "fastchem",
+    )
+).expanduser()
 CACHE = TARGET.CACHE_DIRECTORY
 OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_nircam_cloud_free"
 SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")

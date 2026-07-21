@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -129,10 +128,3 @@ def test_full_native_sampling_is_required_for_paper_reference() -> None:
     assert convergence["reference_stride"] == 1
     assert convergence["cases"]["2"]["robert"]["cloudy_emission_rms_ppm"] > 10.0
     assert convergence["cases"]["2"]["picaso"]["cloudy_transmission_rms_ppm"] > 20.0
-
-
-def test_versioned_official_picaso_reference_checksums() -> None:
-    checksums = json.loads((REFERENCE / "checksums.json").read_text(encoding="utf-8"))
-
-    for name, expected in checksums.items():
-        assert hashlib.sha256((REFERENCE / name).read_bytes()).hexdigest() == expected

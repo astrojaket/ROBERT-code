@@ -124,7 +124,7 @@ two implementations perform identical work.
 
 /Users/jaketaylor/miniforge3/envs/robert-exoplanets/bin/python \
   examples/benchmark_petitradtrans3_multispecies_transmission.py \
-  --output-dir data/validation/multispecies_transmission_petitradtrans3
+  --output-dir examples/outputs/multispecies_transmission_petitradtrans3
 ```
 
 The first script writes its large pRT reference below the ignored runtime output

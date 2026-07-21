@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 
@@ -81,11 +80,3 @@ def test_versioned_cloud_parity_reference_passes_acceptance_gates() -> None:
         report["metrics"]["matched_hg_cloudy_disk_spectrum"]["rms_relative_difference"]
         < 2.0e-6
     )
-
-
-def test_versioned_cloud_parity_reference_checksums() -> None:
-    root = ROOT / "data" / "validation" / "end_to_end_cloud_parity"
-    checksums = json.loads((root / "checksums.json").read_text(encoding="utf-8"))
-
-    for name, expected in checksums.items():
-        assert hashlib.sha256((root / name).read_bytes()).hexdigest() == expected
