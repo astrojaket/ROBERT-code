@@ -18,9 +18,9 @@ The largest scientific gaps are independent science-opacity validation of
 cloudy end-to-end calculations, transmission scattering-return physics,
 calibrated pipeline ingestion and covariance, and long-run posterior validation.
 The largest engineering gaps are the absent plugin system promised by the
-architecture, low coverage in workflow orchestration, no static type-checking
-gate despite a typed public package, and a 5.23 GiB Git history dominated by
-deleted validation arrays.
+architecture, low coverage in workflow orchestration, and no static
+type-checking gate despite a typed public package. The 5.23 GiB Git-history
+finding was resolved in the cleanup follow-up recorded below.
 
 No critical defect was found. The audit fixed two high-impact correctness
 issues: the published L 98-59 b loader could not verify its tracked data, and
@@ -56,7 +56,7 @@ it was environment contamination rather than a repository behavior failure.
 | Core grids and spectra | Implemented, typed, immutable | Strong unit and invariant coverage | Good | Units are string conventions rather than a fully unit-aware internal algebra |
 | Planet, star, observation | Implemented, validated containers | Strong unit coverage and real target loaders | Good | No calibrated JWST pipeline-product model |
 | Atmosphere and temperature | Isothermal, tabulated, spline, Madhusudhan-Seager, and PG14-style profiles | Unit, integration, benchmark, and retrieval coverage | Good | Broader production parameterizations and domain validation remain limited |
-| Chemistry and MMW | Constant/free, background closure, CLR/phantom composition, FastChem adapter | Strong profile tests; POSEIDON CLR parity; selected retrieval checks | Good | FastChem requires external runtime data; disequilibrium chemistry is absent |
+| Chemistry and MMW | Constant/free, background closure, CLR/phantom composition, FastChem adapter | Strong profile tests; POSEIDON CLR parity; selected retrieval checks | Good | FastChem is optional at runtime; disequilibrium chemistry is absent |
 | Stellar spectra | Blackbody and STScI PHOENIX preparation | Unit tests and a G-star benchmark | Good | PHOENIX needs external `PYSYN_CDBS`; stellar heterogeneity is absent |
 | Correlated-k opacity | KTA, ROBERT archives, exo_k preparation, coverage checks, empirical target-bin preparation | Strong interpolation, archive, coverage, and cross-framework tests | Good | Production runs require external molecular data; extrapolation remains deliberately strict |
 | Opacity sampling | ExoMol cross-section HDF path | Functional tests and benchmarks | Explicitly beta | Not the validated retrieval default |
@@ -134,21 +134,23 @@ validation-versus-production boundaries.
 Historical review documents remain intentionally dated snapshots and were not
 rewritten.
 
-#### M3. Git history is 5.23 GiB — unresolved
+#### M3. Git history was 5.23 GiB — resolved in cleanup follow-up
 
 The checked-out content is modest, but `.git` contains a 5.23 GiB pack. The
 largest objects are deleted 40-94 MB NPZ arrays formerly stored beneath
 `docs/data/emission_intercomparison/`; many historical versions accumulate to
 several gigabytes.
 
-Impact: cloning, fetching, backup, CI cold starts, and contributor onboarding
-are unnecessarily expensive. Correcting this requires a coordinated history
-rewrite or repository migration and must not be done as a routine audit edit.
+The follow-up inventory distinguished required lightweight inputs and compact
+benchmark test oracles from generated arrays, plots, chains, deprecated
+k-tables, and full benchmark products. The latter paths were removed from all
+local branches and tags with `git filter-repo`. The packed Git object store is
+now 3.27 MiB; the complete `.git` directory is 3.5 MiB. The largest retained
+blob is the required 1.35 MB packaged CIA table.
 
-Recommended action: inventory all large reachable objects, publish any
-scientifically necessary artifacts in a versioned data archive, introduce a
-small manifest/downloader, then use `git filter-repo` in a coordinated breaking
-maintenance window.
+A verified 5.2 GiB no-hardlink mirror of the pre-rewrite repository is retained
+locally outside the checkout. Publishing the rewritten refs remains a separate,
+explicitly coordinated force-push step.
 
 #### M4. Static typing is declared but not enforced — unresolved
 
