@@ -236,6 +236,7 @@ Public API:
 - `ChemistryModel`.
 - `FreeChemistry`.
 - `EquilibriumChemistry`.
+- `PressureQuenchChemistry` and explicit `QuenchGroup` definitions.
 - Backend protocols.
 
 Internal implementation:
@@ -243,6 +244,8 @@ Internal implementation:
 - Free abundance transforms.
 - Equilibrium grid adapters.
 - Quench approximations when validated.
+- Pure chemistry decorators that preserve base-model provenance and remain
+  outside radiative-transfer implementations.
 
 Allowed dependencies:
 

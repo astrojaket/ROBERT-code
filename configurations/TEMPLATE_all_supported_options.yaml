@@ -158,6 +158,21 @@ atmosphere:
     # phantom_species: phantom
     # phantom_mean_molecular_weight_parameter: phantom_mmw
 
+    # Optional pressure-quench decorator around FastChem equilibrium chemistry.
+    # (The Python API can decorate any meaningful profile-producing model.)
+    # Each parameter is log10(P_q / bar), with its prior declared below.
+    # One species per group is molecular quenching; multiple species share P_q.
+    # quenching:
+    #   model: pressure_quench
+    #   preset: custom
+    #   groups:
+    #     - {pressure_parameter: log_Pq_CO2, species: [CO2]}
+    #     - {pressure_parameter: log_Pq_shared, species: [H2O, CO]}
+    # Taylor et al. (2026) hot-Jupiter grouped alternative (do not add groups):
+    # quenching:
+    #   model: pressure_quench
+    #   preset: taylor_2026_hot_jupiter_element_grouped
+
 # =============================================================================
 # CLOUD PROPERTIES
 # Choose ONE. Cloud parameters must be present in `parameters` only when the
@@ -249,6 +264,15 @@ parameters:
   - {name: gamma2, prior: {type: log_uniform, lower: 1.0e-4, upper: 100.0}, value: 0.1}
   - {name: T_irr, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}
   - {name: alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}, value: 0.5}
+
+  # --- Pressure-quench examples; enable only with the matching block above ---
+  # These are uniform priors on a log10 pressure parameter, not log-uniform
+  # priors applied to an already logarithmic variable. Bounds are user choices.
+  # - {name: log_Pq_CO2, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}, value: -1.0}
+  # - {name: log_Pq_shared, unit: log10(bar), prior: {type: uniform, lower: -4.0, upper: 1.0}, value: -0.5}
+  # Taylor preset parameters:
+  # - {name: log_Pq_C, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}, value: -1.0}
+  # - {name: log_Pq_N, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}, value: -1.0}
 
   # --- Isothermal alternative: remove the five PG14 parameters above ---
   # - {name: temperature, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}, value: 1500.0}

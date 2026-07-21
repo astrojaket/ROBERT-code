@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import log10
 from pathlib import Path
 import os
 from typing import Annotated, Literal
@@ -238,6 +239,66 @@ class ChemistrySpeciesConfig(ConfigModel):
     fastchem_name: str = Field(min_length=1)
 
 
+class QuenchGroupConfig(ConfigModel):
+    """One explicit set of molecular profiles sharing a quench pressure."""
+
+    pressure_parameter: str = Field(
+        min_length=1,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*$",
+    )
+    species: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_species(self) -> "QuenchGroupConfig":
+        if any(not species.strip() for species in self.species):
+            raise ValueError("quench group species names must not be empty")
+        if len(set(self.species)) != len(self.species):
+            raise ValueError("quench group species must be unique")
+        return self
+
+
+class PressureQuenchConfig(ConfigModel):
+    """Pressure-quench decorator applied to the configured base chemistry."""
+
+    model: Literal["pressure_quench"] = "pressure_quench"
+    preset: Literal[
+        "custom",
+        "taylor_2026_hot_jupiter_element_grouped",
+    ] = "custom"
+    groups: tuple[QuenchGroupConfig, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_groups(self) -> "PressureQuenchConfig":
+        if self.preset == "custom" and not self.groups:
+            raise ValueError("custom pressure quenching requires at least one group")
+        if self.preset != "custom" and self.groups:
+            raise ValueError("pressure-quench presets do not accept custom groups")
+        groups = self.resolved_groups()
+        parameters = tuple(group.pressure_parameter for group in groups)
+        if len(set(parameters)) != len(parameters):
+            raise ValueError("quench pressure parameter names must be unique")
+        species = tuple(item for group in groups for item in group.species)
+        if len(set(species)) != len(species):
+            raise ValueError("a species may belong to only one quench group")
+        return self
+
+    def resolved_groups(self) -> tuple[QuenchGroupConfig, ...]:
+        """Return explicit groups for custom configuration or a named preset."""
+
+        if self.preset == "custom":
+            return self.groups
+        return (
+            QuenchGroupConfig(
+                pressure_parameter="log_Pq_C",
+                species=("H2O", "CO", "CO2", "CH4"),
+            ),
+            QuenchGroupConfig(
+                pressure_parameter="log_Pq_N",
+                species=("NH3",),
+            ),
+        )
+
+
 class FastChemConfig(ConfigModel):
     model: Literal["fastchem_equilibrium"]
     fastchem_path: Path
@@ -247,6 +308,7 @@ class FastChemConfig(ConfigModel):
     constant_log10_vmr_parameters: dict[str, str] | None = Field(
         default_factory=dict
     )
+    quenching: PressureQuenchConfig | None = None
 
     @model_validator(mode="after")
     def validate_constant_overrides(self) -> "FastChemConfig":
@@ -263,6 +325,31 @@ class FastChemConfig(ConfigModel):
             raise ValueError("constant log10 VMR parameter names must not be empty")
         if len(set(parameters)) != len(parameters):
             raise ValueError("constant log10 VMR parameter names must be unique")
+        if self.quenching is not None:
+            groups = self.quenching.resolved_groups()
+            quench_species = {
+                species for group in groups for species in group.species
+            }
+            missing = sorted(quench_species - labels)
+            if missing:
+                raise ValueError(
+                    "quench species missing from FastChem labels: "
+                    + ", ".join(missing)
+                )
+            base_parameters = {
+                self.metallicity_parameter,
+                self.carbon_to_oxygen_parameter,
+                *parameters,
+            }
+            quench_parameters = {
+                group.pressure_parameter for group in groups
+            }
+            collisions = sorted(base_parameters & quench_parameters)
+            if collisions:
+                raise ValueError(
+                    "quench parameters collide with FastChem parameters: "
+                    + ", ".join(collisions)
+                )
         return self
 
 
@@ -687,6 +774,7 @@ class TaskConfig(ConfigModel):
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")
         required: set[str] = set()
+        parameter_configs = {item.name: item for item in self.parameters}
         stellar_contamination = self.stellar_contamination
         if stellar_contamination is not None:
             if self.radiative_transfer.model != "transmission":
@@ -725,6 +813,33 @@ class TaskConfig(ConfigModel):
                 required.add(
                     chemistry_config.phantom_mean_molecular_weight_parameter
                 )
+        quenching = getattr(chemistry_config, "quenching", None)
+        if quenching is not None:
+            quench_parameters = tuple(
+                group.pressure_parameter for group in quenching.resolved_groups()
+            )
+            required.update(quench_parameters)
+            lower_domain = log10(self.atmosphere.pressure.top_bar)
+            upper_domain = log10(self.atmosphere.pressure.bottom_bar)
+            for name in quench_parameters:
+                parameter = parameter_configs.get(name)
+                if parameter is None:
+                    continue
+                if parameter.prior.type != "uniform":
+                    raise ValueError(
+                        "log10 quench-pressure parameters require uniform priors, "
+                        "not priors that transform an already logarithmic value: "
+                        + name
+                    )
+                if (
+                    parameter.prior.lower < lower_domain
+                    or parameter.prior.upper > upper_domain
+                ):
+                    raise ValueError(
+                        f"quench-pressure prior {name} must lie within the pressure "
+                        f"grid layer-center domain [{lower_domain}, {upper_domain}] "
+                        "log10(bar)"
+                    )
         temperature = self.atmosphere.temperature
         if temperature.model == "parmentier_guillot_2014":
             required.update({"kappa_IR", "gamma1", "gamma2", "T_irr", "alpha"})
@@ -829,7 +944,6 @@ class TaskConfig(ConfigModel):
                 + ", ".join(missing_parameters)
             )
         if stellar_contamination is not None:
-            parameter_configs = {item.name: item for item in self.parameters}
             maximum_fraction = sum(
                 region.covering_fraction or 0.0
                 for region in stellar_contamination.regions

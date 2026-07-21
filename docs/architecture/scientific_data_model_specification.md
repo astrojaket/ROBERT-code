@@ -220,6 +220,10 @@ Responsibilities:
 - Produce composition arrays under an explicit convention, such as VMR or mass
   fraction.
 - Validate normalization rules.
+- Expose deterministic parameter requirements and science-relevant provenance.
+- When decorated by a disequilibrium transform, retain base-model output
+  contracts and make pressure-domain, interpolation, and closure policies
+  explicit.
 
 Ownership:
 

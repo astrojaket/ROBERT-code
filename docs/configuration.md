@@ -159,6 +159,73 @@ parameters:
 The configured K-table directory must contain an SO2 R1000 product before
 opacity preparation is run.
 
+### Pressure-quench retrievals
+
+FastChem equilibrium profiles can be decorated with explicit pressure-quench
+groups. Each `pressure_parameter` is `log10(P_q / bar)`, and its prior belongs
+in the normal `parameters` list. Bounds are a user and science-case choice;
+ROBERT does not impose the Taylor et al. `[-5.5, 2]` range globally. Use a
+`uniform` prior for a uniform prior on the logarithmic parameter—a
+`log_uniform` prior would apply another logarithm and is not the intended
+semantics.
+
+One species in a group gives arbitrary molecular quenching. This example uses
+CO2, demonstrating that CH4 and NH3 are not hard-coded:
+
+```yaml
+atmosphere:
+  chemistry:
+    model: fastchem_equilibrium
+    fastchem_path: /path/to/fastchem
+    species:
+      - {label: H2O, fastchem_name: H2O1}
+      - {label: CO, fastchem_name: C1O1}
+      - {label: CO2, fastchem_name: C1O2}
+    quenching:
+      model: pressure_quench
+      preset: custom
+      groups:
+        - {pressure_parameter: log_Pq_CO2, species: [CO2]}
+parameters:
+  - {name: log_Pq_CO2, unit: log10(bar), prior: {type: uniform, lower: -4.0, upper: 1.0}}
+```
+
+Multiple species may share a pressure, and multiple independent groups may be
+declared:
+
+```yaml
+quenching:
+  model: pressure_quench
+  preset: custom
+  groups:
+    - {pressure_parameter: log_Pq_C_subset, species: [H2O, CO, CO2]}
+    - {pressure_parameter: log_Pq_CH4, species: [CH4]}
+    - {pressure_parameter: log_Pq_NH3, species: [NH3]}
+```
+
+The Taylor et al. (2026) hot-Jupiter grouped preset is shorter:
+
+```yaml
+quenching:
+  model: pressure_quench
+  preset: taylor_2026_hot_jupiter_element_grouped
+parameters:
+  - {name: log_Pq_C, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}}
+  - {name: log_Pq_N, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}}
+```
+
+It applies `log_Pq_C` to H2O, CO, CO2, and CH4, and `log_Pq_N` to
+NH3. It deliberately does not add N2. "Elemental" means grouped molecular
+profiles here, not an elemental-conservation calculation. Custom Python groups
+may include N2 if the base model produces it.
+
+Strict YAML quenching currently supports the FastChem base. The Python
+decorator is general for profile-producing `ChemistryModel` implementations;
+ROBERT's configured free chemistry is constant with altitude, so quenching it
+would be a no-op and is rejected as an unknown configuration field. See
+[Chemistry](theory/chemistry.md) for interpolation, bounds, closure,
+provenance, and validation-level details.
+
 Free-chemistry nested sampling also accepts a joint CLR prior. All retrieved
 abundances must use one shared group; the configured background gas is the
 derived final composition category:

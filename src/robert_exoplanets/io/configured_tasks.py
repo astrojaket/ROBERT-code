@@ -22,6 +22,8 @@ from robert_exoplanets.atmosphere import (
     IsothermalTemperatureProfile,
     MadhusudhanSeager2009TemperatureProfile,
     ParmentierGuillot2014TemperatureProfile,
+    PressureQuenchChemistry,
+    QuenchGroup,
     SplineTemperatureProfile,
     TabulatedTemperatureProfile,
 )
@@ -523,6 +525,20 @@ def build_problem(
                 }
             ),
         )
+    quenching = getattr(chemistry_item, "quenching", None)
+    if quenching is not None:
+        chemistry = PressureQuenchChemistry(
+            base_model=chemistry,
+            groups=tuple(
+                QuenchGroup(
+                    pressure_parameter=group.pressure_parameter,
+                    species=group.species,
+                )
+                for group in quenching.resolved_groups()
+            ),
+            preset=quenching.preset,
+        )
+    phantom_species = getattr(chemistry_item, "phantom_species", None)
     geometry_item = config.radiative_transfer.geometry
     geometry = (
         normal_emission_geometry()
@@ -686,8 +702,8 @@ def build_problem(
                 mean_molecular_weight_model=mean_molecular_weight,
                 opacity_free_species=(
                     ()
-                    if chemistry_item.phantom_species is None
-                    else (chemistry_item.phantom_species,)
+                    if phantom_species is None
+                    else (phantom_species,)
                 ),
                 pressure_grid=pressure,
                 cia_table=cia,
@@ -710,8 +726,8 @@ def build_problem(
                 mean_molecular_weight_model=mean_molecular_weight,
                 opacity_free_species=(
                     ()
-                    if chemistry_item.phantom_species is None
-                    else (chemistry_item.phantom_species,)
+                    if phantom_species is None
+                    else (phantom_species,)
                 ),
                 pressure_grid=pressure,
                 cia_table=cia,
@@ -726,6 +742,9 @@ def build_problem(
         forward_model = build_multi_dataset_emission_model(
             configs, spectral_grids=spectral_grids
         )
+        forward_manifest_metadata = dict(
+            next(iter(forward_model.models.values())).manifest_metadata
+        )
         opacity_ids = {
             f"{dataset}:{key}": value
             for dataset, model in forward_model.models.items()
@@ -733,6 +752,9 @@ def build_problem(
         }
     else:
         forward_model = NamedRegionalModels(cloud_models)
+        forward_manifest_metadata = dict(
+            next(iter(cloud_models.values())).manifest_metadata
+        )
         opacity_ids = {
             f"{dataset}:{key}": value
             for dataset, model in cloud_models.items()
@@ -753,6 +775,7 @@ def build_problem(
             "cloud_model": config.clouds.model,
             "geometry": geometry_item.model,
             "radiative_transfer_model": rt.model,
+            **forward_manifest_metadata,
             **stellar_contamination_metadata,
         },
         opacity_identifiers=opacity_ids,

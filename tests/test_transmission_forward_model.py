@@ -17,6 +17,8 @@ from robert_exoplanets import (
     ParameterizedTransmissionModelConfig,
     Planet,
     PressureGrid,
+    PressureQuenchChemistry,
+    QuenchGroup,
     SpectralGrid,
     Spectrum,
     Star,
@@ -129,6 +131,37 @@ def test_parameterized_transmission_factory_builds_transit_depth() -> None:
     assert spectrum.metadata["forward_model"] == "parameterized_transmission"
     assert model.manifest_metadata["reference_pressure_bar"] == "10"
     assert model.opacity_identifiers == {"H2O": "h2o-transmission-test"}
+
+
+def test_transmission_discovers_quench_parameters_and_manifest_metadata() -> None:
+    base = _factory()
+    chemistry = PressureQuenchChemistry(
+        base_model=base.chemistry_model,
+        groups=(QuenchGroup("log_Pq_H2O", ("H2O",)),),
+    )
+    model = build_parameterized_transmission_model(
+        replace(base, chemistry_model=chemistry),
+        spectral_grid=_spectral_grid(),
+    )
+
+    spectrum = model(
+        {
+            "temperature": 1000.0,
+            "log_h2o": -3.0,
+            "log_Pq_H2O": -2.0,
+            "radius_scale": 1.0,
+        }
+    )
+
+    assert model.required_parameters == (
+        "temperature",
+        "log_h2o",
+        "log_Pq_H2O",
+        "radius_scale",
+    )
+    assert model.manifest_metadata["chemistry_quench_scheme"] == "pressure_quench"
+    assert model.manifest_metadata["chemistry_quench_groups"] == "log_Pq_H2O:H2O"
+    assert np.all(np.isfinite(spectrum.values))
 
 
 def test_transmission_depth_responds_to_abundance_and_reference_radius() -> None:

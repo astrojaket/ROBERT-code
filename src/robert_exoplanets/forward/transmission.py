@@ -240,6 +240,9 @@ class ParameterizedTransmissionForwardModel:
 
     @property
     def manifest_metadata(self) -> Mapping[str, str]:
+        chemistry_metadata = getattr(
+            self.atmosphere_builder.chemistry_model, "metadata", {}
+        )
         return immutable_mapping(
             {
                 "forward_model": "parameterized_transmission",
@@ -263,6 +266,9 @@ class ParameterizedTransmissionForwardModel:
                     self.atmosphere_builder.temperature_profile.name
                 ),
                 "chemistry_model": self.atmosphere_builder.chemistry_model.name,
+                "chemistry_species": ",".join(
+                    self.atmosphere_builder.chemistry_model.species
+                ),
                 "required_parameters": ",".join(self.required_parameters),
                 "gas_combination": self.config.gas_combination,
                 "include_rayleigh": str(self.config.include_rayleigh).lower(),
@@ -288,6 +294,10 @@ class ParameterizedTransmissionForwardModel:
                     ),
                     labels=(self.spectral_grid.unit,),
                 ),
+                **{
+                    f"chemistry_{key}": str(value)
+                    for key, value in chemistry_metadata.items()
+                },
                 **(
                     {}
                     if self.cloud_model is None

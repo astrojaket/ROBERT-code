@@ -105,6 +105,11 @@ Invariants:
 - Composition convention is explicit.
 - Species names map cleanly to opacity species.
 - Backend grid coverage is validated before sampling.
+- Chemistry decorators preserve base provenance and declare their additional
+  parameters deterministically.
+- Pressure-quench transforms use explicit species groups, pressure units,
+  interpolation and closure policies; they do not silently extrapolate or
+  renormalize.
 
 ## 4. Opacity Providers
 

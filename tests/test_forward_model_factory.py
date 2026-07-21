@@ -25,6 +25,8 @@ from robert_exoplanets import (
     ParameterizedGreyCloudEmissionForwardModel,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     ParameterizedEmissionModelConfig,
+    PressureQuenchChemistry,
+    QuenchGroup,
     RefractiveIndexCloudConfig,
     RefractiveIndexSpectrum,
     GreyScatteringCloudConfig,
@@ -256,6 +258,39 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
         "runtime_temperature_and_chemistry"
     )
     assert np.all(hot.values > cool.values)
+
+
+def test_parameterized_emission_discovers_quench_parameters_and_provenance() -> None:
+    chemistry = PressureQuenchChemistry(
+        base_model=FreeChemistry(
+            active_species=("H2O",),
+            parameter_names={"H2O": "log_h2o"},
+            parameter_mode="log10",
+        ),
+        groups=(QuenchGroup("log_Pq_H2O", ("H2O",)),),
+    )
+    config = ParameterizedEmissionFactoryConfig(
+        planet=Planet(name="Quenched b", radius_m=7.0e7, gravity_m_s2=20.0),
+        star=Star(name="Quenched", radius_m=7.0e8, effective_temperature_k=5500.0),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="T_iso"),
+        chemistry_model=chemistry,
+        opacity_source=_provider(),
+        opacity_binning=None,
+        model=ParameterizedEmissionModelConfig(
+            opacity_species=("H2O",),
+            include_rayleigh=False,
+            thermal_integration_backend="numpy",
+            stellar_spectrum_model="blackbody",
+        ),
+    )
+
+    model = build_parameterized_emission_model(config, spectral_grid=_spectral_grid())
+    spectrum = model({"T_iso": 1000.0, "log_h2o": -3.0, "log_Pq_H2O": 0.0})
+
+    assert model.required_parameters == ("T_iso", "log_h2o", "log_Pq_H2O")
+    assert model.manifest_metadata["chemistry_quench_scheme"] == "pressure_quench"
+    assert model.manifest_metadata["chemistry_quench_groups"] == "log_Pq_H2O:H2O"
+    assert np.all(np.isfinite(spectrum.values))
 
 
 def test_parameterized_emission_supports_opacity_free_phantom_with_fitted_mass() -> None:

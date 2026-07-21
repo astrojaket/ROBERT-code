@@ -25,6 +25,7 @@ from robert_exoplanets.instruments import (
     ObservationDataset,
 )
 from robert_exoplanets.opacity import CorrelatedKTable
+from robert_exoplanets.retrieval.manifest import build_run_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -66,6 +67,268 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.bodies.star.spectrum_model == "phoenix"
     assert config.bodies.star.log_g_cgs == 4.5
     assert config.bodies.star.metallicity_dex == 0.0
+
+
+def test_yaml_configures_arbitrary_molecular_pressure_quenching() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "preset": "custom",
+        "groups": [
+            {
+                "pressure_parameter": "log_Pq_CO2",
+                "species": ["CO2"],
+            },
+            {
+                "pressure_parameter": "log_Pq_water_carbon",
+                "species": ["H2O", "CO"],
+            },
+        ],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_CO2",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "log_Pq_water_carbon",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -4.0, "upper": 1.0},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+
+    quenching = parsed.atmosphere.chemistry.quenching
+    assert quenching is not None
+    assert quenching.preset == "custom"
+    assert quenching.groups[0].species == ("CO2",)
+    assert quenching.groups[1].species == ("H2O", "CO")
+
+
+def test_yaml_configures_taylor_2026_grouped_quench_preset() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "preset": "taylor_2026_hot_jupiter_element_grouped",
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_C",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "log_Pq_N",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+    groups = parsed.atmosphere.chemistry.quenching.resolved_groups()
+
+    assert groups[0].pressure_parameter == "log_Pq_C"
+    assert groups[0].species == ("H2O", "CO", "CO2", "CH4")
+    assert groups[1].species == ("NH3",)
+    assert all("N2" not in group.species for group in groups)
+
+
+@pytest.mark.parametrize(
+    ("quenching", "message"),
+    [
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "log Pq", "species": ["CO2"]}
+                ],
+            },
+            "pressure_parameter",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "log_Pq_1", "species": ["CO2"]},
+                    {"pressure_parameter": "log_Pq_2", "species": ["CO2"]},
+                ],
+            },
+            "only one quench group",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "log_Pq_X", "species": ["C2H2"]}
+                ],
+            },
+            "missing from FastChem labels",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "metallicity", "species": ["CO2"]}
+                ],
+            },
+            "collide with FastChem parameters",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {
+                        "pressure_parameter": "log_Pq_CO2",
+                        "species": ["CO2"],
+                        "interpolation": "nearest",
+                    }
+                ],
+            },
+            "Extra inputs are not permitted",
+        ),
+    ],
+)
+def test_yaml_rejects_malformed_pressure_quenching(quenching, message) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = quenching
+
+    with pytest.raises(ValidationError, match=message):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_requires_every_quench_pressure_prior() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+        ],
+    }
+
+    with pytest.raises(ValidationError, match="log_Pq_CO2"):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_rejects_quenching_for_constant_with_altitude_free_chemistry() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_H2O", "species": ["H2O"]}
+        ],
+    }
+
+    with pytest.raises(ValidationError, match="quenching"):
+        TaskConfig.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("prior", "message"),
+    [
+        (
+            {"type": "log_uniform", "lower": 0.01, "upper": 1.0},
+            "already logarithmic",
+        ),
+        (
+            {"type": "uniform", "lower": -7.0, "upper": 1.0},
+            "pressure grid layer-center domain",
+        ),
+    ],
+)
+def test_yaml_validates_quench_prior_semantics_and_grid_domain(prior, message) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+        ],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {"name": "log_Pq_CO2", "prior": prior},
+    ]
+
+    with pytest.raises(ValidationError, match=message):
+        TaskConfig.model_validate(raw)
+
+
+def test_configured_fastchem_is_wrapped_by_pressure_quench_decorator(
+    monkeypatch,
+) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["bodies"]["star"]["spectrum_model"] = "blackbody"
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+        ],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_CO2",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+    ]
+    parsed = TaskConfig.model_validate(raw)
+    observation = Observation.from_arrays(
+        wavelength=[3.0, 4.0],
+        wavelength_bin_edges=[2.5, 3.5, 4.5],
+        flux=[1.0e-3, 1.0e-3],
+        uncertainty=[1.0e-5, 1.0e-5],
+        flux_unit="eclipse_depth",
+        observable="eclipse_depth",
+    )
+    observations = ObservationCollection(
+        datasets=(ObservationDataset(name="nircam", observation=observation),)
+    )
+
+    def fake_table(_config, _dataset_name, species):
+        return CorrelatedKTable(
+            species=species,
+            pressure_bar=np.array([1.0e-6, 100.0]),
+            temperature_K=np.array([500.0, 2500.0]),
+            wavenumber_cm_inverse=10000.0 / observation.spectral_grid.values,
+            g_samples=np.array([0.5]),
+            g_weights=np.array([1.0]),
+            kcoeff=np.full((2, 2, 2, 1), 1.0e-24),
+            metadata={"checksum_sha256": f"configured-{species}"},
+        )
+
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks._load_cached_table",
+        fake_table,
+    )
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks.load_nemesispy_cia_table",
+        lambda: None,
+    )
+
+    problem = build_problem(parsed, observations)
+    manifest = build_run_manifest(
+        problem,
+        method="unit-test",
+        settings={},
+        random_seed=7,
+    )
+
+    assert "log_Pq_CO2" in problem.parameter_names
+    assert problem.metadata["chemistry_quench_scheme"] == "pressure_quench"
+    assert problem.metadata["chemistry_quench_groups"] == "log_Pq_CO2:CO2"
+    assert problem.metadata["chemistry_quench_pressure_semantics"] == "log10(P_q/bar)"
+    assert manifest.problem_metadata["chemistry_quench_scheme"] == "pressure_quench"
+    assert manifest.problem_metadata["chemistry_quench_closure_policy"] == (
+        "no_renormalization"
+    )
 
 
 def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
