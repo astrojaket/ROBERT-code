@@ -62,3 +62,34 @@ See [Configuring and running ROBERT](../configuration.md) for the complete YAML
 schema, directory setup, opacity preparation, and MPI/Slurm workflow. The
 superseded pre-YAML HAT-P-32b examples are retained only in
 `examples/Depreciated_Benchmarks/HAT_P_32b/`.
+
+## Deferred MultiNest-to-OE analysis
+
+A completed MultiNest result can be inspected and post-processed before a
+separate OE refinement is authorized. For the WASP-69b Mie-catalogue run, use
+the supplied 80-layer spline configuration and point the deferred runner at
+the completed MultiNest result directory:
+
+```bash
+python run_oe_from_nested.py \
+  --nested-config /path/to/multinest-run/configuration.yaml \
+  --nested-result-dir /path/to/multinest-run/outputs/multinest \
+  --oe-config /path/to/layer-oe-run/configuration.yaml
+```
+
+Parameters shared by the two models inherit the MultiNest best fit and
+posterior covariance. The PG14 best-fit temperature profile is evaluated at
+all 80 pressure-layer centres to initialize the new OE temperature state. The
+temperature prior covariance is
+`S_ij = sigma_T^2 exp(-|log10(P_i/P_j)| / L)`, with the supplied configuration
+recording `sigma_T=250 K` and `L=1.5 dex`. This smooths departures from the
+MultiNest profile instead of treating adjacent layer temperatures as
+independent. The exact prior state and covariance are saved in
+`multinest_to_oe_prior.npz`. MultiNest outputs remain unchanged. By default the
+handoff refuses a result that has not reported convergence;
+`--allow-unconverged` is available only for explicit diagnostic work.
+
+For a generated one-rank DiRAC OE directory, replace the final
+`run_retrieval.py` command in `submit.sbatch` with the deferred command above;
+the standard submission command starts an independent midpoint-initialized OE
+run and does not consume the MultiNest result.

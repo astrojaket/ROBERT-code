@@ -19,6 +19,9 @@ from robert_exoplanets.instruments import (
 BELLO_ARUFE2025_EUREKA_SHA256 = (
     "fb423903613e2ac8d729c31cbfb40b66f4441080e381c5e9d49451227673d672"
 )
+BELLO_ARUFE2025_EUREKA_CONTENT_SHA256 = (
+    "fb423903613e2ac8d729c31cbfb40b66f4441080e381c5e9d49451227673d672"
+)
 _FILENAME = "L9859b_combined_spectrum_eureka.txt"
 _EXPECTED_POINTS = 218
 _DETECTOR_GAP_MICRON = 0.05
@@ -42,8 +45,15 @@ def load_bello_arufe2025_l9859b(
     path = root / _FILENAME
     if not path.exists():
         raise FileNotFoundError(path)
-    checksum = sha256(path.read_bytes()).hexdigest()
-    if verify_checksum and checksum != BELLO_ARUFE2025_EUREKA_SHA256:
+    raw = path.read_bytes()
+    checksum = sha256(raw).hexdigest()
+    # Git and text editors may normalize terminal blank lines.  Verify the
+    # scientific text content while retaining the exact upstream byte hash.
+    content_checksum = sha256(raw.rstrip(b"\r\n") + b"\n").hexdigest()
+    if (
+        verify_checksum
+        and content_checksum != BELLO_ARUFE2025_EUREKA_CONTENT_SHA256
+    ):
         raise RobertDataError("Bello-Arufe et al. L 98-59 b checksum mismatch")
 
     values = _read_spectrum(path)
@@ -74,11 +84,13 @@ def load_bello_arufe2025_l9859b(
             wavelength_bin_edges=infer_wavelength_bin_edges(selected_wavelength),
             metadata={
                 "source": f"Zenodo 10.5281/zenodo.14676143 {_FILENAME}",
-                "doi": "10.3847/2041-8213/ada7f5",
+                "doi": "10.3847/2041-8213/adaf22",
                 "data_doi": "10.5281/zenodo.14676143",
                 "reduction": "Eureka! combined",
                 "published_flux_unit": "ppm",
                 "checksum_sha256": checksum,
+                "content_checksum_sha256": content_checksum,
+                "upstream_checksum_sha256": BELLO_ARUFE2025_EUREKA_SHA256,
             },
         )
         datasets.append(
@@ -124,4 +136,8 @@ def _read_spectrum(path: Path) -> np.ndarray:
     return np.asarray(rows, dtype=float)
 
 
-__all__ = ["BELLO_ARUFE2025_EUREKA_SHA256", "load_bello_arufe2025_l9859b"]
+__all__ = [
+    "BELLO_ARUFE2025_EUREKA_CONTENT_SHA256",
+    "BELLO_ARUFE2025_EUREKA_SHA256",
+    "load_bello_arufe2025_l9859b",
+]

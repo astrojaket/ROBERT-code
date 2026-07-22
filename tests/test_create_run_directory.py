@@ -37,6 +37,7 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert run_directory.name == "wasp69b-cloud-free-native-modes-R1000"
     assert (run_directory / "source_configuration.yaml").is_file()
     assert (run_directory / "run_retrieval.py").is_file()
+    assert (run_directory / "run_oe_from_nested.py").is_file()
     assert (run_directory / "run_forward.py").is_file()
     assert (run_directory / "postprocess_retrieval.py").is_file()
     assert (run_directory / "postprocess_forward.py").is_file()

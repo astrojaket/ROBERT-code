@@ -401,7 +401,7 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
 
 
 def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
-    assert len(DEFAULTS) == 19
+    assert len(DEFAULTS) == 20
     for path in DEFAULTS:
         config = load_task_config(path)
         assert config.run.name.startswith(("wasp69b-", "wasp80b-"))

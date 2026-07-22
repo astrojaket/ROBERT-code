@@ -1,0 +1,89 @@
+schema_version: 2
+
+run:
+  name: l98-59b-flat-clr-b-000
+  description: >-
+    Flat-spectrum prior-behavior experiment with H2O, CO2, CO, and H2S after
+    removing SO2. H2S is the physical opacity-bearing CLR closure category, not
+    a conventional background or phantom gas.
+
+bodies:
+  planet:
+    name: L 98-59 b
+    radius_m: 5415350.0
+    mass_kg: 2.806934e24
+  star:
+    name: L 98-59
+    radius_m: 210797100.0
+    effective_temperature_k: 3415.0
+    log_g_cgs: 4.86
+    metallicity_dex: -0.46
+    spectrum_model: blackbody
+
+observations:
+  loader: robert_npz
+  path: ../outputs/data/realization_000.npz
+  datasets: [synthetic]
+  verify_checksum: false
+  dataset_options: {}
+
+atmosphere:
+  pressure: {bottom_bar: 1.0, top_bar: 1.0e-7, layers: 80}
+  temperature: {model: isothermal, temperature_k: null, parameter_name: temperature}
+  chemistry:
+    model: free
+    species: [H2O, CO2, CO]
+    parameter_mode: log10
+    parameter_names: {H2O: log_H2O, CO2: log_CO2, CO: log_CO}
+    fixed_mixing_ratios: {}
+    background_species: [H2S]
+    background_fractions: [1.0]
+    fill_background: true
+    excess_policy: raise
+
+clouds: {model: none}
+
+opacity:
+  format: exomol_kta
+  # Overridden in resolved configs by ROBERT_K_TABLE_DIRECTORY.
+  path: ../../../opacity_data/exomol_R1000
+  resolution: R1000
+  species: [H2O, CO2, CO, H2S]
+  cache_directory: ../outputs/opacity_cache
+  binning: {num: 100, use_rebin: false, remove_zeros: true, g_points: 8}
+
+radiative_transfer:
+  model: transmission
+  include_rayleigh: false
+  gas_combination: random_overlap
+  reference_pressure_bar: 1.0
+  radius_scale_parameter: radius_scale
+  gravity_model: inverse_square
+  impact_quadrature_order: 8
+
+likelihood: {model: gaussian, include_normalization: true}
+
+parameters:
+  - {name: log_H2O, label: log10 H2O VMR, value: -0.60206, prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}}
+  - {name: log_CO2, label: log10 CO2 VMR, value: -0.60206, prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}}
+  - {name: log_CO, label: log10 CO VMR, value: -0.60206, prior: {type: centered_log_ratio, lower: -12.0, upper: 0.0, group: composition}}
+  - {name: temperature, label: Isothermal temperature, unit: K, value: 596.0, prior: {type: uniform, lower: 100.0, upper: 800.0}}
+  - {name: radius_scale, label: 1-bar reference-radius scale, value: 0.97, prior: {type: uniform, lower: 0.85, upper: 1.15}}
+
+sampler:
+  engine: multinest
+  live_points: 50
+  multinest_max_iterations: 0
+  dlogz: 0.5
+  sampling_efficiency: 0.8
+  importance_nested_sampling: true
+  multimodal: true
+  iterations_before_update: 50
+  resume: overwrite
+  show_status: false
+  seed: 20000
+  invalid_loglike_floor: -1.0e100
+
+outputs: {directory: ../outputs/runs/b/000}
+plotting: {enabled: false}
+runtime: {mpi_processes: 3, scratch_directory: ../outputs/scratch/b/000}

@@ -20,6 +20,9 @@ from ..status import append_retrieval_attempt_event, write_retrieval_status
 from .base import NestedSamplerResult, validate_mpi_world_size
 
 
+MULTINEST_MAX_SEED = 30080
+
+
 def run_multinest(
     problem: RetrievalProblem,
     *,
@@ -55,8 +58,11 @@ def run_multinest(
     efficiency = float(sampling_efficiency)
     if not np.isfinite(efficiency) or efficiency <= 0.0 or efficiency > 1.0:
         raise RobertConfigError("sampling_efficiency must be in (0, 1]")
-    if seed is not None and int(seed) < 0:
-        raise RobertConfigError("MultiNest seed must be non-negative")
+    if seed is not None and not 0 <= int(seed) <= MULTINEST_MAX_SEED:
+        raise RobertConfigError(
+            f"MultiNest seed must lie in [0, {MULTINEST_MAX_SEED}] for the "
+            "legacy Fortran random-number generator"
+        )
     invalid_floor = float(invalid_loglike_floor)
     if not np.isfinite(invalid_floor) or invalid_floor >= 0.0:
         raise RobertConfigError("MultiNest invalid_loglike_floor must be finite and negative")
@@ -351,4 +357,4 @@ def _attempt_id() -> str:
     return f"{timestamp}-{job}-{restart}-{os.getpid()}"
 
 
-__all__ = ["run_multinest"]
+__all__ = ["MULTINEST_MAX_SEED", "run_multinest"]

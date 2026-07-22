@@ -17,6 +17,44 @@ from .problem import RetrievalProblem
 RetrievalProblemLike = RetrievalProblem | MultiDatasetRetrievalProblem
 
 
+def log_pressure_correlated_covariance(
+    pressure: ArrayLike,
+    *,
+    standard_deviation: float,
+    correlation_length_dex: float,
+) -> NDArray[np.float64]:
+    """Build an exponential T-P prior covariance in log10 pressure.
+
+    The covariance between levels ``i`` and ``j`` is
+    ``sigma**2 * exp(-abs(log10(P_i/P_j)) / L)``, where ``L`` is the
+    e-folding correlation length in pressure decades. This is the maintained
+    form of the smoothing prior previously used by the HAT-P-32b OE benchmark.
+    """
+
+    pressure_values = np.asarray(pressure, dtype=float)
+    sigma = float(standard_deviation)
+    length = float(correlation_length_dex)
+    if pressure_values.ndim != 1 or pressure_values.size < 2:
+        raise RobertValidationError("pressure must contain at least two levels")
+    if not np.all(np.isfinite(pressure_values)) or np.any(pressure_values <= 0.0):
+        raise RobertValidationError("pressure must be finite and positive")
+    if len(np.unique(pressure_values)) != pressure_values.size:
+        raise RobertValidationError("pressure levels must be unique")
+    if not np.isfinite(sigma) or sigma <= 0.0:
+        raise RobertValidationError("standard_deviation must be finite and positive")
+    if not np.isfinite(length) or length <= 0.0:
+        raise RobertValidationError(
+            "correlation_length_dex must be finite and positive"
+        )
+    log_pressure = np.log10(pressure_values)
+    covariance = sigma**2 * np.exp(
+        -np.abs(log_pressure[:, np.newaxis] - log_pressure[np.newaxis, :])
+        / length
+    )
+    covariance.setflags(write=False)
+    return covariance
+
+
 @dataclass(frozen=True)
 class OptimalEstimationResult:
     """Result from a finite-difference optimal-estimation retrieval."""

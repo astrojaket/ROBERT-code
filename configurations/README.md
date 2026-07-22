@@ -41,6 +41,14 @@ configuration, so only the inference engine and run/output identity change:
 | OE to UltraNest | `wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_ultranest.yaml` | `wasp69b_mie_catalog_pg14_R1000_optimal_estimation_to_ultranest.yaml` |
 | OE to MultiNest | `wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml` | `wasp69b_mie_catalog_pg14_R1000_optimal_estimation_to_multinest.yaml` |
 
+The Mie-catalogue case also provides
+`wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation.yaml` for a
+deferred OE analysis after a completed MultiNest run has been inspected. It
+retrieves one temperature at each of the 80 pressure-layer centres. Run it
+with `run_oe_from_nested.py`; the ordinary YAML runner does not perform the
+completed-result handoff. Its explicit smoothing prior uses a 250 K marginal
+standard deviation and an exponential 1.5-dex log-pressure correlation length.
+
 The short scenario files use `extends` to inherit the common target physics,
 opacity, source-data paths, and sampler defaults. ROBERT resolves and validates
 the complete configuration before a run; `create_run_directory.py` writes that

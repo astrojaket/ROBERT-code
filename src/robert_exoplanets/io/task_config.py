@@ -501,6 +501,8 @@ class SamplerConfig(ConfigModel):
     oe_convergence_tolerance: PositiveFloat = 1.0e-4
     oe_finite_difference_fraction: PositiveFloat = 1.0e-4
     oe_damping: float = Field(default=0.0, ge=0.0)
+    oe_temperature_prior_sigma_k: PositiveFloat | None = None
+    oe_temperature_correlation_length_dex: PositiveFloat | None = None
     prior_sigma: PositiveFloat = 4.0
     minimum_prior_fraction: float = Field(default=0.05, gt=0.0, le=1.0)
     require_oe_convergence: bool = True
@@ -510,6 +512,17 @@ class SamplerConfig(ConfigModel):
         if "multinest" in self.engine and self.resume not in {"resume", "overwrite"}:
             raise ValueError(
                 "MultiNest resume must be 'resume' or 'overwrite'"
+            )
+        temperature_prior_values = (
+            self.oe_temperature_prior_sigma_k,
+            self.oe_temperature_correlation_length_dex,
+        )
+        if (temperature_prior_values[0] is None) != (
+            temperature_prior_values[1] is None
+        ):
+            raise ValueError(
+                "OE temperature prior sigma and correlation length must be "
+                "configured together"
             )
         return self
 
@@ -663,6 +676,18 @@ class TaskConfig(ConfigModel):
                     for index in range(len(temperature.knot_pressure))
                 )
             )
+        if self.sampler.oe_temperature_prior_sigma_k is not None:
+            if not self.sampler.engine.startswith("optimal_estimation"):
+                raise ValueError(
+                    "correlated OE temperature priors require an optimal-estimation engine"
+                )
+            if (
+                temperature.model != "spline"
+                or temperature.knot_temperature_k is not None
+            ):
+                raise ValueError(
+                    "correlated OE temperature priors require a retrieved spline profile"
+                )
         unknown_options = sorted(
             set(self.observations.dataset_options) - set(self.observations.datasets)
         )

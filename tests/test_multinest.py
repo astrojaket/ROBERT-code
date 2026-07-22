@@ -18,6 +18,7 @@ from robert_exoplanets import (
     UniformPrior,
     run_multinest,
 )
+from robert_exoplanets.core import RobertConfigError
 
 
 def _problem() -> RetrievalProblem:
@@ -100,6 +101,15 @@ def test_multinest_adapter_transforms_prior_and_returns_common_result(
     np.testing.assert_allclose(result.weights, [0.25, 0.75])
     assert (tmp_path / "chains" / "1-params.json").is_file()
     assert (tmp_path / "sampler_status.json").is_file()
+
+
+def test_multinest_rejects_seed_outside_legacy_fortran_range(tmp_path) -> None:
+    with pytest.raises(RobertConfigError, match="legacy Fortran"):
+        run_multinest(
+            _problem(),
+            output_dir=tmp_path,
+            seed=30081,
+        )
 
 
 @pytest.mark.skipif(

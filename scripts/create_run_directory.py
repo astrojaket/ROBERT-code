@@ -77,6 +77,7 @@ python run_retrieval.py --config configuration.yaml --prepare-opacity
 python run_retrieval.py --config configuration.yaml --smoke-only
 sbatch submit.sbatch
 # On Glamdring, pass ./submit.sh to addqueue instead.
+# Deferred completed-MultiNest-to-OE analysis uses run_oe_from_nested.py.
 python postprocess_retrieval.py --config configuration.yaml
 python postprocess_forward.py --config configuration.yaml
 ```
@@ -124,6 +125,7 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     shutil.copy2(source, run_directory / "source_configuration.yaml")
     for filename in (
         "run_retrieval.py",
+        "run_oe_from_nested.py",
         "run_forward.py",
         "postprocess_retrieval.py",
         "postprocess_forward.py",

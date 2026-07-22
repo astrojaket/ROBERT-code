@@ -1,0 +1,129 @@
+extends: wasp69b_mie_catalog_pg14_R1000.yaml
+
+run:
+  name: wasp69b-mie-catalog-layer-by-layer-R1000-optimal-estimation
+  description: Deferred OE refinement with one retrieved temperature at each of the 80 pressure-layer centres, initialized from a completed PG14 MultiNest result.
+
+atmosphere:
+  temperature:
+    model: spline
+    # These are exactly the 80 configured pressure-grid centres, ordered from
+    # the 100-bar bottom to the 1e-6-bar top. The spline therefore has one
+    # retrieved temperature per atmospheric layer.
+    knot_pressure: [100, 79.2016405019, 62.728998582, 49.6823959473, 39.349272631, 31.1652694493, 24.6834046707, 19.5496614309, 15.4836525659, 12.2633068418, 9.71274019847, 7.69264957488, 6.09270466137, 4.82552204274, 3.82189262063, 3.02700165376, 2.3974349678, 1.89880782447, 1.50388694696, 1.19110313328, 0.94337322163, 0.747167067587, 0.591768574819, 0.468690419231, 0.371210500907, 0.294004806433, 0.23285662985, 0.184426270859, 0.146068632036, 0.115688752832, 0.0916273901189, 0.0725703961232, 0.0574769442484, 0.0455226827551, 0.0360547115425, 0.0285559230199, 0.0226167594922, 0.0179128445462, 0.0141872667412, 0.0112365480014, 0.00889953035289, 0.00704857403645, 0.00558258626886, 0.00442149990737, 0.00350190046143, 0.0027735626142, 0.00219670709079, 0.00173982805293, 0.00137797235983, 0.00109137671465, 0.00086438826206, 0.000684609683857, 0.00054222210065, 0.000429448798879, 0.000340130493828, 0.000269388930959, 0.00021336045265, 0.000168984978681, 0.000133838875317, 0.000106002584881, 8.39557862e-05, 6.64943599667e-05, 5.26646239348e-05, 4.17112461206e-05, 3.30359912013e-05, 2.61650469875e-05, 2.07231464522e-05, 1.64130719538e-05, 1.29994222441e-05, 1.02957556731e-05, 8.15440739519e-06, 6.4584244302e-06, 5.11517809929e-06, 4.05130496924e-06, 3.20869999737e-06, 2.5413430367e-06, 2.01278537585e-06, 1.59415903746e-06, 1.26260010987e-06, 1e-06]
+    parameter_names: [T_00, T_01, T_02, T_03, T_04, T_05, T_06, T_07, T_08, T_09, T_10, T_11, T_12, T_13, T_14, T_15, T_16, T_17, T_18, T_19, T_20, T_21, T_22, T_23, T_24, T_25, T_26, T_27, T_28, T_29, T_30, T_31, T_32, T_33, T_34, T_35, T_36, T_37, T_38, T_39, T_40, T_41, T_42, T_43, T_44, T_45, T_46, T_47, T_48, T_49, T_50, T_51, T_52, T_53, T_54, T_55, T_56, T_57, T_58, T_59, T_60, T_61, T_62, T_63, T_64, T_65, T_66, T_67, T_68, T_69, T_70, T_71, T_72, T_73, T_74, T_75, T_76, T_77, T_78, T_79]
+    pressure_unit: bar
+    extrapolation: raise
+
+parameters:
+  # Parameters shared with the completed PG14 MultiNest run are initialized
+  # from its best fit and use its posterior covariance in the deferred handoff.
+  - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}, value: 1.0}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.05, upper: 1.5}, value: 0.775}
+  - {name: log_SO2, label: log10(SO2 VMR), prior: {type: uniform, lower: -10.0, upper: -4.0}, value: -7.0}
+
+  # The handoff runner replaces these placeholders with the completed
+  # MultiNest PG14 best-fit profile before OE starts.
+  - {name: T_00, label: T at 100 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_01, label: T at 79.2 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_02, label: T at 62.7 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_03, label: T at 49.7 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_04, label: T at 39.3 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_05, label: T at 31.2 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_06, label: T at 24.7 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_07, label: T at 19.5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_08, label: T at 15.5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_09, label: T at 12.3 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_10, label: T at 9.71 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_11, label: T at 7.69 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_12, label: T at 6.09 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_13, label: T at 4.83 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_14, label: T at 3.82 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_15, label: T at 3.03 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_16, label: T at 2.40 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_17, label: T at 1.90 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_18, label: T at 1.50 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_19, label: T at 1.19 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_20, label: T at 0.943 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_21, label: T at 0.747 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_22, label: T at 0.592 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_23, label: T at 0.469 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_24, label: T at 0.371 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_25, label: T at 0.294 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_26, label: T at 0.233 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_27, label: T at 0.184 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_28, label: T at 0.146 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_29, label: T at 0.116 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_30, label: T at 0.0916 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_31, label: T at 0.0726 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_32, label: T at 0.0575 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_33, label: T at 0.0455 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_34, label: T at 0.0361 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_35, label: T at 0.0286 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_36, label: T at 0.0226 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_37, label: T at 0.0179 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_38, label: T at 0.0142 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_39, label: T at 0.0112 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_40, label: T at 0.00890 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_41, label: T at 0.00705 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_42, label: T at 0.00558 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_43, label: T at 0.00442 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_44, label: T at 0.00350 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_45, label: T at 0.00277 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_46, label: T at 0.00220 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_47, label: T at 0.00174 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_48, label: T at 0.00138 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_49, label: T at 0.00109 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_50, label: T at 8.64e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_51, label: T at 6.85e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_52, label: T at 5.42e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_53, label: T at 4.29e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_54, label: T at 3.40e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_55, label: T at 2.69e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_56, label: T at 2.13e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_57, label: T at 1.69e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_58, label: T at 1.34e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_59, label: T at 1.06e-4 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_60, label: T at 8.40e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_61, label: T at 6.65e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_62, label: T at 5.27e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_63, label: T at 4.17e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_64, label: T at 3.30e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_65, label: T at 2.62e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_66, label: T at 2.07e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_67, label: T at 1.64e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_68, label: T at 1.30e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_69, label: T at 1.03e-5 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_70, label: T at 8.15e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_71, label: T at 6.46e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_72, label: T at 5.12e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_73, label: T at 4.05e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_74, label: T at 3.21e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_75, label: T at 2.54e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_76, label: T at 2.01e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_77, label: T at 1.59e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_78, label: T at 1.26e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+  - {name: T_79, label: T at 1.00e-6 bar, unit: K, prior: {type: uniform, lower: 400.0, upper: 3500.0}, value: 1500.0}
+
+  - {name: log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}, value: -7.0}
+  - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}, value: -1.0}
+  - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}, value: -4.0}
+  - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}, value: 0.5}
+
+sampler:
+  engine: optimal_estimation
+  oe_max_iterations: 12
+  oe_convergence_tolerance: 1.0e-4
+  oe_finite_difference_fraction: 1.0e-4
+  oe_damping: 1.0e-3
+  # Exponential smoothing covariance:
+  # S_ij = sigma_T^2 exp(-|log10(P_i/P_j)| / correlation_length_dex).
+  oe_temperature_prior_sigma_k: 250.0
+  oe_temperature_correlation_length_dex: 1.5
+
+outputs:
+  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation
+
+runtime:
+  mpi_processes: 1
+  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation

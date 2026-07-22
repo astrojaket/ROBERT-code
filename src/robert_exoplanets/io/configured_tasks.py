@@ -26,7 +26,7 @@ from robert_exoplanets.atmosphere import (
     TabulatedTemperatureProfile,
 )
 from robert_exoplanets.bodies import Planet, Star
-from robert_exoplanets.core import PressureGrid
+from robert_exoplanets.core import PressureGrid, RobertConfigError
 from robert_exoplanets.forward import (
     ParameterizedEmissionFactoryConfig,
     ParameterizedEmissionModelConfig,
@@ -48,6 +48,7 @@ from robert_exoplanets.retrieval import (
     RetrievalParameterSet,
     UniformPrior,
     load_observation_npz,
+    log_pressure_correlated_covariance,
     run_oe_then_nested_sampling,
     run_retrieval,
 )
@@ -756,7 +757,7 @@ def run_retrieval_task(config: TaskConfig, source: Path):
             problem,
             method="optimal_estimation",
             output_dir=config.outputs.directory / "optimal_estimation",
-            **_optimal_estimation_kwargs(config),
+            **_optimal_estimation_kwargs(config, problem),
         )
     elif engine in {"ultranest", "multinest"}:
         result = run_retrieval(
@@ -774,7 +775,7 @@ def run_retrieval_task(config: TaskConfig, source: Path):
             prior_sigma=sampler.prior_sigma,
             minimum_prior_fraction=sampler.minimum_prior_fraction,
             require_oe_convergence=sampler.require_oe_convergence,
-            oe_kwargs=_optimal_estimation_kwargs(config),
+            oe_kwargs=_optimal_estimation_kwargs(config, problem),
             nested_kwargs=_nested_sampler_kwargs(config, nested_method),
             nested_method=nested_method,
             seed=sampler.seed,
@@ -784,14 +785,78 @@ def run_retrieval_task(config: TaskConfig, source: Path):
     return result
 
 
-def _optimal_estimation_kwargs(config: TaskConfig) -> dict[str, object]:
+def _optimal_estimation_kwargs(
+    config: TaskConfig,
+    problem: MultiDatasetRetrievalProblem,
+) -> dict[str, object]:
     sampler = config.sampler
-    return {
+    settings: dict[str, object] = {
         "max_iterations": sampler.oe_max_iterations,
         "convergence_tolerance": sampler.oe_convergence_tolerance,
         "finite_difference_fraction": sampler.oe_finite_difference_fraction,
         "damping": sampler.oe_damping,
     }
+    if sampler.oe_temperature_prior_sigma_k is not None:
+        settings["prior_covariance"] = configured_temperature_prior_covariance(
+            config, problem
+        )[0]
+    return settings
+
+
+def configured_temperature_prior_covariance(
+    config: TaskConfig,
+    problem: MultiDatasetRetrievalProblem,
+    covariance: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Insert the configured log-pressure smoothing block into an OE prior."""
+
+    sigma = config.sampler.oe_temperature_prior_sigma_k
+    correlation_length = config.sampler.oe_temperature_correlation_length_dex
+    if sigma is None or correlation_length is None:
+        raise RobertConfigError(
+            "OE temperature prior sigma and correlation length are not configured"
+        )
+    builder = getattr(problem.forward_model, "atmosphere_builder", None)
+    profile = None if builder is None else builder.temperature_profile
+    if not isinstance(profile, SplineTemperatureProfile):
+        raise RobertConfigError(
+            "correlated OE temperature priors require a retrieved spline profile"
+        )
+    if profile.knot_temperature is not None:
+        raise RobertConfigError(
+            "correlated OE temperature priors require retrieved temperatures"
+        )
+    names = tuple(profile.parameter_names or ())
+    parameter_index = {
+        name: index for index, name in enumerate(problem.parameter_names)
+    }
+    try:
+        indices = np.asarray([parameter_index[name] for name in names], dtype=int)
+    except KeyError as exc:
+        raise RobertConfigError(
+            f"OE problem is missing spline temperature parameter {exc.args[0]!r}"
+        ) from exc
+    if covariance is None:
+        smoothed = np.diag(
+            [
+                parameter.approximate_standard_deviation**2
+                for parameter in problem.parameters.parameters
+            ]
+        )
+    else:
+        smoothed = np.array(covariance, dtype=float, copy=True)
+    expected_shape = (problem.ndim, problem.ndim)
+    if smoothed.shape != expected_shape:
+        raise RobertConfigError(
+            f"OE prior covariance must have shape {expected_shape}"
+        )
+    temperature_covariance = log_pressure_correlated_covariance(
+        profile.knot_pressure,
+        standard_deviation=sigma,
+        correlation_length_dex=correlation_length,
+    )
+    smoothed[np.ix_(indices, indices)] = temperature_covariance
+    return smoothed, np.array(profile.knot_pressure, copy=True)
 
 
 def _nested_sampler_kwargs(config: TaskConfig, method: str) -> dict[str, object]:
@@ -826,9 +891,16 @@ def _nested_sampler_kwargs(config: TaskConfig, method: str) -> dict[str, object]
 def _sampler_description(config: TaskConfig) -> str:
     sampler = config.sampler
     if sampler.engine == "optimal_estimation":
-        return (
+        description = (
             f"Inference: optimal_estimation, max_iterations={sampler.oe_max_iterations}"
         )
+        if sampler.oe_temperature_prior_sigma_k is not None:
+            description += (
+                ", correlated_temperature_prior="
+                f"{sampler.oe_temperature_prior_sigma_k:g} K/"
+                f"{sampler.oe_temperature_correlation_length_dex:g} dex"
+            )
+        return description
     limits = (
         f"max_calls={sampler.max_calls}"
         if "ultranest" in sampler.engine
@@ -861,7 +933,7 @@ def _preflight_retrieval_manifests(
 
     engine = config.sampler.engine
     if engine == "optimal_estimation" or engine.startswith("optimal_estimation_to_"):
-        oe_kwargs = _optimal_estimation_kwargs(config)
+        oe_kwargs = _optimal_estimation_kwargs(config, problem)
         build_run_manifest(
             problem,
             method="optimal_estimation",

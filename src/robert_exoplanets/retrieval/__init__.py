@@ -21,7 +21,11 @@ from .hybrid import (
     run_optimal_estimation_from_nested_result,
 )
 from .manifest import RunManifest
-from .optimal_estimation import OptimalEstimationResult, run_optimal_estimation
+from .optimal_estimation import (
+    OptimalEstimationResult,
+    log_pressure_correlated_covariance,
+    run_optimal_estimation,
+)
 from .priors import (
     CenteredLogRatioPrior,
     LogUniformPrior,
@@ -77,6 +81,7 @@ __all__ = [
     "ROBERT_OBSERVATION_SCHEMA",
     "load_nested_sampler_result",
     "load_retrieval_status",
+    "log_pressure_correlated_covariance",
     "run_optimal_estimation",
     "nested_posterior_oe_prior",
     "refine_priors_from_optimal_estimation",

@@ -336,6 +336,9 @@ sampler:
   oe_convergence_tolerance: 1.0e-4
   oe_finite_difference_fraction: 1.0e-4
   oe_damping: 0.0
+  # Optional correlated spline-temperature prior. Configure both or neither.
+  # oe_temperature_prior_sigma_k: 250.0
+  # oe_temperature_correlation_length_dex: 1.5
 
   # OE-to-nested prior handoff controls.
   prior_sigma: 4.0
