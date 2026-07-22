@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from robert_exoplanets.atmosphere import SplineTemperatureProfile
+from robert_exoplanets.atmosphere.builder import _edge_evaluation_grid
 from robert_exoplanets.io.configured_tasks import (
     configured_temperature_prior_covariance,
     describe_config,
@@ -20,6 +21,8 @@ from run_oe_from_nested import (
     _pressure_grid,
     _temperature_profile,
     layer_temperature_overrides,
+    temperature_prior_covariance,
+    temperature_state_overrides,
 )
 
 
@@ -31,6 +34,14 @@ OE_CONFIG = (
     ROOT
     / "configurations"
     / "wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation.yaml"
+)
+PG14_NESTED_CONFIG = (
+    ROOT / "configurations" / "wasp69b_cloud_free_native_pg14_R1000_multinest.yaml"
+)
+PG14_OE_CONFIG = (
+    ROOT
+    / "configurations"
+    / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml"
 )
 
 
@@ -44,6 +55,7 @@ def test_layer_by_layer_oe_configuration_matches_pressure_grid() -> None:
     assert config.sampler.oe_temperature_correlation_length_dex == 1.5
     assert "correlated_temperature_prior=250 K/1.5 dex" in describe_config(config)
     assert temperature.model == "spline"
+    assert temperature.extrapolation == "clip"
     assert len(temperature.knot_pressure) == config.atmosphere.pressure.layers == 80
     assert temperature.parameter_names == tuple(f"T_{index:02d}" for index in range(80))
     np.testing.assert_allclose(
@@ -62,6 +74,13 @@ def test_layer_by_layer_oe_configuration_matches_pressure_grid() -> None:
         "T_irr",
         "alpha",
     }.intersection(item.name for item in config.parameters)
+
+    profile = _temperature_profile(config)
+    edge_temperature = profile.evaluate(
+        {name: 1500.0 for name in profile.required_parameters()},
+        _edge_evaluation_grid(_pressure_grid(config)),
+    )
+    np.testing.assert_allclose(edge_temperature, 1500.0)
 
 
 def test_pg14_best_fit_initializes_every_oe_temperature_layer() -> None:
@@ -98,6 +117,42 @@ def test_pg14_best_fit_initializes_every_oe_temperature_layer() -> None:
         source_temperature,
         rtol=1.0e-12,
     )
+
+
+def test_same_pg14_parameterization_transfers_without_temperature_overrides() -> None:
+    nested_config = load_task_config(PG14_NESTED_CONFIG)
+    oe_config = load_task_config(PG14_OE_CONFIG)
+    target_profile = _temperature_profile(oe_config)
+    problem = SimpleNamespace(
+        forward_model=SimpleNamespace(
+            atmosphere_builder=SimpleNamespace(temperature_profile=target_profile)
+        )
+    )
+
+    overrides = temperature_state_overrides(nested_config, {}, problem)
+
+    assert overrides == {}
+
+
+def test_same_pg14_parameterization_keeps_nested_temperature_covariance() -> None:
+    oe_config = load_task_config(PG14_OE_CONFIG)
+    profile = _temperature_profile(oe_config)
+    problem = SimpleNamespace(
+        forward_model=SimpleNamespace(
+            atmosphere_builder=SimpleNamespace(temperature_profile=profile)
+        )
+    )
+    covariance = np.eye(len(oe_config.parameters))
+
+    actual, names, pressure = temperature_prior_covariance(
+        oe_config,
+        problem,
+        covariance,
+    )
+
+    assert actual is covariance
+    assert names == profile.required_parameters()
+    assert pressure.size == 0
 
 
 def test_log_pressure_temperature_covariance_has_requested_smoothing() -> None:

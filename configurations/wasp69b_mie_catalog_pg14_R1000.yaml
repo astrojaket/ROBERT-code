@@ -1,5 +1,8 @@
 extends: wasp69b_cloud_free_R1000.yaml
 
+paths:
+  optical_constants_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/optical_constants/exo_skryer
+
 run:
   name: wasp69b-mie-catalog-pg14-R1000
   description: One-region MgSiO3 Mie cloud with fixed catalogue optical constants and PG14 temperature profile.
@@ -13,7 +16,6 @@ observations:
 
 clouds:
   model: mie_catalog
-  optical_constants_path: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/optical_constants/exo_skryer
   material: MgSiO3
   particle_density_kg_m3: 3200.0
   geometric_stddev: 1.0
@@ -41,8 +43,3 @@ sampler:
   resume: resume
   show_status: false
   seed: 2712
-
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_catalog_pg14_R1000
-runtime:
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_mie_catalog_pg14_R1000

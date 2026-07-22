@@ -20,6 +20,9 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
   explicit commands such as `conda run -n robert-exoplanets python ...` and
   `conda run -n robert-exoplanets python -m pytest ...`; do not rely on the
   currently activated shell environment.
+- Always use Git over SSH for GitHub operations, with remotes such as
+  `git@github.com:owner/repository.git`. Do not require or use the GitHub CLI
+  (`gh`); create commits locally and fetch or push them through the SSH remote.
 - Keep physics-facing APIs explicit and typed so later scientific implementations can replace stubs without changing user-facing examples.
 - Prefer small, well-tested modules over broad framework code.
 - Do not add numerical approximations that look like real retrieval physics unless they are clearly labeled as placeholders.

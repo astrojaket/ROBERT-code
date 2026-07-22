@@ -31,8 +31,3 @@ parameters:
   - {name: cloud_logk_3, prior: {type: uniform, lower: -6.0, upper: 0.0}}
   - {name: cloud_logk_4, prior: {type: uniform, lower: -6.0, upper: 0.0}}
   - {name: cloud_logk_5, prior: {type: uniform, lower: -6.0, upper: 0.0}}
-
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp80b_mie_direct_nk_pg14_R1000
-runtime:
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp80b_mie_direct_nk_pg14_R1000

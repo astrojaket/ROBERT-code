@@ -6,7 +6,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from robert_exoplanets.io.configured_tasks import build_problem, load_observations
+from robert_exoplanets.io.configured_tasks import (
+    build_native_emission_model,
+    build_problem,
+    load_observations,
+)
 from robert_exoplanets.io.task_config import initialize_task_directories, load_task_config
 from robert_exoplanets.postprocessing import (
     discover_retrieval_result_directories,
@@ -50,7 +54,9 @@ def main() -> None:
 
     config = load_task_config(args.config)
     initialize_task_directories(config)
-    problem = build_problem(config, load_observations(config))
+    observations = load_observations(config)
+    problem = build_problem(config, observations)
+    native_spectrum_model = build_native_emission_model(config, observations)
     result_dirs = tuple(args.result_dir or ()) or discover_retrieval_result_directories(
         config.outputs.directory
     )
@@ -79,6 +85,12 @@ def main() -> None:
             max_posterior_samples=(
                 args.max_samples or config.plotting.max_posterior_samples
             ),
+            posterior_predictive_samples=(
+                config.plotting.posterior_predictive_samples
+            ),
+            posterior_predictive_seed=config.plotting.posterior_predictive_seed,
+            corner_max_parameters=config.plotting.corner_max_parameters,
+            native_spectrum_model=native_spectrum_model,
         )
         print(
             f"{phase}: reduced chi-squared={diagnostics['reduced_chi_squared']}; "

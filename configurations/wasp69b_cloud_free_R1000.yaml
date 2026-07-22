@@ -1,6 +1,12 @@
 # ROBERT cloud-free emission retrieval: WASP-69b NIRCam + MIRI native modes.
-# Paths below are explicit DiRAC paths. Copy this file for each science run.
 schema_version: 2
+
+# All input locations live here. Writable outputs, scratch files, and opacity
+# cache default to ./outputs, ./scratch, and ./opacity_cache beside this YAML.
+paths:
+  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp69b_schlawin2024
+  fastchem_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/chemistry/fastchem
+  k_table_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
 
 run:
   name: wasp69b-cloud-free-native-modes-R1000
@@ -21,7 +27,6 @@ bodies:
 
 observations:
   loader: schlawin2024_wasp69b
-  path: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp69b_schlawin2024
   datasets: [f322w2, f444w, lrs]  # Native NIRCam modes plus MIRI/LRS
   verify_checksum: true
   miri_offset_parameter: null
@@ -36,7 +41,6 @@ atmosphere:
     internal_temperature_k: 100.0
   chemistry:
     model: fastchem_equilibrium
-    fastchem_path: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/chemistry/fastchem
     metallicity_parameter: metallicity
     carbon_to_oxygen_parameter: CtoO
     # "label" is ROBERT's molecule name; "fastchem_name" is FastChem's name.
@@ -57,10 +61,8 @@ clouds:
 
 opacity:
   format: exomol_kta
-  path: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
   resolution: R1000          # Change to R15000 to select that directory/file suffix
   species: [H2O, CO2, CO, CH4, NH3, SO2]
-  cache_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-cache/wasp69b_native_modes
   binning:
     num: 300
     use_rebin: false
@@ -120,9 +122,5 @@ sampler:
   show_status: true
   seed: 2712
 
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_cloud_free_R1000_400live
-
 runtime:
   mpi_processes: auto        # Uses SLURM_NTASKS; one process in the terminal
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_cloud_free_R1000

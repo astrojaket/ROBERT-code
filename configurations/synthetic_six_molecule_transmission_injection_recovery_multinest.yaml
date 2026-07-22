@@ -1,5 +1,9 @@
 schema_version: 2
 
+paths:
+  observations_directory: ../examples/outputs/synthetic_six_molecule_transmission_injection_recovery/synthetic_transmission_observation.npz
+  k_table_directory: ../opacity_data/exomol_xsec
+
 run:
   name: synthetic-six-molecule-transmission-injection-recovery
   description: >-
@@ -21,7 +25,6 @@ bodies:
 
 observations:
   loader: robert_npz
-  path: ../examples/outputs/synthetic_six_molecule_transmission_injection_recovery/synthetic_transmission_observation.npz
   datasets: [synthetic_transit]
   verify_checksum: false
   miri_offset_parameter: null
@@ -57,10 +60,8 @@ clouds:
 
 opacity:
   format: exomol_cross_section_hdf
-  path: ../opacity_data/exomol_xsec
   resolution: R100
   species: [H2O, CO, CO2, CH4, NH3, HCN]
-  cache_directory: ../examples/outputs/synthetic_six_molecule_transmission_injection_recovery/opacity_cache
   binning:
     num: 100
     use_rebin: false
@@ -123,8 +124,6 @@ sampler:
   show_status: true
   seed: 2716
 
-outputs:
-  directory: ../examples/outputs/synthetic_six_molecule_transmission_injection_recovery
 
 plotting:
   enabled: true
@@ -146,4 +145,3 @@ plotting:
 
 runtime:
   mpi_processes: 2
-  scratch_directory: ../examples/outputs/synthetic_six_molecule_transmission_injection_recovery/scratch

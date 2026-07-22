@@ -12,8 +12,3 @@ sampler:
   require_oe_convergence: true
   multinest_max_iterations: 0
   resume: resume
-
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_catalog_pg14_R1000_oe_to_multinest
-runtime:
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_mie_catalog_pg14_R1000_oe_to_multinest

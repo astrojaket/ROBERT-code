@@ -20,6 +20,9 @@ plotting:
   image_format: png
   dpi: 180
   max_posterior_samples: 20000
+  posterior_predictive_samples: 200
+  posterior_predictive_seed: 0
+  corner_max_parameters: 20
   dataset_colors:
     f322w2: "#20639b"
     f444w: "#ef5675"
@@ -36,8 +39,10 @@ plotting:
 
 After successful inference, MPI rank 0 post-processes every completed phase.
 A hybrid run therefore receives separate OE and nested-sampling plot folders.
-The numerical posterior summary always uses every sample;
-`max_posterior_samples` limits only the samples rendered in histograms.
+The numerical posterior summary always uses every sample.
+`max_posterior_samples` limits rendered marginal/corner samples, while
+`posterior_predictive_samples` controls the forward evaluations used for the
+68% spectral and temperature-profile credible envelopes.
 
 The benchmark configurations
 `wasp69b_cloud_free_native_pg14_R1000.yaml` and
@@ -57,9 +62,18 @@ ROBERT discovers each completed phase and writes beneath `outputs/plots/`:
 - `fit_statistics.json`;
 - `posterior_summary.json`;
 - `fit_spectrum_residuals.png`;
+- `temperature_profiles.png` when the forward model exposes a T-P profile;
+- `posterior_corner.png` for nested posteriors up to `corner_max_parameters`;
 - `posterior_marginals.png` or `optimal_estimation_parameters.png`;
 - `parameter_correlation.png`; and
 - `plot_manifest.json`.
+
+The spectrum plot shows the observation-grid posterior model as open squares
+and a 68% posterior envelope. For ExoMol correlated-k configurations, ROBERT
+also evaluates and plots the median and 68% envelope on the exact native
+opacity grid. Formats for which a native-grid correlation is not defined are
+reported honestly and retain the observation-grid model rather than drawing
+an interpolated curve and calling it native.
 
 When `plotting.leave_one_out.enabled` is true for a nested-sampling result,
 ROBERT additionally writes `leave_one_out.json`,

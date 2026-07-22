@@ -44,6 +44,8 @@ from .transmission import (
 from .inhomogeneous import (
     DilutedEmissionModel,
     DiskEmissionModelConfig,
+    MultiDatasetDilutedEmissionModel,
+    MultiDatasetTwoRegionEmissionModel,
     TwoRegionEmissionModel,
     build_disk_emission_model,
 )
@@ -67,6 +69,8 @@ __all__ = [
     "ExoMolOpacitySamplingSource",
     "GreyScatteringCloudConfig",
     "MultiDatasetEmissionForwardModel",
+    "MultiDatasetDilutedEmissionModel",
+    "MultiDatasetTwoRegionEmissionModel",
     "NativeSpectrumMultiDatasetForwardModel",
     "NativeSpectrumMultiDatasetPrediction",
     "ParameterizedEmissionFactoryConfig",

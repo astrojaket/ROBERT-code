@@ -10,8 +10,3 @@ sampler:
   prior_sigma: 4.0
   minimum_prior_fraction: 0.05
   require_oe_convergence: true
-
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_cloud_free_native_pg14_R1000_oe_to_ultranest
-runtime:
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_cloud_free_native_pg14_R1000_oe_to_ultranest
