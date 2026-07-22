@@ -23,6 +23,7 @@ from robert_exoplanets.instruments import (
     ObservationCollection,
     ObservationDataset,
 )
+from robert_exoplanets.retrieval.samplers.multinest import MULTINEST_MAX_SEED
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -43,6 +44,7 @@ CLOUDY_MULTISPECIES_TRANSMISSION = (
 )
 L98_59B_CLR = ROOT / "configurations" / "l98_59b_clr_transmission_multinest.yaml"
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
+SHIPPED_CONFIGURATIONS = tuple(sorted((ROOT / "configurations").glob("*.yaml")))
 
 
 def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
@@ -406,6 +408,14 @@ def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
         config = load_task_config(path)
         assert config.run.name.startswith(("wasp69b-", "wasp80b-"))
         assert config.opacity.resolution == "R1000"
+
+
+def test_all_shipped_multinest_seeds_fit_legacy_fortran_range() -> None:
+    for path in SHIPPED_CONFIGURATIONS:
+        config = load_task_config(path)
+        if "multinest" not in config.sampler.engine or config.sampler.seed is None:
+            continue
+        assert config.sampler.seed <= MULTINEST_MAX_SEED, path
 
 
 def test_mie_catalog_configuration_is_valid_for_transmission() -> None:

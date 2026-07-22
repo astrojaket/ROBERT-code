@@ -121,7 +121,7 @@ sampler:
   iterations_before_update: 40
   resume: overwrite
   show_status: true
-  seed: 20260716
+  seed: 2716
 
 outputs:
   directory: ../examples/outputs/synthetic_six_molecule_transmission_injection_recovery

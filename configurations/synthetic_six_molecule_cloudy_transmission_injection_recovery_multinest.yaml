@@ -147,7 +147,7 @@ sampler:
   iterations_before_update: 50
   resume: overwrite
   show_status: true
-  seed: 20260717
+  seed: 2717
 
 outputs:
   directory: ../examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery

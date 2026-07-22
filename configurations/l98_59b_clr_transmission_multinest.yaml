@@ -99,7 +99,7 @@ sampler:
   iterations_before_update: 50
   resume: overwrite
   show_status: true
-  seed: 20260719
+  seed: 2719
   invalid_loglike_floor: -1.0e100
 
 outputs:

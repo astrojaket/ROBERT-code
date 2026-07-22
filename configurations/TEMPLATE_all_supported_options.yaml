@@ -328,7 +328,7 @@ sampler:
   iterations_before_update: 100
   resume: resume                # MultiNest also supports overwrite; UltraNest has more modes.
   show_status: true
-  seed: 20260712
+  seed: 2712
   invalid_loglike_floor: -1.0e100
 
   # Optimal-estimation phase controls, used by OE-only and OE-to-nested runs.

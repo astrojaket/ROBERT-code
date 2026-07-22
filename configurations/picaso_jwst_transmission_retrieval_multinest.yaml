@@ -139,7 +139,7 @@ sampler:
   iterations_before_update: 50
   resume: overwrite
   show_status: true
-  seed: 20260718
+  seed: 2718
 
 outputs:
   directory: ../examples/outputs/picaso_jwst_transmission_retrieval

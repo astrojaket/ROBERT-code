@@ -485,6 +485,7 @@ def build_problem(
             ),
         )
         mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
+        opacity_free_species: tuple[str, ...] = ()
     else:
         if chemistry_item.fill_background:
             fractions = chemistry_item.background_fractions
@@ -518,6 +519,11 @@ def build_problem(
                     )
                 }
             ),
+        )
+        opacity_free_species = (
+            ()
+            if chemistry_item.phantom_species is None
+            else (chemistry_item.phantom_species,)
         )
     geometry_item = config.radiative_transfer.geometry
     geometry = (
@@ -641,11 +647,7 @@ def build_problem(
                 temperature_profile=temperature,
                 chemistry_model=chemistry,
                 mean_molecular_weight_model=mean_molecular_weight,
-                opacity_free_species=(
-                    ()
-                    if chemistry_item.phantom_species is None
-                    else (chemistry_item.phantom_species,)
-                ),
+                opacity_free_species=opacity_free_species,
                 pressure_grid=pressure,
                 cia_table=cia,
                 opacity_source=provider,
@@ -664,11 +666,7 @@ def build_problem(
                 temperature_profile=temperature,
                 chemistry_model=chemistry,
                 mean_molecular_weight_model=mean_molecular_weight,
-                opacity_free_species=(
-                    ()
-                    if chemistry_item.phantom_species is None
-                    else (chemistry_item.phantom_species,)
-                ),
+                opacity_free_species=opacity_free_species,
                 pressure_grid=pressure,
                 cia_table=cia,
                 geometry=geometry,

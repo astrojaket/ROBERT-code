@@ -40,7 +40,7 @@ sampler:
   dlogz: 0.5
   resume: resume
   show_status: false
-  seed: 20260712
+  seed: 2712
 
 outputs:
   directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_catalog_pg14_R1000

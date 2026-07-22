@@ -95,7 +95,7 @@ sampler:
   iterations_before_update: 40
   resume: overwrite
   show_status: true
-  seed: 20260715
+  seed: 2715
 
 outputs:
   directory: ../examples/outputs/synthetic_transmission_injection_recovery
