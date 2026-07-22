@@ -82,8 +82,12 @@ def test_disk_model_configuration_selects_existing_regional_hardware() -> None:
 
 
 def test_multi_dataset_two_region_model_mixes_each_named_spectrum() -> None:
-    hot = lambda parameters: {"nircam": _constant([10.0, 20.0])(parameters)}
-    cold = lambda parameters: {"nircam": _constant([2.0, 4.0])(parameters)}
+    def hot(parameters):
+        return {"nircam": _constant([10.0, 20.0])(parameters)}
+
+    def cold(parameters):
+        return {"nircam": _constant([2.0, 4.0])(parameters)}
+
     model = MultiDatasetTwoRegionEmissionModel(hot, cold)
 
     spectra = model({"hot_area_fraction": 0.25})
@@ -92,7 +96,9 @@ def test_multi_dataset_two_region_model_mixes_each_named_spectrum() -> None:
 
 
 def test_multi_dataset_dilution_scales_each_named_spectrum() -> None:
-    regional = lambda parameters: {"miri": _constant([10.0, 20.0])(parameters)}
+    def regional(parameters):
+        return {"miri": _constant([10.0, 20.0])(parameters)}
+
     model = MultiDatasetDilutedEmissionModel(regional)
 
     spectra = model({"dayside_dilution": 0.4})

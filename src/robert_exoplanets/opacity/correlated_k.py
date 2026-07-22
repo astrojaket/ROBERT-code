@@ -281,12 +281,6 @@ class CorrelatedKTable:
         modify the source molecular cross sections.
         """
 
-        try:
-            import h5py
-        except ImportError as exc:  # pragma: no cover - dependency error path
-            raise RobertValidationError(
-                "loading ExoMol cross sections requires h5py"
-            ) from exc
         if (
             isinstance(g_points, bool)
             or int(g_points) != g_points
@@ -297,6 +291,12 @@ class CorrelatedKTable:
             raise RobertValidationError(
                 "ExoMol cross-section correlation requires spectral bin edges"
             )
+        try:
+            import h5py
+        except ImportError as exc:  # pragma: no cover - dependency error path
+            raise RobertValidationError(
+                "loading ExoMol cross sections requires h5py"
+            ) from exc
         source = Path(path).expanduser().resolve()
         edge_grid = SpectralGrid(
             values=spectral_grid.bin_edges,
