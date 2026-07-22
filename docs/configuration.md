@@ -54,6 +54,9 @@ sbatch submit.sbatch
 
 The major sections are intentionally explicit:
 
+- `paths`: the one top-level block for machine-specific input locations;
+  writable `outputs/`, `scratch/`, and `opacity_cache/` directories default
+  beside the YAML file and are created by ROBERT;
 - `bodies`: planetary and stellar parameters;
 - `observations`: published-data loader or self-describing ROBERT NPZ, data
   path, and selected instrument datasets;
@@ -62,6 +65,8 @@ The major sections are intentionally explicit:
   corresponding to each molecule;
 - `clouds`: cloud-free or configured emission-cloud treatment; configured
   transmission currently requires `none`;
+- `disk_emission`: one region, a diluted region, or two independently
+  configurable regions with selective atmosphere/chemistry/cloud overrides;
 - `opacity`: KTA or ExoMolOP cross-section root, resolution label, selected
   molecules, target-bin preparation, and an external cache directory;
 - `radiative_transfer`: emission geometry/backend or transmission reference
@@ -73,9 +78,64 @@ The major sections are intentionally explicit:
 - `plotting`: optional automatic retrieval/forward post-processing, image
   format, Matplotlib style, sampling display limit, colours, labels, and the
   optional PSIS leave-one-out diagnostic;
-- `outputs`: a project directory outside the source checkout; and
-- `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise,
-  while `scratch_directory` controls runtime caches.
+- `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise.
+
+## Self-contained paths
+
+Normal YAML files do not need `outputs.directory`, `opacity.cache_directory`,
+or `runtime.scratch_directory`. Given `/project/configuration.yaml`, ROBERT
+automatically resolves and creates `/project/outputs`, `/project/opacity_cache`,
+and `/project/scratch`. External inputs are collected once at the top:
+
+```yaml
+schema_version: 2
+paths:
+  project_directory: .
+  observations_directory: ${ROBERT_DATA_ROOT}/wasp69b
+  fastchem_directory: ${ROBERT_DATA_ROOT}/fastchem
+  k_table_directory: ${ROBERT_OPACITY_ROOT}
+```
+
+Relative paths resolve from the YAML directory. Undefined environment
+variables are rejected. Explicit legacy writable paths remain readable for
+old configurations, but new configurations should rely on the local defaults.
+
+## Projected-disk regions
+
+The top-level `atmosphere` and `clouds` blocks define the primary/hot column.
+A diluted model only adds its projected emitting fraction:
+
+```yaml
+disk_emission:
+  model: diluted_one_region
+  dilution_parameter: dayside_dilution
+```
+
+A two-region model adds hot and cold fluxes after their independent radiative
+transfer calculations. Each override inherits omitted components:
+
+```yaml
+disk_emission:
+  model: two_region
+  hot_fraction_parameter: hot_area_fraction
+  hot_region: {}
+  cold_region:
+    atmosphere:
+      temperature:
+        model: isothermal
+        parameter_name: cold_temperature
+      chemistry:
+        model: free
+        species: [H2O, CO2, CO, CH4, NH3, SO2]
+        parameter_names: {H2O: cold_log_H2O, CO2: cold_log_CO2}
+        background_species: [H2, He]
+    clouds:
+      model: none
+```
+
+All parameters named by either region, plus the area/dilution fraction, must
+appear in `parameters`. Fraction priors must remain within `[0, 1]` physically.
+Two-region and diluted models are emission-only.
 
 ## Stellar spectra
 
@@ -238,5 +298,5 @@ cd /scratch/dp448/dc-tayl1/my_project/<run.name>
 sbatch submit.sbatch
 ```
 
-After any failed multi-writer launch, select a new `outputs.directory` in YAML.
+After any failed multi-writer launch, use a new self-contained run directory.
 An HDF5 checkpoint touched by independent writers must not be resumed.

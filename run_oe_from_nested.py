@@ -60,7 +60,7 @@ def main() -> None:
 
     initialize_task_directories(oe_config)
     oe_problem = build_problem(oe_config, load_observations(oe_config))
-    temperature_overrides = layer_temperature_overrides(
+    temperature_overrides = temperature_state_overrides(
         nested_config,
         nested_result.best_fit_parameters,
         oe_problem,
@@ -71,10 +71,12 @@ def main() -> None:
         state_overrides=temperature_overrides,
         covariance_floor_fraction=args.covariance_floor_fraction,
     )
-    prior_covariance, temperature_pressure = configured_temperature_prior_covariance(
-        oe_config,
-        oe_problem,
-        prior_covariance,
+    prior_covariance, temperature_parameter_names, temperature_pressure = (
+        temperature_prior_covariance(
+            oe_config,
+            oe_problem,
+            prior_covariance,
+        )
     )
     prior_path = oe_config.outputs.directory / "multinest_to_oe_prior.npz"
     np.savez(
@@ -82,12 +84,13 @@ def main() -> None:
         parameter_names=np.asarray(oe_problem.parameter_names),
         prior_state=prior_state,
         prior_covariance=prior_covariance,
-        temperature_parameter_names=np.asarray(
-            _spline_temperature_profile(oe_problem).parameter_names
-        ),
+        temperature_parameter_names=np.asarray(temperature_parameter_names),
         temperature_pressure_bar=temperature_pressure,
     )
-    smoke = smoke_evaluation(oe_problem)
+    # Validate the state OE will actually use. A generic prior midpoint can be
+    # outside the valid model domain even when the transferred nested state is
+    # physically valid.
+    smoke = smoke_evaluation(oe_problem, prior_state)
     write_config_snapshot(oe_config, args.oe_config)
     (oe_config.outputs.directory / "smoke_evaluation.json").write_text(
         json.dumps(smoke, indent=2), encoding="utf-8"
@@ -183,12 +186,58 @@ def layer_temperature_overrides(
     }
 
 
+def temperature_state_overrides(
+    nested_config: TaskConfig,
+    nested_best_fit: Mapping[str, float],
+    oe_problem: object,
+) -> dict[str, float]:
+    """Prepare temperature overrides only when OE changes to a spline state."""
+
+    target_profile = _atmosphere_builder(oe_problem).temperature_profile
+    if isinstance(target_profile, SplineTemperatureProfile):
+        return layer_temperature_overrides(
+            nested_config,
+            nested_best_fit,
+            oe_problem,
+        )
+    source_profile = _temperature_profile(nested_config)
+    if (
+        type(source_profile) is not type(target_profile)
+        or source_profile.required_parameters() != target_profile.required_parameters()
+    ):
+        raise RobertConfigError(
+            "the nested and OE temperature profiles must use the same "
+            "parameterization unless OE uses a retrieved spline profile"
+        )
+    # Same-name parameters transfer directly in nested_posterior_oe_prior.
+    return {}
+
+
+def temperature_prior_covariance(
+    oe_config: TaskConfig,
+    oe_problem: object,
+    prior_covariance: np.ndarray,
+) -> tuple[np.ndarray, tuple[str, ...], np.ndarray]:
+    """Apply optional spline smoothing and describe the temperature prior block."""
+
+    profile = _atmosphere_builder(oe_problem).temperature_profile
+    parameter_names = tuple(profile.required_parameters())
+    if oe_config.sampler.oe_temperature_prior_sigma_k is None:
+        return prior_covariance, parameter_names, np.asarray([], dtype=float)
+    covariance, pressure = configured_temperature_prior_covariance(
+        oe_config,
+        oe_problem,
+        prior_covariance,
+    )
+    return covariance, parameter_names, pressure
+
+
 def _atmosphere_builder(oe_problem: object):
     forward_model = getattr(oe_problem, "forward_model", None)
     builder = getattr(forward_model, "atmosphere_builder", None)
     if builder is None:
         raise RobertConfigError(
-            "layer-temperature handoff requires an emission problem with a shared "
+            "deferred OE handoff requires an emission problem with a shared "
             "atmosphere builder"
         )
     return builder

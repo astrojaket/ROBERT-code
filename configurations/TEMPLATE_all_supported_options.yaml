@@ -9,6 +9,19 @@
 schema_version: 2
 
 # =============================================================================
+# PATHS: ALL MACHINE-SPECIFIC LOCATIONS LIVE HERE.
+# Relative paths resolve beside this YAML. ROBERT creates ./outputs, ./scratch,
+# and ./opacity_cache automatically, so they do not need to be configured.
+# Environment variables such as ${ROBERT_DATA_ROOT} are supported.
+# =============================================================================
+paths:
+  project_directory: .
+  observations_directory: /path/to/observations
+  fastchem_directory: /path/to/fastchem
+  k_table_directory: /path/to/opacity
+  optical_constants_directory: /path/to/optical_constants
+
+# =============================================================================
 # RUN IDENTITY
 # =============================================================================
 run:
@@ -62,7 +75,7 @@ observations:
     #   uncertainty_scale: 1.15          # Fixed 15% inflation.
     #   uncertainty_scale_parameter: miri_error_scale
     #   jitter_parameter: miri_jitter
-  # path is populated from housekeeping.observations_directory.
+  # path is populated from paths.observations_directory.
 
 # =============================================================================
 # ATMOSPHERE PROPERTIES
@@ -106,7 +119,7 @@ atmosphere:
     model: fastchem_equilibrium
     metallicity_parameter: metallicity
     carbon_to_oxygen_parameter: CtoO
-    # fastchem_path is populated from housekeeping.fastchem_directory.
+    # fastchem_path is populated from paths.fastchem_directory.
     species:
       - {label: H2O, fastchem_name: H2O1}
       - {label: CO2, fastchem_name: C1O2}
@@ -165,7 +178,7 @@ clouds:
   # geometric_stddev: 1.0
   # quadrature_points: 1
   # multiple_scattering_backend: sh4
-  # optical_constants_path is populated from housekeeping.optical_constants_directory.
+  # optical_constants_path is populated from paths.optical_constants_directory.
 
   # Shared emission/transmission retrieved refractive-index Mie cloud:
   # model: mie_direct_nk
@@ -176,6 +189,35 @@ clouds:
   # geometric_stddev: 1.0
   # quadrature_points: 1
   # multiple_scattering_backend: sh4
+
+# =============================================================================
+# PROJECTED-DISK EMISSION
+# The top-level atmosphere/clouds define the primary (hot) column. Regional
+# overrides inherit every omitted field. Two-region and dilution modes require
+# their fraction parameter in `parameters` with bounds inside [0, 1].
+# =============================================================================
+disk_emission:
+  model: one_region
+  # Diluted one-column alternative:
+  # model: diluted_one_region
+  # dilution_parameter: dayside_dilution
+  # Two-column alternative ("2tp" is accepted as an alias):
+  # model: two_region
+  # hot_fraction_parameter: hot_area_fraction
+  # hot_region: {}                  # Inherits the top-level atmosphere/clouds.
+  # cold_region:
+  #   atmosphere:
+  #     temperature:
+  #       model: isothermal
+  #       parameter_name: cold_temperature
+  #     chemistry:                  # Omit to share top-level chemistry.
+  #       model: free
+  #       species: [H2O, CO2, CO, CH4, NH3, SO2]
+  #       parameter_names: {H2O: cold_log_H2O, CO2: cold_log_CO2, CO: cold_log_CO, CH4: cold_log_CH4, NH3: cold_log_NH3, SO2: cold_log_SO2}
+  #       background_species: [H2, He]
+  #       background_fractions: [0.8547, 0.1453]
+  #   clouds:
+  #     model: none
 
 # =============================================================================
 # OPACITY AND RADIATIVE TRANSFER
@@ -189,7 +231,7 @@ opacity:
     use_rebin: false
     remove_zeros: true
     g_points: 8               # Used by exomol_cross_section_hdf only.
-  # path and cache_directory are populated from housekeeping.
+  # path is populated from paths.k_table_directory; cache defaults locally.
 
 radiative_transfer:
   model: emission             # Alternative: transmission
@@ -356,6 +398,9 @@ plotting:
   image_format: png              # png, pdf, or svg.
   dpi: 180
   max_posterior_samples: 20000   # Plotting limit; statistics always use all samples.
+  posterior_predictive_samples: 200 # Forward calls for spectral and T-P envelopes.
+  posterior_predictive_seed: 0
+  corner_max_parameters: 20      # Larger states retain marginals/correlation only.
   dataset_colors:                # Optional dataset-name overrides.
     f322w2: "#20639b"
     f444w: "#ef5675"
@@ -369,16 +414,3 @@ plotting:
 
 runtime:
   mpi_processes: auto
-
-# =============================================================================
-# HOUSEKEEPING: ALL MACHINE- AND PROJECT-SPECIFIC PATHS LIVE HERE.
-# Relative paths resolve relative to this YAML file.
-# =============================================================================
-housekeeping:
-  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp69b_schlawin2024
-  fastchem_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/chemistry/fastchem
-  k_table_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
-  optical_constants_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/optical_constants/exo_skryer
-  opacity_cache_directory: opacity_cache
-  output_directory: outputs
-  scratch_directory: scratch

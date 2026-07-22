@@ -6,10 +6,16 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 
-from robert_exoplanets import Observation, Spectrum
+from robert_exoplanets import (
+    IsothermalTemperatureProfile,
+    Observation,
+    PressureGrid,
+    Spectrum,
+)
 from robert_exoplanets.instruments import ObservationCollection, ObservationDataset
 from robert_exoplanets.postprocessing import (
     calculate_fit_statistics,
@@ -43,16 +49,24 @@ def _problem() -> MultiDatasetRetrievalProblem:
         (ObservationDataset("synthetic", observation),)
     )
 
-    def forward(parameters):
-        level = parameters["level"]
-        return {
-            "synthetic": Spectrum.from_arrays(
-                observation.wavelength,
-                level * observation.wavelength,
-                unit=observation.flux_unit,
-                observable=observation.observable,
-            )
-        }
+    class Forward:
+        atmosphere_builder = SimpleNamespace(
+            temperature_profile=IsothermalTemperatureProfile(
+                parameter_name="level"
+            ),
+            pressure_grid=PressureGrid.logspace(1.0e-5, 10.0, 5, unit="bar"),
+        )
+
+        def __call__(self, parameters):
+            level = parameters["level"]
+            return {
+                "synthetic": Spectrum.from_arrays(
+                    observation.wavelength,
+                    level * observation.wavelength,
+                    unit=observation.flux_unit,
+                    observable=observation.observable,
+                )
+            }
 
     return MultiDatasetRetrievalProblem(
         name="synthetic-postprocessing",
@@ -60,7 +74,7 @@ def _problem() -> MultiDatasetRetrievalProblem:
         parameters=RetrievalParameterSet(
             (RetrievalParameter("level", UniformPrior(0.5, 1.5)),)
         ),
-        forward_model=forward,
+        forward_model=Forward(),
     )
 
 
@@ -118,6 +132,12 @@ def test_retrieval_postprocessing_writes_statistics_and_plots(tmp_path: Path) ->
         problem,
         result_dir,
         plot_dir=plot_dir,
+        native_spectrum_model=lambda parameters: Spectrum.from_arrays(
+            np.linspace(1.0, 3.0, 9),
+            parameters["level"] * np.linspace(1.0, 3.0, 9),
+            unit="relative_flux",
+            observable="relative_flux",
+        ),
     )
 
     assert diagnostics["reduced_chi_squared"] == 0.0
@@ -127,6 +147,10 @@ def test_retrieval_postprocessing_writes_statistics_and_plots(tmp_path: Path) ->
     assert (plot_dir / "fit_spectrum_residuals.png").is_file()
     assert (plot_dir / "posterior_marginals.png").is_file()
     assert (plot_dir / "parameter_correlation.png").is_file()
+    assert (plot_dir / "posterior_corner.png").is_file()
+    assert (plot_dir / "temperature_profiles.png").is_file()
+    assert diagnostics["posterior_predictive_draws"] == 3
+    assert diagnostics["native_opacity_spectrum"] is True
     assert discover_retrieval_result_directories(tmp_path / "outputs") == (result_dir,)
 
 

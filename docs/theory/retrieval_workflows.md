@@ -77,6 +77,22 @@ python run_oe_from_nested.py \
   --oe-config /path/to/layer-oe-run/configuration.yaml
 ```
 
+Create the OE run directory from the supplied source YAML so that its
+`configuration.yaml` is a complete, flattened configuration:
+
+```bash
+python scripts/create_run_directory.py \
+  --project-dir /path/to/project \
+  --config configurations/wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation.yaml
+```
+
+Do not put `extends: configuration.yaml` in the isolated `configuration.yaml`;
+that makes the file its own parent. For a like-for-like PG14 refinement, the
+standard MultiNest and optimal-estimation configurations can be supplied to
+the deferred runner. Their common temperature parameters and posterior
+covariance transfer directly, without the layer-temperature conversion or a
+correlated spline prior.
+
 Parameters shared by the two models inherit the MultiNest best fit and
 posterior covariance. The PG14 best-fit temperature profile is evaluated at
 all 80 pressure-layer centres to initialize the new OE temperature state. The
@@ -84,7 +100,9 @@ temperature prior covariance is
 `S_ij = sigma_T^2 exp(-|log10(P_i/P_j)| / L)`, with the supplied configuration
 recording `sigma_T=250 K` and `L=1.5 dex`. This smooths departures from the
 MultiNest profile instead of treating adjacent layer temperatures as
-independent. The exact prior state and covariance are saved in
+independent. Because the retrieved knots are the layer centres, the two outer
+pressure edges use clipped endpoint temperatures across their half-layers.
+The exact prior state and covariance are saved in
 `multinest_to_oe_prior.npz`. MultiNest outputs remain unchanged. By default the
 handoff refuses a result that has not reported convergence;
 `--allow-unconverged` is available only for explicit diagnostic work.

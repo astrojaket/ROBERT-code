@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from robert_exoplanets.io.configured_tasks import (
@@ -15,6 +16,7 @@ from robert_exoplanets.io.configured_tasks import (
 )
 from robert_exoplanets.io.task_config import (
     TaskConfig,
+    configured_regions,
     initialize_task_directories,
     load_task_config,
 )
@@ -68,6 +70,19 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.bodies.star.metallicity_dex == 0.0
 
 
+def test_yaml_rejects_direct_self_extension_with_actionable_message(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "configuration.yaml"
+    source.write_text("extends: configuration.yaml\n", encoding="utf-8")
+
+    with pytest.raises(
+        ValueError,
+        match="configuration extends itself.*must not contain an extends entry",
+    ):
+        load_task_config(source)
+
+
 def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
     config = load_task_config(EXAMPLE)
     raw = deepcopy(config.model_dump(mode="python"))
@@ -76,6 +91,124 @@ def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
     parsed = TaskConfig.model_validate(raw)
 
     assert parsed.bodies.star.spectrum_model == "blackbody"
+
+
+def _two_region_raw() -> dict:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    cold_species = list(raw["opacity"]["species"])
+    raw["disk_emission"] = {
+        "model": "two_region",
+        "hot_fraction_parameter": "hot_area_fraction",
+        "cold_region": {
+            "atmosphere": {
+                "temperature": {"model": "isothermal", "temperature_k": 900.0},
+                "chemistry": {
+                    "model": "free",
+                    "species": cold_species,
+                    "fixed_mixing_ratios": {
+                        species: 1.0e-8 for species in cold_species
+                    },
+                    "background_species": ["H2", "He"],
+                },
+            },
+            "clouds": {
+                "model": "deck_haze",
+                "log10_cloud_top_pressure_bar_parameter": "cold_cloud_top",
+                "log10_cloud_optical_depth_parameter": "cold_cloud_tau",
+                "log10_haze_mass_extinction_parameter": "cold_haze_extinction",
+                "haze_slope_parameter": "cold_haze_slope",
+            },
+        },
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "hot_area_fraction",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 1.0},
+        },
+        *(
+            {
+                "name": name,
+                "prior": {"type": "uniform", "lower": -12.0, "upper": 4.0},
+            }
+            for name in (
+                "cold_cloud_top",
+                "cold_cloud_tau",
+                "cold_haze_extinction",
+                "cold_haze_slope",
+            )
+        ),
+    ]
+    return raw
+
+
+def test_yaml_resolves_independent_two_region_physics() -> None:
+    parsed = TaskConfig.model_validate(_two_region_raw())
+
+    hot, cold = configured_regions(parsed)
+
+    assert parsed.disk_emission.model == "two_region"
+    assert hot.atmosphere.temperature.model == "parmentier_guillot_2014"
+    assert hot.atmosphere.chemistry.model == "fastchem_equilibrium"
+    assert hot.clouds.model == "none"
+    assert cold.atmosphere.pressure is parsed.atmosphere.pressure
+    assert cold.atmosphere.temperature.model == "isothermal"
+    assert cold.atmosphere.chemistry.model == "free"
+    assert cold.clouds.model == "deck_haze"
+
+
+def test_two_region_yaml_requires_the_area_fraction_parameter() -> None:
+    raw = _two_region_raw()
+    raw["parameters"] = [
+        item for item in raw["parameters"] if item["name"] != "hot_area_fraction"
+    ]
+
+    with pytest.raises(ValidationError, match="hot_area_fraction"):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_accepts_diluted_emission_and_rejects_it_for_transmission() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["disk_emission"] = {
+        "model": "diluted_one_region",
+        "dilution_parameter": "dayside_dilution",
+    }
+    raw["parameters"] = (
+        *raw["parameters"],
+        {
+            "name": "dayside_dilution",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 1.0},
+        },
+    )
+
+    parsed = TaskConfig.model_validate(raw)
+    assert parsed.disk_emission.model == "diluted_one_region"
+
+    raw["radiative_transfer"]["model"] = "transmission"
+    with pytest.raises(ValidationError, match="require.*emission"):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_defaults_writable_paths_to_the_configuration_directory(
+    tmp_path: Path,
+) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="json"))
+    raw.pop("paths", None)
+    raw.pop("housekeeping", None)
+    raw.pop("outputs")
+    raw["runtime"].pop("scratch_directory")
+    raw["opacity"].pop("cache_directory")
+    source = tmp_path / "configuration.yaml"
+    source.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+    parsed = load_task_config(source)
+
+    assert parsed.outputs.directory == tmp_path / "outputs"
+    assert parsed.runtime.scratch_directory == tmp_path / "scratch"
+    assert parsed.opacity.cache_directory == tmp_path / "opacity_cache"
 
 
 def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
@@ -481,20 +614,21 @@ def test_direct_nk_default_replaces_catalogue_cloud_fields() -> None:
     assert len(config.clouds.real_index_parameter_names) == 6
 
 
-def test_complete_template_uses_housekeeping_for_internal_paths() -> None:
+def test_complete_template_uses_one_top_level_path_block() -> None:
     config = load_task_config(TEMPLATE)
 
     assert config.clouds.model == "none"
-    assert config.housekeeping is not None
-    assert config.observations.path == config.housekeeping.observations_directory
+    assert config.paths is not None
+    assert config.housekeeping is None
+    assert config.observations.path == config.paths.observations_directory
     assert (
         config.atmosphere.chemistry.fastchem_path
-        == config.housekeeping.fastchem_directory
+        == config.paths.fastchem_directory
     )
-    assert config.opacity.path == config.housekeeping.k_table_directory
-    assert config.opacity.cache_directory == config.housekeeping.opacity_cache_directory
-    assert config.outputs.directory == config.housekeeping.output_directory
-    assert config.runtime.scratch_directory == config.housekeeping.scratch_directory
+    assert config.opacity.path == config.paths.k_table_directory
+    assert config.opacity.cache_directory == ROOT / "configurations" / "opacity_cache"
+    assert config.outputs.directory == ROOT / "configurations" / "outputs"
+    assert config.runtime.scratch_directory == ROOT / "configurations" / "scratch"
     assert config.plotting.enabled is False
     assert config.sampler.max_calls is None
     assert config.plotting.dataset_colors["f322w2"] == "#20639b"

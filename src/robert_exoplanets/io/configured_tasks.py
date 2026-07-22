@@ -26,15 +26,20 @@ from robert_exoplanets.atmosphere import (
     TabulatedTemperatureProfile,
 )
 from robert_exoplanets.bodies import Planet, Star
-from robert_exoplanets.core import PressureGrid, RobertConfigError
+from robert_exoplanets.core import PressureGrid, RobertConfigError, SpectralGrid
 from robert_exoplanets.forward import (
+    DilutedEmissionModel,
+    MultiDatasetDilutedEmissionModel,
+    MultiDatasetTwoRegionEmissionModel,
     ParameterizedEmissionFactoryConfig,
     ParameterizedEmissionModelConfig,
     ParameterizedDeckHazeCloudModel,
     ParameterizedMieCloudModel,
     ParameterizedTransmissionFactoryConfig,
     ParameterizedTransmissionModelConfig,
+    TwoRegionEmissionModel,
     build_multi_dataset_emission_model,
+    build_parameterized_emission_model,
     build_parameterized_transmission_model,
 )
 from robert_exoplanets.instruments import ObservationCollection, ObservationDataset
@@ -60,7 +65,16 @@ from robert_exoplanets.rt import (
     OpticalConstantsCatalog,
 )
 
-from .task_config import ParameterConfig, TaskConfig, initialize_task_directories
+from .task_config import (
+    CloudsConfig,
+    ChemistryConfig,
+    ParameterConfig,
+    ResolvedRegionConfig,
+    TaskConfig,
+    TemperatureConfig,
+    configured_regions,
+    initialize_task_directories,
+)
 from .l9859b import load_bello_arufe2025_l9859b
 from .wasp69b import load_schlawin2024_wasp69b
 from .wasp80b import load_wiser2025_wasp80b
@@ -95,12 +109,19 @@ def mpi_processes(config: TaskConfig) -> int:
 def describe_config(config: TaskConfig) -> str:
     """Return a concise preflight summary suitable for terminal inspection."""
 
+    regions = configured_regions(config)
+    atmosphere_description = "; ".join(
+        f"{region.name}={region.atmosphere.temperature.model}/"
+        f"{region.atmosphere.chemistry.model}/clouds:{region.clouds.model}"
+        for region in regions
+    )
     return "\n".join(
         [
             f"Run: {config.run.name}",
             f"Target: {config.bodies.planet.name} / {config.bodies.star.name}",
             f"Data: {config.observations.loader} [{', '.join(config.observations.datasets)}]",
-            f"Atmosphere: {config.atmosphere.temperature.model}, {config.atmosphere.chemistry.model}, clouds={config.clouds.model}",
+            f"Disk emission: {config.disk_emission.model}",
+            f"Atmosphere regions: {atmosphere_description}",
             f"Opacity: {config.opacity.resolution} [{', '.join(config.opacity.species)}]",
             (
                 f"Transmission: reference={config.radiative_transfer.reference_pressure_bar:g} bar, "
@@ -404,11 +425,211 @@ def _parameters(items: tuple[ParameterConfig, ...]) -> RetrievalParameterSet:
     return RetrievalParameterSet(tuple(parameters))
 
 
+def _temperature_profile(config: TemperatureConfig, *, gravity: float):
+    if config.model == "parmentier_guillot_2014":
+        return ParmentierGuillot2014TemperatureProfile(
+            gravity=gravity,
+            internal_temperature=config.internal_temperature_k,
+            kappa_ir_parameter_name=config.kappa_ir_parameter,
+            gamma1_parameter_name=config.gamma1_parameter,
+            gamma2_parameter_name=config.gamma2_parameter,
+            irradiation_temperature_parameter_name=(
+                config.irradiation_temperature_parameter
+            ),
+            alpha_parameter_name=config.alpha_parameter,
+        )
+    if config.model == "isothermal":
+        return IsothermalTemperatureProfile(
+            temperature=config.temperature_k,
+            parameter_name=config.parameter_name,
+        )
+    if config.model == "tabulated":
+        return TabulatedTemperatureProfile.from_csv(
+            config.profile_path,
+            pressure_column=config.pressure_column,
+            temperature_column=config.temperature_column,
+            pressure_unit=config.pressure_unit,
+            extrapolation=config.extrapolation,
+        )
+    if config.model == "madhusudhan_seager_2009":
+        return MadhusudhanSeager2009TemperatureProfile(
+            pressure_unit=config.pressure_unit,
+            reference_pressure=config.reference_pressure,
+            p1_parameter_name=config.p1_parameter,
+            p2_parameter_name=config.p2_parameter,
+            p3_parameter_name=config.p3_parameter,
+            t0_parameter_name=config.t0_parameter,
+            alpha1_parameter_name=config.alpha1_parameter,
+            alpha2_parameter_name=config.alpha2_parameter,
+        )
+    return SplineTemperatureProfile(
+        knot_pressure=np.asarray(config.knot_pressure, dtype=float),
+        knot_temperature=(
+            None
+            if config.knot_temperature_k is None
+            else np.asarray(config.knot_temperature_k, dtype=float)
+        ),
+        parameter_names=config.parameter_names,
+        pressure_unit=config.pressure_unit,
+        extrapolation=config.extrapolation,
+    )
+
+
+def _chemistry_components(config: ChemistryConfig):
+    if config.model == "fastchem_equilibrium":
+        chemistry = FastChemEquilibriumChemistry(
+            fastchem_path=config.fastchem_path,
+            fastchem_species=tuple(item.fastchem_name for item in config.species),
+            labels=tuple(item.label for item in config.species),
+            metallicity_parameter_name=config.metallicity_parameter,
+            carbon_to_oxygen_parameter_name=config.carbon_to_oxygen_parameter,
+            constant_log10_vmr_parameters=(
+                config.constant_log10_vmr_parameters or {}
+            ),
+        )
+        return (
+            chemistry,
+            CompositionMeanMolecularWeight(normalization="raw_sum"),
+            (),
+        )
+    if config.fill_background:
+        fractions = config.background_fractions
+        background = BackgroundGasMixture(
+            {name: 1.0 for name in config.background_species}
+            if fractions is None
+            else dict(zip(config.background_species, fractions, strict=True))
+        )
+    else:
+        background = None
+    chemistry = FreeChemistry(
+        active_species=config.species,
+        background=background,
+        fixed_mixing_ratios=config.fixed_mixing_ratios,
+        parameter_names=config.parameter_names,
+        parameter_mode=config.parameter_mode,
+        fill_background=config.fill_background,
+        excess_policy=config.excess_policy,
+    )
+    mean_molecular_weight = CompositionMeanMolecularWeight(
+        normalization="require" if config.fill_background else "normalize",
+        molecular_mass_parameters=(
+            {}
+            if config.phantom_species is None
+            else {
+                config.phantom_species: config.phantom_mean_molecular_weight_parameter
+            }
+        ),
+    )
+    opacity_free_species = (
+        () if config.phantom_species is None else (config.phantom_species,)
+    )
+    return chemistry, mean_molecular_weight, opacity_free_species
+
+
+def _cloud_model(config: CloudsConfig):
+    if config.model == "none":
+        return None
+    if config.model == "deck_haze":
+        return ParameterizedDeckHazeCloudModel(
+            log10_cloud_top_pressure_bar_parameter=(
+                config.log10_cloud_top_pressure_bar_parameter
+            ),
+            log10_cloud_optical_depth_parameter=(
+                config.log10_cloud_optical_depth_parameter
+            ),
+            log10_haze_mass_extinction_parameter=(
+                config.log10_haze_mass_extinction_parameter
+            ),
+            haze_slope_parameter=config.haze_slope_parameter,
+            haze_reference_wavelength_micron=(
+                config.haze_reference_wavelength_micron
+            ),
+            deck_single_scattering_albedo=config.deck_single_scattering_albedo,
+            deck_asymmetry_factor=config.deck_asymmetry_factor,
+            haze_single_scattering_albedo=config.haze_single_scattering_albedo,
+            haze_asymmetry_factor=config.haze_asymmetry_factor,
+            multiple_scattering_backend=config.multiple_scattering_backend,
+        )
+    if config.model == "mie_catalog":
+        wavelength = ()
+        real_parameters = ()
+        imaginary_parameters = ()
+        fixed_index = OpticalConstantsCatalog(config.optical_constants_path).load(
+            config.material
+        )
+    else:
+        wavelength = config.refractive_index_wavelength_micron
+        real_parameters = config.real_index_parameter_names
+        imaginary_parameters = config.log10_imaginary_index_parameter_names
+        fixed_index = None
+    return ParameterizedMieCloudModel(
+        refractive_index_wavelength_micron=wavelength,
+        real_index_parameter_names=real_parameters,
+        log10_imaginary_index_parameter_names=imaginary_parameters,
+        fixed_refractive_index=fixed_index,
+        log10_condensate_mass_fraction_parameter=config.log10_mass_fraction_parameter,
+        log10_effective_radius_micron_parameter=config.log10_radius_micron_parameter,
+        particle_density_kg_m3=config.particle_density_kg_m3,
+        geometric_stddev=config.geometric_stddev,
+        log10_cloud_top_pressure_bar_parameter=config.log10_top_pressure_bar_parameter,
+        log10_cloud_base_pressure_bar_parameter=config.log10_base_pressure_bar_parameter,
+        quadrature_points=config.quadrature_points,
+        refractive_index_extrapolation="raise",
+        multiple_scattering_backend=config.multiple_scattering_backend,
+    )
+
+
+def _pressure_grid(region: ResolvedRegionConfig, *, planet: Planet) -> PressureGrid:
+    pressure = region.atmosphere.pressure
+    return PressureGrid.from_log_centers(
+        pressure.bottom_bar,
+        pressure.top_bar,
+        n_layers=pressure.layers,
+        unit="bar",
+        name=f"{planet.name} {region.name} configured pressure grid",
+    )
+
+
+def _opacity_providers(
+    config: TaskConfig,
+    observations: ObservationCollection,
+    *,
+    planet: Planet,
+) -> dict[str, CorrelatedKOpacityProvider]:
+    providers = {}
+    for dataset in observations.datasets:
+        tables = {
+            species: _load_cached_table(config, dataset.name, species)
+            for species in config.opacity.species
+        }
+        reference = next(iter(tables.values()))
+        for species, table in tuple(tables.items()):
+            if not np.allclose(
+                table.g_samples, reference.g_samples, rtol=0.0, atol=1.0e-8
+            ):
+                raise ValueError(f"{species} uses a different correlated-k g grid")
+            if not np.allclose(
+                table.g_weights, reference.g_weights, rtol=0.0, atol=1.0e-8
+            ):
+                raise ValueError(f"{species} uses different correlated-k weights")
+            tables[species] = replace(
+                table,
+                g_samples=reference.g_samples,
+                g_weights=reference.g_weights,
+            )
+        providers[dataset.name] = CorrelatedKOpacityProvider(
+            tables,
+            name=f"{planet.name}-{dataset.name}-{config.opacity.resolution}-binned",
+            interpolation="log_pressure_temperature_log_k_clip",
+        )
+    return providers
+
+
 def build_problem(
     config: TaskConfig,
     observations: ObservationCollection | None = None,
 ) -> MultiDatasetRetrievalProblem:
-    """Construct the typed emission problem selected by the YAML file."""
+    """Construct the typed regional retrieval problem selected by the YAML file."""
 
     observations = load_observations(config) if observations is None else observations
     planet, gravity = _planet(config)
@@ -420,111 +641,6 @@ def build_problem(
         log_g_cgs=star_item.log_g_cgs,
         metallicity_dex=star_item.metallicity_dex,
     )
-    pressure_item = config.atmosphere.pressure
-    pressure = PressureGrid.from_log_centers(
-        pressure_item.bottom_bar,
-        pressure_item.top_bar,
-        n_layers=pressure_item.layers,
-        unit="bar",
-        name=f"{planet.name} configured pressure grid",
-    )
-    temperature_item = config.atmosphere.temperature
-    if temperature_item.model == "parmentier_guillot_2014":
-        temperature = ParmentierGuillot2014TemperatureProfile(
-            gravity=gravity,
-            internal_temperature=temperature_item.internal_temperature_k,
-        )
-    elif temperature_item.model == "isothermal":
-        temperature = IsothermalTemperatureProfile(
-            temperature=temperature_item.temperature_k,
-            parameter_name=temperature_item.parameter_name,
-        )
-    elif temperature_item.model == "tabulated":
-        temperature = TabulatedTemperatureProfile.from_csv(
-            temperature_item.profile_path,
-            pressure_column=temperature_item.pressure_column,
-            temperature_column=temperature_item.temperature_column,
-            pressure_unit=temperature_item.pressure_unit,
-            extrapolation=temperature_item.extrapolation,
-        )
-    elif temperature_item.model == "madhusudhan_seager_2009":
-        temperature = MadhusudhanSeager2009TemperatureProfile(
-            pressure_unit=temperature_item.pressure_unit,
-            reference_pressure=temperature_item.reference_pressure,
-            p1_parameter_name=temperature_item.p1_parameter,
-            p2_parameter_name=temperature_item.p2_parameter,
-            p3_parameter_name=temperature_item.p3_parameter,
-            t0_parameter_name=temperature_item.t0_parameter,
-            alpha1_parameter_name=temperature_item.alpha1_parameter,
-            alpha2_parameter_name=temperature_item.alpha2_parameter,
-        )
-    else:
-        temperature = SplineTemperatureProfile(
-            knot_pressure=np.asarray(temperature_item.knot_pressure, dtype=float),
-            knot_temperature=(
-                None
-                if temperature_item.knot_temperature_k is None
-                else np.asarray(temperature_item.knot_temperature_k, dtype=float)
-            ),
-            parameter_names=temperature_item.parameter_names,
-            pressure_unit=temperature_item.pressure_unit,
-            extrapolation=temperature_item.extrapolation,
-        )
-    chemistry_item = config.atmosphere.chemistry
-    if chemistry_item.model == "fastchem_equilibrium":
-        chemistry = FastChemEquilibriumChemistry(
-            fastchem_path=chemistry_item.fastchem_path,
-            fastchem_species=tuple(
-                item.fastchem_name for item in chemistry_item.species
-            ),
-            labels=tuple(item.label for item in chemistry_item.species),
-            metallicity_parameter_name=chemistry_item.metallicity_parameter,
-            carbon_to_oxygen_parameter_name=chemistry_item.carbon_to_oxygen_parameter,
-            constant_log10_vmr_parameters=(
-                chemistry_item.constant_log10_vmr_parameters or {}
-            ),
-        )
-        mean_molecular_weight = CompositionMeanMolecularWeight(normalization="raw_sum")
-        opacity_free_species: tuple[str, ...] = ()
-    else:
-        if chemistry_item.fill_background:
-            fractions = chemistry_item.background_fractions
-            if fractions is None:
-                background = BackgroundGasMixture(
-                    {name: 1.0 for name in chemistry_item.background_species}
-                )
-            else:
-                background = BackgroundGasMixture(
-                    dict(zip(chemistry_item.background_species, fractions, strict=True))
-                )
-        else:
-            background = None
-        chemistry = FreeChemistry(
-            active_species=chemistry_item.species,
-            background=background,
-            fixed_mixing_ratios=chemistry_item.fixed_mixing_ratios,
-            parameter_names=chemistry_item.parameter_names,
-            parameter_mode=chemistry_item.parameter_mode,
-            fill_background=chemistry_item.fill_background,
-            excess_policy=chemistry_item.excess_policy,
-        )
-        mean_molecular_weight = CompositionMeanMolecularWeight(
-            normalization="require" if chemistry_item.fill_background else "normalize",
-            molecular_mass_parameters=(
-                {}
-                if chemistry_item.phantom_species is None
-                else {
-                    chemistry_item.phantom_species: (
-                        chemistry_item.phantom_mean_molecular_weight_parameter
-                    )
-                }
-            ),
-        )
-        opacity_free_species = (
-            ()
-            if chemistry_item.phantom_species is None
-            else (chemistry_item.phantom_species,)
-        )
     geometry_item = config.radiative_transfer.geometry
     geometry = (
         normal_emission_geometry()
@@ -553,145 +669,105 @@ def build_problem(
             impact_quadrature_order=rt.impact_quadrature_order,
             metadata={"configured_model": "transmission"},
         )
-    configs = {}
-    cloud_models = {}
-    spectral_grids = {}
-    clouds = config.clouds
-    shared_cloud_model = None
-    if clouds.model == "deck_haze":
-        shared_cloud_model = ParameterizedDeckHazeCloudModel(
-            log10_cloud_top_pressure_bar_parameter=(
-                clouds.log10_cloud_top_pressure_bar_parameter
-            ),
-            log10_cloud_optical_depth_parameter=(
-                clouds.log10_cloud_optical_depth_parameter
-            ),
-            log10_haze_mass_extinction_parameter=(
-                clouds.log10_haze_mass_extinction_parameter
-            ),
-            haze_slope_parameter=clouds.haze_slope_parameter,
-            haze_reference_wavelength_micron=(
-                clouds.haze_reference_wavelength_micron
-            ),
-            deck_single_scattering_albedo=(
-                clouds.deck_single_scattering_albedo
-            ),
-            deck_asymmetry_factor=clouds.deck_asymmetry_factor,
-            haze_single_scattering_albedo=(
-                clouds.haze_single_scattering_albedo
-            ),
-            haze_asymmetry_factor=clouds.haze_asymmetry_factor,
-            multiple_scattering_backend=clouds.multiple_scattering_backend,
+    providers = _opacity_providers(config, observations, planet=planet)
+    spectral_grids = {
+        dataset.name: dataset.observation.spectral_grid
+        for dataset in observations.datasets
+    }
+    regions = configured_regions(config)
+    regional_models = {}
+    regional_opacity_ids = {}
+    for region in regions:
+        temperature = _temperature_profile(
+            region.atmosphere.temperature,
+            gravity=gravity,
         )
-    if clouds.model == "mie_catalog":
-        shared_cloud_model = ParameterizedMieCloudModel(
-            refractive_index_wavelength_micron=(),
-            real_index_parameter_names=(),
-            log10_imaginary_index_parameter_names=(),
-            fixed_refractive_index=OpticalConstantsCatalog(
-                clouds.optical_constants_path
-            ).load(clouds.material),
-            log10_condensate_mass_fraction_parameter=clouds.log10_mass_fraction_parameter,
-            log10_effective_radius_micron_parameter=clouds.log10_radius_micron_parameter,
-            particle_density_kg_m3=clouds.particle_density_kg_m3,
-            geometric_stddev=clouds.geometric_stddev,
-            log10_cloud_top_pressure_bar_parameter=clouds.log10_top_pressure_bar_parameter,
-            log10_cloud_base_pressure_bar_parameter=clouds.log10_base_pressure_bar_parameter,
-            quadrature_points=clouds.quadrature_points,
-            refractive_index_extrapolation="raise",
-            multiple_scattering_backend=clouds.multiple_scattering_backend,
+        chemistry, mean_molecular_weight, opacity_free_species = (
+            _chemistry_components(region.atmosphere.chemistry)
         )
-    elif clouds.model == "mie_direct_nk":
-        shared_cloud_model = ParameterizedMieCloudModel(
-            refractive_index_wavelength_micron=clouds.refractive_index_wavelength_micron,
-            real_index_parameter_names=clouds.real_index_parameter_names,
-            log10_imaginary_index_parameter_names=clouds.log10_imaginary_index_parameter_names,
-            log10_condensate_mass_fraction_parameter=clouds.log10_mass_fraction_parameter,
-            log10_effective_radius_micron_parameter=clouds.log10_radius_micron_parameter,
-            particle_density_kg_m3=clouds.particle_density_kg_m3,
-            geometric_stddev=clouds.geometric_stddev,
-            log10_cloud_top_pressure_bar_parameter=clouds.log10_top_pressure_bar_parameter,
-            log10_cloud_base_pressure_bar_parameter=clouds.log10_base_pressure_bar_parameter,
-            quadrature_points=clouds.quadrature_points,
-            refractive_index_extrapolation="raise",
-            multiple_scattering_backend=clouds.multiple_scattering_backend,
-        )
-    for dataset in observations.datasets:
-        tables = {
-            species: _load_cached_table(config, dataset.name, species)
-            for species in config.opacity.species
-        }
-        reference = next(iter(tables.values()))
-        for species, table in tuple(tables.items()):
-            if not np.allclose(
-                table.g_samples, reference.g_samples, rtol=0.0, atol=1.0e-8
-            ):
-                raise ValueError(f"{species} uses a different correlated-k g grid")
-            if not np.allclose(
-                table.g_weights, reference.g_weights, rtol=0.0, atol=1.0e-8
-            ):
-                raise ValueError(f"{species} uses different correlated-k weights")
-            tables[species] = replace(
-                table, g_samples=reference.g_samples, g_weights=reference.g_weights
+        pressure = _pressure_grid(region, planet=planet)
+        cloud = _cloud_model(region.clouds)
+        if rt.model == "emission":
+            factories = {
+                dataset.name: ParameterizedEmissionFactoryConfig(
+                    planet=planet,
+                    star=star,
+                    temperature_profile=temperature,
+                    chemistry_model=chemistry,
+                    mean_molecular_weight_model=mean_molecular_weight,
+                    opacity_free_species=opacity_free_species,
+                    pressure_grid=pressure,
+                    cia_table=cia,
+                    geometry=geometry,
+                    opacity_source=providers[dataset.name],
+                    opacity_binning=None,
+                    model=model_config,
+                    cloud_model=cloud,
+                )
+                for dataset in observations.datasets
+            }
+            regional_model = build_multi_dataset_emission_model(
+                factories,
+                spectral_grids=spectral_grids,
             )
-        provider = CorrelatedKOpacityProvider(
-            tables,
-            name=f"{planet.name}-{dataset.name}-{config.opacity.resolution}-binned",
-            interpolation="log_pressure_temperature_log_k_clip",
-        )
-        spectral_grids[dataset.name] = dataset.observation.spectral_grid
-        if rt.model == "transmission":
-            factory = ParameterizedTransmissionFactoryConfig(
-                planet=planet,
-                star=star,
-                temperature_profile=temperature,
-                chemistry_model=chemistry,
-                mean_molecular_weight_model=mean_molecular_weight,
-                opacity_free_species=opacity_free_species,
-                pressure_grid=pressure,
-                cia_table=cia,
-                opacity_source=provider,
-                opacity_binning=None,
-                model=model_config,
-                cloud_model=shared_cloud_model,
-            )
-            cloud_models[dataset.name] = build_parameterized_transmission_model(
-                factory,
-                spectral_grid=dataset.observation.spectral_grid,
-            )
+            regional_opacity_ids[region.name] = {
+                f"{dataset}:{key}": value
+                for dataset, model in regional_model.models.items()
+                for key, value in model.opacity_identifiers.items()
+            }
         else:
-            factory = ParameterizedEmissionFactoryConfig(
-                planet=planet,
-                star=star,
-                temperature_profile=temperature,
-                chemistry_model=chemistry,
-                mean_molecular_weight_model=mean_molecular_weight,
-                opacity_free_species=opacity_free_species,
-                pressure_grid=pressure,
-                cia_table=cia,
-                geometry=geometry,
-                opacity_source=provider,
-                opacity_binning=None,
-                model=model_config,
-                cloud_model=shared_cloud_model,
-            )
-            configs[dataset.name] = factory
-    if rt.model == "emission":
-        forward_model = build_multi_dataset_emission_model(
-            configs, spectral_grids=spectral_grids
+            dataset_models = {}
+            for dataset in observations.datasets:
+                factory = ParameterizedTransmissionFactoryConfig(
+                    planet=planet,
+                    star=star,
+                    temperature_profile=temperature,
+                    chemistry_model=chemistry,
+                    mean_molecular_weight_model=mean_molecular_weight,
+                    opacity_free_species=opacity_free_species,
+                    pressure_grid=pressure,
+                    cia_table=cia,
+                    opacity_source=providers[dataset.name],
+                    opacity_binning=None,
+                    model=model_config,
+                    cloud_model=cloud,
+                )
+                dataset_models[dataset.name] = build_parameterized_transmission_model(
+                    factory,
+                    spectral_grid=dataset.observation.spectral_grid,
+                )
+            regional_model = NamedRegionalModels(dataset_models)
+            regional_opacity_ids[region.name] = {
+                f"{dataset}:{key}": value
+                for dataset, model in dataset_models.items()
+                for key, value in model.opacity_identifiers.items()
+            }
+        regional_models[region.name] = regional_model
+
+    disk_mode = config.disk_emission.model
+    if disk_mode in {"two_region", "2tp"}:
+        forward_model = MultiDatasetTwoRegionEmissionModel(
+            regional_models["hot"],
+            regional_models["cold"],
+            hot_fraction_parameter=config.disk_emission.hot_fraction_parameter,
         )
         opacity_ids = {
-            f"{dataset}:{key}": value
-            for dataset, model in forward_model.models.items()
-            for key, value in model.opacity_identifiers.items()
+            f"{region}:{key}": value
+            for region, identifiers in regional_opacity_ids.items()
+            for key, value in identifiers.items()
         }
+        canonical_disk_mode = "two_region"
+    elif disk_mode in {"diluted", "diluted_one_region"}:
+        forward_model = MultiDatasetDilutedEmissionModel(
+            regional_models["primary"],
+            dilution_parameter=config.disk_emission.dilution_parameter,
+        )
+        opacity_ids = regional_opacity_ids["primary"]
+        canonical_disk_mode = "diluted_one_region"
     else:
-        forward_model = NamedRegionalModels(cloud_models)
-        opacity_ids = {
-            f"{dataset}:{key}": value
-            for dataset, model in cloud_models.items()
-            for key, value in model.opacity_identifiers.items()
-        }
+        forward_model = regional_models["primary"]
+        opacity_ids = regional_opacity_ids["primary"]
+        canonical_disk_mode = "one_region"
     return MultiDatasetRetrievalProblem(
         name=config.run.name,
         observations=observations,
@@ -704,7 +780,10 @@ def build_problem(
         metadata={
             "configuration_schema_version": str(config.schema_version),
             "opacity_resolution": config.opacity.resolution,
-            "cloud_model": config.clouds.model,
+            "cloud_model": ",".join(
+                f"{region.name}:{region.clouds.model}" for region in regions
+            ),
+            "disk_emission_model": canonical_disk_mode,
             "geometry": geometry_item.model,
             "radiative_transfer_model": rt.model,
         },
@@ -712,14 +791,147 @@ def build_problem(
     )
 
 
-def smoke_evaluation(problem: MultiDatasetRetrievalProblem) -> dict[str, float]:
-    theta = problem.prior_transform(np.full(problem.ndim, 0.5))
+def build_native_emission_model(
+    config: TaskConfig,
+    observations: ObservationCollection,
+):
+    """Build an exact native-opacity-grid model for retrieval diagnostics.
+
+    Native diagnostic spectra are currently available for ExoMol correlated-k
+    tables. Cross-section HDF inputs require a separate spectral correlation
+    choice and therefore deliberately fall back to observation-grid plotting.
+    """
+
+    if (
+        config.radiative_transfer.model != "emission"
+        or config.opacity.format != "exomol_kta"
+    ):
+        return None
+    provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+        config.opacity.path,
+        species=config.opacity.species,
+        resolution=config.opacity.resolution,
+        name=f"native-{config.opacity.resolution}",
+        interpolation="log_pressure_temperature_log_k_clip",
+        nonfinite_policy="floor",
+    )
+    reference = provider.tables[config.opacity.species[0]]
+    common_wavenumber = np.asarray(reference.wavenumber_cm_inverse, dtype=float)
+    for species in config.opacity.species[1:]:
+        common_wavenumber = np.intersect1d(
+            common_wavenumber,
+            provider.tables[species].wavenumber_cm_inverse,
+        )
+    observed_wavelength = np.concatenate(
+        [dataset.observation.wavelength for dataset in observations.datasets]
+    )
+    native_wavelength = 10_000.0 / common_wavenumber
+    selected = (
+        (native_wavelength >= float(np.min(observed_wavelength)))
+        & (native_wavelength <= float(np.max(observed_wavelength)))
+    )
+    native_wavelength = np.sort(native_wavelength[selected])
+    if native_wavelength.size < 2:
+        raise RobertConfigError(
+            "native opacity grid does not cover the configured observations"
+        )
+    spectral_grid = SpectralGrid.from_array(
+        native_wavelength,
+        unit="micron",
+        name=f"{config.opacity.resolution} native opacity diagnostic grid",
+    )
+    planet, gravity = _planet(config)
+    star_item = config.bodies.star
+    star = Star(
+        name=star_item.name,
+        radius_m=star_item.radius_m,
+        effective_temperature_k=star_item.effective_temperature_k,
+        log_g_cgs=star_item.log_g_cgs,
+        metallicity_dex=star_item.metallicity_dex,
+    )
+    geometry_item = config.radiative_transfer.geometry
+    geometry = (
+        normal_emission_geometry()
+        if geometry_item.model == "normal_emission"
+        else gauss_legendre_disk_geometry(geometry_item.points)
+    )
+    rt = config.radiative_transfer
+    model_config = ParameterizedEmissionModelConfig(
+        opacity_species=config.opacity.species,
+        include_rayleigh=rt.include_rayleigh,
+        gas_combination=rt.gas_combination,
+        thermal_integration_backend=rt.thermal_integration_backend,
+        stellar_spectrum_model=star_item.spectrum_model,
+        metadata={
+            "configured_geometry": geometry_item.model,
+            "diagnostic_grid": "native_opacity",
+        },
+    )
+    cia = load_nemesispy_cia_table()
+    regional_models = {}
+    for region in configured_regions(config):
+        chemistry, mean_molecular_weight, opacity_free_species = (
+            _chemistry_components(region.atmosphere.chemistry)
+        )
+        factory = ParameterizedEmissionFactoryConfig(
+            planet=planet,
+            star=star,
+            temperature_profile=_temperature_profile(
+                region.atmosphere.temperature,
+                gravity=gravity,
+            ),
+            chemistry_model=chemistry,
+            mean_molecular_weight_model=mean_molecular_weight,
+            opacity_free_species=opacity_free_species,
+            pressure_grid=_pressure_grid(region, planet=planet),
+            cia_table=cia,
+            geometry=geometry,
+            opacity_source=provider,
+            opacity_binning=None,
+            model=model_config,
+            cloud_model=_cloud_model(region.clouds),
+        )
+        regional_models[region.name] = build_parameterized_emission_model(
+            factory,
+            spectral_grid=spectral_grid,
+        )
+    disk = config.disk_emission
+    if disk.model in {"two_region", "2tp"}:
+        return TwoRegionEmissionModel(
+            regional_models["hot"],
+            regional_models["cold"],
+            hot_fraction_parameter=disk.hot_fraction_parameter,
+        )
+    if disk.model in {"diluted", "diluted_one_region"}:
+        return DilutedEmissionModel(
+            regional_models["primary"],
+            dilution_parameter=disk.dilution_parameter,
+        )
+    return regional_models["primary"]
+
+
+def smoke_evaluation(
+    problem: MultiDatasetRetrievalProblem,
+    state: np.ndarray | None = None,
+) -> dict[str, float]:
+    """Evaluate a representative state and expose any hidden model error."""
+
+    theta = (
+        problem.prior_transform(np.full(problem.ndim, 0.5))
+        if state is None
+        else np.asarray(state, dtype=float)
+    )
     started = time.perf_counter()
     value = problem.log_likelihood_from_vector(theta)
     elapsed = time.perf_counter() - started
     if not np.isfinite(value) or value <= problem.invalid_loglike:
+        # log_likelihood_from_vector deliberately converts physical-domain
+        # errors to the sampler's invalid floor. Re-evaluate through the
+        # unguarded OE interface so setup-time smoke failures retain their
+        # actionable original exception.
+        problem.gaussian_inputs_from_vector(theta)
         raise RuntimeError(
-            "prior-midpoint smoke evaluation returned an invalid likelihood"
+            "smoke evaluation returned an invalid likelihood"
         )
     return {"elapsed_seconds": elapsed, "log_likelihood": float(value)}
 
@@ -1017,6 +1229,10 @@ def _postprocess_retrieval_outputs(
         if parameter.label is not None
     }
     parameter_labels.update(config.plotting.parameter_labels)
+    native_spectrum_model = build_native_emission_model(
+        config,
+        problem.observations,
+    )
     for result_dir in discover_retrieval_result_directories(config.outputs.directory):
         postprocess_retrieval_output(
             problem,
@@ -1028,6 +1244,12 @@ def _postprocess_retrieval_outputs(
             image_format=config.plotting.image_format,
             dpi=config.plotting.dpi,
             max_posterior_samples=config.plotting.max_posterior_samples,
+            posterior_predictive_samples=(
+                config.plotting.posterior_predictive_samples
+            ),
+            posterior_predictive_seed=config.plotting.posterior_predictive_seed,
+            corner_max_parameters=config.plotting.corner_max_parameters,
+            native_spectrum_model=native_spectrum_model,
             leave_one_out=config.plotting.leave_one_out.enabled,
             loo_max_posterior_draws=(
                 config.plotting.leave_one_out.max_posterior_draws
@@ -1044,6 +1266,7 @@ def _postprocess_retrieval_outputs(
 
 
 __all__ = [
+    "build_native_emission_model",
     "build_problem",
     "describe_config",
     "load_observations",

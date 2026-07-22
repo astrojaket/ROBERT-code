@@ -32,7 +32,8 @@ same prior in every sampler variant.
 
 The WASP-69b cloud-free native-mode and fixed-catalogue Mie cases also ship as
 an inference benchmark matrix. Each file extends the corresponding science
-configuration, so only the inference engine and run/output identity change:
+configuration, so only the inference engine and run identity change. Writable
+directories are local defaults beside each run's `configuration.yaml`:
 
 | Workflow | Cloud-free YAML | Mie-catalogue YAML |
 | --- | --- | --- |
@@ -68,5 +69,6 @@ calibration-sensitivity test.
 
 For new projects, start from `TEMPLATE_all_supported_options.yaml`. It groups
 the editable inputs into system, data, atmosphere, cloud, opacity/RT, priors,
-sampler, and housekeeping sections. The active block is a valid cloud-free retrieval;
-commented alternatives show the currently supported optional modes and priors.
+sampler, plotting, and one top-level paths section. The active block is a valid
+cloud-free retrieval; commented alternatives show the supported one-region,
+diluted, two-region, chemistry, cloud, and prior modes.

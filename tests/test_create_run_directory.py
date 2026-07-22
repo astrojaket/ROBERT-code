@@ -111,7 +111,7 @@ def test_create_run_directory_refuses_to_mix_runs(tmp_path: Path) -> None:
         create_run_directory(**kwargs)
 
 
-def test_create_run_directory_updates_housekeeping_writable_paths(
+def test_create_run_directory_uses_top_level_paths_and_local_writable_defaults(
     tmp_path: Path,
 ) -> None:
     run_directory = create_run_directory(
@@ -120,9 +120,9 @@ def test_create_run_directory_updates_housekeeping_writable_paths(
     )
     config = load_task_config(run_directory / "configuration.yaml")
 
-    assert config.housekeeping is not None
-    assert config.housekeeping.output_directory == run_directory / "outputs"
-    assert (
-        config.housekeeping.opacity_cache_directory == run_directory / "opacity_cache"
-    )
-    assert config.housekeeping.scratch_directory == run_directory / "scratch"
+    assert config.paths is not None
+    assert config.paths.project_directory == run_directory
+    assert config.housekeeping is None
+    assert config.outputs.directory == run_directory / "outputs"
+    assert config.opacity.cache_directory == run_directory / "opacity_cache"
+    assert config.runtime.scratch_directory == run_directory / "scratch"

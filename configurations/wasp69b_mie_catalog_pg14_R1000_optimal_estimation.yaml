@@ -7,8 +7,3 @@ run:
 sampler:
   engine: optimal_estimation
   oe_max_iterations: 8
-
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp69b_mie_catalog_pg14_R1000_optimal_estimation
-runtime:
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp69b_mie_catalog_pg14_R1000_optimal_estimation

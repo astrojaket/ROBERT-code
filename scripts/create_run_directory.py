@@ -133,16 +133,48 @@ def create_run_directory(*, project_dir: Path, source_config: Path) -> Path:
     ):
         shutil.copy2(ROOT / filename, run_directory / filename)
 
-    generated = config.model_dump(mode="json")
-    generated["outputs"]["directory"] = str(run_directory / "outputs")
-    generated["opacity"]["cache_directory"] = str(run_directory / "opacity_cache")
-    generated["runtime"]["scratch_directory"] = str(run_directory / "scratch")
-    if generated.get("housekeeping") is not None:
-        generated["housekeeping"]["output_directory"] = str(run_directory / "outputs")
-        generated["housekeeping"]["opacity_cache_directory"] = str(
-            run_directory / "opacity_cache"
+    generated = config.model_dump(mode="json", exclude_none=True)
+    configured_paths = config.paths or config.housekeeping
+    paths = (
+        {}
+        if configured_paths is None
+        else configured_paths.model_dump(mode="json", exclude_none=True)
+    )
+    paths.update(
+        {
+            "project_directory": ".",
+            "observations_directory": str(config.observations.path),
+            "k_table_directory": str(config.opacity.path),
+        }
+    )
+    if config.atmosphere.chemistry.model == "fastchem_equilibrium":
+        paths["fastchem_directory"] = str(
+            config.atmosphere.chemistry.fastchem_path
         )
-        generated["housekeeping"]["scratch_directory"] = str(run_directory / "scratch")
+        generated["atmosphere"]["chemistry"].pop("fastchem_path", None)
+    if config.clouds.model == "mie_catalog":
+        paths["optical_constants_directory"] = str(
+            config.clouds.optical_constants_path
+        )
+        generated["clouds"].pop("optical_constants_path", None)
+    for key in (
+        "opacity_cache_directory",
+        "output_directory",
+        "scratch_directory",
+    ):
+        paths.pop(key, None)
+    generated["observations"].pop("path", None)
+    generated["opacity"].pop("path", None)
+    generated["opacity"].pop("cache_directory", None)
+    generated.pop("outputs", None)
+    generated["runtime"].pop("scratch_directory", None)
+    generated.pop("housekeeping", None)
+    generated.pop("paths", None)
+    generated = {
+        "schema_version": generated.pop("schema_version"),
+        "paths": paths,
+        **generated,
+    }
     execution_config = run_directory / "configuration.yaml"
     execution_config.write_text(
         yaml.safe_dump(generated, sort_keys=False), encoding="utf-8"

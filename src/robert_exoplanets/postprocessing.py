@@ -52,6 +52,10 @@ def postprocess_retrieval_output(
     image_format: str = "png",
     dpi: int = 180,
     max_posterior_samples: int = 20_000,
+    posterior_predictive_samples: int = 200,
+    posterior_predictive_seed: int = 0,
+    corner_max_parameters: int = 20,
+    native_spectrum_model: object | None = None,
     leave_one_out: bool = False,
     loo_max_posterior_draws: int = 2_000,
     loo_seed: int = 0,
@@ -62,12 +66,18 @@ def postprocess_retrieval_output(
     _validate_plot_options(style, image_format, dpi)
     if max_posterior_samples < 1:
         raise RobertValidationError("max_posterior_samples must be positive")
+    if posterior_predictive_samples < 1:
+        raise RobertValidationError("posterior_predictive_samples must be positive")
     result_path = Path(result_dir).expanduser()
     summary = _read_json(result_path / "result.json")
     arrays = _read_npz(result_path / "result_arrays.npz")
     names = tuple(str(name) for name in summary.get("parameter_names", ()))
     if not names:
         raise RobertDataError(f"retrieval result has no parameter names: {result_path}")
+    if names != problem.parameter_names:
+        raise RobertDataError(
+            "retrieval result parameter order does not match the configured problem"
+        )
     best = _float_mapping(summary.get("best_fit_parameters"), "best_fit_parameters")
     spectra = problem.model_spectra(best)
     diagnostics = calculate_fit_statistics(
@@ -96,6 +106,31 @@ def postprocess_retrieval_output(
     )
     posterior = posterior_summary(names, arrays)
     diagnostics["posterior"] = posterior
+    posterior_draws = _posterior_parameter_draws(
+        names,
+        arrays,
+        maximum=posterior_predictive_samples,
+        seed=posterior_predictive_seed,
+    )
+    bounds = np.asarray(problem.parameters.bounds, dtype=float)
+    posterior_draws = np.clip(
+        posterior_draws,
+        bounds[:, 0],
+        bounds[:, 1],
+    )
+    spectral_quantiles = _posterior_spectral_quantiles(problem, posterior_draws)
+    native_quantiles = _posterior_native_spectral_quantiles(
+        problem,
+        posterior_draws,
+        native_spectrum_model,
+    )
+    temperature_quantiles = _posterior_temperature_quantiles(
+        problem,
+        posterior_draws,
+    )
+    diagnostics["posterior_predictive_draws"] = int(posterior_draws.shape[0])
+    diagnostics["native_opacity_spectrum"] = native_quantiles is not None
+    diagnostics["temperature_profile_regions"] = tuple(temperature_quantiles)
 
     destination = Path(plot_dir).expanduser()
     destination.mkdir(parents=True, exist_ok=True)
@@ -147,7 +182,16 @@ def postprocess_retrieval_output(
         dataset_colors=dataset_colors,
         style=style,
         dpi=dpi,
+        posterior_quantiles=spectral_quantiles,
+        native_quantiles=native_quantiles,
     )
+    if temperature_quantiles:
+        _plot_temperature_profiles(
+            temperature_quantiles,
+            destination / f"temperature_profiles.{image_format}",
+            style=style,
+            dpi=dpi,
+        )
     _plot_parameters(
         names,
         arrays,
@@ -157,6 +201,8 @@ def postprocess_retrieval_output(
         image_format=image_format,
         dpi=dpi,
         max_samples=max_posterior_samples,
+        seed=posterior_predictive_seed,
+        corner_max_parameters=corner_max_parameters,
     )
     _write_plot_manifest(
         destination,
@@ -385,6 +431,173 @@ def weighted_quantile(
     return np.interp(probability, cumulative, sorted_data)
 
 
+def _posterior_parameter_draws(
+    names: Sequence[str],
+    arrays: Mapping[str, np.ndarray],
+    *,
+    maximum: int,
+    seed: int,
+) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    if "samples" in arrays:
+        samples = np.asarray(arrays["samples"], dtype=float)
+        if samples.ndim != 2 or samples.shape[1] != len(names):
+            raise RobertDataError("nested posterior samples do not match parameter names")
+        weights = _normalized_weights(arrays.get("weights"), samples.shape[0])
+        count = min(maximum, max(1, samples.shape[0]))
+        indices = rng.choice(samples.shape[0], size=count, replace=True, p=weights)
+        return np.asarray(samples[indices], dtype=float)
+    if "state_vector" in arrays and "covariance" in arrays:
+        state = np.asarray(arrays["state_vector"], dtype=float)
+        covariance = np.asarray(arrays["covariance"], dtype=float)
+        return np.asarray(
+            rng.multivariate_normal(
+                state,
+                covariance,
+                size=maximum,
+                check_valid="raise",
+            ),
+            dtype=float,
+        )
+    raise RobertDataError("result arrays contain neither nested samples nor OE state")
+
+
+def _posterior_spectral_quantiles(
+    problem: MultiDatasetRetrievalProblem,
+    draws: np.ndarray,
+) -> dict[str, np.ndarray]:
+    predictions: dict[str, list[np.ndarray]] = {
+        name: [] for name in problem.observations.names
+    }
+    for draw in draws:
+        spectra = problem.model_spectra(draw)
+        for name in predictions:
+            predictions[name].append(np.asarray(spectra[name].values, dtype=float))
+    return {
+        name: np.quantile(np.stack(values), (0.16, 0.5, 0.84), axis=0)
+        for name, values in predictions.items()
+    }
+
+
+def _posterior_native_spectral_quantiles(
+    problem: MultiDatasetRetrievalProblem,
+    draws: np.ndarray,
+    model: object | None,
+) -> dict[str, np.ndarray | str] | None:
+    if model is None:
+        return None
+    spectra = [model(problem.parameter_mapping(draw)) for draw in draws]
+    if not spectra or any(not isinstance(spectrum, Spectrum) for spectrum in spectra):
+        raise RobertValidationError("native spectrum model must return Spectrum")
+    reference = spectra[0]
+    if any(
+        spectrum.unit != reference.unit
+        or spectrum.observable != reference.observable
+        or not np.array_equal(
+            spectrum.spectral_grid.values,
+            reference.spectral_grid.values,
+        )
+        for spectrum in spectra[1:]
+    ):
+        raise RobertValidationError(
+            "native posterior spectra must share one grid, unit, and observable"
+        )
+    return {
+        "wavelength": np.asarray(reference.spectral_grid.values, dtype=float),
+        "quantiles": np.quantile(
+            np.stack([spectrum.values for spectrum in spectra]),
+            (0.16, 0.5, 0.84),
+            axis=0,
+        ),
+        "unit": reference.unit,
+    }
+
+
+def _posterior_temperature_quantiles(
+    problem: MultiDatasetRetrievalProblem,
+    draws: np.ndarray,
+) -> dict[str, dict[str, np.ndarray]]:
+    builders = _named_atmosphere_builders(problem.forward_model)
+    output = {}
+    for name, builder in builders.items():
+        profiles = []
+        for draw in draws:
+            parameters = problem.parameter_mapping(draw)
+            profiles.append(
+                np.asarray(
+                    builder.temperature_profile.evaluate(
+                        parameters,
+                        builder.pressure_grid,
+                    ),
+                    dtype=float,
+                )
+            )
+        output[name] = {
+            "pressure": np.asarray(builder.pressure_grid.centers, dtype=float),
+            "quantiles": np.quantile(
+                np.stack(profiles),
+                (0.16, 0.5, 0.84),
+                axis=0,
+            ),
+        }
+    return output
+
+
+def _named_atmosphere_builders(model: object) -> dict[str, object]:
+    if hasattr(model, "hot_model") and hasattr(model, "cold_model"):
+        output = {}
+        for prefix, regional in (
+            ("hot", model.hot_model),
+            ("cold", model.cold_model),
+        ):
+            nested = _named_atmosphere_builders(regional)
+            for name, builder in nested.items():
+                output[prefix if name == "primary" else f"{prefix}_{name}"] = builder
+        return output
+    if hasattr(model, "emission_model"):
+        return _named_atmosphere_builders(model.emission_model)
+    builder = getattr(model, "atmosphere_builder", None)
+    if builder is not None:
+        return {"primary": builder}
+    models = getattr(model, "models", None)
+    if isinstance(models, Mapping) and models:
+        return _named_atmosphere_builders(next(iter(models.values())))
+    return {}
+
+
+def _plot_temperature_profiles(
+    profiles: Mapping[str, Mapping[str, np.ndarray]],
+    output: Path,
+    *,
+    style: str,
+    dpi: int,
+) -> None:
+    plt = _pyplot()
+    with plt.style.context(style):
+        figure, axis = plt.subplots(figsize=(6.5, 7.0))
+        for index, (name, values) in enumerate(profiles.items()):
+            pressure = values["pressure"]
+            quantiles = values["quantiles"]
+            color = DEFAULT_DATASET_COLORS[index % len(DEFAULT_DATASET_COLORS)]
+            axis.fill_betweenx(
+                pressure,
+                quantiles[0],
+                quantiles[2],
+                color=color,
+                alpha=0.22,
+            )
+            axis.plot(quantiles[1], pressure, color=color, label=f"{name} median")
+        axis.set_yscale("log")
+        axis.invert_yaxis()
+        axis.set_xlabel("Temperature (K)")
+        axis.set_ylabel("Pressure (bar)")
+        axis.set_title("Posterior temperature-pressure profile (68% interval)")
+        axis.legend(fontsize=8)
+        figure.tight_layout()
+        figure.savefig(output, dpi=dpi, bbox_inches="tight")
+        plt.close(figure)
+
+
 def _plot_fit(
     problem: MultiDatasetRetrievalProblem,
     spectra: Mapping[str, Spectrum],
@@ -395,6 +608,8 @@ def _plot_fit(
     dataset_colors: Mapping[str, str] | None,
     style: str,
     dpi: int,
+    posterior_quantiles: Mapping[str, np.ndarray] | None = None,
+    native_quantiles: Mapping[str, np.ndarray | str] | None = None,
 ) -> None:
     plt = _pyplot()
     colors = _dataset_color_mapping(problem, dataset_colors)
@@ -410,6 +625,26 @@ def _plot_fit(
             gridspec_kw={"height_ratios": (3, 1)},
         )
         flux_label = "Model and observation"
+        if native_quantiles is not None:
+            native_wavelength = np.asarray(native_quantiles["wavelength"], dtype=float)
+            native_values = np.asarray(native_quantiles["quantiles"], dtype=float)
+            native_scale, flux_label = _plot_scale(str(native_quantiles["unit"]))
+            fit_axis.fill_between(
+                native_wavelength,
+                native_values[0] * native_scale,
+                native_values[2] * native_scale,
+                color="0.35",
+                alpha=0.18,
+                linewidth=0.0,
+                label="Native-grid 68% envelope",
+            )
+            fit_axis.plot(
+                native_wavelength,
+                native_values[1] * native_scale,
+                color="0.15",
+                linewidth=1.15,
+                label="Native-opacity-grid median",
+            )
         for dataset in problem.observations.datasets:
             name = dataset.name
             observation = dataset.observation
@@ -431,7 +666,43 @@ def _plot_fit(
                 alpha=0.75,
                 label=observation.instrument or name,
             )
-            fit_axis.plot(wavelength, model * scale, color=color, linewidth=1.6)
+            quantiles = (
+                None
+                if posterior_quantiles is None
+                else posterior_quantiles.get(name)
+            )
+            if quantiles is not None and quantiles.shape[1] == valid.size:
+                quantiles = quantiles[:, valid]
+            plotted_model = model
+            if quantiles is not None:
+                plotted_model = quantiles[1]
+                fit_axis.fill_between(
+                    wavelength,
+                    quantiles[0] * scale,
+                    quantiles[2] * scale,
+                    color=color,
+                    alpha=0.2,
+                    linewidth=0.0,
+                    label=(
+                        "68% posterior envelope"
+                        if dataset is problem.observations.datasets[0]
+                        else None
+                    ),
+                )
+            fit_axis.plot(
+                wavelength,
+                plotted_model * scale,
+                linestyle="none",
+                marker="s",
+                markersize=4.0,
+                markerfacecolor="none",
+                markeredgecolor=color,
+                label=(
+                    "Observation-grid model"
+                    if dataset is problem.observations.datasets[0]
+                    else None
+                ),
+            )
             residual_axis.plot(
                 wavelength,
                 (data - model) / uncertainty,
@@ -465,6 +736,8 @@ def _plot_parameters(
     image_format: str,
     dpi: int,
     max_samples: int,
+    seed: int,
+    corner_max_parameters: int,
 ) -> None:
     plt = _pyplot()
     labels = {name: name for name in names}
@@ -515,6 +788,20 @@ def _plot_parameters(
             style=style,
             dpi=dpi,
         )
+        if len(names) <= corner_max_parameters:
+            _plot_corner(
+                _posterior_parameter_draws(
+                    names,
+                    arrays,
+                    maximum=max_samples,
+                    seed=seed,
+                ),
+                names,
+                labels,
+                output_dir / f"posterior_corner.{image_format}",
+                style=style,
+                dpi=dpi,
+            )
         return
     if "state_vector" in arrays and "covariance" in arrays:
         state = np.asarray(arrays["state_vector"], dtype=float)
@@ -543,6 +830,64 @@ def _plot_parameters(
             style=style,
             dpi=dpi,
         )
+
+
+def _plot_corner(
+    samples: np.ndarray,
+    names: Sequence[str],
+    labels: Mapping[str, str],
+    output: Path,
+    *,
+    style: str,
+    dpi: int,
+) -> None:
+    plt = _pyplot()
+    count = len(names)
+    with plt.style.context(style):
+        figure, axes = plt.subplots(
+            count,
+            count,
+            figsize=(max(3.2, 2.15 * count), max(3.2, 2.15 * count)),
+            squeeze=False,
+        )
+        for row in range(count):
+            for column in range(count):
+                axis = axes[row, column]
+                if row < column:
+                    axis.set_visible(False)
+                    continue
+                if row == column:
+                    axis.hist(
+                        samples[:, column],
+                        bins=35,
+                        color="#20639b",
+                        alpha=0.8,
+                        density=True,
+                    )
+                    axis.set_yticks([])
+                else:
+                    axis.plot(
+                        samples[:, column],
+                        samples[:, row],
+                        ".",
+                        color="#20639b",
+                        alpha=min(0.35, max(0.03, 150.0 / samples.shape[0])),
+                        markersize=1.4,
+                        rasterized=True,
+                    )
+                if row == count - 1:
+                    axis.set_xlabel(labels[names[column]], fontsize=8)
+                else:
+                    axis.set_xticklabels([])
+                if column == 0 and row > 0:
+                    axis.set_ylabel(labels[names[row]], fontsize=8)
+                elif column > 0:
+                    axis.set_yticklabels([])
+                axis.tick_params(labelsize=7)
+        figure.suptitle("Posterior corner plot", y=1.0)
+        figure.tight_layout()
+        figure.savefig(output, dpi=dpi, bbox_inches="tight")
+        plt.close(figure)
 
 
 def _plot_correlation(

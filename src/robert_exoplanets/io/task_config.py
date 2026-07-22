@@ -100,6 +100,24 @@ class PressureConfig(ConfigModel):
 class ParmentierGuillotTemperatureConfig(ConfigModel):
     model: Literal["parmentier_guillot_2014"]
     internal_temperature_k: float = Field(default=100.0, ge=0.0)
+    kappa_ir_parameter: str = Field(default="kappa_IR", min_length=1)
+    gamma1_parameter: str = Field(default="gamma1", min_length=1)
+    gamma2_parameter: str = Field(default="gamma2", min_length=1)
+    irradiation_temperature_parameter: str = Field(default="T_irr", min_length=1)
+    alpha_parameter: str = Field(default="alpha", min_length=1)
+
+    @model_validator(mode="after")
+    def validate_parameter_names(self) -> "ParmentierGuillotTemperatureConfig":
+        names = (
+            self.kappa_ir_parameter,
+            self.gamma1_parameter,
+            self.gamma2_parameter,
+            self.irradiation_temperature_parameter,
+            self.alpha_parameter,
+        )
+        if len(set(names)) != len(names):
+            raise ValueError("Parmentier-Guillot parameter names must be unique")
+        return self
 
 
 class IsothermalTemperatureConfig(ConfigModel):
@@ -393,6 +411,53 @@ CloudsConfig = Annotated[
 ]
 
 
+class RegionalAtmosphereOverrideConfig(ConfigModel):
+    """Optional regional replacements for the shared atmospheric defaults."""
+
+    pressure: PressureConfig | None = None
+    temperature: TemperatureConfig | None = None
+    chemistry: ChemistryConfig | None = None
+
+
+class RegionOverrideConfig(ConfigModel):
+    """Overrides applied to one projected-disk emission region."""
+
+    atmosphere: RegionalAtmosphereOverrideConfig = RegionalAtmosphereOverrideConfig()
+    clouds: CloudsConfig | None = None
+
+
+class OneRegionDiskEmissionConfig(ConfigModel):
+    model: Literal["one_region"] = "one_region"
+
+
+class DilutedDiskEmissionConfig(ConfigModel):
+    model: Literal["diluted_one_region", "diluted"]
+    dilution_parameter: str = Field(default="dayside_dilution", min_length=1)
+
+
+class TwoRegionDiskEmissionConfig(ConfigModel):
+    model: Literal["two_region", "2tp"]
+    hot_fraction_parameter: str = Field(default="hot_area_fraction", min_length=1)
+    hot_region: RegionOverrideConfig = RegionOverrideConfig()
+    cold_region: RegionOverrideConfig
+
+
+DiskEmissionConfig = Annotated[
+    OneRegionDiskEmissionConfig
+    | DilutedDiskEmissionConfig
+    | TwoRegionDiskEmissionConfig,
+    Field(discriminator="model"),
+]
+
+
+class ResolvedRegionConfig(ConfigModel):
+    """Fully resolved configuration for one physical emission column."""
+
+    name: str = Field(min_length=1)
+    atmosphere: AtmosphereConfig
+    clouds: CloudsConfig
+
+
 class OpacityBinningConfig(ConfigModel):
     num: PositiveInt = 300
     use_rebin: bool = False
@@ -556,6 +621,9 @@ class PlottingConfig(ConfigModel):
     image_format: Literal["png", "pdf", "svg"] = "png"
     dpi: PositiveInt = 180
     max_posterior_samples: PositiveInt = 20_000
+    posterior_predictive_samples: PositiveInt = 200
+    posterior_predictive_seed: NonNegativeInt = 0
+    corner_max_parameters: PositiveInt = 20
     dataset_colors: dict[str, str] = Field(default_factory=dict)
     parameter_labels: dict[str, str] = Field(default_factory=dict)
     leave_one_out: LeaveOneOutConfig = LeaveOneOutConfig()
@@ -580,14 +648,15 @@ class RuntimeConfig(ConfigModel):
 
 
 class HousekeepingConfig(ConfigModel):
-    """Machine- and project-specific locations for a user-facing YAML file."""
+    """Machine- and project-specific paths kept in one visible YAML block."""
 
-    observations_directory: Path
-    fastchem_directory: Path
-    k_table_directory: Path
-    opacity_cache_directory: Path
-    output_directory: Path
-    scratch_directory: Path
+    project_directory: Path | None = None
+    observations_directory: Path | None = None
+    fastchem_directory: Path | None = None
+    k_table_directory: Path | None = None
+    opacity_cache_directory: Path | None = None
+    output_directory: Path | None = None
+    scratch_directory: Path | None = None
     optical_constants_directory: Path | None = None
 
 
@@ -595,11 +664,13 @@ class TaskConfig(ConfigModel):
     """Complete schema-versioned retrieval/forward-model configuration."""
 
     schema_version: Literal[2]
+    paths: HousekeepingConfig | None = None
     run: RunConfig
     bodies: BodiesConfig
     observations: ObservationsConfig
     atmosphere: AtmosphereConfig
     clouds: CloudsConfig = CloudFreeConfig()
+    disk_emission: DiskEmissionConfig = OneRegionDiskEmissionConfig()
     opacity: OpacityConfig
     radiative_transfer: RadiativeTransferConfig
     likelihood: LikelihoodConfig = LikelihoodConfig()
@@ -608,79 +679,67 @@ class TaskConfig(ConfigModel):
     outputs: OutputsConfig
     plotting: PlottingConfig = PlottingConfig()
     runtime: RuntimeConfig
+    # Legacy name retained so existing configurations continue to load. New
+    # YAML should use the top-level ``paths`` block.
     housekeeping: HousekeepingConfig | None = None
 
     @model_validator(mode="after")
     def validate_cross_references(self) -> "TaskConfig":
+        if self.paths is not None and self.housekeeping is not None:
+            raise ValueError("configure paths or legacy housekeeping, not both")
         opacity = self.opacity.species
-        chemistry_config = self.atmosphere.chemistry
-        chemistry = (
-            tuple(item.label for item in chemistry_config.species)
-            if chemistry_config.model == "fastchem_equilibrium"
-            else chemistry_config.species + chemistry_config.background_species
-        )
         if len(set(opacity)) != len(opacity):
             raise ValueError("opacity.species contains duplicates")
-        if len(set(chemistry)) != len(chemistry):
-            raise ValueError("atmosphere.chemistry.species labels contain duplicates")
-        missing = sorted(set(opacity) - set(chemistry))
-        if missing:
-            raise ValueError(
-                "opacity species missing from chemistry labels: " + ", ".join(missing)
-            )
+        regions = configured_regions(self)
+        for region in regions:
+            chemistry = _chemistry_species(region.atmosphere.chemistry)
+            if len(set(chemistry)) != len(chemistry):
+                raise ValueError(
+                    f"{region.name} chemistry species labels contain duplicates"
+                )
+            missing = sorted(set(opacity) - set(chemistry))
+            if missing:
+                raise ValueError(
+                    f"opacity species missing from {region.name} chemistry labels: "
+                    + ", ".join(missing)
+                )
         names = tuple(item.name for item in self.parameters)
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")
         required: set[str] = set()
-        if chemistry_config.model == "fastchem_equilibrium":
-            required.update(
-                {
-                    chemistry_config.metallicity_parameter,
-                    chemistry_config.carbon_to_oxygen_parameter,
-                }
-            )
-            required.update(
-                (chemistry_config.constant_log10_vmr_parameters or {}).values()
-            )
+        for region in regions:
+            required.update(_required_chemistry_parameters(region.atmosphere.chemistry))
+            required.update(_required_temperature_parameters(region.atmosphere.temperature))
+            required.update(_required_cloud_parameters(region.clouds))
+        disk_mode = _disk_emission_mode(self.disk_emission)
+        if disk_mode == "diluted_one_region":
+            required.add(self.disk_emission.dilution_parameter)
+            fraction_parameter = self.disk_emission.dilution_parameter
+        elif disk_mode == "two_region":
+            required.add(self.disk_emission.hot_fraction_parameter)
+            fraction_parameter = self.disk_emission.hot_fraction_parameter
         else:
-            required.update(
-                chemistry_config.parameter_names.get(species, species)
-                for species in chemistry_config.species
-                if species not in chemistry_config.fixed_mixing_ratios
-            )
-            if chemistry_config.phantom_mean_molecular_weight_parameter is not None:
-                required.add(
-                    chemistry_config.phantom_mean_molecular_weight_parameter
+            fraction_parameter = None
+        if fraction_parameter is not None:
+            parameter_lookup = {item.name: item for item in self.parameters}
+            configured_fraction = parameter_lookup.get(fraction_parameter)
+            if configured_fraction is not None and (
+                configured_fraction.prior.lower < 0.0
+                or configured_fraction.prior.upper > 1.0
+            ):
+                raise ValueError(
+                    f"{fraction_parameter} prior must lie within [0, 1]"
                 )
-        temperature = self.atmosphere.temperature
-        if temperature.model == "parmentier_guillot_2014":
-            required.update({"kappa_IR", "gamma1", "gamma2", "T_irr", "alpha"})
-        elif temperature.model == "isothermal" and temperature.temperature_k is None:
-            required.add(temperature.parameter_name)
-        elif temperature.model == "madhusudhan_seager_2009":
-            required.update(
-                {
-                    temperature.p1_parameter,
-                    temperature.p2_parameter,
-                    temperature.p3_parameter,
-                    temperature.t0_parameter,
-                    temperature.alpha1_parameter,
-                    temperature.alpha2_parameter,
-                }
-            )
-        elif temperature.model == "spline" and temperature.knot_temperature_k is None:
-            required.update(
-                temperature.parameter_names
-                or tuple(
-                    f"temperature_{index}"
-                    for index in range(len(temperature.knot_pressure))
-                )
-            )
         if self.sampler.oe_temperature_prior_sigma_k is not None:
             if not self.sampler.engine.startswith("optimal_estimation"):
                 raise ValueError(
                     "correlated OE temperature priors require an optimal-estimation engine"
                 )
+            if disk_mode != "one_region":
+                raise ValueError(
+                    "correlated OE temperature priors currently require one_region disk emission"
+                )
+            temperature = regions[0].atmosphere.temperature
             if (
                 temperature.model != "spline"
                 or temperature.knot_temperature_k is not None
@@ -709,11 +768,16 @@ class TaskConfig(ConfigModel):
         if self.observations.miri_offset_parameter is not None:
             required.add(self.observations.miri_offset_parameter)
         radiative_transfer = self.radiative_transfer
+        if radiative_transfer.model == "transmission" and disk_mode != "one_region":
+            raise ValueError(
+                "diluted and two-region disk models require radiative_transfer.model=emission"
+            )
         if radiative_transfer.model == "transmission":
+            pressure = regions[0].atmosphere.pressure
             if not (
-                self.atmosphere.pressure.top_bar
+                pressure.top_bar
                 <= radiative_transfer.reference_pressure_bar
-                <= self.atmosphere.pressure.bottom_bar
+                <= pressure.bottom_bar
             ):
                 raise ValueError(
                     "transmission reference_pressure_bar must lie within the pressure grid"
@@ -726,34 +790,42 @@ class TaskConfig(ConfigModel):
             if item.prior.type == "centered_log_ratio"
         }
         if clr_parameters:
-            if chemistry_config.model != "free":
-                raise ValueError(
-                    "centered_log_ratio priors require free chemistry"
+            matched_clr_parameters: set[str] = set()
+            for region in regions:
+                chemistry_config = region.atmosphere.chemistry
+                if chemistry_config.model != "free":
+                    continue
+                chemistry_parameters = _retrieved_free_chemistry_parameters(
+                    chemistry_config
                 )
-            if chemistry_config.parameter_mode != "log10":
+                regional_clr = chemistry_parameters.intersection(clr_parameters)
+                if not regional_clr:
+                    continue
+                if chemistry_config.parameter_mode != "log10":
+                    raise ValueError(
+                        "centered_log_ratio priors require chemistry parameter_mode=log10"
+                    )
+                if not chemistry_config.fill_background:
+                    raise ValueError(
+                        "centered_log_ratio priors require a background closure category"
+                    )
+                if regional_clr != chemistry_parameters:
+                    raise ValueError(
+                        "all and only retrieved free-chemistry abundances must use "
+                        "centered_log_ratio priors within each region"
+                    )
+                groups = {
+                    clr_parameters[name].group or "composition"
+                    for name in regional_clr
+                }
+                if len(groups) != 1:
+                    raise ValueError(
+                        "free-chemistry centered_log_ratio priors must share one group per region"
+                    )
+                matched_clr_parameters.update(regional_clr)
+            if matched_clr_parameters != set(clr_parameters):
                 raise ValueError(
-                    "centered_log_ratio priors require chemistry parameter_mode=log10"
-                )
-            if not chemistry_config.fill_background:
-                raise ValueError(
-                    "centered_log_ratio priors require a background closure category"
-                )
-            chemistry_parameters = {
-                chemistry_config.parameter_names.get(species, species)
-                for species in chemistry_config.species
-                if species not in chemistry_config.fixed_mixing_ratios
-            }
-            if set(clr_parameters) != chemistry_parameters:
-                raise ValueError(
-                    "all and only retrieved free-chemistry abundances must use "
-                    "centered_log_ratio priors"
-                )
-            groups = {
-                prior.group or "composition" for prior in clr_parameters.values()
-            }
-            if len(groups) != 1:
-                raise ValueError(
-                    "free-chemistry centered_log_ratio priors must share one group"
+                    "centered_log_ratio priors require matching free chemistry parameters"
                 )
             if self.sampler.engine == "optimal_estimation" or self.sampler.engine.startswith(
                 "optimal_estimation_to_"
@@ -767,34 +839,136 @@ class TaskConfig(ConfigModel):
                 "required model parameters are missing: "
                 + ", ".join(missing_parameters)
             )
-        clouds = self.clouds
-        if clouds.model == "deck_haze":
-            cloud_parameters = {
-                clouds.log10_cloud_top_pressure_bar_parameter,
-                clouds.log10_cloud_optical_depth_parameter,
-                clouds.log10_haze_mass_extinction_parameter,
-                clouds.haze_slope_parameter,
-            }
-        elif clouds.model != "none":
-            cloud_parameters = {
-                clouds.log10_mass_fraction_parameter,
-                clouds.log10_radius_micron_parameter,
-                clouds.log10_top_pressure_bar_parameter,
-                clouds.log10_base_pressure_bar_parameter,
-            }
-            if clouds.model == "mie_direct_nk":
-                cloud_parameters.update(clouds.real_index_parameter_names)
-                cloud_parameters.update(clouds.log10_imaginary_index_parameter_names)
-        else:
-            cloud_parameters = set()
-        if cloud_parameters:
-            missing_cloud_parameters = sorted(cloud_parameters - set(names))
-            if missing_cloud_parameters:
-                raise ValueError(
-                    "required cloud parameters are missing: "
-                    + ", ".join(missing_cloud_parameters)
-                )
         return self
+
+
+def _disk_emission_mode(config: DiskEmissionConfig) -> str:
+    aliases = {
+        "one_region": "one_region",
+        "diluted": "diluted_one_region",
+        "diluted_one_region": "diluted_one_region",
+        "2tp": "two_region",
+        "two_region": "two_region",
+    }
+    return aliases[config.model]
+
+
+def configured_regions(config: TaskConfig) -> tuple[ResolvedRegionConfig, ...]:
+    """Resolve regional overrides against the top-level atmospheric defaults."""
+
+    mode = _disk_emission_mode(config.disk_emission)
+    if mode != "two_region":
+        return (
+            ResolvedRegionConfig(
+                name="primary",
+                atmosphere=config.atmosphere,
+                clouds=config.clouds,
+            ),
+        )
+    disk = config.disk_emission
+    return (
+        _resolve_region("hot", config.atmosphere, config.clouds, disk.hot_region),
+        _resolve_region("cold", config.atmosphere, config.clouds, disk.cold_region),
+    )
+
+
+def _resolve_region(
+    name: str,
+    base_atmosphere: AtmosphereConfig,
+    base_clouds: CloudsConfig,
+    override: RegionOverrideConfig,
+) -> ResolvedRegionConfig:
+    atmosphere_override = override.atmosphere
+    atmosphere = AtmosphereConfig(
+        pressure=atmosphere_override.pressure or base_atmosphere.pressure,
+        temperature=atmosphere_override.temperature or base_atmosphere.temperature,
+        chemistry=atmosphere_override.chemistry or base_atmosphere.chemistry,
+    )
+    return ResolvedRegionConfig(
+        name=name,
+        atmosphere=atmosphere,
+        clouds=override.clouds or base_clouds,
+    )
+
+
+def _chemistry_species(config: ChemistryConfig) -> tuple[str, ...]:
+    if config.model == "fastchem_equilibrium":
+        return tuple(item.label for item in config.species)
+    return config.species + config.background_species
+
+
+def _required_chemistry_parameters(config: ChemistryConfig) -> set[str]:
+    if config.model == "fastchem_equilibrium":
+        return {
+            config.metallicity_parameter,
+            config.carbon_to_oxygen_parameter,
+            *(config.constant_log10_vmr_parameters or {}).values(),
+        }
+    required = _retrieved_free_chemistry_parameters(config)
+    if config.phantom_mean_molecular_weight_parameter is not None:
+        required.add(config.phantom_mean_molecular_weight_parameter)
+    return required
+
+
+def _retrieved_free_chemistry_parameters(config: FreeChemistryConfig) -> set[str]:
+    return {
+        config.parameter_names.get(species, species)
+        for species in config.species
+        if species not in config.fixed_mixing_ratios
+    }
+
+
+def _required_temperature_parameters(config: TemperatureConfig) -> set[str]:
+    if config.model == "parmentier_guillot_2014":
+        return {
+            config.kappa_ir_parameter,
+            config.gamma1_parameter,
+            config.gamma2_parameter,
+            config.irradiation_temperature_parameter,
+            config.alpha_parameter,
+        }
+    if config.model == "isothermal":
+        return set() if config.temperature_k is not None else {config.parameter_name}
+    if config.model == "madhusudhan_seager_2009":
+        return {
+            config.p1_parameter,
+            config.p2_parameter,
+            config.p3_parameter,
+            config.t0_parameter,
+            config.alpha1_parameter,
+            config.alpha2_parameter,
+        }
+    if config.model == "spline" and config.knot_temperature_k is None:
+        return set(
+            config.parameter_names
+            or tuple(
+                f"temperature_{index}"
+                for index in range(len(config.knot_pressure))
+            )
+        )
+    return set()
+
+
+def _required_cloud_parameters(config: CloudsConfig) -> set[str]:
+    if config.model == "deck_haze":
+        return {
+            config.log10_cloud_top_pressure_bar_parameter,
+            config.log10_cloud_optical_depth_parameter,
+            config.log10_haze_mass_extinction_parameter,
+            config.haze_slope_parameter,
+        }
+    if config.model == "none":
+        return set()
+    required = {
+        config.log10_mass_fraction_parameter,
+        config.log10_radius_micron_parameter,
+        config.log10_top_pressure_bar_parameter,
+        config.log10_base_pressure_bar_parameter,
+    }
+    if config.model == "mie_direct_nk":
+        required.update(config.real_index_parameter_names)
+        required.update(config.log10_imaginary_index_parameter_names)
+    return required
 
 
 def load_task_config(path: str | Path) -> TaskConfig:
@@ -804,7 +978,7 @@ def load_task_config(path: str | Path) -> TaskConfig:
     if not source.is_file():
         raise FileNotFoundError(source)
     raw = _load_yaml_mapping(source)
-    _apply_housekeeping_paths(raw)
+    _apply_configured_paths(raw)
     for keys in (
         ("observations", "path"),
         ("atmosphere", "chemistry", "fastchem_path"),
@@ -812,6 +986,21 @@ def load_task_config(path: str | Path) -> TaskConfig:
         ("opacity", "path"),
         ("opacity", "cache_directory"),
         ("clouds", "optical_constants_path"),
+        ("disk_emission", "hot_region", "atmosphere", "chemistry", "fastchem_path"),
+        ("disk_emission", "hot_region", "atmosphere", "temperature", "profile_path"),
+        ("disk_emission", "hot_region", "clouds", "optical_constants_path"),
+        ("disk_emission", "cold_region", "atmosphere", "chemistry", "fastchem_path"),
+        ("disk_emission", "cold_region", "atmosphere", "temperature", "profile_path"),
+        ("disk_emission", "cold_region", "clouds", "optical_constants_path"),
+        ("paths", "project_directory"),
+        ("paths", "observations_directory"),
+        ("paths", "fastchem_directory"),
+        ("paths", "k_table_directory"),
+        ("paths", "opacity_cache_directory"),
+        ("paths", "output_directory"),
+        ("paths", "scratch_directory"),
+        ("paths", "optical_constants_directory"),
+        ("housekeeping", "project_directory"),
         ("housekeeping", "observations_directory"),
         ("housekeeping", "fastchem_directory"),
         ("housekeeping", "k_table_directory"),
@@ -830,21 +1019,47 @@ def load_task_config(path: str | Path) -> TaskConfig:
         else:
             if not isinstance(section, dict) or keys[-1] not in section:
                 continue
-            value = Path(section[keys[-1]]).expanduser()
+            if section[keys[-1]] is None:
+                continue
+            value = _expanded_path(section[keys[-1]])
             section[keys[-1]] = str(
                 value if value.is_absolute() else source.parent / value
             )
     return TaskConfig.model_validate(raw)
 
 
-def _apply_housekeeping_paths(raw: dict) -> None:
-    """Fill internal path fields from one readable user-facing path block."""
+def _expanded_path(value: object) -> Path:
+    text = os.path.expandvars(str(value))
+    if "$" in text:
+        raise ValueError(f"path contains an undefined environment variable: {value}")
+    return Path(text).expanduser()
 
-    housekeeping = raw.get("housekeeping")
-    if housekeeping is None:
-        return
-    if not isinstance(housekeeping, dict):
-        raise ValueError("housekeeping must be a YAML mapping")
+
+def _apply_configured_paths(raw: dict) -> None:
+    """Fill component paths and local writable defaults from the top path block."""
+
+    if raw.get("paths") is not None and raw.get("housekeeping") is not None:
+        raise ValueError("configure paths or legacy housekeeping, not both")
+    path_config = raw.get("paths", raw.get("housekeeping", {}))
+    if path_config is None:
+        path_config = {}
+    if not isinstance(path_config, dict):
+        raise ValueError("paths must be a YAML mapping")
+    project_directory = path_config.get("project_directory") or "."
+    derived = {
+        "opacity_cache_directory": str(
+            Path(str(project_directory)) / "opacity_cache"
+        ),
+        "output_directory": str(Path(str(project_directory)) / "outputs"),
+        "scratch_directory": str(Path(str(project_directory)) / "scratch"),
+    }
+    for key, value in derived.items():
+        if path_config.get(key) is None:
+            path_config[key] = value
+    if raw.get("paths") is not None:
+        raw["paths"] = path_config
+    elif raw.get("housekeeping") is not None:
+        raw["housekeeping"] = path_config
     mappings = (
         (("observations", "path"), "observations_directory"),
         (("opacity", "path"), "k_table_directory"),
@@ -853,7 +1068,7 @@ def _apply_housekeeping_paths(raw: dict) -> None:
         (("runtime", "scratch_directory"), "scratch_directory"),
     )
     for keys, source_key in mappings:
-        if source_key not in housekeeping:
+        if path_config.get(source_key) is None:
             continue
         section = raw
         for key in keys[:-1]:
@@ -862,23 +1077,39 @@ def _apply_housekeeping_paths(raw: dict) -> None:
             section = section.setdefault(key, {})
         if not isinstance(section, dict):
             raise ValueError("configuration sections must be YAML mappings")
-        section.setdefault(keys[-1], housekeeping[source_key])
-    chemistry = raw.get("atmosphere", {}).get("chemistry", {})
-    if (
-        isinstance(chemistry, dict)
-        and chemistry.get("model") == "fastchem_equilibrium"
-        and "fastchem_directory" in housekeeping
-    ):
-        chemistry.setdefault("fastchem_path", housekeeping["fastchem_directory"])
-    clouds = raw.get("clouds")
-    if (
-        isinstance(clouds, dict)
-        and clouds.get("model") == "mie_catalog"
-        and "optical_constants_directory" in housekeeping
-    ):
-        clouds.setdefault(
-            "optical_constants_path", housekeeping["optical_constants_directory"]
-        )
+        section.setdefault(keys[-1], path_config[source_key])
+    _fill_regional_input_paths(raw, path_config)
+
+
+def _fill_regional_input_paths(raw: dict, path_config: dict) -> None:
+    atmosphere_cloud_pairs = [
+        (raw.get("atmosphere", {}), raw.get("clouds")),
+    ]
+    disk = raw.get("disk_emission", {})
+    if isinstance(disk, dict):
+        for name in ("hot_region", "cold_region"):
+            region = disk.get(name, {})
+            if isinstance(region, dict):
+                atmosphere_cloud_pairs.append(
+                    (region.get("atmosphere", {}), region.get("clouds"))
+                )
+    for atmosphere, clouds in atmosphere_cloud_pairs:
+        if isinstance(atmosphere, dict):
+            chemistry = atmosphere.get("chemistry", {})
+            if (
+                isinstance(chemistry, dict)
+                and chemistry.get("model") == "fastchem_equilibrium"
+                and path_config.get("fastchem_directory") is not None
+            ):
+                chemistry.setdefault("fastchem_path", path_config["fastchem_directory"])
+        if (
+            isinstance(clouds, dict)
+            and clouds.get("model") == "mie_catalog"
+            and path_config.get("optical_constants_directory") is not None
+        ):
+            clouds.setdefault(
+                "optical_constants_path", path_config["optical_constants_directory"]
+            )
 
 
 def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:
@@ -901,6 +1132,11 @@ def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:
         if not parent.is_absolute()
         else parent.resolve()
     )
+    if parent == source:
+        raise ValueError(
+            f"configuration extends itself: {source} declares extends: {extends!r}; "
+            "a self-contained run configuration must not contain an extends entry"
+        )
     if not parent.is_file():
         raise FileNotFoundError(parent)
     return _deep_merge(_load_yaml_mapping(parent, (*ancestors, source)), raw)

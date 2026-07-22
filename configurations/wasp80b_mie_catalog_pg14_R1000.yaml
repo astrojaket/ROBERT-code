@@ -1,5 +1,8 @@
 extends: wasp69b_mie_catalog_pg14_R1000.yaml
 
+paths:
+  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp80b_wiser2025
+
 run:
   name: wasp80b-mie-catalog-pg14-R1000
   description: WASP-80b one-region MgSiO3 Mie cloud with fixed catalogue optical constants and PG14 temperature profile.
@@ -19,7 +22,6 @@ bodies:
 
 observations:
   loader: wiser2025_wasp80b
-  path: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp80b_wiser2025
   datasets: [f322w2, f444w, lrs]
   miri_offset_parameter: null
 
@@ -38,7 +40,6 @@ atmosphere:
 
 opacity:
   species: [H2O, CO2, CO, CH4, NH3, HCN]
-  cache_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-cache/wasp80b_native_modes
 
 parameters:
   - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}}
@@ -52,8 +53,3 @@ parameters:
   - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
   - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
   - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
-
-outputs:
-  directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-runs/wasp80b_mie_catalog_pg14_R1000
-runtime:
-  scratch_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-work/wasp80b_mie_catalog_pg14_R1000

@@ -8,6 +8,8 @@ import pytest
 from robert_exoplanets import (
     DilutedEmissionModel,
     DiskEmissionModelConfig,
+    MultiDatasetDilutedEmissionModel,
+    MultiDatasetTwoRegionEmissionModel,
     SpectralGrid,
     Spectrum,
     TwoRegionEmissionModel,
@@ -77,3 +79,28 @@ def test_disk_model_configuration_selects_existing_regional_hardware() -> None:
     np.testing.assert_allclose(one_region({}).values, [10.0, 20.0])
     np.testing.assert_allclose(diluted({"dayside_dilution": 0.5}).values, [5.0, 10.0])
     np.testing.assert_allclose(two_region({"hot_area_fraction": 0.5}).values, [6.0, 12.0])
+
+
+def test_multi_dataset_two_region_model_mixes_each_named_spectrum() -> None:
+    def hot(parameters):
+        return {"nircam": _constant([10.0, 20.0])(parameters)}
+
+    def cold(parameters):
+        return {"nircam": _constant([2.0, 4.0])(parameters)}
+
+    model = MultiDatasetTwoRegionEmissionModel(hot, cold)
+
+    spectra = model({"hot_area_fraction": 0.25})
+
+    np.testing.assert_allclose(spectra["nircam"].values, [4.0, 8.0])
+
+
+def test_multi_dataset_dilution_scales_each_named_spectrum() -> None:
+    def regional(parameters):
+        return {"miri": _constant([10.0, 20.0])(parameters)}
+
+    model = MultiDatasetDilutedEmissionModel(regional)
+
+    spectra = model({"dayside_dilution": 0.4})
+
+    np.testing.assert_allclose(spectra["miri"].values, [4.0, 8.0])
