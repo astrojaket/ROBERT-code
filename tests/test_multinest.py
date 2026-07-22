@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import sys
 from types import SimpleNamespace
 
@@ -17,6 +18,11 @@ from robert_exoplanets import (
     Spectrum,
     UniformPrior,
     run_multinest,
+)
+from robert_exoplanets.retrieval.samplers.multinest import (
+    MULTINEST_MAX_SEED,
+    _effective_multinest_seed,
+    _global_evidence,
 )
 
 
@@ -100,6 +106,35 @@ def test_multinest_adapter_transforms_prior_and_returns_common_result(
     np.testing.assert_allclose(result.weights, [0.25, 0.75])
     assert (tmp_path / "chains" / "1-params.json").is_file()
     assert (tmp_path / "sampler_status.json").is_file()
+
+
+def test_multinest_maps_requested_seed_into_native_randomns_range() -> None:
+    assert _effective_multinest_seed(None) == -1
+    assert _effective_multinest_seed(0) == 0
+    assert _effective_multinest_seed(MULTINEST_MAX_SEED) == MULTINEST_MAX_SEED
+    assert _effective_multinest_seed(MULTINEST_MAX_SEED + 1) == 0
+    assert _effective_multinest_seed(358_737_206) == 21_281
+
+
+def test_multinest_global_evidence_ignores_malformed_mode_errors(
+    tmp_path,
+) -> None:
+    stats = tmp_path / "1-stats.dat"
+    stats.write_text(
+        "Nested Sampling Global Log-Evidence : -1.3 +/- 0.2\n"
+        "Nested Importance Sampling Global Log-Evidence : -1.2 +/- 0.1\n"
+        "Strictly Local Log-Evidence : -1.1 +/- 0.197626258336498618-322\n",
+        encoding="utf-8",
+    )
+
+    class BrokenModeAnalyzer:
+        def get_stats(self):
+            raise AssertionError("per-mode statistics must not be parsed")
+
+    evidence, error = _global_evidence(BrokenModeAnalyzer(), Path(stats))
+
+    assert evidence == pytest.approx(-1.2)
+    assert error == pytest.approx(0.1)
 
 
 @pytest.mark.skipif(

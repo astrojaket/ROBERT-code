@@ -25,6 +25,14 @@ For a deployment prepared before the Glamdring MPI-launch correction, retain
 the project tree and use the execution-only refresh in the next section. It
 requires all non-execution science-contract content to remain identical.
 
+For a deployment prepared before the MultiNest 3.10 seed-range correction,
+use `--refresh-multinest-seeds` after pulling the corrected commit. This
+audited migration records that frozen requested seeds are reduced into
+MultiNest's native `0..30080` safe range only at the sampler boundary. It does
+not alter immutable `run.json` definitions or checkpoint identities. It refuses
+to run if any production run directory has output beyond its immutable
+`run.json`; staged references, injections, and pilot directories are preserved.
+
 ## 2. Prepare and stage shared data
 
 The following source layout is canonical. Change only a leaf name if the
@@ -78,6 +86,16 @@ export STAGE9_PRT_INPUT_DATA="$STAGE9_PROJECT_ROOT/reference/petitradtrans/input
 "$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
   "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
   "$STAGE9_PROJECT_ROOT" --verify-only
+```
+
+Deployments that already completed setup and injections under a commit older
+than the MultiNest seed correction must replace the execution refresh above
+with this one-time command before verification:
+
+```bash
+"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+  "$STAGE9_REPOSITORY/scripts/prepare_emission_intercomparison_v2_stage_9.py" \
+  "$STAGE9_PROJECT_ROOT" --refresh-multinest-seeds
 ```
 
 The staging script inventories and links or copies existing reference trees;

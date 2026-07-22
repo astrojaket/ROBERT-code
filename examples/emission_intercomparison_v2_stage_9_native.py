@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
+import warnings
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -635,7 +636,21 @@ class PicasoNativeForward(NativeForward):
                     rows, columns=("pressure", "wavenumber", "opd", "w0", "g0")
                 )
             )
-        result = case.spectrum(self.opacity, calculation="thermal", full_output=False)
+        with warnings.catch_warnings():
+            # PICASO evaluates diagnostic cloud/Rayleigh fractions even when
+            # both terms are exactly zero.  Its expected 0/0 diagnostics emit
+            # one warning per likelihood call but do not enter the thermal
+            # solution.  Suppress only this known PICASO optics warning; the
+            # returned spectrum is still required to be finite downstream.
+            warnings.filterwarnings(
+                "ignore",
+                message="invalid value encountered in divide",
+                category=RuntimeWarning,
+                module=r"picaso\.optics",
+            )
+            result = case.spectrum(
+                self.opacity, calculation="thermal", full_output=False
+            )
         result_wavenumber = np.asarray(result["wavenumber"], dtype=float)
         if result_wavenumber.shape != self._picaso_wavenumber.shape or not np.allclose(
             result_wavenumber, self._picaso_wavenumber, rtol=0.0, atol=1.0e-12

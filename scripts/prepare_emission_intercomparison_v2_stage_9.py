@@ -123,17 +123,115 @@ def _refresh_execution_deployment(
     )
 
 
+def _run_payload(root: Path, run: Any) -> dict[str, object]:
+    run_dir = root / "runs" / run.retriever / run.scenario / run.run_id
+    return {
+        **run.to_mapping(),
+        "schema_version": "2.0.0",
+        "stage": 9,
+        "track": "track_b_native_retrieval",
+        "project_root": str(root),
+        "run_directory": str(run_dir),
+        "injection_product": str(
+            root / "injections" / run.injector / run.scenario / "native_mean.npz"
+        ),
+        "noise_vector": None,
+        "common_contract": str(root / "contracts" / "common_contract.json"),
+        "frozen_contract": str(
+            root / "contracts" / "stage_9_retrieval_contract.json"
+        ),
+    }
+
+
+def _refresh_multinest_seed_deployment(
+    root: Path,
+    *,
+    frozen: dict[str, object],
+    integrity: dict[str, object],
+    runs: tuple[Any, ...],
+) -> None:
+    """Add the audited MultiNest seed policy without changing run identities."""
+
+    deployed_contract_path = root / "contracts" / "stage_9_retrieval_contract.json"
+    deployed_manifest_path = root / "integrity" / "setup_manifest.json"
+    if not deployed_contract_path.is_file() or not deployed_manifest_path.is_file():
+        raise RuntimeError(
+            "seed refresh requires an existing prepared Stage-9 deployment"
+        )
+
+    deployed_contract = json.loads(
+        deployed_contract_path.read_text(encoding="utf-8")
+    )
+    legacy_expected = json.loads(_canonical_json(frozen))
+    legacy_expected["sampler"].pop("seed_policy", None)
+    if deployed_contract not in (legacy_expected, frozen):
+        raise RuntimeError(
+            "refusing seed refresh because deployed Stage-9 contract content changed"
+        )
+
+    deployed_manifest = json.loads(
+        deployed_manifest_path.read_text(encoding="utf-8")
+    )
+    if deployed_manifest.get("stage_9_contract_repository_sha256") != _sha256(
+        deployed_contract_path
+    ):
+        raise RuntimeError(
+            "refusing seed refresh because the deployed contract hash does not match"
+        )
+    comparable_manifest = dict(deployed_manifest)
+    comparable_integrity = dict(integrity)
+    comparable_manifest.pop("stage_9_contract_repository_sha256", None)
+    comparable_integrity.pop("stage_9_contract_repository_sha256", None)
+    if comparable_manifest != comparable_integrity:
+        raise RuntimeError(
+            "refusing seed refresh because the deployed setup manifest changed"
+        )
+
+    for run in runs:
+        run_dir = root / "runs" / run.retriever / run.scenario / run.run_id
+        unexpected = [
+            path
+            for path in run_dir.iterdir()
+            if path.name != "run.json"
+        ]
+        if unexpected:
+            raise RuntimeError(
+                "refusing seed refresh after production output was created: "
+                f"{run_dir}"
+            )
+        run_path = run_dir / "run.json"
+        if not run_path.is_file():
+            raise RuntimeError(f"seed refresh is missing run definition: {run_path}")
+        deployed_run = json.loads(run_path.read_text(encoding="utf-8"))
+        expected_run = _run_payload(root, run)
+        if deployed_run != expected_run:
+            raise RuntimeError(
+                "refusing seed refresh because a run definition changed: "
+                f"{run_path}"
+            )
+
+    deployed_contract_path.write_text(
+        _canonical_json(frozen), encoding="utf-8"
+    )
+    deployed_manifest_path.write_text(
+        _canonical_json(integrity), encoding="utf-8"
+    )
+
+
 def prepare(
     root: Path,
     *,
     verify_only: bool = False,
     refresh_execution_contract: bool = False,
+    refresh_multinest_seeds: bool = False,
 ) -> dict[str, object]:
     """Create or verify a complete, idempotent Stage-9 project tree."""
 
-    if verify_only and refresh_execution_contract:
+    if sum(
+        (verify_only, refresh_execution_contract, refresh_multinest_seeds)
+    ) > 1:
         raise RuntimeError(
-            "--verify-only and --refresh-execution-contract are mutually exclusive"
+            "verify and refresh modes are mutually exclusive"
         )
     root = root.expanduser().resolve()
     common = json.loads(COMMON_CONTRACT.read_text(encoding="utf-8"))
@@ -156,6 +254,10 @@ def prepare(
     }
     if refresh_execution_contract:
         _refresh_execution_deployment(root, frozen=frozen, integrity=integrity)
+    if refresh_multinest_seeds:
+        _refresh_multinest_seed_deployment(
+            root, frozen=frozen, integrity=integrity, runs=runs
+        )
 
     directories = (
         root,
@@ -210,22 +312,7 @@ def prepare(
     for run in runs:
         run_dir = root / "runs" / run.retriever / run.scenario / run.run_id
         _ensure_directory(run_dir, verify_only=verify_only)
-        payload = {
-            **run.to_mapping(),
-            "schema_version": "2.0.0",
-            "stage": 9,
-            "track": "track_b_native_retrieval",
-            "project_root": str(root),
-            "run_directory": str(run_dir),
-            "injection_product": str(
-                root / "injections" / run.injector / run.scenario / "native_mean.npz"
-            ),
-            "noise_vector": None,
-            "common_contract": str(root / "contracts" / "common_contract.json"),
-            "frozen_contract": str(
-                root / "contracts" / "stage_9_retrieval_contract.json"
-            ),
-        }
+        payload = _run_payload(root, run)
         _ensure_text(
             run_dir / "run.json", _canonical_json(payload), verify_only=verify_only
         )
@@ -288,11 +375,13 @@ def main() -> None:
     parser.add_argument("project_root", type=Path)
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--refresh-execution-contract", action="store_true")
+    parser.add_argument("--refresh-multinest-seeds", action="store_true")
     args = parser.parse_args()
     summary = prepare(
         args.project_root,
         verify_only=args.verify_only,
         refresh_execution_contract=args.refresh_execution_contract,
+        refresh_multinest_seeds=args.refresh_multinest_seeds,
     )
     print(json.dumps(summary, indent=2, sort_keys=True))
 

@@ -25,6 +25,7 @@ NOISE_TIERS_PPM = (30, 60, 100)
 NOISE_REALIZATIONS = ("mean",)
 MPI_RANKS_PER_RETRIEVAL = 12
 THREADS_PER_RANK = 1
+MULTINEST_SEED_MAX = 30_080
 
 # Barstow et al. (2020) did not randomize the synthetic spectral points.  Keep
 # this exported mapping empty so downstream code cannot silently add a draw.
@@ -264,6 +265,11 @@ def validate_run_matrix(runs: Iterable[RunDefinition]) -> None:
             raise RobertValidationError(
                 "every Stage-9 retrieval requires 12 ranks and one thread per rank"
             )
+        if not 0 <= run.sampler_seed <= 0x7FFF_FFFF:
+            raise RobertValidationError(
+                "every Stage-9 requested sampler seed must be a non-negative "
+                "31-bit integer"
+            )
         names = {item.name for item in parameter_definitions(run.scenario)}
         if "area_scale" in names or "log10_area_scale" in names:
             raise RobertValidationError("area scale is excluded from Stage 9")
@@ -327,7 +333,18 @@ def frozen_contract_payload(*, common_contract_sha256: str) -> dict[str, object]
             "shard_count": 12,
             "retrievals_per_shard": 6,
         },
-        "sampler": {"engine": "multinest", **MULTINEST_SETTINGS},
+        "sampler": {
+            "engine": "multinest",
+            **MULTINEST_SETTINGS,
+            "seed_policy": {
+                "requested_derivation": (
+                    "first_32_bits_sha256_masked_to_nonnegative_31_bit"
+                ),
+                "effective_mapping": "requested_seed_modulo_30081_at_multinest_boundary",
+                "effective_minimum": 0,
+                "effective_maximum": MULTINEST_SEED_MAX,
+            },
+        },
         "execution": {
             "cluster": "glamdring",
             "scheduler_queue": "redwood",

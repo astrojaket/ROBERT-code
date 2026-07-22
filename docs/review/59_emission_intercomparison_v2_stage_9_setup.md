@@ -1,7 +1,30 @@
 # Emission intercomparison V2 Stage-9 frozen setup
 
-Status: implementation and deployment kit complete; no Stage-9 science,
-preflight, pilot, injection, or retrieval has been executed.
+Status: implementation and deployment kit complete; Glamdring preflight,
+native-injection, and bounded pilot work has begun, but no Stage-9 production
+retrieval has been submitted.
+
+## Glamdring retrieval-pilot correction
+
+The first approved bounded retrieval pilots exposed two infrastructure-only
+failures before production. MultiNest 3.10 rejects deterministic seeds outside
+the common safe range `0..30080`. Stage 9 preserves each frozen requested seed
+and reduces it modulo `30081` only at the PyMultiNest boundary. This retains run
+identities and checkpoint compatibility while recording both requested and
+effective values. The one-time audited `--refresh-multinest-seeds` deployment
+migration updates only the frozen policy contract and manifest; it verifies but
+does not alter run definitions, staged references, injections, or pilots, and
+refuses to run after production output exists.
+
+The pRT and PICASO pilots both completed native MultiNest sampling before
+PyMultiNest failed while parsing underflowed per-mode Fortran values written
+without an exponent marker (for example, `0.46-309`). ROBERT now reads only
+the global-evidence lines it consumes, repairs that legacy exponent form when
+encountered, and treats a non-finite bounded-pilot evidence uncertainty as
+undefined rather than allowing it to corrupt JSON. Existing valid PICASO and
+pRT checkpoints remain resumable. Known PICASO zero-cloud/zero-Rayleigh `0/0`
+diagnostic warnings are narrowly suppressed during its thermal call; returned
+spectra retain the downstream finite-value gate.
 
 ## Science boundary
 

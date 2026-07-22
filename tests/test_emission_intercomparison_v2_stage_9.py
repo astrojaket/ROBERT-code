@@ -7,10 +7,12 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (
     GAUSSIAN_NOISE_SEEDS,
     MULTINEST_SETTINGS,
+    MULTINEST_SEED_MAX,
     SCENARIOS,
     build_run_matrix,
     frozen_contract_payload,
@@ -73,6 +75,8 @@ def test_frozen_stage_9_matrix_counts_and_resources() -> None:
     assert MULTINEST_SETTINGS["mpi_nprocs"] == 12
     assert len(GAUSSIAN_NOISE_SEEDS) == 0
     assert {run.noise_id for run in runs} == {"mean"}
+    assert all(0 <= run.sampler_seed <= 0x7FFF_FFFF for run in runs)
+    assert any(run.sampler_seed > MULTINEST_SEED_MAX for run in runs)
 
 
 def test_stage_9_parameters_exclude_area_and_retrieve_clouds() -> None:
@@ -146,6 +150,14 @@ def test_committed_stage_9_contract_matches_source_of_truth() -> None:
     assert expected["execution"]["mpi_launcher"] == "conda_mpich_hydra_fork"
     assert expected["execution"]["single_node_required"] is True
     assert expected["noise"]["spectral_points_randomized"] is False
+    assert expected["sampler"]["seed_policy"] == {
+        "requested_derivation": (
+            "first_32_bits_sha256_masked_to_nonnegative_31_bit"
+        ),
+        "effective_mapping": "requested_seed_modulo_30081_at_multinest_boundary",
+        "effective_minimum": 0,
+        "effective_maximum": 30080,
+    }
     assert (
         expected["fixed"]["picaso_r100_projection"]
         == "native_wavenumber_bin_support_overlap_no_center_interpolation"
@@ -224,6 +236,54 @@ def test_execution_contract_refresh_preserves_deployment(
         encoding="utf-8",
     )
     module.prepare(project, refresh_execution_contract=True)
+
+
+def test_multinest_seed_refresh_preserves_injections_and_rejects_run_outputs(
+    tmp_path: Path,
+) -> None:
+    module = _load_prepare_module()
+    project = tmp_path / "stage9"
+    module.prepare(project)
+
+    contract_path = project / "contracts" / "stage_9_retrieval_contract.json"
+    legacy_contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    legacy_contract["sampler"].pop("seed_policy")
+    contract_path.write_text(
+        json.dumps(legacy_contract, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    manifest_path = project / "integrity" / "setup_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["stage_9_contract_repository_sha256"] = hashlib.sha256(
+        contract_path.read_bytes()
+    ).hexdigest()
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    run_files = tuple(sorted(project.glob("runs/*/*/*/run.json")))
+    run_bytes_before = {path: path.read_bytes() for path in run_files}
+
+    injection = (
+        project
+        / "injections"
+        / "picaso"
+        / "clear_non_inverted"
+        / "native_mean.npz"
+    )
+    injection.write_bytes(b"preserve-me")
+
+    module.prepare(project, refresh_multinest_seeds=True)
+
+    assert injection.read_bytes() == b"preserve-me"
+    assert {path: path.read_bytes() for path in run_files} == run_bytes_before
+    module.prepare(project, verify_only=True)
+
+    first_run = next(project.glob("runs/*/*/*"))
+    (first_run / "sampler_status.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="after production output"):
+        module.prepare(project, refresh_multinest_seeds=True)
 
 
 def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:

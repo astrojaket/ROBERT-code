@@ -1,0 +1,499 @@
+{
+  "cloud_contract": {
+    "asymmetry_factor": 0.0,
+    "cloud_bottom_pressure_bar": 100.0,
+    "cloud_parameters_retrieved_natively": true,
+    "delta_m": false,
+    "extinction_slope": 0.0,
+    "picaso_cloud_grid": "native_opacity_wavenumber_bins",
+    "reference_wavelength_micron": 5.0
+  },
+  "common_contract_sha256": "3dcd6512753e63020d034c9f7a42f23011e06c56cc80d83462951402935460d9",
+  "execution": {
+    "addqueue_allocation": "single_wrapper_n12",
+    "cluster": "glamdring",
+    "mpi_launcher": "conda_mpich_hydra_fork",
+    "mpi_ranks_per_retrieval": 12,
+    "scheduler_queue": "redwood",
+    "single_node_required": true,
+    "threads_per_rank": 1
+  },
+  "fixed": {
+    "internal_temperature_k": 100.0,
+    "likelihood": "independent Gaussian with fixed ppm uncertainty",
+    "normalization_parameters_retrieved": [],
+    "picaso_r100_projection": "native_wavenumber_bin_support_overlap_no_center_interpolation",
+    "radii_gravity_and_eclipse_normalization": "version_2_common_contract"
+  },
+  "frameworks": [
+    "robert",
+    "picaso",
+    "petitradtrans"
+  ],
+  "matrix": {
+    "directed_cross_framework_pairs": [
+      [
+        "robert",
+        "picaso"
+      ],
+      [
+        "robert",
+        "petitradtrans"
+      ],
+      [
+        "picaso",
+        "robert"
+      ],
+      [
+        "picaso",
+        "petitradtrans"
+      ],
+      [
+        "petitradtrans",
+        "robert"
+      ],
+      [
+        "petitradtrans",
+        "picaso"
+      ]
+    ],
+    "retrieval_count": 72,
+    "retrievals_per_shard": 6,
+    "self_controls": [],
+    "shard_count": 12
+  },
+  "noise": {
+    "data_realization": "unperturbed_native_mean",
+    "gaussian_seeds": {},
+    "interpretation": "nonzero error envelopes enter the Gaussian likelihood",
+    "protocol_reference": "Barstow et al. 2020, MNRAS 493, 4884; doi:10.1093/mnras/staa548",
+    "realizations": [
+      "mean"
+    ],
+    "spectral_points_randomized": false,
+    "tiers_ppm": [
+      30,
+      60,
+      100
+    ]
+  },
+  "parameters_by_scenario": {
+    "clear_inverted": [
+      {
+        "label": "log10 kappa_IR",
+        "lower": -4.5,
+        "name": "log10_kappa_ir",
+        "truth": -3.0,
+        "unit": null,
+        "upper": -1.5
+      },
+      {
+        "label": "log10 gamma_1",
+        "lower": -2.0,
+        "name": "log10_gamma1",
+        "truth": -1.0,
+        "unit": null,
+        "upper": -0.7
+      },
+      {
+        "label": "log10 gamma_2",
+        "lower": -0.6,
+        "name": "log10_gamma2",
+        "truth": 1.0,
+        "unit": null,
+        "upper": 1.3
+      },
+      {
+        "label": "T_irr",
+        "lower": 1000.0,
+        "name": "T_irr_k",
+        "truth": 1500.0,
+        "unit": "K",
+        "upper": 2000.0
+      },
+      {
+        "label": "alpha",
+        "lower": 0.0,
+        "name": "alpha",
+        "truth": 0.5,
+        "unit": null,
+        "upper": 1.0
+      },
+      {
+        "label": "log10 VMR(H2O)",
+        "lower": -10.0,
+        "name": "log10_vmr_H2O",
+        "truth": -3.491797294457031,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO",
+        "truth": -3.3373641232710303,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO2)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO2",
+        "truth": -7.17170823821244,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CH4)",
+        "lower": -10.0,
+        "name": "log10_vmr_CH4",
+        "truth": -7.413273524259568,
+        "unit": null,
+        "upper": -2.0
+      }
+    ],
+    "clear_non_inverted": [
+      {
+        "label": "log10 kappa_IR",
+        "lower": -4.5,
+        "name": "log10_kappa_ir",
+        "truth": -3.0,
+        "unit": null,
+        "upper": -1.5
+      },
+      {
+        "label": "log10 gamma_1",
+        "lower": -2.0,
+        "name": "log10_gamma1",
+        "truth": -1.0,
+        "unit": null,
+        "upper": -0.7
+      },
+      {
+        "label": "log10 gamma_2",
+        "lower": -0.6,
+        "name": "log10_gamma2",
+        "truth": -0.3010299956639812,
+        "unit": null,
+        "upper": 1.3
+      },
+      {
+        "label": "T_irr",
+        "lower": 1000.0,
+        "name": "T_irr_k",
+        "truth": 1500.0,
+        "unit": "K",
+        "upper": 2000.0
+      },
+      {
+        "label": "alpha",
+        "lower": 0.0,
+        "name": "alpha",
+        "truth": 0.5,
+        "unit": null,
+        "upper": 1.0
+      },
+      {
+        "label": "log10 VMR(H2O)",
+        "lower": -10.0,
+        "name": "log10_vmr_H2O",
+        "truth": -3.491797294457031,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO",
+        "truth": -3.3373641232710303,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO2)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO2",
+        "truth": -7.17170823821244,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CH4)",
+        "lower": -10.0,
+        "name": "log10_vmr_CH4",
+        "truth": -7.413273524259568,
+        "unit": null,
+        "upper": -2.0
+      }
+    ],
+    "grey_absorbing_non_inverted": [
+      {
+        "label": "log10 kappa_IR",
+        "lower": -4.5,
+        "name": "log10_kappa_ir",
+        "truth": -3.0,
+        "unit": null,
+        "upper": -1.5
+      },
+      {
+        "label": "log10 gamma_1",
+        "lower": -2.0,
+        "name": "log10_gamma1",
+        "truth": -1.0,
+        "unit": null,
+        "upper": -0.7
+      },
+      {
+        "label": "log10 gamma_2",
+        "lower": -0.6,
+        "name": "log10_gamma2",
+        "truth": -0.3010299956639812,
+        "unit": null,
+        "upper": 1.3
+      },
+      {
+        "label": "T_irr",
+        "lower": 1000.0,
+        "name": "T_irr_k",
+        "truth": 1500.0,
+        "unit": "K",
+        "upper": 2000.0
+      },
+      {
+        "label": "alpha",
+        "lower": 0.0,
+        "name": "alpha",
+        "truth": 0.5,
+        "unit": null,
+        "upper": 1.0
+      },
+      {
+        "label": "log10 VMR(H2O)",
+        "lower": -10.0,
+        "name": "log10_vmr_H2O",
+        "truth": -3.491797294457031,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO",
+        "truth": -3.3373641232710303,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO2)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO2",
+        "truth": -7.17170823821244,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CH4)",
+        "lower": -10.0,
+        "name": "log10_vmr_CH4",
+        "truth": -7.413273524259568,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 tau_cloud(5 um)",
+        "lower": -1.0,
+        "name": "log10_cloud_tau_5um",
+        "truth": 0.0,
+        "unit": null,
+        "upper": 1.0
+      },
+      {
+        "label": "log10 P_cloud,top",
+        "lower": -3.0,
+        "name": "log10_cloud_top_pressure_bar",
+        "truth": -2.0,
+        "unit": "bar",
+        "upper": -1.0
+      }
+    ],
+    "grey_scattering_non_inverted": [
+      {
+        "label": "log10 kappa_IR",
+        "lower": -4.5,
+        "name": "log10_kappa_ir",
+        "truth": -3.0,
+        "unit": null,
+        "upper": -1.5
+      },
+      {
+        "label": "log10 gamma_1",
+        "lower": -2.0,
+        "name": "log10_gamma1",
+        "truth": -1.0,
+        "unit": null,
+        "upper": -0.7
+      },
+      {
+        "label": "log10 gamma_2",
+        "lower": -0.6,
+        "name": "log10_gamma2",
+        "truth": -0.3010299956639812,
+        "unit": null,
+        "upper": 1.3
+      },
+      {
+        "label": "T_irr",
+        "lower": 1000.0,
+        "name": "T_irr_k",
+        "truth": 1500.0,
+        "unit": "K",
+        "upper": 2000.0
+      },
+      {
+        "label": "alpha",
+        "lower": 0.0,
+        "name": "alpha",
+        "truth": 0.5,
+        "unit": null,
+        "upper": 1.0
+      },
+      {
+        "label": "log10 VMR(H2O)",
+        "lower": -10.0,
+        "name": "log10_vmr_H2O",
+        "truth": -3.491797294457031,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO",
+        "truth": -3.3373641232710303,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CO2)",
+        "lower": -10.0,
+        "name": "log10_vmr_CO2",
+        "truth": -7.17170823821244,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 VMR(CH4)",
+        "lower": -10.0,
+        "name": "log10_vmr_CH4",
+        "truth": -7.413273524259568,
+        "unit": null,
+        "upper": -2.0
+      },
+      {
+        "label": "log10 tau_cloud(5 um)",
+        "lower": -1.0,
+        "name": "log10_cloud_tau_5um",
+        "truth": 0.0,
+        "unit": null,
+        "upper": 1.0
+      },
+      {
+        "label": "log10 P_cloud,top",
+        "lower": -3.0,
+        "name": "log10_cloud_top_pressure_bar",
+        "truth": -2.0,
+        "unit": "bar",
+        "upper": -1.0
+      },
+      {
+        "label": "omega_0",
+        "lower": 0.5,
+        "name": "cloud_single_scattering_albedo",
+        "truth": 0.9,
+        "unit": null,
+        "upper": 0.99
+      }
+    ]
+  },
+  "retention": {
+    "all_posterior_predictive_spectra": false,
+    "canonical_posterior_compressed": true,
+    "failed_restart_files_preserved": true,
+    "native_injection_means": 12,
+    "per_likelihood_spectra": false,
+    "raw_multinest_chains_archived_after_validation": true,
+    "standard_normal_noise_vectors": 0
+  },
+  "sampler": {
+    "engine": "multinest",
+    "evidence_tolerance": 0.5,
+    "importance_nested_sampling": true,
+    "invalid_loglike_floor": -1e+100,
+    "max_iter": 0,
+    "mpi_nprocs": 12,
+    "multimodal": true,
+    "n_iter_before_update": 100,
+    "n_live_points": 400,
+    "resume": true,
+    "sampling_efficiency": 0.8,
+    "seed_policy": {
+      "effective_mapping": "requested_seed_modulo_30081_at_multinest_boundary",
+      "effective_maximum": 30080,
+      "effective_minimum": 0,
+      "requested_derivation": "first_32_bits_sha256_masked_to_nonnegative_31_bit"
+    },
+    "verbose": false
+  },
+  "scenarios": [
+    {
+      "cloud": "clear",
+      "cloud_single_scattering_albedo_truth": null,
+      "cloud_tau_truth": null,
+      "cloud_top_pressure_bar_truth": null,
+      "gamma2_truth": 0.5,
+      "name": "clear_non_inverted",
+      "profile": "pg14_non_inverted"
+    },
+    {
+      "cloud": "clear",
+      "cloud_single_scattering_albedo_truth": null,
+      "cloud_tau_truth": null,
+      "cloud_top_pressure_bar_truth": null,
+      "gamma2_truth": 10.0,
+      "name": "clear_inverted",
+      "profile": "pg14_inverted"
+    },
+    {
+      "cloud": "grey_absorbing",
+      "cloud_single_scattering_albedo_truth": 0.0,
+      "cloud_tau_truth": 1.0,
+      "cloud_top_pressure_bar_truth": 0.01,
+      "gamma2_truth": 0.5,
+      "name": "grey_absorbing_non_inverted",
+      "profile": "pg14_non_inverted"
+    },
+    {
+      "cloud": "grey_isotropic_scattering",
+      "cloud_single_scattering_albedo_truth": 0.9,
+      "cloud_tau_truth": 1.0,
+      "cloud_top_pressure_bar_truth": 0.01,
+      "gamma2_truth": 0.5,
+      "name": "grey_scattering_non_inverted",
+      "profile": "pg14_non_inverted"
+    }
+  ],
+  "schema_version": "2.0.0",
+  "science_question": "How do native ROBERT, PICASO, and petitRADTRANS emission forward models bias and broaden atmospheric and grey-cloud retrievals under directed model mismatch?",
+  "scope_exclusions": [
+    "Track A shared-tensor retrievals",
+    "MgSiO3 or other condensate microphysics",
+    "Mie optical properties",
+    "anisotropic scattering",
+    "wavelength-dependent cloud extinction",
+    "high-order scattering methods",
+    "fabricated shared opacity or cloud tensors"
+  ],
+  "stage": 9,
+  "status": "approved_setup_not_yet_executed",
+  "track": "track_b_native_retrieval"
+}
