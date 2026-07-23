@@ -12,10 +12,12 @@ from robert_exoplanets.io.task_config import configured_regions, load_task_confi
 ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "configurations" / "retrievals"
 MODELS = {
-    "clear": ("one_region", 0),
-    "one-region": ("one_region", 0),
-    "diluted": ("diluted_one_region", 1),
-    "two-region": ("two_region", 1),
+    "clear": ("one_region", 7, "none"),
+    "one-region": ("one_region", 11, "mie_catalog"),
+    "diluted": ("diluted_one_region", 12, "mie_catalog"),
+    "two-region": ("two_region", 21, "mie_catalog"),
+    "n-k": ("one_region", 23, "mie_direct_nk"),
+    "diluted-n-k": ("diluted_one_region", 24, "mie_direct_nk"),
 }
 
 
@@ -32,37 +34,26 @@ def test_wasp_retrieval_matrix_is_queue_ready(
     datasets: tuple[str, ...],
     parameter_offset: int,
     model_name: str,
-    model_expectation: tuple[str, int],
+    model_expectation: tuple[str, int, str],
 ) -> None:
     config = load_task_config(
         MATRIX / planet / model_name / "configuration.yaml"
     )
-    disk_model, extra_parameter_count = model_expectation
-    base_parameter_count = {
-        "clear": 7,
-        "one-region": 11,
-        "diluted": 11,
-        "two-region": 20,
-    }[model_name]
+    disk_model, base_parameter_count, cloud_model = model_expectation
 
     assert config.run.name == model_name
     assert config.observations.datasets == datasets
     assert config.disk_emission.model == disk_model
     assert config.sampler.engine == "multinest"
-    assert config.sampler.live_points == 400
+    assert config.sampler.live_points == 1000
     assert config.sampler.max_calls is None
     assert config.runtime.mpi_processes == 128
     assert config.opacity.resolution == "R1000"
-    assert len(config.parameters) == (
-        base_parameter_count + parameter_offset + extra_parameter_count
-    )
+    assert len(config.parameters) == base_parameter_count + parameter_offset
 
     regions = configured_regions(config)
     assert len(regions) == (2 if model_name == "two-region" else 1)
-    if model_name == "clear":
-        assert regions[0].clouds.model == "none"
-    else:
-        assert all(region.clouds.model == "mie_catalog" for region in regions)
+    assert all(region.clouds.model == cloud_model for region in regions)
 
 
 @pytest.mark.parametrize("planet", ["WASP-69b", "WASP-80b"])

@@ -9,6 +9,7 @@ disk_emission:
 
 sampler:
   engine: multinest
+  live_points: 1000
   multinest_max_iterations: 0
   resume: resume
   show_status: false

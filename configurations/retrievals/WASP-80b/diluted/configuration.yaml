@@ -23,6 +23,7 @@ parameters:
   - {name: dayside_dilution, label: dayside dilution, prior: {type: uniform, lower: 0.0, upper: 1.0}}
 
 sampler:
+  live_points: 1000
   seed: 8003
 
 runtime:

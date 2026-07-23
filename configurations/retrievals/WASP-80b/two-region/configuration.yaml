@@ -54,6 +54,7 @@ parameters:
   - {name: hot_area_fraction, label: hot area fraction, prior: {type: uniform, lower: 0.0, upper: 1.0}}
 
 sampler:
+  live_points: 1000
   seed: 8004
 
 runtime:

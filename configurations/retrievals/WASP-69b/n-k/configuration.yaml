@@ -1,8 +1,8 @@
-extends: ../../../wasp69b_cloud_free_R1000.yaml
+extends: ../../../wasp69b_mie_direct_nk_pg14_R1000.yaml
 
 run:
-  name: clear
-  description: WASP-69b cloud-free one-region baseline using the complete native spectrum.
+  name: n-k
+  description: WASP-69b homogeneous one-region direct-n/k Mie cloud retrieval using the complete native spectrum.
 
 observations:
   datasets: [f322w2, avg, f444w, lrs]
@@ -16,7 +16,7 @@ sampler:
   multinest_max_iterations: 0
   resume: resume
   show_status: false
-  seed: 6901
+  seed: 6905
 
 runtime:
   mpi_processes: 128

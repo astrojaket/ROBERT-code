@@ -1,8 +1,8 @@
-extends: ../one-region/configuration.yaml
+extends: ../n-k/configuration.yaml
 
 run:
-  name: diluted
-  description: WASP-69b diluted one-region MgSiO3 cloud-layer retrieval using the complete native spectrum.
+  name: diluted-n-k
+  description: WASP-80b diluted one-region direct-n/k Mie cloud retrieval using all native datasets.
 
 disk_emission:
   model: diluted_one_region
@@ -11,7 +11,6 @@ disk_emission:
 parameters:
   - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}}
   - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.05, upper: 1.5}}
-  - {name: log_SO2, label: log10(SO2 VMR), prior: {type: uniform, lower: -10.0, upper: -4.0}}
   - {name: kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}}
   - {name: gamma1, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
   - {name: gamma2, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
@@ -21,11 +20,23 @@ parameters:
   - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
   - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
   - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
+  - {name: cloud_n_0, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_1, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_2, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_3, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_4, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_n_5, prior: {type: uniform, lower: 1.0, upper: 3.0}}
+  - {name: cloud_logk_0, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_1, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_2, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_3, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_4, prior: {type: uniform, lower: -6.0, upper: 0.0}}
+  - {name: cloud_logk_5, prior: {type: uniform, lower: -6.0, upper: 0.0}}
   - {name: dayside_dilution, label: dayside dilution, prior: {type: uniform, lower: 0.0, upper: 1.0}}
 
 sampler:
   live_points: 1000
-  seed: 6903
+  seed: 8006
 
 runtime:
   mpi_processes: 128
