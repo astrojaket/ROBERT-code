@@ -1,0 +1,18 @@
+extends: ../../../wasp80b_mie_catalog_pg14_R1000.yaml
+
+run:
+  name: one-region
+  description: WASP-80b homogeneous one-region MgSiO3 cloud retrieval using all native datasets.
+
+disk_emission:
+  model: one_region
+
+sampler:
+  engine: multinest
+  multinest_max_iterations: 0
+  resume: resume
+  show_status: false
+  seed: 8002
+
+plotting:
+  enabled: true

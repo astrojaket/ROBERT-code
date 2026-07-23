@@ -1,0 +1,27 @@
+extends: ../one-region/configuration.yaml
+
+run:
+  name: diluted
+  description: WASP-69b diluted one-region MgSiO3 cloud-layer retrieval using the complete native spectrum.
+
+disk_emission:
+  model: diluted_one_region
+  dilution_parameter: dayside_dilution
+
+parameters:
+  - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.05, upper: 1.5}}
+  - {name: log_SO2, label: log10(SO2 VMR), prior: {type: uniform, lower: -10.0, upper: -4.0}}
+  - {name: kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}}
+  - {name: gamma1, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: gamma2, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: T_irr, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}}
+  - {name: alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+  - {name: log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}}
+  - {name: log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
+  - {name: log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
+  - {name: log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
+  - {name: dayside_dilution, label: dayside dilution, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+
+sampler:
+  seed: 6903

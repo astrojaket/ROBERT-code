@@ -1,0 +1,57 @@
+extends: ../one-region/configuration.yaml
+
+run:
+  name: two-region
+  description: WASP-80b independent hot/cold MgSiO3 cloud retrieval using all native datasets.
+
+disk_emission:
+  model: two_region
+  hot_fraction_parameter: hot_area_fraction
+  hot_region: {}
+  cold_region:
+    atmosphere:
+      temperature:
+        model: parmentier_guillot_2014
+        internal_temperature_k: 100.0
+        kappa_ir_parameter: cold_kappa_IR
+        gamma1_parameter: cold_gamma1
+        gamma2_parameter: cold_gamma2
+        irradiation_temperature_parameter: cold_T_irr
+        alpha_parameter: cold_alpha
+    clouds:
+      model: mie_catalog
+      material: MgSiO3
+      particle_density_kg_m3: 3200.0
+      geometric_stddev: 1.0
+      quadrature_points: 1
+      log10_mass_fraction_parameter: cold_log_cloud_mass_fraction
+      log10_radius_micron_parameter: cold_log_cloud_radius_micron
+      log10_top_pressure_bar_parameter: cold_log_cloud_top_pressure_bar
+      log10_base_pressure_bar_parameter: cold_log_cloud_base_pressure_bar
+      multiple_scattering_backend: sh4
+
+parameters:
+  - {name: metallicity, label: '[M/H]', unit: dex, prior: {type: uniform, lower: 0.0, upper: 2.0}}
+  - {name: CtoO, label: C/O, prior: {type: uniform, lower: 0.05, upper: 1.5}}
+  - {name: kappa_IR, label: hot kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}}
+  - {name: gamma1, label: hot gamma1, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: gamma2, label: hot gamma2, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: T_irr, label: hot T_irr, unit: K, prior: {type: uniform, lower: 800.0, upper: 2200.0}}
+  - {name: alpha, label: hot alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+  - {name: log_cloud_mass_fraction, label: hot cloud mass fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}}
+  - {name: log_cloud_radius_micron, label: hot cloud radius, prior: {type: uniform, lower: -3.0, upper: 1.0}}
+  - {name: log_cloud_top_pressure_bar, label: hot cloud top, prior: {type: uniform, lower: -6.0, upper: -2.0}}
+  - {name: log_cloud_base_pressure_bar, label: hot cloud base, prior: {type: uniform, lower: -1.0, upper: 2.0}}
+  - {name: cold_kappa_IR, unit: m2 kg-1, prior: {type: log_uniform, lower: 1.0e-5, upper: 1.0}}
+  - {name: cold_gamma1, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: cold_gamma2, prior: {type: log_uniform, lower: 1.0e-2, upper: 100.0}}
+  - {name: cold_T_irr, unit: K, prior: {type: uniform, lower: 400.0, upper: 1400.0}}
+  - {name: cold_alpha, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+  - {name: cold_log_cloud_mass_fraction, prior: {type: uniform, lower: -12.0, upper: -2.0}}
+  - {name: cold_log_cloud_radius_micron, prior: {type: uniform, lower: -3.0, upper: 1.0}}
+  - {name: cold_log_cloud_top_pressure_bar, prior: {type: uniform, lower: -6.0, upper: -2.0}}
+  - {name: cold_log_cloud_base_pressure_bar, prior: {type: uniform, lower: -1.0, upper: 2.0}}
+  - {name: hot_area_fraction, label: hot area fraction, prior: {type: uniform, lower: 0.0, upper: 1.0}}
+
+sampler:
+  seed: 8004

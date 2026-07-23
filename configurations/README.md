@@ -58,6 +58,13 @@ resolved configuration into the self-contained run directory.
 `wasp69b_cloud_free_R1000.yaml` is retained as the complete, standalone original
 WASP-69b cloud-free native baseline that the named WASP-69b defaults extend.
 
+The matched WASP-69b/WASP-80b regional-emission MultiNest matrix is documented
+under [`retrievals/README.md`](retrievals/README.md). It creates the simple
+`WASP-69b/<model>` and `WASP-80b/<model>` run layout and covers clear,
+one-region cloudy, diluted cloudy, and two-region cloudy models. Unlike the
+older defaults below, that targeted matrix explicitly includes the six
+published overlap-average bins for WASP-69b.
+
 The Mie configurations are higher-dimensional tests. Begin with the cloud-free and
 fixed-catalogue cloud cases; use the direct-n/k cases after the opacity cache,
 MPI launch, and fixed-material baseline have been checked.

@@ -1,0 +1,18 @@
+extends: ../../../wasp80b_cloud_free_native_pg14_R1000.yaml
+
+run:
+  name: clear
+  description: WASP-80b cloud-free one-region baseline using all native datasets.
+
+disk_emission:
+  model: one_region
+
+sampler:
+  engine: multinest
+  multinest_max_iterations: 0
+  resume: resume
+  show_status: false
+  seed: 8001
+
+plotting:
+  enabled: true
