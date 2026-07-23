@@ -28,6 +28,9 @@ CONTRACT = (
 )
 PREPARE = ROOT / "scripts/prepare_emission_intercomparison_v2_stage_9.py"
 NATIVE = ROOT / "examples/emission_intercomparison_v2_stage_9_native.py"
+SINGLE_RUN_PLOT = (
+    ROOT / "examples/plot_emission_intercomparison_v2_stage_9_run.py"
+)
 MPI_LAUNCHER = (
     ROOT / "scripts/launch_emission_intercomparison_v2_stage_9_mpi.sh"
 )
@@ -51,6 +54,17 @@ def _load_prepare_module():
 
 def _load_native_module():
     spec = importlib.util.spec_from_file_location("stage9_native_for_tests", NATIVE)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_single_run_plot_module():
+    spec = importlib.util.spec_from_file_location(
+        "stage9_single_run_plot_for_tests", SINGLE_RUN_PLOT
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -305,3 +319,70 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
     assert "addqueue -q redwood -s" in shard_text
     assert "-n 12" in shard_text
     assert "1x12" not in shard_text
+
+
+def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
+    tmp_path: Path,
+) -> None:
+    module = _load_single_run_plot_module()
+    definitions = parameter_definitions("clear_non_inverted")
+    names = [item.name for item in definitions]
+    truths = np.asarray([item.truth for item in definitions], dtype=float)
+    rng = np.random.default_rng(42)
+    samples = np.tile(truths, (80, 1))
+    for index, item in enumerate(definitions):
+        samples[:, index] += rng.normal(
+            0.0, 0.01 * (item.upper - item.lower), samples.shape[0]
+        )
+        samples[:, index] = np.clip(samples[:, index], item.lower, item.upper)
+    weights = np.linspace(1.0, 2.0, samples.shape[0])
+    weights /= np.sum(weights)
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    wavelength = np.linspace(1.0, 12.0, 40)
+    injection = np.linspace(5.0e-4, 2.5e-3, wavelength.size)
+    np.savez(
+        run_dir / "result_arrays.npz",
+        samples=samples,
+        log_likelihood=np.linspace(-10.0, 0.0, samples.shape[0]),
+        weights=weights,
+    )
+    np.savez(
+        run_dir / "diagnostic_spectra.npz",
+        wavelength_micron=wavelength,
+        injection_eclipse_depth=injection,
+        best_fit_eclipse_depth=injection + 2.0e-6,
+        posterior_median_eclipse_depth=injection - 1.0e-6,
+    )
+    (run_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "parameter_names": names,
+                "best_fit_parameters": dict(zip(names, truths, strict=True)),
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "posterior_summary.json").write_text("{}", encoding="utf-8")
+    run_config = tmp_path / "run.json"
+    run_config.write_text(
+        json.dumps(
+            {
+                "run_id": "synthetic-single-run",
+                "scenario": "clear_non_inverted",
+                "noise_ppm": 60,
+                "run_directory": str(run_dir),
+                "common_contract": str(COMMON),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    output = module.plot_individual_run(
+        run_config, output=tmp_path / "plots", max_tp_draws=50
+    )
+
+    assert (output / "spectrum_fit.png").stat().st_size > 0
+    assert (output / "temperature_pressure.png").stat().st_size > 0
+    assert (output / "posterior_corner.png").stat().st_size > 0

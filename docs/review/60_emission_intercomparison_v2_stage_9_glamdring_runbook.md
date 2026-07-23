@@ -298,3 +298,20 @@ export MPLBACKEND=Agg
 Inspect the native-injection comparison, retrieval spectral comparison,
 posterior comparison, and truth-recovery products before using the verified
 per-run archive tool to remove any raw chain directory.
+
+For one completed production retrieval, generate its saved-spectrum fit,
+analytic PG14 temperature-pressure posterior, and weighted posterior corner
+plot without loading opacities or evaluating a forward spectrum:
+
+```bash
+export STAGE9_RUN_CONFIG="$STAGE9_PROJECT_ROOT/runs/picaso/clear_non_inverted/clear_non_inverted__inj-robert__ret-picaso__060ppm__mean/run.json"
+
+export MPLBACKEND=Agg
+"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+  "$STAGE9_REPOSITORY/examples/plot_emission_intercomparison_v2_stage_9_run.py" \
+  "$STAGE9_RUN_CONFIG"
+```
+
+The three PNG files are written below that run's `plots/` directory. The TP
+envelope is computed from at most 5,000 deterministic weighted posterior draws;
+this is a diagnostic compression and does not alter the stored posterior.
