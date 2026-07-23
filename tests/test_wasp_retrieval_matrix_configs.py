@@ -51,7 +51,7 @@ def test_wasp_retrieval_matrix_is_queue_ready(
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 400
     assert config.sampler.max_calls is None
-    assert config.runtime.mpi_processes == "auto"
+    assert config.runtime.mpi_processes == 128
     assert config.opacity.resolution == "R1000"
     assert len(config.parameters) == (
         base_parameter_count + parameter_offset + extra_parameter_count

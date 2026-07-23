@@ -17,5 +17,8 @@ sampler:
   show_status: false
   seed: 6902
 
+runtime:
+  mpi_processes: 128
+
 plotting:
   enabled: true

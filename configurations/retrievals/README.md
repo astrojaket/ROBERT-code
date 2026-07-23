@@ -40,7 +40,9 @@ done
 
 Each generated model directory contains its resolved `configuration.yaml`,
 `submit.sbatch`, runners, and local `outputs/`, `opacity_cache/`, and `scratch/`
-locations. Inspect the generated configuration before submission, then use:
+locations. Every retrieval explicitly configures 128 MPI processes to match
+the 128-task Slurm launcher. Inspect the generated configuration before
+submission, then use:
 
 ```bash
 cd "${project_root}/WASP-69b/clear"

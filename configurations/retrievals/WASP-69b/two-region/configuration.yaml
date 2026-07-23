@@ -56,3 +56,6 @@ parameters:
 
 sampler:
   seed: 6904
+
+runtime:
+  mpi_processes: 128
