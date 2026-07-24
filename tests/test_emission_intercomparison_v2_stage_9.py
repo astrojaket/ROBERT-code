@@ -371,6 +371,8 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
             {
                 "run_id": "synthetic-single-run",
                 "scenario": "clear_non_inverted",
+                "injector": "robert",
+                "retriever": "picaso",
                 "noise_ppm": 60,
                 "run_directory": str(run_dir),
                 "common_contract": str(COMMON),

@@ -25,6 +25,7 @@ from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import ( 
 
 
 COLORS = {"robert": "#0072B2", "picaso": "#D55E00", "petitradtrans": "#009E73"}
+DATA_COLOR = "#202020"
 
 
 def _injection(
@@ -105,6 +106,33 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                     3, 3, figsize=(14, 10), sharex=True, constrained_layout=True
                 )
                 for axis, injector in zip(axes[:, 0], FRAMEWORKS, strict=True):
+                    data_match = next(
+                        (run for run in selected if run["injector"] == injector),
+                        None,
+                    )
+                    if data_match is not None:
+                        with np.load(
+                            data_match["diagnostic_spectra"], allow_pickle=False
+                        ) as archive:
+                            wavelength = np.asarray(
+                                archive["wavelength_micron"], dtype=float
+                            )
+                            injection = np.asarray(
+                                archive["injection_eclipse_depth"], dtype=float
+                            )
+                        axis.errorbar(
+                            wavelength,
+                            injection * 1.0e6,
+                            yerr=np.full(wavelength.size, float(tier)),
+                            fmt="o",
+                            ms=1.8,
+                            color=DATA_COLOR,
+                            ecolor=DATA_COLOR,
+                            elinewidth=0.5,
+                            capsize=0.0,
+                            alpha=0.65,
+                            label=f"data ({tier} ppm)",
+                        )
                     for retriever in FRAMEWORKS:
                         match = next(
                             (
@@ -129,7 +157,6 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                             median = np.asarray(
                                 archive["posterior_median_eclipse_depth"], dtype=float
                             )
-                        axis.plot(wavelength, injection * 1.0e6, color="black", lw=1.0)
                         axis.plot(
                             wavelength,
                             median * 1.0e6,
@@ -139,6 +166,7 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                     axis.set_ylabel(f"inj {injector}\nppm")
                     axis.grid(alpha=0.2)
                 for axis, injector in zip(axes[:, 1], FRAMEWORKS, strict=True):
+                    axis.axhspan(-tier, tier, color="0.85", alpha=0.55)
                     for retriever in FRAMEWORKS:
                         match = next(
                             (
@@ -172,6 +200,7 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                     axis.grid(alpha=0.2)
                 # The third column shows best-fit minus injection for the same cells.
                 for axis, injector in zip(axes[:, 2], FRAMEWORKS, strict=True):
+                    axis.axhspan(-tier, tier, color="0.85", alpha=0.55)
                     for retriever in FRAMEWORKS:
                         match = next(
                             (

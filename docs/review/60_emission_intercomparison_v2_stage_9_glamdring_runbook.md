@@ -312,6 +312,13 @@ export MPLBACKEND=Agg
   "$STAGE9_RUN_CONFIG"
 ```
 
-The three PNG files are written below that run's `plots/` directory. The TP
-envelope is computed from at most 5,000 deterministic weighted posterior draws;
-this is a diagnostic compression and does not alter the stored posterior.
+The three PNG files are written below that run's `plots/` directory. Spectral
+data are shown as the noiseless injection values with the run's 30, 60, or
+100 ppm likelihood uncertainty as error bars. Best-fitting solutions are
+consistently medium purple, with posterior and truth comparisons in
+complementary green and amber. The spectral panel labels the injector and
+retriever explicitly and shades the best-fitting spectrum by the same one-sigma
+data uncertainty. This band is the likelihood uncertainty centered on the best
+fit, not a posterior-predictive credible interval. The TP envelope is computed
+from at most 5,000 deterministic weighted posterior draws; this is a diagnostic
+compression and does not alter the stored posterior.

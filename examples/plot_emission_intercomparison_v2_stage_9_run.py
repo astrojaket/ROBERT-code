@@ -18,6 +18,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 import numpy as np  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
@@ -33,6 +34,12 @@ from emission_intercomparison_v2_stage_9_native import (  # noqa: E402
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (  # noqa: E402
     parameter_definitions,
 )
+
+
+BEST_FIT_COLOR = "#9370DB"  # Matplotlib's named medium purple.
+POSTERIOR_COLOR = "#009E73"
+TRUTH_COLOR = "#E69F00"
+DATA_COLOR = "#202020"
 
 
 def _weighted_quantile(
@@ -125,10 +132,9 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         wavelength = np.asarray(archive["wavelength_micron"], dtype=float)
         injection = np.asarray(archive["injection_eclipse_depth"], dtype=float)
         best = np.asarray(archive["best_fit_eclipse_depth"], dtype=float)
-        median = np.asarray(
-            archive["posterior_median_eclipse_depth"], dtype=float
-        )
     sigma_ppm = float(run["noise_ppm"])
+    injector = str(run["injector"])
+    retriever = str(run["retriever"])
     fig, (spectrum, residual) = plt.subplots(
         2,
         1,
@@ -137,43 +143,65 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         gridspec_kw={"height_ratios": (2.2, 1.0)},
         constrained_layout=True,
     )
-    spectrum.plot(
+    data_artist = spectrum.errorbar(
         wavelength,
         injection * 1.0e6,
-        color="black",
-        lw=1.2,
-        label="injection / noiseless data",
+        yerr=np.full(wavelength.size, sigma_ppm),
+        fmt="o",
+        ms=2.2,
+        color=DATA_COLOR,
+        ecolor=DATA_COLOR,
+        elinewidth=0.65,
+        capsize=0.0,
+        alpha=0.75,
+        label=f"{sigma_ppm:g} ppm data generated with {injector}",
     )
-    spectrum.plot(
-        wavelength, median * 1.0e6, color="#0072B2", lw=1.3, label="posterior median"
+    uncertainty_artist = spectrum.fill_between(
+        wavelength,
+        best * 1.0e6 - sigma_ppm,
+        best * 1.0e6 + sigma_ppm,
+        color=BEST_FIT_COLOR,
+        alpha=0.18,
+        linewidth=0.0,
+        label="best fit ± 1σ data uncertainty",
     )
-    spectrum.plot(
-        wavelength, best * 1.0e6, color="#D55E00", lw=1.0, label="best fit"
+    (best_artist,) = spectrum.plot(
+        wavelength,
+        best * 1.0e6,
+        color=BEST_FIT_COLOR,
+        lw=1.5,
+        label=f"best-fitting spectrum from {retriever}",
     )
     spectrum.set_ylabel("eclipse depth [ppm]")
-    spectrum.legend()
+    spectrum.legend(
+        handles=(data_artist, best_artist, uncertainty_artist),
+        labels=(
+            f"{sigma_ppm:g} ppm data generated with {injector}",
+            f"best-fitting spectrum from {retriever}",
+            "best fit ± 1σ data uncertainty",
+        ),
+    )
     spectrum.grid(alpha=0.2)
 
     residual.axhspan(
-        -sigma_ppm,
-        sigma_ppm,
-        color="0.85",
-        alpha=0.7,
-        label=f"±{sigma_ppm:g} ppm likelihood σ",
+        -sigma_ppm, sigma_ppm, color=DATA_COLOR, alpha=0.08
+    )
+    best_residual = (best - injection) * 1.0e6
+    residual.fill_between(
+        wavelength,
+        best_residual - sigma_ppm,
+        best_residual + sigma_ppm,
+        color=BEST_FIT_COLOR,
+        alpha=0.18,
+        linewidth=0.0,
+        label="best fit ± 1σ",
     )
     residual.plot(
         wavelength,
-        (median - injection) * 1.0e6,
-        color="#0072B2",
-        lw=1.2,
-        label="median − injection",
-    )
-    residual.plot(
-        wavelength,
-        (best - injection) * 1.0e6,
-        color="#D55E00",
-        lw=1.0,
-        label="best − injection",
+        best_residual,
+        color=BEST_FIT_COLOR,
+        lw=1.35,
+        label=f"{retriever} best fit − data",
     )
     residual.axhline(0.0, color="black", lw=0.7)
     residual.set(xlabel="wavelength [micron]", ylabel="residual [ppm]")
@@ -237,22 +265,35 @@ def _plot_temperature_pressure(
 
     fig, axis = plt.subplots(figsize=(7.2, 8.2), constrained_layout=True)
     axis.fill_betweenx(
-        pressure, q025, q975, color="#56B4E9", alpha=0.18, label="central 95%"
+        pressure, q025, q975, color=POSTERIOR_COLOR, alpha=0.12, label="central 95%"
     )
     axis.fill_betweenx(
-        pressure, q16, q84, color="#56B4E9", alpha=0.35, label="central 68%"
+        pressure, q16, q84, color=POSTERIOR_COLOR, alpha=0.28, label="central 68%"
     )
-    axis.plot(q50, pressure, color="#0072B2", lw=1.5, label="profile median")
+    axis.plot(q50, pressure, color=POSTERIOR_COLOR, lw=1.5, label="profile median")
     axis.plot(
         median_profile,
         pressure,
-        color="#0072B2",
+        color=POSTERIOR_COLOR,
         lw=1.0,
         ls=":",
         label="median-parameter profile",
     )
-    axis.plot(best_profile, pressure, color="#D55E00", lw=1.1, label="best fit")
-    axis.plot(truth_profile, pressure, color="black", lw=1.2, ls="--", label="truth")
+    axis.plot(
+        best_profile,
+        pressure,
+        color=BEST_FIT_COLOR,
+        lw=1.5,
+        label="best fit",
+    )
+    axis.plot(
+        truth_profile,
+        pressure,
+        color=TRUTH_COLOR,
+        lw=1.2,
+        ls="--",
+        label="truth",
+    )
     axis.set_yscale("log")
     axis.invert_yaxis()
     axis.set(
@@ -287,13 +328,21 @@ def _plot_corner(
     names: tuple[str, ...],
     samples: NDArray[np.float64],
     weights: NDArray[np.float64],
+    result: Mapping[str, Any],
     output: Path,
 ) -> None:
     definitions = parameter_definitions(run["scenario"])
     if tuple(item.name for item in definitions) != names:
         raise RuntimeError("posterior parameter order differs from frozen Stage-9 order")
     truths = np.asarray([item.truth for item in definitions], dtype=float)
+    best = np.asarray(
+        [float(result["best_fit_parameters"][name]) for name in names], dtype=float
+    )
     limits = _posterior_limits(samples, weights, truths)
+    limits = [
+        (min(lower, value), max(upper, value))
+        for (lower, upper), value in zip(limits, best, strict=True)
+    ]
     dimension = len(names)
     size = max(9.0, 1.65 * dimension)
     fig, axes = plt.subplots(
@@ -316,10 +365,13 @@ def _plot_corner(
                     range=limits[column],
                     weights=weights,
                     density=True,
-                    color="#56B4E9",
+                    color=POSTERIOR_COLOR,
                     alpha=0.75,
                 )
-                axis.axvline(truths[column], color="black", lw=0.9, ls="--")
+                axis.axvline(
+                    truths[column], color=TRUTH_COLOR, lw=0.9, ls="--"
+                )
+                axis.axvline(best[column], color=BEST_FIT_COLOR, lw=1.1)
                 axis.set_yticks([])
             else:
                 axis.hist2d(
@@ -328,13 +380,28 @@ def _plot_corner(
                     bins=36,
                     range=(limits[column], limits[row]),
                     weights=weights,
-                    cmap="Blues",
+                    cmap="GnBu",
                     cmin=np.finfo(float).tiny,
                 )
-                axis.axvline(truths[column], color="black", lw=0.7, ls="--")
-                axis.axhline(truths[row], color="black", lw=0.7, ls="--")
+                axis.axvline(
+                    truths[column], color=TRUTH_COLOR, lw=0.7, ls="--"
+                )
+                axis.axhline(truths[row], color=TRUTH_COLOR, lw=0.7, ls="--")
                 axis.plot(
-                    truths[column], truths[row], marker="s", ms=2.5, color="black"
+                    truths[column],
+                    truths[row],
+                    marker="s",
+                    ms=2.5,
+                    color=TRUTH_COLOR,
+                )
+                axis.axvline(best[column], color=BEST_FIT_COLOR, lw=0.8)
+                axis.axhline(best[row], color=BEST_FIT_COLOR, lw=0.8)
+                axis.plot(
+                    best[column],
+                    best[row],
+                    marker="D",
+                    ms=2.5,
+                    color=BEST_FIT_COLOR,
                 )
             axis.set_xlim(limits[column])
             if row != column:
@@ -349,7 +416,32 @@ def _plot_corner(
                 axis.set_yticklabels([])
             else:
                 axis.set_ylabel(definitions[row].label, fontsize=7)
-    fig.suptitle(f"{run['run_id']} posterior; dashed lines show truth", fontsize=11)
+    fig.legend(
+        handles=[
+            Line2D(
+                [0],
+                [0],
+                color=BEST_FIT_COLOR,
+                lw=1.3,
+                marker="D",
+                ms=3,
+                label="best fit",
+            ),
+            Line2D(
+                [0],
+                [0],
+                color=TRUTH_COLOR,
+                lw=1.0,
+                ls="--",
+                marker="s",
+                ms=3,
+                label="truth",
+            ),
+        ],
+        loc="upper right",
+        fontsize=8,
+    )
+    fig.suptitle(f"{run['run_id']} posterior", fontsize=11)
     fig.savefig(output, dpi=180)
     plt.close(fig)
 
@@ -379,7 +471,14 @@ def plot_individual_run(
         destination / "temperature_pressure.png",
         max_draws=max_tp_draws,
     )
-    _plot_corner(run, names, samples, weights, destination / "posterior_corner.png")
+    _plot_corner(
+        run,
+        names,
+        samples,
+        weights,
+        result,
+        destination / "posterior_corner.png",
+    )
     return destination
 
 
