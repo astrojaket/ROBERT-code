@@ -31,6 +31,9 @@ NATIVE = ROOT / "examples/emission_intercomparison_v2_stage_9_native.py"
 SINGLE_RUN_PLOT = (
     ROOT / "examples/plot_emission_intercomparison_v2_stage_9_run.py"
 )
+BIG_COMPARISON_PLOT = (
+    ROOT / "examples/plot_emission_intercomparison_v2_stage_9_big_comparison.py"
+)
 MPI_LAUNCHER = (
     ROOT / "scripts/launch_emission_intercomparison_v2_stage_9_mpi.sh"
 )
@@ -64,6 +67,17 @@ def _load_native_module():
 def _load_single_run_plot_module():
     spec = importlib.util.spec_from_file_location(
         "stage9_single_run_plot_for_tests", SINGLE_RUN_PLOT
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_big_comparison_plot_module():
+    spec = importlib.util.spec_from_file_location(
+        "stage9_big_comparison_plot_for_tests", BIG_COMPARISON_PLOT
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -381,10 +395,94 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
         encoding="utf-8",
     )
 
-    output = module.plot_individual_run(
-        run_config, output=tmp_path / "plots", max_tp_draws=50
-    )
+    output = module.plot_individual_run(run_config, output=tmp_path / "plots")
 
     assert (output / "spectrum_fit.png").stat().st_size > 0
     assert (output / "temperature_pressure.png").stat().st_size > 0
     assert (output / "posterior_corner.png").stat().st_size > 0
+
+
+def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
+    tmp_path: Path,
+) -> None:
+    module = _load_big_comparison_plot_module()
+    definitions = parameter_definitions("clear_non_inverted")
+    names = [item.name for item in definitions]
+    truths = np.asarray([item.truth for item in definitions], dtype=float)
+    project = tmp_path / "stage9"
+    contracts = project / "contracts"
+    contracts.mkdir(parents=True)
+    (contracts / "common_contract.json").write_bytes(COMMON.read_bytes())
+    rows = []
+    rng = np.random.default_rng(91)
+    wavelength = np.linspace(1.0, 12.0, 30)
+    injection = np.linspace(5.0e-4, 2.5e-3, wavelength.size)
+    for retriever in ("picaso", "petitradtrans"):
+        run_id = f"synthetic-robert-to-{retriever}"
+        run_dir = project / "runs" / retriever / "clear_non_inverted" / run_id
+        run_dir.mkdir(parents=True)
+        samples = np.tile(truths, (60, 1))
+        for index, item in enumerate(definitions):
+            samples[:, index] += rng.normal(
+                0.0, 0.01 * (item.upper - item.lower), samples.shape[0]
+            )
+            samples[:, index] = np.clip(samples[:, index], item.lower, item.upper)
+        weights = np.ones(samples.shape[0]) / samples.shape[0]
+        np.savez(
+            run_dir / "result_arrays.npz",
+            samples=samples,
+            log_likelihood=np.linspace(-4.0, 0.0, samples.shape[0]),
+            weights=weights,
+        )
+        np.savez(
+            run_dir / "diagnostic_spectra.npz",
+            wavelength_micron=wavelength,
+            injection_eclipse_depth=injection,
+            best_fit_eclipse_depth=injection + 1.0e-6,
+            posterior_median_eclipse_depth=injection,
+        )
+        (run_dir / "result.json").write_text(
+            json.dumps(
+                {
+                    "parameter_names": names,
+                    "best_fit_parameters": dict(zip(names, truths, strict=True)),
+                }
+            ),
+            encoding="utf-8",
+        )
+        (run_dir / "posterior_summary.json").write_text("{}", encoding="utf-8")
+        relative_config = Path("runs") / retriever / "clear_non_inverted" / run_id / "run.json"
+        run_config = project / relative_config
+        run_config.write_text(
+            json.dumps(
+                {
+                    "run_id": run_id,
+                    "scenario": "clear_non_inverted",
+                    "injector": "robert",
+                    "retriever": retriever,
+                    "noise_ppm": 100,
+                    "run_directory": str(run_dir),
+                }
+            ),
+            encoding="utf-8",
+        )
+        rows.append({"run_config": str(relative_config)})
+    (project / "run_index.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    pdf, pages = module.plot_big_comparison(
+        project,
+        scenario_filter="clear_non_inverted",
+        tier_filter=100,
+        injector_filter="robert",
+    )
+
+    assert pages == 1
+    assert pdf.stat().st_size > 0
+    assert (
+        project
+        / "diagnostics"
+        / "big_comparison"
+        / "clear_non_inverted"
+        / "100ppm"
+        / "data_generated_with_robert.png"
+    ).stat().st_size > 0

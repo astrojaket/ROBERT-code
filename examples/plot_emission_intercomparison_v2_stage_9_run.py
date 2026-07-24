@@ -104,33 +104,6 @@ def _posterior(
     return names, samples, weights, result
 
 
-def _parameter_mapping(
-    names: tuple[str, ...], values: NDArray[np.float64]
-) -> dict[str, float]:
-    return {name: float(values[index]) for index, name in enumerate(names)}
-
-
-def _posterior_median(
-    names: tuple[str, ...],
-    samples: NDArray[np.float64],
-    weights: NDArray[np.float64],
-) -> dict[str, float]:
-    return {
-        name: _weighted_quantile(samples[:, index], weights, 0.5)
-        for index, name in enumerate(names)
-    }
-
-
-def _systematic_posterior_indices(
-    weights: NDArray[np.float64], maximum: int
-) -> NDArray[np.int64]:
-    count = min(int(maximum), weights.size)
-    positions = (np.arange(count, dtype=float) + 0.5) / count
-    cumulative = np.cumsum(weights)
-    cumulative[-1] = 1.0
-    return np.searchsorted(cumulative, positions, side="left")
-
-
 def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     path = Path(run["run_directory"]) / "diagnostic_spectra.npz"
     with np.load(path, allow_pickle=False) as archive:
@@ -221,13 +194,8 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
 
 def _plot_temperature_pressure(
     run: Mapping[str, Any],
-    names: tuple[str, ...],
-    samples: NDArray[np.float64],
-    weights: NDArray[np.float64],
     result: Mapping[str, Any],
     output: Path,
-    *,
-    max_draws: int,
 ) -> None:
     common = load_common_contract(run["common_contract"])
     pressure = np.asarray(
@@ -240,73 +208,39 @@ def _plot_temperature_pressure(
     )
     definitions = parameter_definitions(run["scenario"])
     truth = {item.name: item.truth for item in definitions}
-    median = _posterior_median(names, samples, weights)
     best = {
         str(name): float(value)
         for name, value in result["best_fit_parameters"].items()
     }
-    indices = _systematic_posterior_indices(weights, max_draws)
-    profiles = np.asarray(
-        [
-            atmospheric_state(
-                common,
-                str(run["scenario"]),
-                _parameter_mapping(names, samples[index]),
-            ).temperature_cells_k
-            for index in indices
-        ],
-        dtype=float,
-    )
-    q025, q16, q50, q84, q975 = np.quantile(
-        profiles, (0.025, 0.16, 0.5, 0.84, 0.975), axis=0
-    )
     truth_profile = atmospheric_state(
         common, str(run["scenario"]), truth
-    ).temperature_cells_k
-    median_profile = atmospheric_state(
-        common, str(run["scenario"]), median
     ).temperature_cells_k
     best_profile = atmospheric_state(
         common, str(run["scenario"]), best
     ).temperature_cells_k
 
     fig, axis = plt.subplots(figsize=(7.2, 8.2), constrained_layout=True)
-    axis.fill_betweenx(
-        pressure, q025, q975, color=POSTERIOR_COLOR, alpha=0.12, label="central 95%"
-    )
-    axis.fill_betweenx(
-        pressure, q16, q84, color=POSTERIOR_COLOR, alpha=0.28, label="central 68%"
-    )
-    axis.plot(q50, pressure, color=POSTERIOR_COLOR, lw=1.5, label="profile median")
-    axis.plot(
-        median_profile,
-        pressure,
-        color=POSTERIOR_COLOR,
-        lw=1.0,
-        ls=":",
-        label="median-parameter profile",
-    )
     axis.plot(
         best_profile,
         pressure,
         color=BEST_FIT_COLOR,
         lw=1.5,
-        label="best fit",
+        label=f"best-fitting {DISPLAY_NAMES.get(str(run['retriever']), run['retriever'])} TP",
     )
     axis.plot(
         truth_profile,
         pressure,
-        color=TRUTH_COLOR,
-        lw=1.2,
+        color=DATA_COLOR,
+        lw=1.4,
         ls="--",
-        label="truth",
+        label=f"input TP from {DISPLAY_NAMES.get(str(run['injector']), run['injector'])}",
     )
     axis.set_yscale("log")
     axis.invert_yaxis()
     axis.set(
         xlabel="temperature [K]",
         ylabel="pressure [bar]",
-        title=f"{run['run_id']}\nTP posterior from {indices.size} deterministic weighted draws",
+        title=f"{run['run_id']}\nbest-fitting TP compared with the input TP",
     )
     axis.grid(alpha=0.2)
     axis.legend(fontsize=8)
@@ -457,7 +391,6 @@ def plot_individual_run(
     run_config: Path,
     *,
     output: Path | None = None,
-    max_tp_draws: int = 5_000,
 ) -> Path:
     config_path = run_config.expanduser().resolve()
     run = json.loads(config_path.read_text(encoding="utf-8"))
@@ -470,13 +403,7 @@ def plot_individual_run(
     names, samples, weights, result = _posterior(run)
     _plot_spectrum(run, destination / "spectrum_fit.png")
     _plot_temperature_pressure(
-        run,
-        names,
-        samples,
-        weights,
-        result,
-        destination / "temperature_pressure.png",
-        max_draws=max_tp_draws,
+        run, result, destination / "temperature_pressure.png"
     )
     _plot_corner(
         run,
@@ -493,14 +420,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_config", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--max-tp-draws", type=int, default=5_000)
     args = parser.parse_args()
-    if args.max_tp_draws < 1:
-        parser.error("--max-tp-draws must be positive")
     output = plot_individual_run(
         args.run_config,
         output=args.output,
-        max_tp_draws=args.max_tp_draws,
     )
     print(output)
 

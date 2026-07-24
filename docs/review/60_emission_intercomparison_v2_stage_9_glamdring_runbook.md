@@ -319,6 +319,21 @@ consistently medium purple, with posterior and truth comparisons in
 complementary green and amber. The spectral panel labels the injector and
 retriever explicitly and shades the best-fitting spectrum by the same one-sigma
 data uncertainty. This band is the likelihood uncertainty centered on the best
-fit, not a posterior-predictive credible interval. The TP envelope is computed
-from at most 5,000 deterministic weighted posterior draws; this is a diagnostic
-compression and does not alter the stored posterior.
+fit, not a posterior-predictive credible interval. The TP panel compares only
+the best-fitting TP profile with the exact input TP; it does not show a TP
+posterior envelope.
+
+Generate the large clear, non-inverted comparison product with one page per
+uncertainty tier and injection framework:
+
+```bash
+"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+  "$STAGE9_REPOSITORY/examples/plot_emission_intercomparison_v2_stage_9_big_comparison.py" \
+  "$STAGE9_PROJECT_ROOT" --scenario clear_non_inverted
+```
+
+Each page contains the injected spectrum with point-wise error bars, the two
+available directed best-fitting spectra, the two best-fitting TP profiles
+against the common input TP, and exactly four molecular posterior panels: H2O,
+CO, CO2, and CH4. The multipage PDF and page PNGs are written beneath
+`diagnostics/big_comparison/`.
