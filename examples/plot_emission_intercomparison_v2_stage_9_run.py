@@ -40,6 +40,11 @@ BEST_FIT_COLOR = "#9370DB"  # Matplotlib's named medium purple.
 POSTERIOR_COLOR = "#009E73"
 TRUTH_COLOR = "#E69F00"
 DATA_COLOR = "#202020"
+DISPLAY_NAMES = {
+    "robert": "ROBERT",
+    "picaso": "PICASO",
+    "petitradtrans": "petitRADTRANS",
+}
 
 
 def _weighted_quantile(
@@ -135,6 +140,8 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     sigma_ppm = float(run["noise_ppm"])
     injector = str(run["injector"])
     retriever = str(run["retriever"])
+    injector_label = DISPLAY_NAMES.get(injector, injector)
+    retriever_label = DISPLAY_NAMES.get(retriever, retriever)
     fig, (spectrum, residual) = plt.subplots(
         2,
         1,
@@ -154,7 +161,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         elinewidth=0.65,
         capsize=0.0,
         alpha=0.75,
-        label=f"{sigma_ppm:g} ppm data generated with {injector}",
+        label=f"{sigma_ppm:g} ppm data generated with {injector_label}",
     )
     uncertainty_artist = spectrum.fill_between(
         wavelength,
@@ -170,14 +177,14 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         best * 1.0e6,
         color=BEST_FIT_COLOR,
         lw=1.5,
-        label=f"best-fitting spectrum from {retriever}",
+        label=f"best-fitting spectrum from {retriever_label}",
     )
     spectrum.set_ylabel("eclipse depth [ppm]")
     spectrum.legend(
         handles=(data_artist, best_artist, uncertainty_artist),
         labels=(
-            f"{sigma_ppm:g} ppm data generated with {injector}",
-            f"best-fitting spectrum from {retriever}",
+            f"{sigma_ppm:g} ppm data generated with {injector_label}",
+            f"best-fitting spectrum from {retriever_label}",
             "best fit ± 1σ data uncertainty",
         ),
     )
@@ -201,7 +208,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         best_residual,
         color=BEST_FIT_COLOR,
         lw=1.35,
-        label=f"{retriever} best fit − data",
+        label=f"{retriever_label} best fit − data",
     )
     residual.axhline(0.0, color="black", lw=0.7)
     residual.set(xlabel="wavelength [micron]", ylabel="residual [ppm]")
