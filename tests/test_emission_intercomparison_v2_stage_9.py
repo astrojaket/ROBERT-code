@@ -339,6 +339,11 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
     tmp_path: Path,
 ) -> None:
     module = _load_single_run_plot_module()
+    assert module.MODEL_COLORS == {
+        "robert": "#9370DB",
+        "petitradtrans": "#DDA0DD",
+        "picaso": "#36454F",
+    }
     definitions = parameter_definitions("clear_non_inverted")
     names = [item.name for item in definitions]
     truths = np.asarray([item.truth for item in definitions], dtype=float)
@@ -406,6 +411,11 @@ def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
     tmp_path: Path,
 ) -> None:
     module = _load_big_comparison_plot_module()
+    assert module.MODEL_COLORS == {
+        "robert": "#9370DB",
+        "petitradtrans": "#DDA0DD",
+        "picaso": "#36454F",
+    }
     definitions = parameter_definitions("clear_non_inverted")
     names = [item.name for item in definitions]
     truths = np.asarray([item.truth for item in definitions], dtype=float)

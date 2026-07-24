@@ -314,14 +314,14 @@ export MPLBACKEND=Agg
 
 The three PNG files are written below that run's `plots/` directory. Spectral
 data are shown as the noiseless injection values with the run's 30, 60, or
-100 ppm likelihood uncertainty as error bars. Best-fitting solutions are
-consistently medium purple, with posterior and truth comparisons in
-complementary green and amber. The spectral panel labels the injector and
-retriever explicitly and shades the best-fitting spectrum by the same one-sigma
-data uncertainty. This band is the likelihood uncertainty centered on the best
-fit, not a posterior-predictive credible interval. The TP panel compares only
-the best-fitting TP profile with the exact input TP; it does not show a TP
-posterior envelope.
+100 ppm likelihood uncertainty as error bars. Framework colours follow the
+paper palette: ROBERT is medium purple, petitRADTRANS is plum, and PICASO is
+charcoal. The spectral panel labels the injector and retriever explicitly and
+shades the best-fitting spectrum by the same one-sigma data uncertainty. This
+spectral band is the likelihood uncertainty centered on the best fit, not a
+posterior-predictive credible interval. The TP panel compares the best-fitting
+TP profile with the exact input TP and shades the central 68% TP posterior
+derived from up to 5,000 deterministically weighted saved posterior samples.
 
 Generate the large clear, non-inverted comparison product with one page per
 uncertainty tier and injection framework:
@@ -333,7 +333,7 @@ uncertainty tier and injection framework:
 ```
 
 Each page contains the injected spectrum with point-wise error bars, the two
-available directed best-fitting spectra, the two best-fitting TP profiles
-against the common input TP, and exactly four molecular posterior panels: H2O,
-CO, CO2, and CH4. The multipage PDF and page PNGs are written beneath
-`diagnostics/big_comparison/`.
+available directed best-fitting spectra, the two best-fitting TP profiles and
+their central 68% envelopes against the common input TP, and exactly four
+molecular posterior panels: H2O, CO, CO2, and CH4. The multipage PDF and page
+PNGs are written beneath `diagnostics/big_comparison/`.

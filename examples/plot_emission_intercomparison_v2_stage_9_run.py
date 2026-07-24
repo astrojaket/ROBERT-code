@@ -18,6 +18,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 import numpy as np  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
@@ -36,9 +37,11 @@ from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import ( 
 )
 
 
-BEST_FIT_COLOR = "#9370DB"  # Matplotlib's named medium purple.
-POSTERIOR_COLOR = "#009E73"
-TRUTH_COLOR = "#E69F00"
+MODEL_COLORS = {
+    "robert": "#9370DB",  # mediumpurple
+    "petitradtrans": "#DDA0DD",  # plum
+    "picaso": "#36454F",  # charcoal
+}
 DATA_COLOR = "#202020"
 DISPLAY_NAMES = {
     "robert": "ROBERT",
@@ -115,6 +118,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     retriever = str(run["retriever"])
     injector_label = DISPLAY_NAMES.get(injector, injector)
     retriever_label = DISPLAY_NAMES.get(retriever, retriever)
+    retriever_color = MODEL_COLORS[retriever]
     fig, (spectrum, residual) = plt.subplots(
         2,
         1,
@@ -140,7 +144,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         wavelength,
         best * 1.0e6 - sigma_ppm,
         best * 1.0e6 + sigma_ppm,
-        color=BEST_FIT_COLOR,
+        color=retriever_color,
         alpha=0.18,
         linewidth=0.0,
         label="best fit ± 1σ data uncertainty",
@@ -148,7 +152,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     (best_artist,) = spectrum.plot(
         wavelength,
         best * 1.0e6,
-        color=BEST_FIT_COLOR,
+        color=retriever_color,
         lw=1.5,
         label=f"best-fitting spectrum from {retriever_label}",
     )
@@ -171,7 +175,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         wavelength,
         best_residual - sigma_ppm,
         best_residual + sigma_ppm,
-        color=BEST_FIT_COLOR,
+        color=retriever_color,
         alpha=0.18,
         linewidth=0.0,
         label="best fit ± 1σ",
@@ -179,7 +183,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     residual.plot(
         wavelength,
         best_residual,
-        color=BEST_FIT_COLOR,
+        color=retriever_color,
         lw=1.35,
         label=f"{retriever_label} best fit − data",
     )
@@ -194,8 +198,13 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
 
 def _plot_temperature_pressure(
     run: Mapping[str, Any],
+    names: tuple[str, ...],
+    samples: NDArray[np.float64],
+    weights: NDArray[np.float64],
     result: Mapping[str, Any],
     output: Path,
+    *,
+    max_draws: int,
 ) -> None:
     common = load_common_contract(run["common_contract"])
     pressure = np.asarray(
@@ -218,34 +227,75 @@ def _plot_temperature_pressure(
     best_profile = atmospheric_state(
         common, str(run["scenario"]), best
     ).temperature_cells_k
+    draw_indices = _systematic_posterior_indices(weights, max_draws)
+    posterior_profiles = np.asarray(
+        [
+            atmospheric_state(
+                common,
+                str(run["scenario"]),
+                dict(zip(names, samples[index], strict=True)),
+            ).temperature_cells_k
+            for index in draw_indices
+        ],
+        dtype=float,
+    )
+    lower_profile, upper_profile = np.quantile(
+        posterior_profiles, (0.16, 0.84), axis=0
+    )
+    retriever = str(run["retriever"])
+    injector = str(run["injector"])
+    retriever_color = MODEL_COLORS[retriever]
+    injector_color = MODEL_COLORS[injector]
 
     fig, axis = plt.subplots(figsize=(7.2, 8.2), constrained_layout=True)
+    axis.fill_betweenx(
+        pressure,
+        lower_profile,
+        upper_profile,
+        color=retriever_color,
+        alpha=0.18,
+        linewidth=0.0,
+        label=f"{DISPLAY_NAMES.get(retriever, retriever)} central 68% TP posterior",
+    )
     axis.plot(
         best_profile,
         pressure,
-        color=BEST_FIT_COLOR,
+        color=retriever_color,
         lw=1.5,
-        label=f"best-fitting {DISPLAY_NAMES.get(str(run['retriever']), run['retriever'])} TP",
+        label=f"best-fitting {DISPLAY_NAMES.get(retriever, retriever)} TP",
     )
     axis.plot(
         truth_profile,
         pressure,
-        color=DATA_COLOR,
+        color=injector_color,
         lw=1.4,
         ls="--",
-        label=f"input TP from {DISPLAY_NAMES.get(str(run['injector']), run['injector'])}",
+        label=f"input TP from {DISPLAY_NAMES.get(injector, injector)}",
     )
     axis.set_yscale("log")
     axis.invert_yaxis()
     axis.set(
         xlabel="temperature [K]",
         ylabel="pressure [bar]",
-        title=f"{run['run_id']}\nbest-fitting TP compared with the input TP",
+        title=f"{run['run_id']}\nbest-fitting TP and 1σ envelope versus input TP",
     )
     axis.grid(alpha=0.2)
     axis.legend(fontsize=8)
     fig.savefig(output, dpi=180)
     plt.close(fig)
+
+
+def _systematic_posterior_indices(
+    weights: NDArray[np.float64],
+    maximum: int,
+) -> NDArray[np.int64]:
+    if maximum < 1:
+        raise ValueError("maximum posterior TP draws must be positive")
+    count = min(maximum, weights.size)
+    positions = (np.arange(count, dtype=float) + 0.5) / count
+    cumulative = np.cumsum(weights)
+    cumulative[-1] = 1.0
+    return np.searchsorted(cumulative, positions, side="left")
 
 
 def _posterior_limits(
@@ -279,6 +329,14 @@ def _plot_corner(
     best = np.asarray(
         [float(result["best_fit_parameters"][name]) for name in names], dtype=float
     )
+    retriever = str(run["retriever"])
+    injector = str(run["injector"])
+    retriever_color = MODEL_COLORS[retriever]
+    injector_color = MODEL_COLORS[injector]
+    posterior_cmap = LinearSegmentedColormap.from_list(
+        f"{retriever}_posterior",
+        ("#FFFFFF", retriever_color),
+    )
     limits = _posterior_limits(samples, weights, truths)
     limits = [
         (min(lower, value), max(upper, value))
@@ -306,13 +364,13 @@ def _plot_corner(
                     range=limits[column],
                     weights=weights,
                     density=True,
-                    color=POSTERIOR_COLOR,
+                    color=retriever_color,
                     alpha=0.75,
                 )
                 axis.axvline(
-                    truths[column], color=TRUTH_COLOR, lw=0.9, ls="--"
+                    truths[column], color=injector_color, lw=0.9, ls="--"
                 )
-                axis.axvline(best[column], color=BEST_FIT_COLOR, lw=1.1)
+                axis.axvline(best[column], color=retriever_color, lw=1.1)
                 axis.set_yticks([])
             else:
                 axis.hist2d(
@@ -321,28 +379,28 @@ def _plot_corner(
                     bins=36,
                     range=(limits[column], limits[row]),
                     weights=weights,
-                    cmap="GnBu",
+                    cmap=posterior_cmap,
                     cmin=np.finfo(float).tiny,
                 )
                 axis.axvline(
-                    truths[column], color=TRUTH_COLOR, lw=0.7, ls="--"
+                    truths[column], color=injector_color, lw=0.7, ls="--"
                 )
-                axis.axhline(truths[row], color=TRUTH_COLOR, lw=0.7, ls="--")
+                axis.axhline(truths[row], color=injector_color, lw=0.7, ls="--")
                 axis.plot(
                     truths[column],
                     truths[row],
                     marker="s",
                     ms=2.5,
-                    color=TRUTH_COLOR,
+                    color=injector_color,
                 )
-                axis.axvline(best[column], color=BEST_FIT_COLOR, lw=0.8)
-                axis.axhline(best[row], color=BEST_FIT_COLOR, lw=0.8)
+                axis.axvline(best[column], color=retriever_color, lw=0.8)
+                axis.axhline(best[row], color=retriever_color, lw=0.8)
                 axis.plot(
                     best[column],
                     best[row],
                     marker="D",
                     ms=2.5,
-                    color=BEST_FIT_COLOR,
+                    color=retriever_color,
                 )
             axis.set_xlim(limits[column])
             if row != column:
@@ -362,7 +420,7 @@ def _plot_corner(
             Line2D(
                 [0],
                 [0],
-                color=BEST_FIT_COLOR,
+                color=retriever_color,
                 lw=1.3,
                 marker="D",
                 ms=3,
@@ -371,7 +429,7 @@ def _plot_corner(
             Line2D(
                 [0],
                 [0],
-                color=TRUTH_COLOR,
+                color=injector_color,
                 lw=1.0,
                 ls="--",
                 marker="s",
@@ -391,6 +449,7 @@ def plot_individual_run(
     run_config: Path,
     *,
     output: Path | None = None,
+    max_tp_draws: int = 5000,
 ) -> Path:
     config_path = run_config.expanduser().resolve()
     run = json.loads(config_path.read_text(encoding="utf-8"))
@@ -403,7 +462,13 @@ def plot_individual_run(
     names, samples, weights, result = _posterior(run)
     _plot_spectrum(run, destination / "spectrum_fit.png")
     _plot_temperature_pressure(
-        run, result, destination / "temperature_pressure.png"
+        run,
+        names,
+        samples,
+        weights,
+        result,
+        destination / "temperature_pressure.png",
+        max_draws=max_tp_draws,
     )
     _plot_corner(
         run,
@@ -420,10 +485,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_config", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--max-tp-draws",
+        type=int,
+        default=5000,
+        help="maximum deterministic weighted posterior draws for the TP envelope",
+    )
     args = parser.parse_args()
     output = plot_individual_run(
         args.run_config,
         output=args.output,
+        max_tp_draws=args.max_tp_draws,
     )
     print(output)
 

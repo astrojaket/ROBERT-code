@@ -24,7 +24,11 @@ from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import ( 
 )
 
 
-COLORS = {"robert": "#0072B2", "picaso": "#D55E00", "petitradtrans": "#009E73"}
+COLORS = {
+    "robert": "#9370DB",  # mediumpurple
+    "petitradtrans": "#DDA0DD",  # plum
+    "picaso": "#36454F",  # charcoal
+}
 DATA_COLOR = "#202020"
 
 
@@ -154,12 +158,20 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                             injection = np.asarray(
                                 archive["injection_eclipse_depth"], dtype=float
                             )
-                            median = np.asarray(
-                                archive["posterior_median_eclipse_depth"], dtype=float
+                            best = np.asarray(
+                                archive["best_fit_eclipse_depth"], dtype=float
                             )
+                        axis.fill_between(
+                            wavelength,
+                            best * 1.0e6 - tier,
+                            best * 1.0e6 + tier,
+                            color=COLORS[retriever],
+                            alpha=0.10,
+                            linewidth=0.0,
+                        )
                         axis.plot(
                             wavelength,
-                            median * 1.0e6,
+                            best * 1.0e6,
                             color=COLORS[retriever],
                             label=retriever,
                         )
@@ -232,7 +244,7 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                         )
                     axis.axhline(0.0, color="black", lw=0.7)
                     axis.grid(alpha=0.2)
-                axes[0, 0].set_title("injection and posterior median")
+                axes[0, 0].set_title("data and best fits with 1σ envelopes")
                 axes[0, 1].set_title("posterior median - injection [ppm]")
                 axes[0, 2].set_title("best fit - injection [ppm]")
                 for axis in axes[-1]:

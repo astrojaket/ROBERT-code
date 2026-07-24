@@ -46,9 +46,9 @@ DISPLAY_NAMES = {
     "petitradtrans": "petitRADTRANS",
 }
 MODEL_COLORS = {
-    "robert": "#9370DB",
-    "picaso": "#009E73",
-    "petitradtrans": "#E69F00",
+    "robert": "#9370DB",  # mediumpurple
+    "petitradtrans": "#DDA0DD",  # plum
+    "picaso": "#36454F",  # charcoal
 }
 DATA_COLOR = "#202020"
 MOLECULES = ("H2O", "CO", "CO2", "CH4")
@@ -100,6 +100,44 @@ def _posterior(
     return names, samples, weights
 
 
+def _systematic_posterior_indices(
+    weights: NDArray[np.float64],
+    maximum: int,
+) -> NDArray[np.int64]:
+    if maximum < 1:
+        raise ValueError("maximum posterior TP draws must be positive")
+    count = min(maximum, weights.size)
+    positions = (np.arange(count, dtype=float) + 0.5) / count
+    cumulative = np.cumsum(weights)
+    cumulative[-1] = 1.0
+    return np.searchsorted(cumulative, positions, side="left")
+
+
+def _temperature_interval(
+    common: Mapping[str, Any],
+    scenario: str,
+    names: tuple[str, ...],
+    samples: NDArray[np.float64],
+    weights: NDArray[np.float64],
+    *,
+    max_draws: int,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    indices = _systematic_posterior_indices(weights, max_draws)
+    profiles = np.asarray(
+        [
+            atmospheric_state(
+                common,
+                scenario,
+                dict(zip(names, samples[index], strict=True)),
+            ).temperature_cells_k
+            for index in indices
+        ],
+        dtype=float,
+    )
+    lower, upper = np.quantile(profiles, (0.16, 0.84), axis=0)
+    return lower, upper
+
+
 def _plot_page(
     runs: list[dict[str, Any]],
     *,
@@ -107,6 +145,7 @@ def _plot_page(
     scenario: str,
     tier: int,
     injector: str,
+    max_tp_draws: int,
 ) -> plt.Figure:
     fig = plt.figure(figsize=(17.5, 10.5), constrained_layout=True)
     grid = fig.add_gridspec(2, 3)
@@ -201,7 +240,7 @@ def _plot_page(
     tp_axis.plot(
         input_tp,
         pressure,
-        color=DATA_COLOR,
+        color=MODEL_COLORS[injector],
         lw=1.5,
         ls="--",
         label=f"input TP from {DISPLAY_NAMES[injector]}",
@@ -212,6 +251,16 @@ def _plot_page(
     for run in selected:
         retriever = str(run["retriever"])
         color = MODEL_COLORS[retriever]
+        names, samples, weights = _posterior(run)
+        posterior_cache[retriever] = (names, samples, weights)
+        lower_tp, upper_tp = _temperature_interval(
+            common,
+            scenario,
+            names,
+            samples,
+            weights,
+            max_draws=max_tp_draws,
+        )
         result = json.loads(Path(run["result"]).read_text(encoding="utf-8"))
         best_parameters = {
             str(name): float(value)
@@ -220,6 +269,15 @@ def _plot_page(
         best_tp = atmospheric_state(
             common, scenario, best_parameters
         ).temperature_cells_k
+        tp_axis.fill_betweenx(
+            pressure,
+            lower_tp,
+            upper_tp,
+            color=color,
+            alpha=0.16,
+            linewidth=0.0,
+            label=f"{DISPLAY_NAMES[retriever]} central 68% TP posterior",
+        )
         tp_axis.plot(
             best_tp,
             pressure,
@@ -227,13 +285,12 @@ def _plot_page(
             lw=1.5,
             label=f"best-fitting {DISPLAY_NAMES[retriever]} TP",
         )
-        posterior_cache[retriever] = _posterior(run)
     tp_axis.set_yscale("log")
     tp_axis.invert_yaxis()
     tp_axis.set(
         xlabel="temperature [K]",
         ylabel="pressure [bar]",
-        title="Best-fitting TP profiles versus input",
+        title="Best-fitting TP profiles and 1σ envelopes versus input",
     )
     tp_axis.grid(alpha=0.2)
     tp_axis.legend(fontsize=8)
@@ -299,6 +356,7 @@ def plot_big_comparison(
     scenario_filter: str | None = None,
     tier_filter: int | None = None,
     injector_filter: str | None = None,
+    max_tp_draws: int = 5000,
 ) -> tuple[Path, int]:
     project = project.expanduser().resolve()
     runs = _completed_runs(project)
@@ -325,6 +383,7 @@ def plot_big_comparison(
                         scenario=scenario,
                         tier=tier,
                         injector=injector,
+                        max_tp_draws=max_tp_draws,
                     )
                     pdf.savefig(fig)
                     png_dir = output / scenario / f"{tier:03d}ppm"
@@ -346,12 +405,19 @@ def main() -> None:
     )
     parser.add_argument("--noise-ppm", type=int, choices=NOISE_TIERS_PPM)
     parser.add_argument("--injector", choices=FRAMEWORKS)
+    parser.add_argument(
+        "--max-tp-draws",
+        type=int,
+        default=5000,
+        help="maximum deterministic weighted posterior draws per TP envelope",
+    )
     args = parser.parse_args()
     output, pages = plot_big_comparison(
         args.project_root,
         scenario_filter=args.scenario,
         tier_filter=args.noise_ppm,
         injector_filter=args.injector,
+        max_tp_draws=args.max_tp_draws,
     )
     print(f"{output} ({pages} pages)")
 
