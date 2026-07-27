@@ -186,6 +186,22 @@ def test_weighted_spectral_quantiles_use_posterior_samples() -> None:
     np.testing.assert_allclose(q84, [2.68, 26.8])
 
 
+def test_retrieval_runner_loads_serialized_posterior_samples(
+    tmp_path: Path,
+) -> None:
+    module = _load_retrieval_runner_module()
+    expected = np.asarray([[1.0, 2.0], [3.0, 4.0]])
+    np.savez(
+        tmp_path / "result_arrays.npz",
+        samples=expected,
+        log_likelihood=np.asarray([-2.0, -1.0]),
+    )
+
+    actual = module._load_saved_posterior_samples(tmp_path, parameter_count=2)
+
+    np.testing.assert_array_equal(actual, expected)
+
+
 def test_committed_stage_9_contract_matches_source_of_truth() -> None:
     sha = hashlib.sha256(COMMON.read_bytes()).hexdigest()
     expected = frozen_contract_payload(common_contract_sha256=sha)

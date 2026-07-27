@@ -116,6 +116,26 @@ def _distributed_posterior_spectra(
     return spectra
 
 
+def _load_saved_posterior_samples(
+    run_directory: str | Path,
+    parameter_count: int,
+) -> np.ndarray:
+    """Load the rank-0 serialized posterior after the retrieval MPI barrier."""
+
+    arrays_path = Path(run_directory) / "result_arrays.npz"
+    with np.load(arrays_path, allow_pickle=False) as archive:
+        if "samples" not in archive.files:
+            raise RuntimeError(f"saved retrieval arrays contain no samples: {arrays_path}")
+        samples = np.asarray(archive["samples"], dtype=float)
+    if samples.ndim != 2 or samples.shape[1] != parameter_count:
+        raise RuntimeError(
+            "saved posterior samples have an incompatible parameter dimension"
+        )
+    if samples.shape[0] == 0 or not np.all(np.isfinite(samples)):
+        raise RuntimeError("saved posterior samples are empty or non-finite")
+    return samples
+
+
 def _load_observation(run: dict[str, Any]) -> Observation:
     injection_path = Path(run["injection_product"])
     with np.load(injection_path, allow_pickle=False) as archive:
@@ -383,9 +403,13 @@ def main() -> None:
     communicator.Barrier()
     posterior_spectra = None
     if pilot_output is None:
+        samples = _load_saved_posterior_samples(
+            run["run_directory"],
+            len(result.parameter_names),
+        )
         posterior_spectra = _distributed_posterior_spectra(
             tuple(result.parameter_names),
-            np.asarray(result.samples, dtype=float),
+            samples,
             forward,
             communicator,
         )
