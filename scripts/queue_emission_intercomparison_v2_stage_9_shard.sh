@@ -45,5 +45,14 @@ for relative_config in "${run_configs[@]}"; do
     printf 'exec %q\n' "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9.sh"
   } > "$launcher"
   chmod 750 "$launcher"
-  addqueue -q redwood -s -c "s9-${retriever}-${scenario}-${run_id}" -n 1x12 -m "$memory_per_cpu_gb" -r "$launcher"
+  submission_output="$(
+    addqueue -q redwood -s -c "s9-${retriever}-${scenario}-${run_id}" \
+      -n 1x12 -m "$memory_per_cpu_gb" -r "$launcher" 2>&1
+  )"
+  printf '%s\n' "$submission_output"
+  if [[ "$submission_output" == *"Batch job submission failed"* ]] \
+    || [[ "$submission_output" != *"Sending program's output to file:"* ]]; then
+    echo "Stopping shard after an unconfirmed addqueue submission: $run_id" >&2
+    exit 1
+  fi
 done
