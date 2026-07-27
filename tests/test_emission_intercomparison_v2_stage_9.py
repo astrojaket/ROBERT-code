@@ -360,6 +360,9 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
     assert "addqueue -q redwood -s" in shard_text
     assert "-n 1x12" in shard_text
     assert "-n 12" not in shard_text
+    assert '"preliminary_memory_gb"' in shard_text
+    assert "memory_per_cpu_gb=$(( (total_memory_gb + 11) / 12 ))" in shard_text
+    assert '-m "$memory_per_cpu_gb"' in shard_text
 
 
 def test_single_run_plotter_writes_spectrum_tp_and_corner_products(

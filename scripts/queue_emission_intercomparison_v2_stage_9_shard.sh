@@ -20,7 +20,8 @@ done
 shard_json="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 retriever="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["retriever"])' "$shard_json")"
 scenario="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["scenario"])' "$shard_json")"
-memory_gb="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["preliminary_memory_gb"])' "$shard_json")"
+total_memory_gb="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["preliminary_memory_gb"])' "$shard_json")"
+memory_per_cpu_gb=$(( (total_memory_gb + 11) / 12 ))
 mapfile -t run_configs < <(python -c 'import json,sys; [print(item) for item in json.load(open(sys.argv[1]))["execution_order"]]' "$shard_json")
 
 if [[ "${STAGE9_CONFIRM_PRODUCTION_SUBMISSION:-}" != "YES" ]]; then
@@ -44,5 +45,5 @@ for relative_config in "${run_configs[@]}"; do
     printf 'exec %q\n' "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9.sh"
   } > "$launcher"
   chmod 750 "$launcher"
-  addqueue -q redwood -s -c "s9-${retriever}-${scenario}-${run_id}" -n 1x12 -m "$memory_gb" -r "$launcher"
+  addqueue -q redwood -s -c "s9-${retriever}-${scenario}-${run_id}" -n 1x12 -m "$memory_per_cpu_gb" -r "$launcher"
 done

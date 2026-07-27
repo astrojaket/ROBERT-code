@@ -110,10 +110,11 @@ required injection means.
 Exported Stage-9 paths above must remain in the submission shell. Glamdring's
 `-s -n 1x12` pattern starts one wrapper in an explicitly one-node, 12-core
 allocation. The wrapper then starts one self-contained 12-rank Conda
-MPICH/Hydra world. Because `-m` is a per-node request, do not replace `1x12`
-with unconstrained `12`: that could reserve the requested memory on several
-nodes even though Hydra's `fork` launcher uses only the wrapper node. Submit one
-preflight for each framework:
+MPICH/Hydra world. With this topology, Glamdring translates `addqueue -m N`
+into a per-CPU Slurm request. The production helper divides each intended total
+memory budget across the 12 reserved cores and rounds upward. Do not pass the
+total budget directly to `-m`, and do not replace `1x12` with unconstrained
+`12`. Submit one preflight for each framework:
 
 ```bash
 module list
@@ -126,15 +127,15 @@ The launcher rejects a loaded OpenMPI module instead of risking an ABI mixture.
 export STAGE9_TASK=preflight
 
 export STAGE9_FRAMEWORK=picaso
-addqueue -q redwood -s -c s9-preflight-picaso -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-preflight-picaso -n 1x12 -m 3 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=petitradtrans
-addqueue -q redwood -s -c s9-preflight-prt -n 1x12 -m 64 \
+addqueue -q redwood -s -c s9-preflight-prt -n 1x12 -m 6 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=robert
-addqueue -q redwood -s -c s9-preflight-robert -n 1x12 -m 96 \
+addqueue -q redwood -s -c s9-preflight-robert -n 1x12 -m 8 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -194,13 +195,14 @@ export STAGE9_FRAMEWORK=picaso
 export STAGE9_SCENARIO=clear_non_inverted
 export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/diagnostics/resource/forward-pilot-picaso-clear_non_inverted.json"
 
-addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 1x12 -m 3 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
 Change the framework, scenario, unique output filename, and memory request for
-the remaining five jobs. Use 32 GB for PICASO, 64 GB for pRT, 96 GB for clear
-ROBERT, and 128 GB for cloudy ROBERT.
+the remaining five jobs. The intended total budgets are 32 GB for PICASO,
+64 GB for pRT, 96 GB for clear ROBERT, and 128 GB for cloudy ROBERT; with
+`1x12`, use corresponding `-m` values of 3, 6, 8, and 11 GB per CPU.
 
 Next run one cross-retrieval pilot per retriever, again one at a time. The
 three frozen configurations are:
@@ -221,12 +223,12 @@ export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/pilots/picaso/clear_non_inverte
 export STAGE9_PILOT_LIVE_POINTS=50
 export STAGE9_PILOT_MAX_ITER=200
 
-addqueue -q redwood -s -c s9-retpilot-picaso -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-retpilot-picaso -n 1x12 -m 3 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
-Repeat with the pRT and ROBERT configuration/output paths and their 64/96 GB
-requests. Resubmitting the same pilot output exercises MultiNest resume; for a
+Repeat with the pRT and ROBERT configuration/output paths and `-m 6`/`-m 8`
+per-CPU requests. Resubmitting the same pilot output exercises MultiNest resume; for a
 stronger checkpoint test, interrupt only through Glamdring's normal job-control
 interface after a checkpoint exists, then resubmit the identical command.
 
@@ -340,13 +342,14 @@ export STAGE9_TASK=spectral-envelope
 export STAGE9_FRAMEWORK=picaso
 export STAGE9_RUN_CONFIG="$STAGE9_PROJECT_ROOT/runs/picaso/clear_non_inverted/clear_non_inverted__inj-robert__ret-picaso__060ppm__mean/run.json"
 
-addqueue -q redwood -s -c s9-envelope-picaso-example -n 1x12 -m 32 \
+addqueue -q redwood -s -c s9-envelope-picaso-example -n 1x12 -m 3 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
-Use the run's retriever as `STAGE9_FRAMEWORK` and the corresponding per-node
-memory request: 32 GB for PICASO, 64 GB for petitRADTRANS, 96 GB for clear
-ROBERT, or 128 GB for cloudy ROBERT. The backfill is idempotent and stores only
+Use the run's retriever as `STAGE9_FRAMEWORK`. For a `1x12` job, pass the
+per-CPU request to `-m`: 3 GB for PICASO, 6 GB for petitRADTRANS, 8 GB for
+clear ROBERT, or 11 GB for cloudy ROBERT. Those reserve total node budgets of
+36, 72, 96, and 132 GB respectively. The backfill is idempotent and stores only
 q16/q50/q84, not the complete posterior spectral matrix.
 
 Generate the large clear, non-inverted comparison product with one page per
