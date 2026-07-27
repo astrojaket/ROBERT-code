@@ -161,10 +161,29 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                             best = np.asarray(
                                 archive["best_fit_eclipse_depth"], dtype=float
                             )
+                            required = (
+                                "posterior_spectrum_q16_eclipse_depth",
+                                "posterior_spectrum_q84_eclipse_depth",
+                            )
+                            missing = [
+                                name for name in required if name not in archive.files
+                            ]
+                            if missing:
+                                raise RuntimeError(
+                                    "true posterior spectral envelope is missing for "
+                                    f"{match['run_id']}; run its Stage-9 "
+                                    "spectral-envelope backfill"
+                                )
+                            spectrum_q16 = np.asarray(
+                                archive[required[0]], dtype=float
+                            )
+                            spectrum_q84 = np.asarray(
+                                archive[required[1]], dtype=float
+                            )
                         axis.fill_between(
                             wavelength,
-                            best * 1.0e6 - tier,
-                            best * 1.0e6 + tier,
+                            spectrum_q16 * 1.0e6,
+                            spectrum_q84 * 1.0e6,
                             color=COLORS[retriever],
                             alpha=0.10,
                             linewidth=0.0,

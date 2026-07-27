@@ -442,7 +442,7 @@
       "effective_minimum": 0,
       "requested_derivation": "first_32_bits_sha256_masked_to_nonnegative_31_bit"
     },
-    "verbose": false
+    "verbose": true
   },
   "scenarios": [
     {

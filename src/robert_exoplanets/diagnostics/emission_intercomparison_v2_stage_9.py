@@ -40,7 +40,7 @@ MULTINEST_SETTINGS = {
     "importance_nested_sampling": True,
     "multimodal": True,
     "n_iter_before_update": 100,
-    "verbose": False,
+    "verbose": True,
     "mpi_nprocs": MPI_RANKS_PER_RETRIEVAL,
     "invalid_loglike_floor": -1.0e100,
 }

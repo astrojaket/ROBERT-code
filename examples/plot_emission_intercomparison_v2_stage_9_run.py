@@ -113,6 +113,18 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         wavelength = np.asarray(archive["wavelength_micron"], dtype=float)
         injection = np.asarray(archive["injection_eclipse_depth"], dtype=float)
         best = np.asarray(archive["best_fit_eclipse_depth"], dtype=float)
+        required = (
+            "posterior_spectrum_q16_eclipse_depth",
+            "posterior_spectrum_q84_eclipse_depth",
+        )
+        missing = [name for name in required if name not in archive.files]
+        if missing:
+            raise RuntimeError(
+                "true posterior spectral envelope is missing; run the Stage-9 "
+                "spectral-envelope backfill for this retrieval"
+            )
+        spectrum_q16 = np.asarray(archive[required[0]], dtype=float)
+        spectrum_q84 = np.asarray(archive[required[1]], dtype=float)
     sigma_ppm = float(run["noise_ppm"])
     injector = str(run["injector"])
     retriever = str(run["retriever"])
@@ -142,12 +154,12 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     )
     uncertainty_artist = spectrum.fill_between(
         wavelength,
-        best * 1.0e6 - sigma_ppm,
-        best * 1.0e6 + sigma_ppm,
+        spectrum_q16 * 1.0e6,
+        spectrum_q84 * 1.0e6,
         color=retriever_color,
         alpha=0.18,
         linewidth=0.0,
-        label="best fit ± 1σ data uncertainty",
+        label="central 68% spectral posterior",
     )
     (best_artist,) = spectrum.plot(
         wavelength,
@@ -162,7 +174,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         labels=(
             f"{sigma_ppm:g} ppm data generated with {injector_label}",
             f"best-fitting spectrum from {retriever_label}",
-            "best fit ± 1σ data uncertainty",
+            "central 68% spectral posterior",
         ),
     )
     spectrum.grid(alpha=0.2)
@@ -173,12 +185,12 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     best_residual = (best - injection) * 1.0e6
     residual.fill_between(
         wavelength,
-        best_residual - sigma_ppm,
-        best_residual + sigma_ppm,
+        (spectrum_q16 - injection) * 1.0e6,
+        (spectrum_q84 - injection) * 1.0e6,
         color=retriever_color,
         alpha=0.18,
         linewidth=0.0,
-        label="best fit ± 1σ",
+        label="central 68% spectral posterior",
     )
     residual.plot(
         wavelength,

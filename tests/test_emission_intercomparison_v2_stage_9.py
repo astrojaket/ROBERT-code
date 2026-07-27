@@ -28,6 +28,9 @@ CONTRACT = (
 )
 PREPARE = ROOT / "scripts/prepare_emission_intercomparison_v2_stage_9.py"
 NATIVE = ROOT / "examples/emission_intercomparison_v2_stage_9_native.py"
+RETRIEVAL_RUNNER = (
+    ROOT / "examples/run_emission_intercomparison_v2_stage_9_retrieval.py"
+)
 SINGLE_RUN_PLOT = (
     ROOT / "examples/plot_emission_intercomparison_v2_stage_9_run.py"
 )
@@ -57,6 +60,17 @@ def _load_prepare_module():
 
 def _load_native_module():
     spec = importlib.util.spec_from_file_location("stage9_native_for_tests", NATIVE)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_retrieval_runner_module():
+    spec = importlib.util.spec_from_file_location(
+        "stage9_retrieval_runner_for_tests", RETRIEVAL_RUNNER
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -101,6 +115,7 @@ def test_frozen_stage_9_matrix_counts_and_resources() -> None:
     assert {run.threads_per_rank for run in runs} == {1}
     assert MULTINEST_SETTINGS["n_live_points"] == 400
     assert MULTINEST_SETTINGS["mpi_nprocs"] == 12
+    assert MULTINEST_SETTINGS["verbose"] is True
     assert len(GAUSSIAN_NOISE_SEEDS) == 0
     assert {run.noise_id for run in runs} == {"mean"}
     assert all(0 <= run.sampler_seed <= 0x7FFF_FFFF for run in runs)
@@ -158,6 +173,17 @@ def test_cloud_optical_depth_combination_copies_read_only_gas_array() -> None:
     assert combined.flags.writeable
     np.testing.assert_allclose(combined, 1.25)
     np.testing.assert_allclose(gas, 1.0)
+
+
+def test_weighted_spectral_quantiles_use_posterior_samples() -> None:
+    module = _load_retrieval_runner_module()
+    q16, q50, q84 = module._weighted_spectral_quantiles(
+        np.asarray([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]]),
+        np.asarray([0.2, 0.3, 0.5]),
+    )
+    np.testing.assert_allclose(q16, [1.0, 10.0])
+    np.testing.assert_allclose(q50, [2.0, 20.0])
+    np.testing.assert_allclose(q84, [2.68, 26.8])
 
 
 def test_committed_stage_9_contract_matches_source_of_truth() -> None:
@@ -327,12 +353,13 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
     production_text = PRODUCTION_LAUNCHER.read_text(encoding="utf-8")
     assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in task_text
     assert '"$environment_prefix" 1 "$python_executable"' in task_text
+    assert "spectral-envelope)" in task_text
     assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in production_text
 
     shard_text = SHARD_SUBMITTER.read_text(encoding="utf-8")
     assert "addqueue -q redwood -s" in shard_text
-    assert "-n 12" in shard_text
-    assert "1x12" not in shard_text
+    assert "-n 1x12" in shard_text
+    assert "-n 12" not in shard_text
 
 
 def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
@@ -373,6 +400,9 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
         injection_eclipse_depth=injection,
         best_fit_eclipse_depth=injection + 2.0e-6,
         posterior_median_eclipse_depth=injection - 1.0e-6,
+        posterior_spectrum_q16_eclipse_depth=injection - 5.0e-6,
+        posterior_spectrum_q50_eclipse_depth=injection - 1.0e-6,
+        posterior_spectrum_q84_eclipse_depth=injection + 6.0e-6,
     )
     (run_dir / "result.json").write_text(
         json.dumps(
@@ -450,6 +480,9 @@ def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
             injection_eclipse_depth=injection,
             best_fit_eclipse_depth=injection + 1.0e-6,
             posterior_median_eclipse_depth=injection,
+            posterior_spectrum_q16_eclipse_depth=injection - 4.0e-6,
+            posterior_spectrum_q50_eclipse_depth=injection,
+            posterior_spectrum_q84_eclipse_depth=injection + 5.0e-6,
         )
         (run_dir / "result.json").write_text(
             json.dumps(

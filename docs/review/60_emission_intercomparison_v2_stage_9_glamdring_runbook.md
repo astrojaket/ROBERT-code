@@ -108,9 +108,12 @@ required injection means.
 ## 3. Queue preflights
 
 Exported Stage-9 paths above must remain in the submission shell. Glamdring's
-`-s -n 12` pattern starts one wrapper in a one-node, 12-core allocation. The
-wrapper then starts one self-contained 12-rank Conda MPICH/Hydra world. Submit
-one preflight for each framework:
+`-s -n 1x12` pattern starts one wrapper in an explicitly one-node, 12-core
+allocation. The wrapper then starts one self-contained 12-rank Conda
+MPICH/Hydra world. Because `-m` is a per-node request, do not replace `1x12`
+with unconstrained `12`: that could reserve the requested memory on several
+nodes even though Hydra's `fork` launcher uses only the wrapper node. Submit one
+preflight for each framework:
 
 ```bash
 module list
@@ -123,20 +126,23 @@ The launcher rejects a loaded OpenMPI module instead of risking an ABI mixture.
 export STAGE9_TASK=preflight
 
 export STAGE9_FRAMEWORK=picaso
-addqueue -q redwood -s -c s9-preflight-picaso -n 12 -m 32 \
+addqueue -q redwood -s -c s9-preflight-picaso -n 1x12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=petitradtrans
-addqueue -q redwood -s -c s9-preflight-prt -n 12 -m 64 \
+addqueue -q redwood -s -c s9-preflight-prt -n 1x12 -m 64 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 
 export STAGE9_FRAMEWORK=robert
-addqueue -q redwood -s -c s9-preflight-robert -n 12 -m 96 \
+addqueue -q redwood -s -c s9-preflight-robert -n 1x12 -m 96 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
 Do not continue until `integrity/preflight-{picaso,petitradtrans,robert}.json`
 exist and agree with the frozen versions, paths, hashes, and 12-rank ABI.
+MultiNest verbose progress reporting is enabled for production monitoring. This
+changes terminal output only; it does not change the sampler trajectory,
+stopping condition, checkpoints, or posterior.
 
 ## 4. Generate native injections
 
@@ -188,7 +194,7 @@ export STAGE9_FRAMEWORK=picaso
 export STAGE9_SCENARIO=clear_non_inverted
 export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/diagnostics/resource/forward-pilot-picaso-clear_non_inverted.json"
 
-addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 12 -m 32 \
+addqueue -q redwood -s -c s9-fwdpilot-picaso-clear -n 1x12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -215,7 +221,7 @@ export STAGE9_PILOT_OUTPUT="$STAGE9_PROJECT_ROOT/pilots/picaso/clear_non_inverte
 export STAGE9_PILOT_LIVE_POINTS=50
 export STAGE9_PILOT_MAX_ITER=200
 
-addqueue -q redwood -s -c s9-retpilot-picaso -n 12 -m 32 \
+addqueue -q redwood -s -c s9-retpilot-picaso -n 1x12 -m 32 \
   -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
 ```
 
@@ -316,12 +322,32 @@ The three PNG files are written below that run's `plots/` directory. Spectral
 data are shown as the noiseless injection values with the run's 30, 60, or
 100 ppm likelihood uncertainty as error bars. Framework colours follow the
 paper palette: ROBERT is medium purple, petitRADTRANS is plum, and PICASO is
-charcoal. The spectral panel labels the injector and retriever explicitly and
-shades the best-fitting spectrum by the same one-sigma data uncertainty. This
-spectral band is the likelihood uncertainty centered on the best fit, not a
-posterior-predictive credible interval. The TP panel compares the best-fitting
-TP profile with the exact input TP and shades the central 68% TP posterior
-derived from up to 5,000 deterministically weighted saved posterior samples.
+charcoal. The spectral panel labels the injector and retriever explicitly,
+plots the best-fitting spectrum, and shades the wavelength-wise central 68%
+posterior spectrum. That envelope is calculated from native forward-model
+evaluations of every saved weighted posterior sample; it is not the observational
+30, 60, or 100 ppm error envelope. The TP panel compares the best-fitting TP
+profile with the exact input TP and shades the central 68% TP posterior derived
+from up to 5,000 deterministically weighted saved posterior samples.
+
+Newly completed retrievals calculate and save their exact posterior spectral
+quantiles automatically on the same 12-rank job. For a retrieval completed
+before this capability was added, backfill the quantiles as a scheduled
+Glamdring science post-processing job:
+
+```bash
+export STAGE9_TASK=spectral-envelope
+export STAGE9_FRAMEWORK=picaso
+export STAGE9_RUN_CONFIG="$STAGE9_PROJECT_ROOT/runs/picaso/clear_non_inverted/clear_non_inverted__inj-robert__ret-picaso__060ppm__mean/run.json"
+
+addqueue -q redwood -s -c s9-envelope-picaso-example -n 1x12 -m 32 \
+  -r "$STAGE9_REPOSITORY/scripts/submit_emission_intercomparison_v2_stage_9_task.sh"
+```
+
+Use the run's retriever as `STAGE9_FRAMEWORK` and the corresponding per-node
+memory request: 32 GB for PICASO, 64 GB for petitRADTRANS, 96 GB for clear
+ROBERT, or 128 GB for cloudy ROBERT. The backfill is idempotent and stores only
+q16/q50/q84, not the complete posterior spectral matrix.
 
 Generate the large clear, non-inverted comparison product with one page per
 uncertainty tier and injection framework:

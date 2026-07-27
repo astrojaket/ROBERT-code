@@ -56,6 +56,66 @@ def _weighted_quantile(
     return float(np.interp(quantile, cumulative, sorted_values))
 
 
+def _weighted_spectral_quantiles(
+    spectra: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if spectra.ndim != 2 or weights.shape != (spectra.shape[0],):
+        raise RuntimeError("posterior spectra and weights have incompatible shapes")
+    if spectra.shape[0] == 0 or not np.all(np.isfinite(spectra)):
+        raise RuntimeError("posterior spectral samples are empty or non-finite")
+    return tuple(
+        np.asarray(
+            [
+                _weighted_quantile(spectra[:, column], weights, quantile)
+                for column in range(spectra.shape[1])
+            ],
+            dtype=float,
+        )
+        for quantile in (0.16, 0.50, 0.84)
+    )
+
+
+def _distributed_posterior_spectra(
+    parameter_names: tuple[str, ...],
+    samples: np.ndarray,
+    forward: Any,
+    communicator: Any,
+) -> np.ndarray | None:
+    rank = int(communicator.Get_rank())
+    size = int(communicator.Get_size())
+    indices = np.arange(rank, samples.shape[0], size, dtype=np.int64)
+    if indices.size:
+        local = np.asarray(
+            [
+                forward.eclipse_depth(
+                    dict(zip(parameter_names, samples[index], strict=True))
+                )
+                for index in indices
+            ],
+            dtype=float,
+        )
+    else:
+        local = np.empty((0, np.asarray(forward.r100_centers).size), dtype=float)
+    gathered = communicator.gather((indices, local), root=0)
+    if rank != 0:
+        return None
+    if not gathered:
+        raise RuntimeError("MPI posterior-spectrum gather returned no payloads")
+    wavelength_count = next(
+        (values.shape[1] for _, values in gathered if values.ndim == 2 and values.size),
+        0,
+    )
+    if wavelength_count == 0:
+        raise RuntimeError("posterior-spectrum gather returned no spectra")
+    spectra = np.empty((samples.shape[0], wavelength_count), dtype=float)
+    for gathered_indices, values in gathered:
+        if values.shape != (gathered_indices.size, wavelength_count):
+            raise RuntimeError("MPI posterior-spectrum payload has an invalid shape")
+        spectra[gathered_indices] = values
+    return spectra
+
+
 def _load_observation(run: dict[str, Any]) -> Observation:
     injection_path = Path(run["injection_product"])
     with np.load(injection_path, allow_pickle=False) as archive:
@@ -102,11 +162,18 @@ def _validate_run(run: dict[str, Any]) -> None:
         raise RuntimeError(
             "Stage-9 retrievals require exactly 12 MPI ranks and one thread each"
         )
-    if run.get("sampler") != {"engine": "multinest", **MULTINEST_SETTINGS}:
+    expected_sampler = {"engine": "multinest", **MULTINEST_SETTINGS}
+    legacy_quiet_sampler = {**expected_sampler, "verbose": False}
+    if run.get("sampler") not in (expected_sampler, legacy_quiet_sampler):
         raise RuntimeError("run configuration changed the frozen MultiNest settings")
 
 
-def _compact_success_products(run: dict[str, Any], result: Any, forward: Any) -> None:
+def _compact_success_products(
+    run: dict[str, Any],
+    result: Any,
+    forward: Any,
+    posterior_spectra: np.ndarray,
+) -> None:
     output = Path(run["run_directory"])
     arrays_path = output / "result_arrays.npz"
     with np.load(arrays_path, allow_pickle=False) as archive:
@@ -118,6 +185,14 @@ def _compact_success_products(run: dict[str, Any], result: Any, forward: Any) ->
             else np.full(samples.shape[0], 1.0 / samples.shape[0])
         )
     weights = weights / np.sum(weights)
+    if posterior_spectra.shape[0] != samples.shape[0]:
+        raise RuntimeError(
+            "posterior spectral sample count differs from saved posterior"
+        )
+    spectrum_q16, spectrum_q50, spectrum_q84 = _weighted_spectral_quantiles(
+        posterior_spectra,
+        weights,
+    )
     names = tuple(result.parameter_names)
     definitions = {item.name: item for item in parameter_definitions(run["scenario"])}
     median = {
@@ -170,6 +245,10 @@ def _compact_success_products(run: dict[str, Any], result: Any, forward: Any) ->
         injection_eclipse_depth=injection,
         best_fit_eclipse_depth=best_spectrum,
         posterior_median_eclipse_depth=median_spectrum,
+        posterior_spectrum_q16_eclipse_depth=spectrum_q16,
+        posterior_spectrum_q50_eclipse_depth=spectrum_q50,
+        posterior_spectrum_q84_eclipse_depth=spectrum_q84,
+        posterior_spectral_sample_count=np.asarray(samples.shape[0], dtype=np.int64),
     )
     (output / "posterior_summary.json").write_text(
         json.dumps(
@@ -181,6 +260,12 @@ def _compact_success_products(run: dict[str, Any], result: Any, forward: Any) ->
                 "log_evidence": result.log_evidence,
                 "log_evidence_error": result.log_evidence_error,
                 "converged": bool(result.converged),
+                "posterior_spectral_envelope": {
+                    "sample_count": int(samples.shape[0]),
+                    "sample_selection": "all_saved_weighted_posterior_samples",
+                    "quantiles": [0.16, 0.50, 0.84],
+                    "native_forward_framework": run["retriever"],
+                },
                 "fit_metrics": {
                     "n_data": observation.n_points,
                     "n_parameters": len(names),
@@ -296,8 +381,19 @@ def main() -> None:
         **settings,
     )
     communicator.Barrier()
+    posterior_spectra = None
+    if pilot_output is None:
+        posterior_spectra = _distributed_posterior_spectra(
+            tuple(result.parameter_names),
+            np.asarray(result.samples, dtype=float),
+            forward,
+            communicator,
+        )
+    communicator.Barrier()
     if rank == 0 and pilot_output is None:
-        _compact_success_products(run, result, forward)
+        if posterior_spectra is None:
+            raise RuntimeError("primary rank did not receive posterior spectra")
+        _compact_success_products(run, result, forward, posterior_spectra)
     elif rank == 0:
         (pilot_output / "PILOT_ONLY").write_text(
             "This bounded product is an infrastructure/resume pilot and is not a Stage-9 science retrieval.\n",
