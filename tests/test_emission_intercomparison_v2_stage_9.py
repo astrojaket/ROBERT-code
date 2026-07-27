@@ -47,6 +47,9 @@ PRODUCTION_LAUNCHER = (
 SHARD_SUBMITTER = (
     ROOT / "scripts/queue_emission_intercomparison_v2_stage_9_shard.sh"
 )
+ENVELOPE_SUBMITTER = (
+    ROOT / "scripts/queue_emission_intercomparison_v2_stage_9_envelopes.sh"
+)
 
 
 def _load_prepare_module():
@@ -186,6 +189,25 @@ def test_weighted_spectral_quantiles_use_posterior_samples() -> None:
     np.testing.assert_allclose(q84, [2.68, 26.8])
 
 
+def test_default_envelopes_include_one_and_two_sigma_and_chemistry() -> None:
+    module = _load_retrieval_runner_module()
+    assert module.POSTERIOR_ENVELOPE_QUANTILES == (
+        0.025,
+        0.16,
+        0.50,
+        0.84,
+        0.975,
+    )
+    definitions = parameter_definitions("clear_non_inverted")
+    names = tuple(item.name for item in definitions)
+    truth = np.asarray([[item.truth for item in definitions]], dtype=float)
+    species, chemistry = module._posterior_chemistry(names, truth)
+
+    assert species == ("H2", "He", "H2O", "CO", "CO2", "CH4")
+    assert chemistry.shape == (1, 6)
+    np.testing.assert_allclose(np.sum(chemistry, axis=1), 1.0)
+
+
 def test_retrieval_runner_loads_serialized_posterior_samples(
     tmp_path: Path,
 ) -> None:
@@ -200,6 +222,34 @@ def test_retrieval_runner_loads_serialized_posterior_samples(
     actual = module._load_saved_posterior_samples(tmp_path, parameter_count=2)
 
     np.testing.assert_array_equal(actual, expected)
+
+
+def test_posterior_plot_metadata_follows_result_names_and_run_config() -> None:
+    module = _load_single_run_plot_module()
+    run = {
+        "parameters": [
+            {"name": "cloud_fraction", "label": "Cloud fraction"},
+            {
+                "name": "temperature",
+                "label": "Temperature",
+                "unit": "K",
+                "reference_value": 1500.0,
+            },
+        ]
+    }
+
+    metadata = module._parameter_metadata(
+        run,
+        ("temperature", "cloud_fraction"),
+    )
+
+    assert [item["name"] for item in metadata] == [
+        "temperature",
+        "cloud_fraction",
+    ]
+    assert module._parameter_label(metadata[0]) == "Temperature [K]"
+    assert module._reference_value(metadata[0]) == 1500.0
+    assert module._reference_value(metadata[1]) is None
 
 
 def test_committed_stage_9_contract_matches_source_of_truth() -> None:
@@ -369,7 +419,8 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
     production_text = PRODUCTION_LAUNCHER.read_text(encoding="utf-8")
     assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in task_text
     assert '"$environment_prefix" 1 "$python_executable"' in task_text
-    assert "spectral-envelope)" in task_text
+    assert "posterior-envelopes|spectral-envelope)" in task_text
+    assert "generate_emission_intercomparison_v2_stage_9_posterior_envelopes.py" in task_text
     assert "launch_emission_intercomparison_v2_stage_9_mpi.sh" in production_text
 
     shard_text = SHARD_SUBMITTER.read_text(encoding="utf-8")
@@ -381,6 +432,11 @@ def test_glamdring_launchers_use_one_wrapper_and_conda_mpich() -> None:
     assert '-m "$memory_per_cpu_gb"' in shard_text
     assert "Batch job submission failed" in shard_text
     assert "Stopping shard after an unconfirmed addqueue submission" in shard_text
+
+    envelope_text = ENVELOPE_SUBMITTER.read_text(encoding="utf-8")
+    assert "STAGE9_TASK=posterior-envelopes" in envelope_text
+    assert "-n 1x12" in envelope_text
+    assert 'addqueue -q redwood -s -c "s9-envelope-' in envelope_text
 
 
 def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
@@ -409,6 +465,16 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
     run_dir.mkdir()
     wavelength = np.linspace(1.0, 12.0, 40)
     injection = np.linspace(5.0e-4, 2.5e-3, wavelength.size)
+    common = json.loads(COMMON.read_text(encoding="utf-8"))
+    pressure = np.asarray(
+        next(
+            item["centers_bar"]
+            for item in common["pressure_grids"]
+            if item["n_cells"] == 80
+        ),
+        dtype=float,
+    )
+    best_tp = np.linspace(2500.0, 1000.0, pressure.size)
     np.savez(
         run_dir / "result_arrays.npz",
         samples=samples,
@@ -418,12 +484,36 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
     np.savez(
         run_dir / "diagnostic_spectra.npz",
         wavelength_micron=wavelength,
-        injection_eclipse_depth=injection,
+        observed_eclipse_depth=injection,
+        observational_uncertainty_eclipse_depth=np.full(
+            wavelength.size, 60.0e-6
+        ),
         best_fit_eclipse_depth=injection + 2.0e-6,
-        posterior_median_eclipse_depth=injection - 1.0e-6,
+        posterior_spectrum_q025_eclipse_depth=injection - 9.0e-6,
         posterior_spectrum_q16_eclipse_depth=injection - 5.0e-6,
         posterior_spectrum_q50_eclipse_depth=injection - 1.0e-6,
         posterior_spectrum_q84_eclipse_depth=injection + 6.0e-6,
+        posterior_spectrum_q975_eclipse_depth=injection + 10.0e-6,
+    )
+    np.savez(
+        run_dir / "diagnostic_tp.npz",
+        pressure_bar=pressure,
+        best_fit_temperature_k=best_tp,
+        posterior_temperature_q025_k=best_tp - 180.0,
+        posterior_temperature_q16_k=best_tp - 90.0,
+        posterior_temperature_q50_k=best_tp,
+        posterior_temperature_q84_k=best_tp + 90.0,
+        posterior_temperature_q975_k=best_tp + 180.0,
+    )
+    np.savez(
+        run_dir / "diagnostic_chemistry.npz",
+        species=np.asarray(("H2", "He", "H2O", "CO", "CO2", "CH4")),
+        best_fit_vmr=np.asarray((0.84, 0.14, 1.0e-3, 1.0e-3, 1.0e-4, 1.0e-5)),
+        posterior_vmr_q025=np.full(6, 1.0e-6),
+        posterior_vmr_q16=np.full(6, 2.0e-6),
+        posterior_vmr_q50=np.full(6, 3.0e-6),
+        posterior_vmr_q84=np.full(6, 4.0e-6),
+        posterior_vmr_q975=np.full(6, 5.0e-6),
     )
     (run_dir / "result.json").write_text(
         json.dumps(
@@ -446,6 +536,9 @@ def test_single_run_plotter_writes_spectrum_tp_and_corner_products(
                 "noise_ppm": 60,
                 "run_directory": str(run_dir),
                 "common_contract": str(COMMON),
+                "parameters": json.loads(CONTRACT.read_text(encoding="utf-8"))[
+                    "parameters_by_scenario"
+                ]["clear_non_inverted"],
             }
         ),
         encoding="utf-8",
@@ -478,6 +571,16 @@ def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
     rng = np.random.default_rng(91)
     wavelength = np.linspace(1.0, 12.0, 30)
     injection = np.linspace(5.0e-4, 2.5e-3, wavelength.size)
+    common = json.loads(COMMON.read_text(encoding="utf-8"))
+    pressure = np.asarray(
+        next(
+            item["centers_bar"]
+            for item in common["pressure_grids"]
+            if item["n_cells"] == 80
+        ),
+        dtype=float,
+    )
+    best_tp = np.linspace(2400.0, 1100.0, pressure.size)
     for retriever in ("picaso", "petitradtrans"):
         run_id = f"synthetic-robert-to-{retriever}"
         run_dir = project / "runs" / retriever / "clear_non_inverted" / run_id
@@ -498,12 +601,38 @@ def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
         np.savez(
             run_dir / "diagnostic_spectra.npz",
             wavelength_micron=wavelength,
-            injection_eclipse_depth=injection,
+            observed_eclipse_depth=injection,
+            observational_uncertainty_eclipse_depth=np.full(
+                wavelength.size, 100.0e-6
+            ),
             best_fit_eclipse_depth=injection + 1.0e-6,
-            posterior_median_eclipse_depth=injection,
+            posterior_spectrum_q025_eclipse_depth=injection - 8.0e-6,
             posterior_spectrum_q16_eclipse_depth=injection - 4.0e-6,
             posterior_spectrum_q50_eclipse_depth=injection,
             posterior_spectrum_q84_eclipse_depth=injection + 5.0e-6,
+            posterior_spectrum_q975_eclipse_depth=injection + 9.0e-6,
+        )
+        np.savez(
+            run_dir / "diagnostic_tp.npz",
+            pressure_bar=pressure,
+            best_fit_temperature_k=best_tp,
+            posterior_temperature_q025_k=best_tp - 160.0,
+            posterior_temperature_q16_k=best_tp - 80.0,
+            posterior_temperature_q50_k=best_tp,
+            posterior_temperature_q84_k=best_tp + 80.0,
+            posterior_temperature_q975_k=best_tp + 160.0,
+        )
+        np.savez(
+            run_dir / "diagnostic_chemistry.npz",
+            species=np.asarray(("H2", "He", "H2O", "CO", "CO2", "CH4")),
+            best_fit_vmr=np.asarray(
+                (0.84, 0.14, 1.0e-3, 1.0e-3, 1.0e-4, 1.0e-5)
+            ),
+            posterior_vmr_q025=np.full(6, 1.0e-6),
+            posterior_vmr_q16=np.full(6, 2.0e-6),
+            posterior_vmr_q50=np.full(6, 3.0e-6),
+            posterior_vmr_q84=np.full(6, 4.0e-6),
+            posterior_vmr_q975=np.full(6, 5.0e-6),
         )
         (run_dir / "result.json").write_text(
             json.dumps(
@@ -526,6 +655,9 @@ def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
                     "retriever": retriever,
                     "noise_ppm": 100,
                     "run_directory": str(run_dir),
+                    "parameters": json.loads(
+                        CONTRACT.read_text(encoding="utf-8")
+                    )["parameters_by_scenario"]["clear_non_inverted"],
                 }
             ),
             encoding="utf-8",

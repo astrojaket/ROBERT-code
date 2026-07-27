@@ -18,6 +18,8 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from emission_intercomparison_v2_stage_9_native import (  # noqa: E402
+    MOLECULAR_SPECIES,
+    atmospheric_state,
     build_native_forward,
     load_common_contract,
 )
@@ -34,6 +36,8 @@ from robert_exoplanets.retrieval import (  # noqa: E402
     UniformPrior,
     run_retrieval,
 )
+
+POSTERIOR_ENVELOPE_QUANTILES = (0.025, 0.16, 0.50, 0.84, 0.975)
 
 
 def _mpi() -> tuple[int, Any | None]:
@@ -56,24 +60,54 @@ def _weighted_quantile(
     return float(np.interp(quantile, cumulative, sorted_values))
 
 
+def _weighted_column_quantiles(
+    values: np.ndarray,
+    weights: np.ndarray,
+) -> tuple[np.ndarray, ...]:
+    if values.ndim != 2 or weights.shape != (values.shape[0],):
+        raise RuntimeError("posterior values and weights have incompatible shapes")
+    if values.shape[0] == 0 or not np.all(np.isfinite(values)):
+        raise RuntimeError("posterior values are empty or non-finite")
+    return tuple(
+        np.asarray(
+            [
+                _weighted_quantile(values[:, column], weights, quantile)
+                for column in range(values.shape[1])
+            ],
+            dtype=float,
+        )
+        for quantile in POSTERIOR_ENVELOPE_QUANTILES
+    )
+
+
 def _weighted_spectral_quantiles(
     spectra: np.ndarray,
     weights: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    if spectra.ndim != 2 or weights.shape != (spectra.shape[0],):
-        raise RuntimeError("posterior spectra and weights have incompatible shapes")
-    if spectra.shape[0] == 0 or not np.all(np.isfinite(spectra)):
-        raise RuntimeError("posterior spectral samples are empty or non-finite")
-    return tuple(
-        np.asarray(
-            [
-                _weighted_quantile(spectra[:, column], weights, quantile)
-                for column in range(spectra.shape[1])
-            ],
-            dtype=float,
-        )
-        for quantile in (0.16, 0.50, 0.84)
+    quantiles = _weighted_column_quantiles(spectra, weights)
+    return quantiles[1], quantiles[2], quantiles[3]
+
+
+def _posterior_chemistry(
+    parameter_names: tuple[str, ...],
+    samples: np.ndarray,
+) -> tuple[tuple[str, ...], np.ndarray]:
+    active = np.column_stack(
+        [
+            np.power(
+                10.0,
+                samples[:, parameter_names.index(f"log10_vmr_{species}")],
+            )
+            for species in MOLECULAR_SPECIES
+        ]
     )
+    remainder = 1.0 - np.sum(active, axis=1)
+    if np.any(remainder <= 0.0):
+        raise RuntimeError("saved posterior contains an invalid active-gas VMR sum")
+    chemistry = np.column_stack(
+        (remainder * 0.8547, remainder * 0.1453, active)
+    )
+    return ("H2", "He", *MOLECULAR_SPECIES), chemistry
 
 
 def _distributed_posterior_spectra(
@@ -114,6 +148,52 @@ def _distributed_posterior_spectra(
             raise RuntimeError("MPI posterior-spectrum payload has an invalid shape")
         spectra[gathered_indices] = values
     return spectra
+
+
+def _distributed_posterior_temperatures(
+    parameter_names: tuple[str, ...],
+    samples: np.ndarray,
+    common: dict[str, Any],
+    scenario: str,
+    communicator: Any,
+) -> np.ndarray | None:
+    rank = int(communicator.Get_rank())
+    size = int(communicator.Get_size())
+    indices = np.arange(rank, samples.shape[0], size, dtype=np.int64)
+    pressure_count = int(
+        next(
+            item["n_cells"]
+            for item in common["pressure_grids"]
+            if item["n_cells"] == 80
+        )
+    )
+    if indices.size:
+        local = np.asarray(
+            [
+                atmospheric_state(
+                    common,
+                    scenario,
+                    dict(zip(parameter_names, samples[index], strict=True)),
+                ).temperature_cells_k
+                for index in indices
+            ],
+            dtype=float,
+        )
+    else:
+        local = np.empty((0, pressure_count), dtype=float)
+    gathered = communicator.gather((indices, local), root=0)
+    if rank != 0:
+        return None
+    if not gathered:
+        raise RuntimeError("MPI posterior-TP gather returned no payloads")
+    profiles = np.empty((samples.shape[0], pressure_count), dtype=float)
+    for gathered_indices, values in gathered:
+        if values.shape != (gathered_indices.size, pressure_count):
+            raise RuntimeError("MPI posterior-TP payload has an invalid shape")
+        profiles[gathered_indices] = values
+    if not np.all(np.isfinite(profiles)):
+        raise RuntimeError("MPI posterior-TP gather returned non-finite profiles")
+    return profiles
 
 
 def _load_saved_posterior_samples(
@@ -193,6 +273,8 @@ def _compact_success_products(
     result: Any,
     forward: Any,
     posterior_spectra: np.ndarray,
+    posterior_temperatures: np.ndarray,
+    common: dict[str, Any],
 ) -> None:
     output = Path(run["run_directory"])
     arrays_path = output / "result_arrays.npz"
@@ -209,11 +291,33 @@ def _compact_success_products(
         raise RuntimeError(
             "posterior spectral sample count differs from saved posterior"
         )
-    spectrum_q16, spectrum_q50, spectrum_q84 = _weighted_spectral_quantiles(
+    (
+        spectrum_q025,
+        spectrum_q16,
+        spectrum_q50,
+        spectrum_q84,
+        spectrum_q975,
+    ) = _weighted_column_quantiles(
         posterior_spectra,
         weights,
     )
+    if posterior_temperatures.shape[0] != samples.shape[0]:
+        raise RuntimeError(
+            "posterior TP sample count differs from saved posterior"
+        )
+    tp_q025, tp_q16, tp_q50, tp_q84, tp_q975 = _weighted_column_quantiles(
+        posterior_temperatures,
+        weights,
+    )
     names = tuple(result.parameter_names)
+    chemistry_names, posterior_chemistry = _posterior_chemistry(names, samples)
+    (
+        chemistry_q025,
+        chemistry_q16,
+        chemistry_q50,
+        chemistry_q84,
+        chemistry_q975,
+    ) = _weighted_column_quantiles(posterior_chemistry, weights)
     definitions = {item.name: item for item in parameter_definitions(run["scenario"])}
     median = {
         name: _weighted_quantile(samples[:, index], weights, 0.5)
@@ -251,24 +355,90 @@ def _compact_success_products(
         )
     best = dict(result.best_fit_parameters)
     best_spectrum = forward.eclipse_depth(best)
-    median_spectrum = forward.eclipse_depth(median)
-    with np.load(run["injection_product"], allow_pickle=False) as archive:
-        injection = np.asarray(archive["eclipse_depth"], dtype=float)
-        wavelength = np.asarray(archive["wavelength_micron"], dtype=float)
+    median_spectrum = spectrum_q50
+    best_state = atmospheric_state(
+        common,
+        run["scenario"],
+        best,
+    )
+    if best_state.gas_names != chemistry_names:
+        raise RuntimeError("diagnostic chemistry species order is inconsistent")
+    pressure = np.asarray(
+        next(
+            item["centers_bar"]
+            for item in common["pressure_grids"]
+            if item["n_cells"] == 80
+        ),
+        dtype=float,
+    )
     observation = _load_observation(run)
     best_residual = best_spectrum - observation.flux
     median_residual = median_spectrum - observation.flux
     degrees_of_freedom = max(observation.n_points - len(names), 1)
     np.savez_compressed(
         output / "diagnostic_spectra.npz",
-        wavelength_micron=wavelength,
-        injection_eclipse_depth=injection,
+        wavelength_micron=observation.wavelength,
+        observed_eclipse_depth=observation.flux,
+        observational_uncertainty_eclipse_depth=observation.uncertainty,
         best_fit_eclipse_depth=best_spectrum,
-        posterior_median_eclipse_depth=median_spectrum,
+        posterior_spectrum_q025_eclipse_depth=spectrum_q025,
         posterior_spectrum_q16_eclipse_depth=spectrum_q16,
         posterior_spectrum_q50_eclipse_depth=spectrum_q50,
         posterior_spectrum_q84_eclipse_depth=spectrum_q84,
+        posterior_spectrum_q975_eclipse_depth=spectrum_q975,
         posterior_spectral_sample_count=np.asarray(samples.shape[0], dtype=np.int64),
+    )
+    np.savez_compressed(
+        output / "diagnostic_tp.npz",
+        pressure_bar=pressure,
+        best_fit_temperature_k=best_state.temperature_cells_k,
+        posterior_temperature_q025_k=tp_q025,
+        posterior_temperature_q16_k=tp_q16,
+        posterior_temperature_q50_k=tp_q50,
+        posterior_temperature_q84_k=tp_q84,
+        posterior_temperature_q975_k=tp_q975,
+        posterior_temperature_sample_count=np.asarray(
+            samples.shape[0], dtype=np.int64
+        ),
+    )
+    np.savez_compressed(
+        output / "diagnostic_chemistry.npz",
+        species=np.asarray(chemistry_names),
+        best_fit_vmr=best_state.gas_vmr,
+        posterior_vmr_q025=chemistry_q025,
+        posterior_vmr_q16=chemistry_q16,
+        posterior_vmr_q50=chemistry_q50,
+        posterior_vmr_q84=chemistry_q84,
+        posterior_vmr_q975=chemistry_q975,
+        posterior_chemistry_sample_count=np.asarray(
+            samples.shape[0], dtype=np.int64
+        ),
+        vertically_constant=np.asarray(True),
+    )
+    (output / "posterior_envelope_metadata.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "run_id": run["run_id"],
+                "sample_count": int(samples.shape[0]),
+                "sample_selection": "all_saved_weighted_posterior_samples",
+                "quantiles": list(POSTERIOR_ENVELOPE_QUANTILES),
+                "spectral_forward_framework": run["retriever"],
+                "temperature_parameterization": "ParmentierGuillot2014",
+                "chemistry_representation": "volume_mixing_ratio",
+                "chemistry_species": list(chemistry_names),
+                "products": [
+                    "diagnostic_spectra.npz",
+                    "diagnostic_tp.npz",
+                    "diagnostic_chemistry.npz",
+                ],
+                "mpi_ranks": 12,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
     )
     (output / "posterior_summary.json").write_text(
         json.dumps(
@@ -283,8 +453,22 @@ def _compact_success_products(
                 "posterior_spectral_envelope": {
                     "sample_count": int(samples.shape[0]),
                     "sample_selection": "all_saved_weighted_posterior_samples",
-                    "quantiles": [0.16, 0.50, 0.84],
+                    "quantiles": list(POSTERIOR_ENVELOPE_QUANTILES),
                     "native_forward_framework": run["retriever"],
+                },
+                "posterior_temperature_envelope": {
+                    "sample_count": int(samples.shape[0]),
+                    "sample_selection": "all_saved_weighted_posterior_samples",
+                    "quantiles": list(POSTERIOR_ENVELOPE_QUANTILES),
+                    "temperature_parameterization": "ParmentierGuillot2014",
+                },
+                "posterior_chemistry_envelope": {
+                    "sample_count": int(samples.shape[0]),
+                    "sample_selection": "all_saved_weighted_posterior_samples",
+                    "quantiles": list(POSTERIOR_ENVELOPE_QUANTILES),
+                    "species": list(chemistry_names),
+                    "representation": "volume_mixing_ratio",
+                    "vertically_constant": True,
                 },
                 "fit_metrics": {
                     "n_data": observation.n_points,
@@ -402,6 +586,7 @@ def main() -> None:
     )
     communicator.Barrier()
     posterior_spectra = None
+    posterior_temperatures = None
     if pilot_output is None:
         samples = _load_saved_posterior_samples(
             run["run_directory"],
@@ -413,11 +598,25 @@ def main() -> None:
             forward,
             communicator,
         )
+        posterior_temperatures = _distributed_posterior_temperatures(
+            tuple(result.parameter_names),
+            samples,
+            common,
+            run["scenario"],
+            communicator,
+        )
     communicator.Barrier()
     if rank == 0 and pilot_output is None:
-        if posterior_spectra is None:
-            raise RuntimeError("primary rank did not receive posterior spectra")
-        _compact_success_products(run, result, forward, posterior_spectra)
+        if posterior_spectra is None or posterior_temperatures is None:
+            raise RuntimeError("primary rank did not receive posterior diagnostics")
+        _compact_success_products(
+            run,
+            result,
+            forward,
+            posterior_spectra,
+            posterior_temperatures,
+            common,
+        )
     elif rank == 0:
         (pilot_output / "PILOT_ONLY").write_text(
             "This bounded product is an infrastructure/resume pilot and is not a Stage-9 science retrieval.\n",

@@ -32,11 +32,6 @@ from emission_intercomparison_v2_stage_9_native import (  # noqa: E402
     atmospheric_state,
     load_common_contract,
 )
-from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (  # noqa: E402
-    parameter_definitions,
-)
-
-
 MODEL_COLORS = {
     "robert": "#9370DB",  # mediumpurple
     "petitradtrans": "#DDA0DD",  # plum
@@ -63,6 +58,38 @@ def _weighted_quantile(
     return float(np.interp(quantile, cumulative, sorted_values))
 
 
+def _parameter_metadata(
+    run: Mapping[str, Any],
+    names: tuple[str, ...],
+) -> tuple[dict[str, Any], ...]:
+    configured = run.get("parameters")
+    if not isinstance(configured, list):
+        raise RuntimeError("run config must provide a parameters list")
+    by_name = {
+        str(item["name"]): item
+        for item in configured
+        if isinstance(item, dict) and "name" in item
+    }
+    missing = [name for name in names if name not in by_name]
+    if missing:
+        raise RuntimeError(
+            "run config has no plotting metadata for fitted parameters: "
+            + ", ".join(missing)
+        )
+    return tuple(by_name[name] for name in names)
+
+
+def _parameter_label(item: Mapping[str, Any]) -> str:
+    label = str(item.get("label") or item["name"])
+    unit = item.get("unit")
+    return f"{label} [{unit}]" if unit else label
+
+
+def _reference_value(item: Mapping[str, Any]) -> float | None:
+    value = item.get("reference_value", item.get("truth"))
+    return None if value is None else float(value)
+
+
 def _posterior(
     run: Mapping[str, Any],
 ) -> tuple[
@@ -75,8 +102,17 @@ def _posterior(
     result_path = run_dir / "result.json"
     arrays_path = run_dir / "result_arrays.npz"
     spectra_path = run_dir / "diagnostic_spectra.npz"
+    tp_path = run_dir / "diagnostic_tp.npz"
+    chemistry_path = run_dir / "diagnostic_chemistry.npz"
     summary_path = run_dir / "posterior_summary.json"
-    required = (result_path, arrays_path, spectra_path, summary_path)
+    required = (
+        result_path,
+        arrays_path,
+        spectra_path,
+        tp_path,
+        chemistry_path,
+        summary_path,
+    )
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise RuntimeError(
@@ -111,7 +147,11 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     path = Path(run["run_directory"]) / "diagnostic_spectra.npz"
     with np.load(path, allow_pickle=False) as archive:
         wavelength = np.asarray(archive["wavelength_micron"], dtype=float)
-        injection = np.asarray(archive["injection_eclipse_depth"], dtype=float)
+        observed = np.asarray(archive["observed_eclipse_depth"], dtype=float)
+        uncertainty = np.asarray(
+            archive["observational_uncertainty_eclipse_depth"],
+            dtype=float,
+        )
         best = np.asarray(archive["best_fit_eclipse_depth"], dtype=float)
         required = (
             "posterior_spectrum_q16_eclipse_depth",
@@ -121,7 +161,7 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
         if missing:
             raise RuntimeError(
                 "true posterior spectral envelope is missing; run the Stage-9 "
-                "spectral-envelope backfill for this retrieval"
+                "posterior-envelope backfill for this retrieval"
             )
         spectrum_q16 = np.asarray(archive[required[0]], dtype=float)
         spectrum_q84 = np.asarray(archive[required[1]], dtype=float)
@@ -141,8 +181,8 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     )
     data_artist = spectrum.errorbar(
         wavelength,
-        injection * 1.0e6,
-        yerr=np.full(wavelength.size, sigma_ppm),
+        observed * 1.0e6,
+        yerr=uncertainty * 1.0e6,
         fmt="o",
         ms=2.2,
         color=DATA_COLOR,
@@ -182,11 +222,11 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
     residual.axhspan(
         -sigma_ppm, sigma_ppm, color=DATA_COLOR, alpha=0.08
     )
-    best_residual = (best - injection) * 1.0e6
+    best_residual = (best - observed) * 1.0e6
     residual.fill_between(
         wavelength,
-        (spectrum_q16 - injection) * 1.0e6,
-        (spectrum_q84 - injection) * 1.0e6,
+        (spectrum_q16 - observed) * 1.0e6,
+        (spectrum_q84 - observed) * 1.0e6,
         color=retriever_color,
         alpha=0.18,
         linewidth=0.0,
@@ -210,54 +250,42 @@ def _plot_spectrum(run: Mapping[str, Any], output: Path) -> None:
 
 def _plot_temperature_pressure(
     run: Mapping[str, Any],
-    names: tuple[str, ...],
-    samples: NDArray[np.float64],
-    weights: NDArray[np.float64],
-    result: Mapping[str, Any],
     output: Path,
-    *,
-    max_draws: int,
 ) -> None:
-    common = load_common_contract(run["common_contract"])
-    pressure = np.asarray(
-        next(
-            item["centers_bar"]
-            for item in common["pressure_grids"]
-            if item["n_cells"] == 80
-        ),
-        dtype=float,
+    with np.load(
+        Path(run["run_directory"]) / "diagnostic_tp.npz",
+        allow_pickle=False,
+    ) as archive:
+        pressure = np.asarray(archive["pressure_bar"], dtype=float)
+        best_profile = np.asarray(archive["best_fit_temperature_k"], dtype=float)
+        lower_profile = np.asarray(
+            archive["posterior_temperature_q16_k"], dtype=float
+        )
+        upper_profile = np.asarray(
+            archive["posterior_temperature_q84_k"], dtype=float
+        )
+    configured = run.get("parameters")
+    references = (
+        {
+            str(item["name"]): _reference_value(item)
+            for item in configured
+            if isinstance(item, dict) and "name" in item
+        }
+        if isinstance(configured, list)
+        else {}
     )
-    definitions = parameter_definitions(run["scenario"])
-    truth = {item.name: item.truth for item in definitions}
-    best = {
-        str(name): float(value)
-        for name, value in result["best_fit_parameters"].items()
-    }
-    truth_profile = atmospheric_state(
-        common, str(run["scenario"]), truth
-    ).temperature_cells_k
-    best_profile = atmospheric_state(
-        common, str(run["scenario"]), best
-    ).temperature_cells_k
-    draw_indices = _systematic_posterior_indices(weights, max_draws)
-    posterior_profiles = np.asarray(
-        [
-            atmospheric_state(
-                common,
-                str(run["scenario"]),
-                dict(zip(names, samples[index], strict=True)),
-            ).temperature_cells_k
-            for index in draw_indices
-        ],
-        dtype=float,
-    )
-    lower_profile, upper_profile = np.quantile(
-        posterior_profiles, (0.16, 0.84), axis=0
-    )
-    retriever = str(run["retriever"])
-    injector = str(run["injector"])
-    retriever_color = MODEL_COLORS[retriever]
-    injector_color = MODEL_COLORS[injector]
+    truth_profile = None
+    if references and all(value is not None for value in references.values()):
+        common = load_common_contract(run["common_contract"])
+        truth_profile = atmospheric_state(
+            common,
+            str(run["scenario"]),
+            {name: float(value) for name, value in references.items()},
+        ).temperature_cells_k
+    retriever = str(run.get("retriever", "robert"))
+    injector = str(run.get("injector", ""))
+    retriever_color = MODEL_COLORS.get(retriever, "#9370DB")
+    injector_color = MODEL_COLORS.get(injector, "#202020")
 
     fig, axis = plt.subplots(figsize=(7.2, 8.2), constrained_layout=True)
     axis.fill_betweenx(
@@ -276,20 +304,24 @@ def _plot_temperature_pressure(
         lw=1.5,
         label=f"best-fitting {DISPLAY_NAMES.get(retriever, retriever)} TP",
     )
-    axis.plot(
-        truth_profile,
-        pressure,
-        color=injector_color,
-        lw=1.4,
-        ls="--",
-        label=f"input TP from {DISPLAY_NAMES.get(injector, injector)}",
-    )
+    if truth_profile is not None:
+        axis.plot(
+            truth_profile,
+            pressure,
+            color=injector_color,
+            lw=1.4,
+            ls="--",
+            label=f"reference TP from {DISPLAY_NAMES.get(injector, injector)}",
+        )
     axis.set_yscale("log")
     axis.invert_yaxis()
     axis.set(
         xlabel="temperature [K]",
         ylabel="pressure [bar]",
-        title=f"{run['run_id']}\nbest-fitting TP and 1σ envelope versus input TP",
+        title=(
+            f"{run['run_id']}\nbest-fitting TP and 1σ envelope"
+            + (" versus reference TP" if truth_profile is not None else "")
+        ),
     )
     axis.grid(alpha=0.2)
     axis.legend(fontsize=8)
@@ -297,28 +329,25 @@ def _plot_temperature_pressure(
     plt.close(fig)
 
 
-def _systematic_posterior_indices(
-    weights: NDArray[np.float64],
-    maximum: int,
-) -> NDArray[np.int64]:
-    if maximum < 1:
-        raise ValueError("maximum posterior TP draws must be positive")
-    count = min(maximum, weights.size)
-    positions = (np.arange(count, dtype=float) + 0.5) / count
-    cumulative = np.cumsum(weights)
-    cumulative[-1] = 1.0
-    return np.searchsorted(cumulative, positions, side="left")
-
-
 def _posterior_limits(
     samples: NDArray[np.float64],
     weights: NDArray[np.float64],
-    truths: NDArray[np.float64],
+    references: tuple[float | None, ...],
+    best: NDArray[np.float64],
 ) -> list[tuple[float, float]]:
     limits = []
-    for index, truth in enumerate(truths):
-        lower = min(_weighted_quantile(samples[:, index], weights, 0.0025), truth)
-        upper = max(_weighted_quantile(samples[:, index], weights, 0.9975), truth)
+    for index, reference in enumerate(references):
+        lower = min(
+            _weighted_quantile(samples[:, index], weights, 0.0025),
+            best[index],
+        )
+        upper = max(
+            _weighted_quantile(samples[:, index], weights, 0.9975),
+            best[index],
+        )
+        if reference is not None:
+            lower = min(lower, reference)
+            upper = max(upper, reference)
         span = upper - lower
         if span <= 0.0:
             span = max(abs(lower), 1.0) * 0.1
@@ -334,26 +363,20 @@ def _plot_corner(
     result: Mapping[str, Any],
     output: Path,
 ) -> None:
-    definitions = parameter_definitions(run["scenario"])
-    if tuple(item.name for item in definitions) != names:
-        raise RuntimeError("posterior parameter order differs from frozen Stage-9 order")
-    truths = np.asarray([item.truth for item in definitions], dtype=float)
+    metadata = _parameter_metadata(run, names)
+    references = tuple(_reference_value(item) for item in metadata)
     best = np.asarray(
         [float(result["best_fit_parameters"][name]) for name in names], dtype=float
     )
-    retriever = str(run["retriever"])
-    injector = str(run["injector"])
-    retriever_color = MODEL_COLORS[retriever]
-    injector_color = MODEL_COLORS[injector]
+    retriever = str(run.get("retriever", "robert"))
+    injector = str(run.get("injector", ""))
+    retriever_color = MODEL_COLORS.get(retriever, "#9370DB")
+    injector_color = MODEL_COLORS.get(injector, "#202020")
     posterior_cmap = LinearSegmentedColormap.from_list(
         f"{retriever}_posterior",
         ("#FFFFFF", retriever_color),
     )
-    limits = _posterior_limits(samples, weights, truths)
-    limits = [
-        (min(lower, value), max(upper, value))
-        for (lower, upper), value in zip(limits, best, strict=True)
-    ]
+    limits = _posterior_limits(samples, weights, references, best)
     dimension = len(names)
     size = max(9.0, 1.65 * dimension)
     fig, axes = plt.subplots(
@@ -379,9 +402,13 @@ def _plot_corner(
                     color=retriever_color,
                     alpha=0.75,
                 )
-                axis.axvline(
-                    truths[column], color=injector_color, lw=0.9, ls="--"
-                )
+                if references[column] is not None:
+                    axis.axvline(
+                        references[column],
+                        color=injector_color,
+                        lw=0.9,
+                        ls="--",
+                    )
                 axis.axvline(best[column], color=retriever_color, lw=1.1)
                 axis.set_yticks([])
             else:
@@ -394,17 +421,28 @@ def _plot_corner(
                     cmap=posterior_cmap,
                     cmin=np.finfo(float).tiny,
                 )
-                axis.axvline(
-                    truths[column], color=injector_color, lw=0.7, ls="--"
-                )
-                axis.axhline(truths[row], color=injector_color, lw=0.7, ls="--")
-                axis.plot(
-                    truths[column],
-                    truths[row],
-                    marker="s",
-                    ms=2.5,
-                    color=injector_color,
-                )
+                if references[column] is not None:
+                    axis.axvline(
+                        references[column],
+                        color=injector_color,
+                        lw=0.7,
+                        ls="--",
+                    )
+                if references[row] is not None:
+                    axis.axhline(
+                        references[row],
+                        color=injector_color,
+                        lw=0.7,
+                        ls="--",
+                    )
+                if references[column] is not None and references[row] is not None:
+                    axis.plot(
+                        references[column],
+                        references[row],
+                        marker="s",
+                        ms=2.5,
+                        color=injector_color,
+                    )
                 axis.axvline(best[column], color=retriever_color, lw=0.8)
                 axis.axhline(best[row], color=retriever_color, lw=0.8)
                 axis.plot(
@@ -421,23 +459,25 @@ def _plot_corner(
             if row < dimension - 1:
                 axis.set_xticklabels([])
             else:
-                axis.set_xlabel(definitions[column].label, fontsize=7)
+                axis.set_xlabel(_parameter_label(metadata[column]), fontsize=7)
                 axis.tick_params(axis="x", labelrotation=45)
             if column > 0 or row == column:
                 axis.set_yticklabels([])
             else:
-                axis.set_ylabel(definitions[row].label, fontsize=7)
-    fig.legend(
-        handles=[
-            Line2D(
-                [0],
-                [0],
-                color=retriever_color,
-                lw=1.3,
-                marker="D",
-                ms=3,
-                label="best fit",
-            ),
+                axis.set_ylabel(_parameter_label(metadata[row]), fontsize=7)
+    handles = [
+        Line2D(
+            [0],
+            [0],
+            color=retriever_color,
+            lw=1.3,
+            marker="D",
+            ms=3,
+            label="best fit",
+        ),
+    ]
+    if any(value is not None for value in references):
+        handles.append(
             Line2D(
                 [0],
                 [0],
@@ -446,9 +486,11 @@ def _plot_corner(
                 ls="--",
                 marker="s",
                 ms=3,
-                label="truth",
-            ),
-        ],
+                label="reference",
+            )
+        )
+    fig.legend(
+        handles=handles,
         loc="upper right",
         fontsize=8,
     )
@@ -463,6 +505,7 @@ def plot_individual_run(
     output: Path | None = None,
     max_tp_draws: int = 5000,
 ) -> Path:
+    del max_tp_draws  # Retained for command-line compatibility.
     config_path = run_config.expanduser().resolve()
     run = json.loads(config_path.read_text(encoding="utf-8"))
     destination = (
@@ -475,12 +518,7 @@ def plot_individual_run(
     _plot_spectrum(run, destination / "spectrum_fit.png")
     _plot_temperature_pressure(
         run,
-        names,
-        samples,
-        weights,
-        result,
         destination / "temperature_pressure.png",
-        max_draws=max_tp_draws,
     )
     _plot_corner(
         run,
@@ -501,7 +539,7 @@ def main() -> None:
         "--max-tp-draws",
         type=int,
         default=5000,
-        help="maximum deterministic weighted posterior draws for the TP envelope",
+        help="deprecated compatibility option; saved exact TP quantiles are used",
     )
     args = parser.parse_args()
     output = plot_individual_run(

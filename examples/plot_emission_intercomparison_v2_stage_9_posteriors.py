@@ -22,11 +22,14 @@ from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import ( 
     FRAMEWORKS,
     NOISE_TIERS_PPM,
     SCENARIOS,
-    parameter_definitions,
 )
 
 
-COLORS = {"robert": "#0072B2", "picaso": "#D55E00", "petitradtrans": "#009E73"}
+COLORS = {
+    "robert": "#9370DB",
+    "petitradtrans": "#DDA0DD",
+    "picaso": "#36454F",
+}
 LINESTYLES = {"robert": "-", "picaso": "--", "petitradtrans": ":"}
 
 
@@ -35,10 +38,17 @@ def _load_runs(project: Path) -> list[dict[str, Any]]:
     runs = []
     for row in rows:
         config = json.loads((project / row["run_config"]).read_text(encoding="utf-8"))
-        result = Path(config["run_directory"]) / "result_arrays.npz"
+        run_directory = Path(config["run_directory"])
+        result = run_directory / "result_arrays.npz"
+        result_json = run_directory / "result.json"
         summary = Path(config["run_directory"]) / "posterior_summary.json"
-        if result.exists() and summary.exists():
+        if result.exists() and result_json.exists() and summary.exists():
             config["result_arrays"] = result
+            config["parameter_names"] = tuple(
+                json.loads(result_json.read_text(encoding="utf-8"))[
+                    "parameter_names"
+                ]
+            )
             config["posterior_summary"] = summary
             runs.append(config)
     return runs
@@ -64,10 +74,21 @@ def posterior_pdf(project: Path, runs: list[dict[str, Any]], output: Path) -> No
     output.parent.mkdir(parents=True, exist_ok=True)
     with PdfPages(output) as pdf:
         for scenario in SCENARIOS:
-            definitions = parameter_definitions(scenario)
+            scenario_runs = [
+                run for run in runs if run["scenario"] == scenario.name
+            ]
+            configured_parameters: dict[str, dict[str, Any]] = {}
+            for run in scenario_runs:
+                for item in run.get("parameters", []):
+                    if isinstance(item, dict) and "name" in item:
+                        configured_parameters.setdefault(str(item["name"]), item)
             for tier in NOISE_TIERS_PPM:
-                for index, parameter in enumerate(definitions):
-                    edges = np.linspace(parameter.lower, parameter.upper, 61)
+                for parameter_name, parameter in configured_parameters.items():
+                    edges = np.linspace(
+                        float(parameter["lower"]),
+                        float(parameter["upper"]),
+                        61,
+                    )
                     centers = 0.5 * (edges[:-1] + edges[1:])
                     fig, axis = plt.subplots(
                         figsize=(9.5, 5.5), constrained_layout=True
@@ -82,13 +103,16 @@ def posterior_pdf(project: Path, runs: list[dict[str, Any]], output: Path) -> No
                                 and run["noise_ppm"] == tier
                                 and run["injector"] == injector
                                 and run["retriever"] == retriever
+                                and parameter_name in run["parameter_names"]
                             ]
                             if not selected:
                                 continue
                             pooled = np.mean(
                                 [
                                     _weighted_histogram(
-                                        run["result_arrays"], index, edges
+                                        run["result_arrays"],
+                                        run["parameter_names"].index(parameter_name),
+                                        edges,
                                     )
                                     for run in selected
                                 ],
@@ -104,13 +128,24 @@ def posterior_pdf(project: Path, runs: list[dict[str, Any]], output: Path) -> No
                                 label=f"{injector} -> {retriever} (n={len(selected)})",
                             )
                             plotted += 1
-                    axis.axvline(
-                        parameter.truth, color="black", lw=1.2, alpha=0.7, label="truth"
+                    reference = parameter.get(
+                        "reference_value",
+                        parameter.get("truth"),
                     )
+                    if reference is not None:
+                        axis.axvline(
+                            float(reference),
+                            color="black",
+                            lw=1.2,
+                            alpha=0.7,
+                            label="reference",
+                        )
+                    label = str(parameter.get("label") or parameter_name)
+                    unit = parameter.get("unit")
                     axis.set(
-                        xlabel=f"{parameter.label}{' [' + parameter.unit + ']' if parameter.unit else ''}",
+                        xlabel=f"{label}{' [' + str(unit) + ']' if unit else ''}",
                         ylabel="posterior density",
-                        title=f"{scenario.name} | {tier} ppm | {parameter.name}",
+                        title=f"{scenario.name} | {tier} ppm | {parameter_name}",
                     )
                     axis.grid(alpha=0.2)
                     if plotted:
@@ -138,8 +173,17 @@ def truth_recovery_products(
             continue
         summary = json.loads(Path(run["posterior_summary"]).read_text(encoding="utf-8"))
         intervals = summary["credible_intervals"]
-        for parameter in parameter_definitions(run["scenario"]):
-            values = intervals[parameter.name]
+        for parameter in run.get("parameters", []):
+            if not isinstance(parameter, dict) or "name" not in parameter:
+                continue
+            parameter_name = str(parameter["name"])
+            reference = parameter.get(
+                "reference_value",
+                parameter.get("truth"),
+            )
+            if reference is None or parameter_name not in intervals:
+                continue
+            values = intervals[parameter_name]
             records.append(
                 {
                     "run_id": run["run_id"],
@@ -147,8 +191,8 @@ def truth_recovery_products(
                     "noise_ppm": run["noise_ppm"],
                     "injector": run["injector"],
                     "retriever": run["retriever"],
-                    "parameter": parameter.name,
-                    "truth": parameter.truth,
+                    "parameter": parameter_name,
+                    "truth": float(reference),
                     "posterior_median": values["q50"],
                     "median_bias": values["median_bias"],
                     "median_bias_posterior_sigma": values[

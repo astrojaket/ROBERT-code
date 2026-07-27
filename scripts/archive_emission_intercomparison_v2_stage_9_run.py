@@ -34,6 +34,10 @@ def main() -> None:
     required = (
         run / "result.json",
         run / "result_arrays.npz",
+        run / "diagnostic_spectra.npz",
+        run / "diagnostic_tp.npz",
+        run / "diagnostic_chemistry.npz",
+        run / "posterior_envelope_metadata.json",
         run / "posterior_summary.json",
     )
     if not all(path.is_file() for path in required):

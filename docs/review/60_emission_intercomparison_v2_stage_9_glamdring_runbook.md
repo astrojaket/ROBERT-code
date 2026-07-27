@@ -283,9 +283,14 @@ find "$STAGE9_PROJECT_ROOT/runs" \
 ```
 
 Expected cumulative counts are 18, 36, 54, and 72. A successful run also has
-`result.json`, `result_arrays.npz`, `diagnostic_spectra.npz`, and its native
-MultiNest `chains/` directory. Preserve incomplete chains and resubmit only
-that run's generated `addqueue-launch.sh`; do not resubmit an entire shard.
+`result.json`, `result_arrays.npz`, `diagnostic_spectra.npz`,
+`diagnostic_tp.npz`, `diagnostic_chemistry.npz`,
+`posterior_envelope_metadata.json`, and its native MultiNest `chains/`
+directory. The three diagnostic NPZ products are mandatory default outputs.
+They contain the best-fitting solution and weighted posterior
+q2.5/q16/q50/q84/q97.5 envelopes; they do not claim that a real observation
+has known input values. Preserve incomplete chains and resubmit only that
+run's generated `addqueue-launch.sh`; do not resubmit an entire shard.
 
 ## 7. Diagnostics and archival
 
@@ -329,16 +334,24 @@ plots the best-fitting spectrum, and shades the wavelength-wise central 68%
 posterior spectrum. That envelope is calculated from native forward-model
 evaluations of every saved weighted posterior sample; it is not the observational
 30, 60, or 100 ppm error envelope. The TP panel compares the best-fitting TP
-profile with the exact input TP and shades the central 68% TP posterior derived
-from up to 5,000 deterministically weighted saved posterior samples.
+profile with the exact Stage-9 truth reconstructed from the frozen simulation
+contract and shades the saved central 68% TP posterior. The retrieval NPZ
+itself contains no input/truth profile, so the same output schema remains
+appropriate for real JWST observations.
 
-Newly completed retrievals calculate and save their exact posterior spectral
-quantiles automatically on the same 12-rank job. For a retrieval completed
-before this capability was added, backfill the quantiles as a scheduled
-Glamdring science post-processing job:
+Posterior dimensions and plotting metadata are read from each run's
+`result.json` and `run.json`; the plotting code does not hard-code the fitted
+parameter set or order. Labels, units, bounds, and optional reference values
+come from the config. If a real-observation config omits reference/truth
+values, no reference markers or input TP profile are plotted.
+
+Newly completed retrievals calculate and save the exact spectral, TP, and
+chemistry posterior quantiles automatically on the same 12-rank job. For a
+retrieval completed before this capability was added, backfill all three
+products as a scheduled Glamdring science post-processing job:
 
 ```bash
-export STAGE9_TASK=spectral-envelope
+export STAGE9_TASK=posterior-envelopes
 export STAGE9_FRAMEWORK=picaso
 export STAGE9_RUN_CONFIG="$STAGE9_PROJECT_ROOT/runs/picaso/clear_non_inverted/clear_non_inverted__inj-robert__ret-picaso__060ppm__mean/run.json"
 
@@ -350,7 +363,15 @@ Use the run's retriever as `STAGE9_FRAMEWORK`. For a `1x12` job, pass the
 per-CPU request to `-m`: 3 GB for PICASO, 6 GB for petitRADTRANS, 8 GB for
 clear ROBERT, or 11 GB for cloudy ROBERT. Those reserve total node budgets of
 36, 72, 96, and 132 GB respectively. The backfill is idempotent and stores only
-q16/q50/q84, not the complete posterior spectral matrix.
+q2.5/q16/q50/q84/q97.5, not the complete posterior spectrum, TP, or chemistry
+matrices. To submit one six-retrieval framework/scenario batch, use:
+
+```bash
+export STAGE9_CONFIRM_ENVELOPE_SUBMISSION=YES
+
+"$STAGE9_REPOSITORY/scripts/queue_emission_intercomparison_v2_stage_9_envelopes.sh" \
+  picaso clear_non_inverted
+```
 
 Generate the large clear, non-inverted comparison product with one page per
 uncertainty tier and injection framework:

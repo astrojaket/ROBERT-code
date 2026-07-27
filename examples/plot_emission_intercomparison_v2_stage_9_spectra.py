@@ -121,13 +121,19 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                             wavelength = np.asarray(
                                 archive["wavelength_micron"], dtype=float
                             )
-                            injection = np.asarray(
-                                archive["injection_eclipse_depth"], dtype=float
+                            observed = np.asarray(
+                                archive["observed_eclipse_depth"], dtype=float
+                            )
+                            uncertainty = np.asarray(
+                                archive[
+                                    "observational_uncertainty_eclipse_depth"
+                                ],
+                                dtype=float,
                             )
                         axis.errorbar(
                             wavelength,
-                            injection * 1.0e6,
-                            yerr=np.full(wavelength.size, float(tier)),
+                            observed * 1.0e6,
+                            yerr=uncertainty * 1.0e6,
                             fmt="o",
                             ms=1.8,
                             color=DATA_COLOR,
@@ -154,9 +160,6 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                         ) as archive:
                             wavelength = np.asarray(
                                 archive["wavelength_micron"], dtype=float
-                            )
-                            injection = np.asarray(
-                                archive["injection_eclipse_depth"], dtype=float
                             )
                             best = np.asarray(
                                 archive["best_fit_eclipse_depth"], dtype=float
@@ -217,9 +220,13 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                                 archive["wavelength_micron"], dtype=float
                             )
                             residual = np.asarray(
-                                archive["posterior_median_eclipse_depth"], dtype=float
+                                archive[
+                                    "posterior_spectrum_q50_eclipse_depth"
+                                ],
+                                dtype=float,
                             ) - np.asarray(
-                                archive["injection_eclipse_depth"], dtype=float
+                                archive["observed_eclipse_depth"],
+                                dtype=float,
                             )
                         axis.plot(
                             wavelength,
@@ -229,7 +236,7 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                         )
                     axis.axhline(0.0, color="black", lw=0.7)
                     axis.grid(alpha=0.2)
-                # The third column shows best-fit minus injection for the same cells.
+                # The third column shows best-fit minus observed data.
                 for axis, injector in zip(axes[:, 2], FRAMEWORKS, strict=True):
                     axis.axhspan(-tier, tier, color="0.85", alpha=0.55)
                     for retriever in FRAMEWORKS:
@@ -253,7 +260,7 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                             residual = np.asarray(
                                 archive["best_fit_eclipse_depth"], dtype=float
                             ) - np.asarray(
-                                archive["injection_eclipse_depth"], dtype=float
+                                archive["observed_eclipse_depth"], dtype=float
                             )
                         axis.plot(
                             wavelength,
@@ -264,8 +271,8 @@ def plot_retrieval_spectra(project: Path, output: Path) -> None:
                     axis.axhline(0.0, color="black", lw=0.7)
                     axis.grid(alpha=0.2)
                 axes[0, 0].set_title("data and best fits with 1σ envelopes")
-                axes[0, 1].set_title("posterior median - injection [ppm]")
-                axes[0, 2].set_title("best fit - injection [ppm]")
+                axes[0, 1].set_title("posterior spectral median - data [ppm]")
+                axes[0, 2].set_title("best fit - data [ppm]")
                 for axis in axes[-1]:
                     axis.set_xlabel("wavelength [micron]")
                 handles, labels = axes[0, 0].get_legend_handles_labels()

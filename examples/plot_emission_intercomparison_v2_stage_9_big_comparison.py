@@ -76,6 +76,8 @@ def _completed_runs(project: Path) -> list[dict[str, Any]]:
             "result": run_dir / "result.json",
             "arrays": run_dir / "result_arrays.npz",
             "spectra": run_dir / "diagnostic_spectra.npz",
+            "tp": run_dir / "diagnostic_tp.npz",
+            "chemistry": run_dir / "diagnostic_chemistry.npz",
             "summary": run_dir / "posterior_summary.json",
         }
         if all(path.is_file() and path.stat().st_size > 0 for path in products.values()):
@@ -100,44 +102,6 @@ def _posterior(
     return names, samples, weights
 
 
-def _systematic_posterior_indices(
-    weights: NDArray[np.float64],
-    maximum: int,
-) -> NDArray[np.int64]:
-    if maximum < 1:
-        raise ValueError("maximum posterior TP draws must be positive")
-    count = min(maximum, weights.size)
-    positions = (np.arange(count, dtype=float) + 0.5) / count
-    cumulative = np.cumsum(weights)
-    cumulative[-1] = 1.0
-    return np.searchsorted(cumulative, positions, side="left")
-
-
-def _temperature_interval(
-    common: Mapping[str, Any],
-    scenario: str,
-    names: tuple[str, ...],
-    samples: NDArray[np.float64],
-    weights: NDArray[np.float64],
-    *,
-    max_draws: int,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    indices = _systematic_posterior_indices(weights, max_draws)
-    profiles = np.asarray(
-        [
-            atmospheric_state(
-                common,
-                scenario,
-                dict(zip(names, samples[index], strict=True)),
-            ).temperature_cells_k
-            for index in indices
-        ],
-        dtype=float,
-    )
-    lower, upper = np.quantile(profiles, (0.16, 0.84), axis=0)
-    return lower, upper
-
-
 def _plot_page(
     runs: list[dict[str, Any]],
     *,
@@ -145,7 +109,6 @@ def _plot_page(
     scenario: str,
     tier: int,
     injector: str,
-    max_tp_draws: int,
 ) -> plt.Figure:
     fig = plt.figure(figsize=(17.5, 10.5), constrained_layout=True)
     grid = fig.add_gridspec(2, 3)
@@ -181,13 +144,16 @@ def _plot_page(
 
     with np.load(selected[0]["spectra"], allow_pickle=False) as archive:
         wavelength = np.asarray(archive["wavelength_micron"], dtype=float)
-        injection_spectrum = np.asarray(
-            archive["injection_eclipse_depth"], dtype=float
+        observed_spectrum = np.asarray(
+            archive["observed_eclipse_depth"], dtype=float
+        )
+        observational_uncertainty = np.asarray(
+            archive["observational_uncertainty_eclipse_depth"], dtype=float
         )
     spectrum_axis.errorbar(
         wavelength,
-        injection_spectrum * 1.0e6,
-        yerr=np.full(wavelength.size, float(tier)),
+        observed_spectrum * 1.0e6,
+        yerr=observational_uncertainty * 1.0e6,
         fmt="o",
         ms=1.9,
         color=DATA_COLOR,
@@ -266,22 +232,19 @@ def _plot_page(
         color = MODEL_COLORS[retriever]
         names, samples, weights = _posterior(run)
         posterior_cache[retriever] = (names, samples, weights)
-        lower_tp, upper_tp = _temperature_interval(
-            common,
-            scenario,
-            names,
-            samples,
-            weights,
-            max_draws=max_tp_draws,
-        )
-        result = json.loads(Path(run["result"]).read_text(encoding="utf-8"))
-        best_parameters = {
-            str(name): float(value)
-            for name, value in result["best_fit_parameters"].items()
-        }
-        best_tp = atmospheric_state(
-            common, scenario, best_parameters
-        ).temperature_cells_k
+        with np.load(run["tp"], allow_pickle=False) as archive:
+            saved_pressure = np.asarray(archive["pressure_bar"], dtype=float)
+            lower_tp = np.asarray(
+                archive["posterior_temperature_q16_k"], dtype=float
+            )
+            upper_tp = np.asarray(
+                archive["posterior_temperature_q84_k"], dtype=float
+            )
+            best_tp = np.asarray(
+                archive["best_fit_temperature_k"], dtype=float
+            )
+        if not np.array_equal(saved_pressure, pressure):
+            raise RuntimeError("saved TP pressure grid differs from common contract")
         tp_axis.fill_betweenx(
             pressure,
             lower_tp,
@@ -371,6 +334,7 @@ def plot_big_comparison(
     injector_filter: str | None = None,
     max_tp_draws: int = 5000,
 ) -> tuple[Path, int]:
+    del max_tp_draws  # Retained for command-line compatibility.
     project = project.expanduser().resolve()
     runs = _completed_runs(project)
     common = load_common_contract(project / "contracts" / "common_contract.json")
@@ -396,7 +360,6 @@ def plot_big_comparison(
                         scenario=scenario,
                         tier=tier,
                         injector=injector,
-                        max_tp_draws=max_tp_draws,
                     )
                     pdf.savefig(fig)
                     png_dir = output / scenario / f"{tier:03d}ppm"
@@ -422,7 +385,7 @@ def main() -> None:
         "--max-tp-draws",
         type=int,
         default=5000,
-        help="maximum deterministic weighted posterior draws per TP envelope",
+        help="deprecated compatibility option; saved exact TP quantiles are used",
     )
     args = parser.parse_args()
     output, pages = plot_big_comparison(

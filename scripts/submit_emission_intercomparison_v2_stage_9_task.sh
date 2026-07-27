@@ -59,14 +59,14 @@ case "$STAGE9_TASK" in
       --pilot-max-iter "${STAGE9_PILOT_MAX_ITER:-200}" \
       --pilot-live-points "${STAGE9_PILOT_LIVE_POINTS:-50}"
     ;;
-  spectral-envelope)
-    : "${STAGE9_RUN_CONFIG:?STAGE9_RUN_CONFIG is required for spectral-envelope}"
+  posterior-envelopes|spectral-envelope)
+    : "${STAGE9_RUN_CONFIG:?STAGE9_RUN_CONFIG is required for posterior-envelopes}"
     exec "$mpi_launcher" "$environment_prefix" 12 "$python_executable" \
-      "$STAGE9_REPOSITORY/examples/generate_emission_intercomparison_v2_stage_9_spectral_envelope.py" \
+      "$STAGE9_REPOSITORY/examples/generate_emission_intercomparison_v2_stage_9_posterior_envelopes.py" \
       "$STAGE9_RUN_CONFIG"
     ;;
   *)
-    echo "STAGE9_TASK must be preflight, injection, forward-pilot, retrieval-pilot, or spectral-envelope" >&2
+    echo "STAGE9_TASK must be preflight, injection, forward-pilot, retrieval-pilot, or posterior-envelopes" >&2
     exit 2
     ;;
 esac
