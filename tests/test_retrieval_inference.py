@@ -16,7 +16,6 @@ from robert_exoplanets import (
     Spectrum,
     UniformPrior,
     centered_log_ratio_prior_transform,
-    load_emission_observation_npz,
     load_observation_npz,
     run_optimal_estimation,
     run_retrieval,
@@ -145,24 +144,24 @@ def test_parameter_set_rejects_invalid_centered_log_ratio_sentinel() -> None:
         parameters.vector_to_mapping([-50.0, -50.0])
 
 
-def test_load_emission_observation_npz_reads_hat_p_32b_style_keys(tmp_path) -> None:
+def test_load_observation_npz_reads_minimal_array_keys(tmp_path) -> None:
     path = tmp_path / "obs.npz"
     np.savez(path, wavelength=[3.0, 4.0], data=[1.0e-3, 2.0e-3], err=[1.0e-4, 2.0e-4])
 
-    observation = load_emission_observation_npz(path, instrument="G395H")
+    observation = load_observation_npz(path, instrument="G395H")
 
     np.testing.assert_allclose(observation.wavelength, [3.0, 4.0])
     np.testing.assert_allclose(observation.flux, [1.0e-3, 2.0e-3])
     assert observation.instrument == "G395H"
-    assert observation.metadata["source_format"] == "npz_emission_observation"
+    assert observation.metadata["source_format"] == "npz_spectral_observation"
 
 
-def test_load_emission_observation_npz_requires_keys(tmp_path) -> None:
+def test_load_observation_npz_requires_keys(tmp_path) -> None:
     path = tmp_path / "bad.npz"
     np.savez(path, wavelength=[3.0], data=[1.0])
 
     with pytest.raises(RobertDataError, match="uncertainty"):
-        load_emission_observation_npz(path)
+        load_observation_npz(path)
 
 
 def test_retrieval_problem_loglike_and_oe_recover_linear_model(tmp_path) -> None:
@@ -170,7 +169,7 @@ def test_retrieval_problem_loglike_and_oe_recover_linear_model(tmp_path) -> None
     wavelength = np.array([1.0, 2.0, 3.0, 4.0])
     flux = 2.0 + 0.5 * (wavelength - np.mean(wavelength))
     np.savez(path, wavelength=wavelength, data=flux, err=np.full_like(flux, 0.05))
-    observation = load_emission_observation_npz(path, flux_unit="eclipse_depth")
+    observation = load_observation_npz(path, flux_unit="eclipse_depth")
     parameters = RetrievalParameterSet(
         (
             RetrievalParameter("baseline", UniformPrior(0.0, 4.0)),
@@ -200,7 +199,7 @@ def test_retrieval_problem_loglike_and_oe_recover_linear_model(tmp_path) -> None
 
 
 def test_optimal_estimation_honors_observation_mask(tmp_path) -> None:
-    observation = load_emission_observation_npz_from_arrays()
+    observation = load_observation_npz_from_arrays()
     observation = type(observation).from_arrays(
         wavelength=[1.0, 2.0, 3.0],
         flux=[1.25, 999.0, 1.25],
@@ -227,7 +226,7 @@ def test_optimal_estimation_honors_observation_mask(tmp_path) -> None:
 
 
 def test_run_retrieval_writes_manifest_and_unified_result(tmp_path) -> None:
-    observation = load_emission_observation_npz_from_arrays()
+    observation = load_observation_npz_from_arrays()
     parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
     problem = RetrievalProblem(
         name="serialized-test",
@@ -262,7 +261,7 @@ def test_run_retrieval_writes_manifest_and_unified_result(tmp_path) -> None:
 
 
 def test_run_retrieval_dispatch_rejects_missing_ultranest_output_dir() -> None:
-    observation = load_emission_observation_npz_from_arrays()
+    observation = load_observation_npz_from_arrays()
     parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
     problem = RetrievalProblem(
         name="dispatch-test",
@@ -282,7 +281,7 @@ def test_run_retrieval_dispatch_rejects_missing_ultranest_output_dir() -> None:
 
 
 def test_ultranest_result_adapter_extracts_best_fit() -> None:
-    observation = load_emission_observation_npz_from_arrays()
+    observation = load_observation_npz_from_arrays()
     parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
     problem = RetrievalProblem(
         name="adapter-test",
@@ -339,7 +338,7 @@ def test_ultranest_accepts_the_actual_single_process_communicator() -> None:
     _validate_mpi_world_size(1)
 
 
-def load_emission_observation_npz_from_arrays():
+def load_observation_npz_from_arrays():
     from robert_exoplanets.instruments import Observation
 
     return Observation.from_arrays(wavelength=[1.0, 2.0], flux=[1.0, 1.0], uncertainty=[0.1, 0.1])

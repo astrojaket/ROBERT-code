@@ -1589,9 +1589,3 @@ def _readonly_array(
         raise RobertValidationError(f"{name} must contain only finite values")
     array.setflags(write=False)
     return array
-
-
-# Backward-compatible aliases for the original cloud-free-only solver names.
-ClearSkyEmissionResult = EmissionResult
-solve_clear_sky_emission = solve_emission
-solve_clear_sky_emission_spectrum = solve_emission_spectrum

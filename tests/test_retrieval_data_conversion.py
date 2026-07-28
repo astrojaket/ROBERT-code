@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 
 from robert_exoplanets import (
-    convert_emission_observation_table,
-    load_emission_observation_npz,
-    load_emission_observation_table,
+    convert_observation_table,
+    load_observation_npz,
+    load_observation_table,
 )
 
 
@@ -23,7 +23,7 @@ def test_convert_named_csv_from_ppm_and_round_trip(tmp_path: Path) -> None:
     )
     output = tmp_path / "unity.npz"
 
-    convert_emission_observation_table(
+    convert_observation_table(
         source,
         output,
         delimiter=",",
@@ -36,7 +36,7 @@ def test_convert_named_csv_from_ppm_and_round_trip(tmp_path: Path) -> None:
         flux_input_unit="ppm",
         instrument="JWST/NIRSpec-G395H",
     )
-    observation = load_emission_observation_npz(output)
+    observation = load_observation_npz(output)
 
     np.testing.assert_allclose(observation.wavelength, [3.1, 3.3])
     np.testing.assert_allclose(observation.flux, [1.0e-3, 1.2e-3])
@@ -53,14 +53,17 @@ def test_table_loader_sorts_rows_and_infers_edges(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    observation = load_emission_observation_table(
+    observation = load_observation_table(
         source,
         wavelength_column="wave",
         flux_column="depth",
         uncertainty_column="sigma",
         flux_input_unit="percent",
+        observable="transit_depth",
     )
 
     np.testing.assert_allclose(observation.wavelength, [3.0, 4.0])
     np.testing.assert_allclose(observation.flux, [1.0e-3, 2.0e-3])
     np.testing.assert_allclose(observation.wavelength_bin_edges, [2.5, 3.5, 4.5])
+    assert observation.flux_unit == "transit_depth"
+    assert observation.observable == "transit_depth"

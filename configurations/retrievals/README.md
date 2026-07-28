@@ -17,25 +17,31 @@ The geometric-albedo sensitivity model is not part of this matrix. WASP-69b
 uses all four disjoint native data segments, including the six-point NIRCam
 overlap average. WASP-80b uses its three available native segments.
 
-## Create the DiRAC run directories
+## Create standard Slurm run directories
 
 Run these commands from the ROBERT checkout after activating the
 `robert-exoplanets` Conda environment. They create the simple directory layout
 `WASP-69b/<model>` and `WASP-80b/<model>` beneath the selected project root.
 
 ```bash
-project_root=/lustre/dirac3/scratch/dp448/dc-tayl1/my_project
+project_root=/path/to/robert-runs
 
 for model in clear one-region diluted two-region n-k diluted-n-k; do
   python scripts/create_run_directory.py \
     --project-dir "${project_root}/WASP-69b" \
-    --config "configurations/retrievals/WASP-69b/${model}/configuration.yaml"
+    --config "configurations/retrievals/WASP-69b/${model}/configuration.yaml" \
+    --slurm-account my-account \
+    --slurm-partition compute \
+    --slurm-tasks 128
 done
 
 for model in clear one-region diluted two-region n-k diluted-n-k; do
   python scripts/create_run_directory.py \
     --project-dir "${project_root}/WASP-80b" \
-    --config "configurations/retrievals/WASP-80b/${model}/configuration.yaml"
+    --config "configurations/retrievals/WASP-80b/${model}/configuration.yaml" \
+    --slurm-account my-account \
+    --slurm-partition compute \
+    --slurm-tasks 128
 done
 ```
 
@@ -54,3 +60,6 @@ sbatch submit.sbatch
 Repeat the final two commands for each model directory. Existing run
 directories are never overwritten; choose a new project root or move completed
 runs before regenerating the matrix.
+
+For local, standard Slurm, and Oxford Glamdring commands, see
+[`docs/retrievals.md`](../../docs/retrievals.md).

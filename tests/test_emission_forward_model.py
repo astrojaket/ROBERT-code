@@ -6,7 +6,6 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-import robert_exoplanets as robert
 
 from robert_exoplanets import (
     EmissionForwardModel,
@@ -177,14 +176,3 @@ def test_emission_model_can_derive_planet_gravity() -> None:
     )
 
     assert derived.gravity_m_s2 == pytest.approx(6.67430e-11 * 1.0e27 / (7.0e7) ** 2)
-
-
-def test_legacy_clear_sky_api_names_alias_generalized_emission_api() -> None:
-    assert robert.ClearSkyEmissionForwardModel is robert.EmissionForwardModel
-    assert robert.ClearSkyEmissionModelConfig is robert.EmissionModelConfig
-    assert (
-        robert.ParameterizedClearSkyEmissionForwardModel
-        is robert.ParameterizedEmissionForwardModel
-    )
-    assert robert.solve_clear_sky_emission is robert.solve_emission
-    assert robert.solve_clear_sky_emission_spectrum is robert.solve_emission_spectrum

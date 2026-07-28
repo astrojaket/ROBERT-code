@@ -1,140 +1,124 @@
 # ROBERT
 
-ROBERT is an early-stage JWST exoplanet atmospheric retrieval code, initially
-focused on emission. It provides typed domain objects, modular atmosphere and
-chemistry components, opacity preparation, cloud-free and cloudy emission,
-absorption-dominated transmission, optimal estimation, and optional UltraNest
-and MultiNest adapters. Its physical forward models are ready for controlled
-validation analyses within the regimes described below. ROBERT is not yet a
-general-purpose production science model: calibrated pipeline-product
-ingestion, broader atmospheric parameterizations, independent science-opacity
-cloud validation, and long-run posterior validation remain planned.
+ROBERT is a general-purpose radiative-transfer and atmospheric-retrieval
+framework. It combines typed planet, star, atmosphere, opacity, observation,
+instrument, forward-model, likelihood, and inference components behind a
+strict YAML workflow.
 
-The Python distribution name is `robert-exoplanets` to avoid colliding with the existing `robert` package on PyPI.
+ROBERT supports thermal-emission and transmission spectra, correlated-k and
+opacity-sampling inputs, equilibrium and free chemistry, cloud-free and cloudy
+atmospheres, one- and two-region emission, instrument binning, Gaussian
+likelihoods, optimal estimation, UltraNest, and MultiNest. Runs produce
+portable configuration snapshots, manifests, numerical results, diagnostics,
+and plots.
 
-## Python Support
+The Python distribution is named `robert-exoplanets`.
 
-ROBERT supports Python 3.10 through 3.14. The reproducible full environment
-uses Python 3.12, while CI tests every supported version.
+## Installation
 
-## Architecture
-
-The project architecture is governed by [RFC-0001: ROBERT Architectural Specification](docs/rfcs/0001-robert-architectural-specification.md), with companion documents listed in [docs/architecture](docs/architecture/README.md). Future substantial contributions should follow that document suite.
-
-The latest repository-wide capability and risk assessment is the
-[2026-07-21 detailed audit](docs/review/47_repository_audit_2026-07-21.md).
-
-## Quick Start
+The complete reproducible installation uses Conda and Python 3.12:
 
 ```bash
+git clone git@github.com:astrojaket/ROBERT-code.git
+cd ROBERT-code
 conda env create --file environment.yml
 conda activate robert-exoplanets
-# Point STScI stsynphot at a reference-data root containing grid/phoenix.
-export PYSYN_CDBS=/path/to/grp/redcat/trds
-pytest
-python examples/plot_blackbody_reference.py
-python examples/plot_synthetic_tau_weighting.py
-python examples/plot_cloud_scattering_reference.py
-python examples/benchmark_cloud_scattering_picaso_virga.py
 ```
 
-For an already-created environment, refresh the editable install with:
+This environment includes the compiled MPICH, MultiNest, and PyMultiNest
+libraries as well as UltraNest, FastChem, opacity, plotting, notebook, and test
+dependencies.
+
+For a smaller editable installation into an existing Python 3.10–3.14
+environment:
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,opacity,retrieval]"
 ```
 
-Install pip-provided optional runtime integrations without Conda with:
+MultiNest itself is a compiled library and is supplied by `environment.yml`;
+the pip retrieval extra installs UltraNest and mpi4py. PHOENIX stellar spectra
+also require the STScI Synphot reference data:
 
 ```bash
-python -m pip install -e ".[complete]"
+export PYSYN_CDBS=/path/to/synphot/reference-data
 ```
 
-MultiNest is supplied by the full Conda environment because its compiled
-library is installed from conda-forge rather than built locally.
+`PYSYN_CDBS` must name the directory containing `grid/phoenix`. A configuration
+with `bodies.star.spectrum_model: blackbody` does not require those files.
 
-For the runnable Jupyter examples, include the notebook environment:
-
-```bash
-python -m pip install -e ".[dev,notebooks,opacity,retrieval]"
-```
-
-Science runs use a strict, versioned YAML file rather than an edited Python
-workflow. Validate the supplied WASP-69b NIRCam+MIRI example without loading
-its external data or opacity:
+Verify the installation:
 
 ```bash
-python run_retrieval.py \
+conda run -n robert-exoplanets python -m pytest
+conda run -n robert-exoplanets python run_retrieval.py \
   --config configurations/wasp69b_cloud_free_R1000.yaml \
   --validate-only
 ```
 
-See [Configuring and running ROBERT](docs/configuration.md) for portable paths,
-directory initialization, opacity preparation, forward modelling, retrievals,
-128-rank nested-sampler Slurm submission, and automatic or manual plotting.
-Scientific inputs and benchmark products are external by policy; see
-[Scientific data and benchmark artifacts](docs/data_policy.md).
+## Forward models
 
-Completed configured runs can be post-processed without rerunning inference:
+Start with a schema-version-2 YAML configuration. Each parameter may have a
+`value`; ROBERT uses the prior midpoint where `value` is omitted.
 
 ```bash
-python postprocess_retrieval.py --config configuration.yaml
-python postprocess_forward.py --config configuration.yaml
-python postprocess_wasp69b_sampler_benchmark.py --project-dir /path/to/my_project
+conda run -n robert-exoplanets python run_forward.py \
+  --config configurations/wasp69b_cloud_free_R1000.yaml \
+  --validate-only
+
+conda run -n robert-exoplanets python run_forward.py \
+  --config configurations/wasp69b_cloud_free_R1000.yaml \
+  --prepare-opacity
+
+conda run -n robert-exoplanets python run_forward.py \
+  --config configurations/wasp69b_cloud_free_R1000.yaml
 ```
 
-See [Post-processing and plotting](docs/postprocessing.md) for fit statistics,
-plot products, YAML automation, and colour/style overrides.
+The model is written to `outputs/forward_model.npz`. With forward plotting
+enabled in YAML, ROBERT also writes fit diagnostics and a spectrum/residual
+figure under `outputs/plots/forward/`.
 
-The maintained [forward-model benchmark suite](examples/BENCHMARKS.md) uses
-PICASO and petitRADTRANS as independent gold-standard comparisons. Superseded
-benchmark artifacts are removed from Git history and will be archived with
-future benchmark releases on Zenodo.
+See [Forward-model generation](docs/forward_models.md) for the full
+configuration-to-spectrum workflow, output schema, troubleshooting, a
+standalone Python example, and the
+[Jupyter notebook](examples/notebooks/configured_forward_model.ipynb).
 
-The plotting example writes local figures under `examples/outputs/`, which is
-ignored by git.
+## Retrievals
 
-## What Exists Today
+Validate, initialize, prepare opacity, and smoke-test a retrieval before
+starting inference:
 
-- Strict, versioned YAML configuration for reproducible forward-model and
-  retrieval runs, backed by typed planet, star, atmosphere, observation, and
-  instrument data models.
-- STScI PHOENIX stellar-atmosphere spectra selected by effective temperature,
-  log surface gravity, and metallicity, prepared once on each model grid and
-  used by default for emission contrast; a blackbody fallback remains explicit.
-- Correlated-k opacity preparation and evaluation for ExoMolOP/exo_k and
-  ROBERT-native archives, plus target-bin empirical correlated-k preparation
-  from real ExoMolOP cross-section HDF files, including provenance tracking.
-- Configurable pressure-temperature profiles and equilibrium or prescribed
-  chemistry, evaluated consistently within each likelihood call.
-- Cloud-free and cloudy thermal-emission radiative transfer, including disk
-  integration, hydrostatic geometry, Mie cloud optics, Toon two-stream, and
-  SH4 multiple-scattering solvers.
-- A typed parameterized transmission foundation with exact spherical shell
-  chords, explicit reference radius and pressure, constant or self-consistent
-  inverse-square gravity, correlated-k/CIA/Rayleigh extinction, and annulus
-  diagnostics, strict YAML retrieval integration, and synthetic
-  injection-recovery coverage. Scattering-return physics remains future work.
-- Shared-atmosphere, multi-instrument forward modelling with instrument-aware
-  binning and Gaussian likelihood support for masks, offsets, and jitter.
-- Optimal-estimation, UltraNest, MultiNest, and OE-to-nested inference through
-  a common retrieval interface, with MPI-compatible execution for larger runs.
-- Versioned run manifests and portable result products containing the inputs,
-  opacity identifiers, code and runtime provenance, settings, seeds, spectra,
-  and inference outputs.
-- General retrieval and forward-model post-processing with fit statistics,
-  residuals, posterior/OE diagnostics, sampler comparisons, and optional
-  automatic plotting controlled by YAML.
-- Optional ArviZ-backed PSIS leave-one-out diagnostics with pointwise ELPD,
-  Pareto-k reliability checks, aligned multi-dataset metadata, and guarded
-  treatment of retrieved uncertainty nuisance parameters.
-- Unit, integration, regression, injection-recovery, and scientific benchmark
-  tests, including independent forward-model comparisons with pRT and PICASO.
+```bash
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --validate-only
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --initialize
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --prepare-opacity
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --smoke-only
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml
+```
 
-## What Comes Later
+Use `scripts/create_run_directory.py` to generate an isolated directory with
+the resolved configuration, runners, post-processors, a standard Slurm script,
+and an Oxford Glamdring launcher:
 
-- Calibrated JWST pipeline-product ingestion and multi-instrument covariance.
-- Production atmospheric parameterizations and broader sampler support.
-- End-to-end PICASO/Virga parity using independent science molecular-opacity
-  databases, plus high-stream validation beyond the matched SH4 closure.
-- Long-run posterior diagnostics and science-grade validation suites.
+```bash
+conda run -n robert-exoplanets python scripts/create_run_directory.py \
+  --project-dir /path/to/runs \
+  --config configurations/wasp69b_cloud_free_R1000.yaml
+```
+
+See [Running retrievals](docs/retrievals.md) for detailed local, standard
+Slurm, and Oxford-only Glamdring instructions, including MPI selection,
+single-node `addqueue` syntax, memory accounting, resume behavior, monitoring,
+and post-processing.
+
+## Configuration and data
+
+- [Configuration reference](docs/configuration.md)
+- [Portable observation format](docs/data/observation_format.md)
+- [Post-processing and plotting](docs/postprocessing.md)
+- [Complete annotated YAML](configurations/TEMPLATE_all_supported_options.yaml)

@@ -29,7 +29,6 @@ observations:
   loader: robert_npz
   datasets: [picaso_asimov]
   verify_checksum: false
-  miri_offset_parameter: null
   dataset_options: {}
 
 atmosphere:

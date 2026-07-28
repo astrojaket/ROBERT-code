@@ -1,13 +1,10 @@
 """Radiative-transfer-facing reference helpers."""
 
 from .emission import (
-    ClearSkyEmissionResult,
     EmissionResult,
     disk_average_quadrature,
     solve_emission,
     solve_emission_spectrum,
-    solve_clear_sky_emission,
-    solve_clear_sky_emission_spectrum,
 )
 from .clouds import (
     CloudOpticalProperties,
@@ -100,7 +97,6 @@ from .sh4 import (
 from .transmission import AbsorptionTransmissionResult, solve_absorption_transmission
 
 __all__ = [
-    "ClearSkyEmissionResult",
     "EmissionResult",
     "AbsorptionTransmissionResult",
     "CloudOpticalProperties",
@@ -160,8 +156,6 @@ __all__ = [
     "refractive_index_from_parameters",
     "solve_emission",
     "solve_emission_spectrum",
-    "solve_clear_sky_emission",
-    "solve_clear_sky_emission_spectrum",
     "solve_absorption_transmission",
     "solve_thermal_two_stream",
     "solve_thermal_sh4",

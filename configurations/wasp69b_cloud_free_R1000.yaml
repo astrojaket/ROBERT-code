@@ -4,9 +4,9 @@ schema_version: 2
 # All input locations live here. Writable outputs, scratch files, and opacity
 # cache default to ./outputs, ./scratch, and ./opacity_cache beside this YAML.
 paths:
-  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp69b_schlawin2024
-  fastchem_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/chemistry/fastchem
-  k_table_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ktables_exomol
+  observations_directory: ../data/wasp69b_schlawin2024
+  fastchem_directory: ../data/chemistry/fastchem
+  k_table_directory: ../opacity_data/ktables_exomol
 
 run:
   name: wasp69b-cloud-free-native-modes-R1000
@@ -29,7 +29,6 @@ observations:
   loader: schlawin2024_wasp69b
   datasets: [f322w2, f444w, lrs]  # Native NIRCam modes plus MIRI/LRS
   verify_checksum: true
-  miri_offset_parameter: null
 
 atmosphere:
   pressure:

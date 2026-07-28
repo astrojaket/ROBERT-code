@@ -149,6 +149,14 @@ def test_retrieval_postprocessing_writes_statistics_and_plots(tmp_path: Path) ->
     assert (plot_dir / "parameter_correlation.png").is_file()
     assert (plot_dir / "posterior_corner.png").is_file()
     assert (plot_dir / "temperature_profiles.png").is_file()
+    predictive_path = plot_dir / "posterior_predictive_quantiles.npz"
+    assert predictive_path.is_file()
+    with np.load(predictive_path) as predictive:
+        assert "spectrum_synthetic_q16" in predictive
+        assert "spectrum_synthetic_q50" in predictive
+        assert "spectrum_synthetic_q84" in predictive
+        assert "native_q50" in predictive
+        assert "temperature_primary_q50_K" in predictive
     assert diagnostics["posterior_predictive_draws"] == 3
     assert diagnostics["native_opacity_spectrum"] is True
     assert discover_retrieval_result_directories(tmp_path / "outputs") == (result_dir,)

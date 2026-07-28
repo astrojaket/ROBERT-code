@@ -2,15 +2,30 @@
 
 ## Unreleased
 
+- Reframed the public documentation around ROBERT as a general-purpose
+  radiative-transfer and retrieval framework, with complete installation,
+  forward-model, local, Slurm, and Oxford Glamdring workflows plus a maintained
+  Python example and Jupyter notebook.
+- Hardened Oxford Glamdring launch behavior using one `addqueue -s` wrapper,
+  a single-node Conda MPICH/Hydra world, PMIx cleanup, one thread per rank,
+  headless plotting caches, and explicit environment validation.
+- Ported the Stage-9 MultiNest finalization fixes: arbitrary non-negative seeds
+  are mapped into the native generator's safe range, and global evidence is
+  recovered without parsing malformed unrelated per-mode statistics.
+- Persisted the numerical q16/q50/q84 posterior predictive products shown in
+  retrieval spectrum and temperature plots, and clarified best-fit residual,
+  posterior-median, and interval labels.
+- Removed superseded clear-sky compatibility APIs, the configuration-level
+  MIRI offset shorthand, target-specific Slurm scripts, the old DiRAC runbook,
+  and the pre-YAML HAT-P-32b example bundle.
+- Generalized the portable observation API and schema for emission,
+  transmission, and relative-flux spectra.
 - Fixed the bundled L 98-59 b Eureka! spectrum integrity check by recording the
   SHA-256 of the repository-normalized text while retaining upstream Zenodo
   checksum provenance.
 - Made PSIS leave-one-out reject unnormalized Gaussian likelihoods when
   retrieved jitter or uncertainty scaling makes the omitted normalization
   parameter-dependent, and added the diagnostics extra to the CI coverage job.
-- Rebaselined the package description and development roadmap against the
-  implemented transmission, JAX, retrieval, and validation capabilities and
-  added a repository-wide capability, risk, and next-step audit.
 - Defined a repository data policy that retains required lightweight inputs and
   compact benchmark test oracles while excluding heavy opacity tables,
   generated arrays, plots, chains, and notebook output from Git.
@@ -61,13 +76,9 @@
   benchmark workflows with common manifests, results, status, and timings.
 - Generalized the active emission API from the legacy `ClearSky*` and
   `solve_clear_sky_emission*` names to `Emission*` and `solve_emission*`.
-  Backward-compatible aliases remain for historical scripts.
 - Designated PICASO and petitRADTRANS as the maintained gold-standard
   forward-model benchmarks and standardized their plots on a shared purple
   palette with `mediumpurple` for ROBERT model spectra.
-- Archived the pre-YAML HAT-P-32b checks under
-  `examples/Depreciated_Benchmarks/`; they are no longer part of active CI or
-  the maintained benchmark workflow.
 
 ## v0.3.0 - Minimal Forward Model Foundation
 

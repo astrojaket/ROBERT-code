@@ -1,4 +1,4 @@
-"""ROBERT: a foundation for JWST exoplanet atmospheric retrievals."""
+"""ROBERT: a general-purpose radiative-transfer and retrieval framework."""
 
 from ._version import __version__
 
@@ -43,9 +43,6 @@ from .diagnostics import (
     write_leave_one_out_result,
 )
 from .forward import (
-    ClearSkyEmissionFactoryConfig,
-    ClearSkyEmissionForwardModel,
-    ClearSkyEmissionModelConfig,
     EmissionFactoryConfig,
     EmissionForwardModel,
     DilutedEmissionModel,
@@ -68,9 +65,6 @@ from .forward import (
     ParameterizedCloudModel,
     ParameterizedDeckHazeCloudModel,
     ParameterizedMieCloudModel,
-    ParameterizedClearSkyEmissionFactoryConfig,
-    ParameterizedClearSkyEmissionForwardModel,
-    ParameterizedClearSkyEmissionModelConfig,
     ParameterizedGreyCloudEmissionForwardModel,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     RefractiveIndexCloudConfig,
@@ -78,11 +72,9 @@ from .forward import (
     build_disk_emission_model,
     ParameterizedEmissionModelConfig,
     build_emission_model,
-    build_clear_sky_emission_model,
     build_multi_dataset_emission_model,
     build_parameterized_emission_model,
     build_parameterized_transmission_model,
-    build_parameterized_clear_sky_emission_model,
     pressure_grid_from_opacity,
 )
 from .instruments import (
@@ -175,10 +167,9 @@ from .retrieval import (
     UltraNestRunConfig,
     build_retrieval_problem,
     centered_log_ratio_prior_transform,
-    convert_emission_observation_table,
-    load_emission_observation_npz,
+    convert_observation_table,
     load_observation_npz,
-    load_emission_observation_table,
+    load_observation_table,
     load_nested_sampler_result,
     load_retrieval_status,
     run_optimal_estimation,
@@ -191,7 +182,6 @@ from .retrieval import (
     run_configured_retrieval,
     run_multinest,
     run_ultranest,
-    save_emission_observation_npz,
     save_observation_npz,
 )
 from .stellar import (
@@ -202,7 +192,6 @@ from .stellar import (
 )
 from .rt import (
     AbsorptionTransmissionResult,
-    ClearSkyEmissionResult,
     EmissionResult,
     CiaTable,
     CloudOpticalProperties,
@@ -262,8 +251,6 @@ from .rt import (
     refractive_index_from_parameters,
     solve_emission,
     solve_emission_spectrum,
-    solve_clear_sky_emission,
-    solve_clear_sky_emission_spectrum,
     solve_absorption_transmission,
     solve_thermal_sh4,
     solve_thermal_sh4_spectrum,
@@ -297,10 +284,6 @@ __all__ = [
     "CloudOpticalPropertyComparison",
     "CompositionMeanMolecularWeight",
     "ConstantChemistry",
-    "ClearSkyEmissionFactoryConfig",
-    "ClearSkyEmissionForwardModel",
-    "ClearSkyEmissionModelConfig",
-    "ClearSkyEmissionResult",
     "EmissionResult",
     "EmissionFactoryConfig",
     "EmissionForwardModel",
@@ -381,9 +364,6 @@ __all__ = [
     "ParameterizedCloudModel",
     "ParameterizedDeckHazeCloudModel",
     "ParameterizedMieCloudModel",
-    "ParameterizedClearSkyEmissionFactoryConfig",
-    "ParameterizedClearSkyEmissionForwardModel",
-    "ParameterizedClearSkyEmissionModelConfig",
     "ParameterizedGreyCloudEmissionForwardModel",
     "ParameterizedRefractiveIndexCloudEmissionForwardModel",
     "RefractiveIndexCloudConfig",
@@ -432,12 +412,10 @@ __all__ = [
     "blackbody_eclipse_depth_spectrum",
     "calculate_fit_statistics",
     "build_emission_model",
-    "build_clear_sky_emission_model",
     "build_multi_dataset_emission_model",
     "build_disk_emission_model",
     "build_parameterized_emission_model",
     "build_parameterized_transmission_model",
-    "build_parameterized_clear_sky_emission_model",
     "build_retrieval_problem",
     "build_atmosphere_setup",
     "assemble_gas_optical_depth",
@@ -477,11 +455,9 @@ __all__ = [
     "load_nemesispy_cia_table",
     "load_schlawin2024_wasp69b",
     "load_wiser2025_wasp80b",
-    "load_emission_observation_npz",
     "load_observation_npz",
-    "load_emission_observation_table",
-    "convert_emission_observation_table",
-    "save_emission_observation_npz",
+    "load_observation_table",
+    "convert_observation_table",
     "save_observation_npz",
     "load_nested_sampler_result",
     "load_retrieval_status",
@@ -530,8 +506,6 @@ __all__ = [
     "run_ultranest",
     "solve_emission",
     "solve_emission_spectrum",
-    "solve_clear_sky_emission",
-    "solve_clear_sky_emission_spectrum",
     "solve_absorption_transmission",
     "solve_thermal_sh4",
     "solve_thermal_sh4_spectrum",

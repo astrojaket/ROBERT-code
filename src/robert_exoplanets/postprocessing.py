@@ -134,6 +134,15 @@ def postprocess_retrieval_output(
 
     destination = Path(plot_dir).expanduser()
     destination.mkdir(parents=True, exist_ok=True)
+    posterior_products = destination / "posterior_predictive_quantiles.npz"
+    _write_posterior_predictive_quantiles(
+        problem,
+        posterior_products,
+        spectral_quantiles=spectral_quantiles,
+        native_quantiles=native_quantiles,
+        temperature_quantiles=temperature_quantiles,
+    )
+    diagnostics["posterior_predictive_file"] = str(posterior_products.resolve())
     diagnostics["leave_one_out"] = {"enabled": bool(leave_one_out)}
     if leave_one_out:
         samples = arrays.get("samples")
@@ -565,6 +574,45 @@ def _named_atmosphere_builders(model: object) -> dict[str, object]:
     return {}
 
 
+def _write_posterior_predictive_quantiles(
+    problem: MultiDatasetRetrievalProblem,
+    output: Path,
+    *,
+    spectral_quantiles: Mapping[str, np.ndarray],
+    native_quantiles: Mapping[str, np.ndarray | str] | None,
+    temperature_quantiles: Mapping[str, Mapping[str, np.ndarray]],
+) -> None:
+    """Persist the numerical products behind posterior interval plots."""
+
+    arrays: dict[str, np.ndarray] = {}
+    for dataset in problem.observations.datasets:
+        name = dataset.name
+        quantiles = np.asarray(spectral_quantiles[name], dtype=float)
+        arrays[f"spectrum_{name}_wavelength_micron"] = np.asarray(
+            dataset.observation.wavelength, dtype=float
+        )
+        arrays[f"spectrum_{name}_q16"] = quantiles[0]
+        arrays[f"spectrum_{name}_q50"] = quantiles[1]
+        arrays[f"spectrum_{name}_q84"] = quantiles[2]
+    if native_quantiles is not None:
+        quantiles = np.asarray(native_quantiles["quantiles"], dtype=float)
+        arrays["native_wavelength_micron"] = np.asarray(
+            native_quantiles["wavelength"], dtype=float
+        )
+        arrays["native_q16"] = quantiles[0]
+        arrays["native_q50"] = quantiles[1]
+        arrays["native_q84"] = quantiles[2]
+    for name, values in temperature_quantiles.items():
+        quantiles = np.asarray(values["quantiles"], dtype=float)
+        arrays[f"temperature_{name}_pressure_bar"] = np.asarray(
+            values["pressure"], dtype=float
+        )
+        arrays[f"temperature_{name}_q16_K"] = quantiles[0]
+        arrays[f"temperature_{name}_q50_K"] = quantiles[1]
+        arrays[f"temperature_{name}_q84_K"] = quantiles[2]
+    np.savez_compressed(output, **arrays)
+
+
 def _plot_temperature_profiles(
     profiles: Mapping[str, Mapping[str, np.ndarray]],
     output: Path,
@@ -636,7 +684,7 @@ def _plot_fit(
                 color="0.35",
                 alpha=0.18,
                 linewidth=0.0,
-                label="Native-grid 68% envelope",
+                label="Native-grid 68% posterior predictive interval",
             )
             fit_axis.plot(
                 native_wavelength,
@@ -684,7 +732,7 @@ def _plot_fit(
                     alpha=0.2,
                     linewidth=0.0,
                     label=(
-                        "68% posterior envelope"
+                        "68% posterior predictive interval"
                         if dataset is problem.observations.datasets[0]
                         else None
                     ),
@@ -698,7 +746,11 @@ def _plot_fit(
                 markerfacecolor="none",
                 markeredgecolor=color,
                 label=(
-                    "Observation-grid model"
+                    (
+                        "Observation-grid posterior median"
+                        if quantiles is not None
+                        else "Observation-grid best-fit model"
+                    )
                     if dataset is problem.observations.datasets[0]
                     else None
                 ),
@@ -713,13 +765,13 @@ def _plot_fit(
         reduced_text = "undefined" if reduced is None else f"{float(reduced):.3f}"
         fit_axis.set_ylabel(flux_label)
         fit_axis.set_title(
-            f"{problem.name}: best fit (reduced $\\chi^2$ = {reduced_text})"
+            f"{problem.name}: retrieval fit (reduced $\\chi^2$ = {reduced_text})"
         )
         fit_axis.legend(fontsize=8, ncol=max(1, min(3, len(colors))))
         residual_axis.axhline(0.0, color="0.2", linewidth=0.8)
         residual_axis.axhline(1.0, color="0.6", linestyle="--", linewidth=0.7)
         residual_axis.axhline(-1.0, color="0.6", linestyle="--", linewidth=0.7)
-        residual_axis.set_ylabel(r"Residual / $\sigma$")
+        residual_axis.set_ylabel("Best-fit residual / $\\sigma$")
         residual_axis.set_xlabel("Wavelength (micron)")
         figure.tight_layout()
         figure.savefig(output, dpi=dpi, bbox_inches="tight")

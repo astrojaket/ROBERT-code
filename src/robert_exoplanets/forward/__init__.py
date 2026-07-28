@@ -7,34 +7,26 @@ from .clouds import (
 )
 
 from .emission import (
-    ClearSkyEmissionForwardModel,
-    ClearSkyEmissionModelConfig,
     EmissionForwardModel,
     EmissionModelConfig,
     GreyScatteringCloudConfig,
     ParameterizedEmissionForwardModel,
-    ParameterizedClearSkyEmissionForwardModel,
-    ParameterizedClearSkyEmissionModelConfig,
     ParameterizedGreyCloudEmissionForwardModel,
     ParameterizedRefractiveIndexCloudEmissionForwardModel,
     ParameterizedEmissionModelConfig,
     RefractiveIndexCloudConfig,
 )
 from .factory import (
-    ClearSkyEmissionFactoryConfig,
     EmissionFactoryConfig,
     ExoKOpacitySource,
     ExoKTableBinning,
     ExoMolOpacitySamplingSource,
     ParameterizedEmissionFactoryConfig,
     ParameterizedTransmissionFactoryConfig,
-    ParameterizedClearSkyEmissionFactoryConfig,
-    build_clear_sky_emission_model,
     build_emission_model,
     build_multi_dataset_emission_model,
     build_parameterized_emission_model,
     build_parameterized_transmission_model,
-    build_parameterized_clear_sky_emission_model,
     pressure_grid_from_opacity,
 )
 from .transmission import (
@@ -56,9 +48,6 @@ from .multi_dataset import (
 )
 
 __all__ = [
-    "ClearSkyEmissionFactoryConfig",
-    "ClearSkyEmissionForwardModel",
-    "ClearSkyEmissionModelConfig",
     "EmissionFactoryConfig",
     "EmissionForwardModel",
     "DilutedEmissionModel",
@@ -81,20 +70,15 @@ __all__ = [
     "ParameterizedTransmissionFactoryConfig",
     "ParameterizedTransmissionForwardModel",
     "ParameterizedTransmissionModelConfig",
-    "ParameterizedClearSkyEmissionFactoryConfig",
-    "ParameterizedClearSkyEmissionForwardModel",
-    "ParameterizedClearSkyEmissionModelConfig",
     "ParameterizedGreyCloudEmissionForwardModel",
     "ParameterizedRefractiveIndexCloudEmissionForwardModel",
     "RefractiveIndexCloudConfig",
     "TwoRegionEmissionModel",
     "ParameterizedEmissionModelConfig",
     "build_emission_model",
-    "build_clear_sky_emission_model",
     "build_multi_dataset_emission_model",
     "build_disk_emission_model",
     "build_parameterized_emission_model",
     "build_parameterized_transmission_model",
-    "build_parameterized_clear_sky_emission_model",
     "pressure_grid_from_opacity",
 ]

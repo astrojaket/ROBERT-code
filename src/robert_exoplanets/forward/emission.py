@@ -1414,23 +1414,11 @@ def _array_signature(*arrays: ArrayLike, labels: tuple[str, ...] = ()) -> str:
     return digest.hexdigest()
 
 
-# Backward-compatible aliases for the original cloud-free-only API names.
-# The implementations are now shared by cloud-free and cloudy emission models.
-ClearSkyEmissionForwardModel = EmissionForwardModel
-ClearSkyEmissionModelConfig = EmissionModelConfig
-ParameterizedClearSkyEmissionForwardModel = ParameterizedEmissionForwardModel
-ParameterizedClearSkyEmissionModelConfig = ParameterizedEmissionModelConfig
-
-
 __all__ = [
-    "ClearSkyEmissionForwardModel",
-    "ClearSkyEmissionModelConfig",
     "EmissionForwardModel",
     "EmissionModelConfig",
     "GreyScatteringCloudConfig",
     "ParameterizedEmissionForwardModel",
-    "ParameterizedClearSkyEmissionForwardModel",
-    "ParameterizedClearSkyEmissionModelConfig",
     "ParameterizedGreyCloudEmissionForwardModel",
     "ParameterizedRefractiveIndexCloudEmissionForwardModel",
     "ParameterizedEmissionModelConfig",

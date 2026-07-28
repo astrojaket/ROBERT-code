@@ -1,7 +1,7 @@
 extends: wasp69b_cloud_free_R1000.yaml
 
 paths:
-  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp80b_wiser2025
+  observations_directory: ../data/wasp80b_wiser2025
 
 run:
   name: wasp80b-cloud-free-native-pg14-R1000

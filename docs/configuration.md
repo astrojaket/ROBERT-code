@@ -1,118 +1,108 @@
-# Configuring and running ROBERT
+# Configuration reference
 
-ROBERT's user interface is a versioned YAML file. The file contains the
-science choices; the Python runners contain no target-specific settings. Start
-by copying `configurations/wasp69b_cloud_free_R1000.yaml` to a new filename and
-editing the copy.
+ROBERT's command-line interface uses a strict schema-version-2 YAML file.
+Unknown keys, inconsistent parameter references, invalid physical ranges, and
+unsupported model combinations are errors.
 
-Schema version 2 adds explicit stellar `log_g_cgs`, `metallicity_dex`, and
-`spectrum_model` fields and makes PHOENIX the default. To migrate a version-1
-file, add those three fields under `bodies.star` and set `schema_version: 2`;
-use `spectrum_model: blackbody` to reproduce the version-1 stellar treatment.
+Start with the [complete annotated template](../configurations/TEMPLATE_all_supported_options.yaml)
+or copy a shorter YAML from `configurations/`.
 
-The available WASP-69b/WASP-80b cloud-free, Mie-cloud, and temperature-profile
-defaults are catalogued in [configurations/README.md](../configurations/README.md).
+## Paths
 
-The runners may also be copied beside that YAML in an external project
-directory. They import the installed `robert-exoplanets` package and do not
-depend on their own location:
-
-```bash
-cp run_retrieval.py run_forward.py /path/to/my_project/
-cd /path/to/my_project
-python run_retrieval.py --config configuration.yaml --validate-only
-```
-
-## Isolated project directories
-
-For DiRAC runs, create one directory per run beneath a project directory. The
-creator uses `run.name` as the directory name, preserves the original YAML,
-copies both runners and a minimal `submit.sbatch`, and sets the generated
-configuration's output, opacity-cache, and scratch paths inside that directory.
-The generated script requests one rank on one node for an OE-only run and 128
-ranks on one node for UltraNest, MultiNest, and either OE-to-nested
-workflow. It emails `jake.taylor@physics.ox.ac.uk` when the job begins, ends,
-or fails.
-
-```bash
-cd /scratch/dp448/dc-tayl1/ROBERT-code
-python scripts/create_run_directory.py \
-  --project-dir /scratch/dp448/dc-tayl1/my_project \
-  --config configurations/wasp69b_cloud_free_R1000.yaml
-```
-
-Edit `/scratch/dp448/dc-tayl1/my_project/<run.name>/configuration.yaml`, then
-work entirely from that directory:
-
-```bash
-cd /scratch/dp448/dc-tayl1/my_project/<run.name>
-python run_retrieval.py --config configuration.yaml --validate-only
-python run_retrieval.py --config configuration.yaml --prepare-opacity
-python run_retrieval.py --config configuration.yaml --smoke-only
-sbatch submit.sbatch
-```
-
-The major sections are intentionally explicit:
-
-- `paths`: the one top-level block for machine-specific input locations;
-  writable `outputs/`, `scratch/`, and `opacity_cache/` directories default
-  beside the YAML file and are created by ROBERT;
-- `bodies`: planetary and stellar parameters;
-- `observations`: published-data loader or self-describing ROBERT NPZ, data
-  path, and selected instrument datasets;
-- `atmosphere`: pressure grid; a Parmentier-Guillot, isothermal, or external
-  tabulated CSV temperature profile; chemistry model; and the FastChem name
-  corresponding to each molecule;
-- `clouds`: cloud-free or configured emission-cloud treatment; configured
-  transmission currently requires `none`;
-- `disk_emission`: one region, a diluted region, or two independently
-  configurable regions with selective atmosphere/chemistry/cloud overrides;
-- `opacity`: KTA or ExoMolOP cross-section root, resolution label, selected
-  molecules, target-bin preparation, and an external cache directory;
-- `radiative_transfer`: emission geometry/backend or transmission reference
-  pressure, radius parameter, gravity law, and impact quadrature;
-- `parameters`: ordered retrieval priors and optional forward-model values;
-- `sampler`: inference engine (OE, UltraNest, MultiNest, or OE followed by
-  either nested sampler), convergence/iteration controls, resume policy, and
-  seed;
-- `plotting`: optional automatic retrieval/forward post-processing, image
-  format, Matplotlib style, sampling display limit, colours, labels, and the
-  optional PSIS leave-one-out diagnostic;
-- `runtime`: `auto` uses `SLURM_NTASKS` under Slurm and one process otherwise.
-
-## Self-contained paths
-
-Normal YAML files do not need `outputs.directory`, `opacity.cache_directory`,
-or `runtime.scratch_directory`. Given `/project/configuration.yaml`, ROBERT
-automatically resolves and creates `/project/outputs`, `/project/opacity_cache`,
-and `/project/scratch`. External inputs are collected once at the top:
+Keep machine-specific input locations in one block:
 
 ```yaml
 schema_version: 2
 paths:
   project_directory: .
-  observations_directory: ${ROBERT_DATA_ROOT}/wasp69b
-  fastchem_directory: ${ROBERT_DATA_ROOT}/fastchem
-  k_table_directory: ${ROBERT_OPACITY_ROOT}
+  observations_directory: ./data/observations
+  fastchem_directory: ./data/fastchem
+  k_table_directory: ./data/opacity
+  optical_constants_directory: ./data/optical_constants
 ```
 
-Relative paths resolve from the YAML directory. Undefined environment
-variables are rejected. Explicit legacy writable paths remain readable for
-old configurations, but new configurations should rely on the local defaults.
+Relative paths resolve from the YAML file. ROBERT expands `${VARIABLE}` and
+rejects undefined variables. Writable directories default to `outputs/`,
+`opacity_cache/`, and `scratch/` beneath `project_directory`.
 
-## Projected-disk regions
-
-The top-level `atmosphere` and `clouds` blocks define the primary/hot column.
-A diluted model only adds its projected emitting fraction:
+## Run and bodies
 
 ```yaml
-disk_emission:
-  model: diluted_one_region
-  dilution_parameter: dayside_dilution
+run:
+  name: unique-run-name
+  description: Concise description of data and model.
+
+bodies:
+  planet:
+    name: Example b
+    radius_m: 7.0e7
+    mass_kg: 1.0e27
+  star:
+    name: Example
+    radius_m: 5.0e8
+    effective_temperature_k: 4800
+    log_g_cgs: 4.5
+    metallicity_dex: 0.0
+    spectrum_model: phoenix
 ```
 
-A two-region model adds hot and cold fluxes after their independent radiative
-transfer calculations. Each override inherits omitted components:
+A planet may supply `gravity_m_s2` instead of `mass_kg`. Stellar
+`spectrum_model` is `phoenix` or `blackbody`.
+
+## Observations
+
+Supported loaders are `robert_npz`, `bello_arufe2025_l9859b`,
+`schlawin2024_wasp69b`, and `wiser2025_wasp80b`:
+
+```yaml
+observations:
+  loader: robert_npz
+  path: observation.npz
+  datasets: [g395h]
+  verify_checksum: false
+  dataset_options:
+    g395h:
+      offset_parameter: g395h_offset
+      uncertainty_scale: 1.0
+      uncertainty_scale_parameter: g395h_error_scale
+      jitter_parameter: g395h_jitter
+```
+
+Only selected, statistically independent datasets should be included. Every
+named nuisance parameter must appear in `parameters`.
+
+## Atmosphere
+
+The atmosphere specifies a pressure grid, temperature profile, and chemistry:
+
+```yaml
+atmosphere:
+  pressure:
+    bottom_bar: 100.0
+    top_bar: 1.0e-6
+    layers: 80
+  temperature:
+    model: isothermal
+    parameter_name: temperature
+  chemistry:
+    model: free
+    species: [H2O, CO2, CO]
+    parameter_mode: log10
+    parameter_names: {H2O: log_H2O, CO2: log_CO2, CO: log_CO}
+    background_species: [H2, He]
+    background_fractions: [0.8547, 0.1453]
+    fill_background: true
+```
+
+Temperature models are `parmentier_guillot_2014`, `isothermal`, `tabulated`,
+`madhusudhan_seager_2009`, and `spline`. Chemistry models are
+`fastchem_equilibrium` and `free`. The annotated template lists the required
+fields for each choice.
+
+## Clouds and projected emission
+
+Cloud models are `none`, `deck_haze`, `mie_catalog`, and `mie_direct_nk`.
+Emission can use one region, a diluted region, or hot and cold regions:
 
 ```yaml
 disk_emission:
@@ -124,179 +114,103 @@ disk_emission:
       temperature:
         model: isothermal
         parameter_name: cold_temperature
-      chemistry:
-        model: free
-        species: [H2O, CO2, CO, CH4, NH3, SO2]
-        parameter_names: {H2O: cold_log_H2O, CO2: cold_log_CO2}
-        background_species: [H2, He]
     clouds:
       model: none
 ```
 
-All parameters named by either region, plus the area/dilution fraction, must
-appear in `parameters`. Fraction priors must remain within `[0, 1]` physically.
-Two-region and diluted models are emission-only.
+Regional blocks inherit omitted top-level atmosphere and cloud settings.
+Dilution and two-region models require their fraction parameter to have bounds
+inside `[0, 1]`.
 
-## Stellar spectra
-
-Configured emission models use the STScI PHOENIX atmosphere grid by default.
-Set the Synphot reference-data root before preparing a forward model; the path
-must be the directory above `grid/`, not the `grid/phoenix` directory itself:
-
-```bash
-export PYSYN_CDBS=/scratch/dp448/dc-tayl1/grp/redcat/trds
-```
-
-The stellar block records all three PHOENIX interpolation coordinates:
+## Opacity and radiative transfer
 
 ```yaml
-bodies:
-  star:
-    name: WASP-69
-    radius_m: 565568100.0
-    effective_temperature_k: 4750.0
-    log_g_cgs: 4.5
-    metallicity_dex: 0.0
-    spectrum_model: phoenix
+opacity:
+  format: exomol_kta
+  resolution: R1000
+  species: [H2O, CO2, CO]
+  binning:
+    num: 300
+    use_rebin: false
+    remove_zeros: true
+    g_points: 8
+
+radiative_transfer:
+  model: emission
+  geometry:
+    model: normal_emission
+    points: 4
+  include_rayleigh: true
+  gas_combination: random_overlap
+  thermal_integration_backend: auto
 ```
 
-Use `spectrum_model: blackbody` for the former Planck-spectrum behavior. The
-PHOENIX atlas is loaded and flux-conservingly averaged onto every model's
-spectral bins during model construction, so no stellar file I/O occurs during
-likelihood evaluation. ROBERT converts the tabulated surface flux to radiance
-as `F_lambda / pi` and normalizes the finite atlas integral to
-`sigma * T_eff**4`; both choices are recorded in spectrum and run metadata.
+Opacity formats are `exomol_kta` and `exomol_cross_section_hdf`. Gas
+combination is `random_overlap` or `equivalent_extinction`. Emission geometry
+is `normal_emission` or `gauss_legendre_disk`.
 
-The WASP-69 benchmark opacity set follows the molecules named in Schlawin et
-al.: H2O, CO2, CO, CH4, NH3, and SO2. The first five use FastChem equilibrium
-profiles. SO2 follows the paper's PICASO retrieval treatment as a constant
-abundance controlled by `log_SO2`:
+For transmission, set `model: transmission` and configure
+`reference_pressure_bar`, optional `radius_scale_parameter`,
+`gravity_model`, and `impact_quadrature_order`.
+
+## Parameters and likelihood
 
 ```yaml
-atmosphere:
-  chemistry:
-    model: fastchem_equilibrium
-    constant_log10_vmr_parameters: {SO2: log_SO2}
+likelihood:
+  model: gaussian
+  include_normalization: true
+
 parameters:
-  - name: log_SO2
-    prior: {type: uniform, lower: -10.0, upper: -4.0}
+  - name: temperature
+    label: Isothermal temperature
+    unit: K
+    prior: {type: uniform, lower: 500.0, upper: 2500.0}
+    value: 1400.0
+  - name: log_H2O
+    prior: {type: uniform, lower: -12.0, upper: -1.0}
+    value: -3.0
 ```
 
-The configured K-table directory must contain an SO2 R1000 product before
-opacity preparation is run.
+Prior types are `uniform`, `log_uniform`, and `centered_log_ratio`. Parameter
+order is retained in sampler arrays and plots. `value` controls forward runs;
+when absent, the prior midpoint is used.
 
-Free-chemistry nested sampling also accepts a joint CLR prior. All retrieved
-abundances must use one shared group; the configured background gas is the
-derived final composition category:
+## Sampler, plotting, and runtime
 
 ```yaml
-atmosphere:
-  chemistry:
-    model: free
-    species: [SO2, CO2, H2S]
-    parameter_mode: log10
-    parameter_names: {SO2: log_SO2, CO2: log_CO2, H2S: log_H2S}
-    background_species: [H2]
-    background_fractions: [1.0]
-    fill_background: true
-parameters:
-  - {name: log_SO2, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
-  - {name: log_CO2, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
-  - {name: log_H2S, prior: {type: centered_log_ratio, lower: -12, upper: 0, group: composition}}
+sampler:
+  engine: ultranest
+  live_points: 400
+  max_calls: null
+  dlogz: 0.5
+  resume: resume
+  seed: 2712
+
+plotting:
+  enabled: true
+  retrieval: true
+  forward: true
+  image_format: png
+  dpi: 180
+  posterior_predictive_samples: 200
+  posterior_predictive_seed: 0
+
+runtime:
+  mpi_processes: auto
 ```
 
-To avoid assuming a physical background gas, set the sole background species
-to a name such as `phantom`, configure
-`phantom_mean_molecular_weight_parameter`, and add that scalar mass parameter
-in amu. The phantom supplies closure and MMW but no opacity. See
-`docs/theory/chemistry.md` for the full semantics and validation constraints.
+Inference engines are `optimal_estimation`, `ultranest`, `multinest`,
+`optimal_estimation_to_ultranest`, and `optimal_estimation_to_multinest`.
+With `mpi_processes: auto`, ROBERT uses the launched MPI or Slurm world and
+otherwise runs on one process.
 
-Unknown fields and inconsistent molecule/parameter references are errors. To
-inspect the resolved choices without loading data or opacity, run:
+## Validation
+
+Resolve and inspect a configuration without loading data or opacity:
 
 ```bash
-python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --validate-only
+python run_retrieval.py --config configuration.yaml --validate-only
 ```
 
-UltraNest runs to its convergence criteria by default (`sampler.max_calls:
-null`). A positive `max_calls` is an optional safety cap for short checks. When
-that cap is reached, UltraNest stops proposing likelihood evaluations and may
-remain active briefly while all MPI ranks consolidate and write the final
-partial result; `sampler_status.json` identifies that finalization state.
-
-All relative paths are resolved relative to the YAML file, not the runner or
-current shell directory. All real actions create the configured output,
-opacity-cache, and scratch directories automatically. They can also be created
-without loading science data:
-
-```bash
-python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --initialize
-```
-
-Opacity is prepared once, on one process:
-
-```bash
-python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --prepare-opacity
-```
-
-Then run a one-evaluation terminal check or the retrieval:
-
-```bash
-python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml --smoke-only
-python run_retrieval.py --config configurations/wasp69b_cloud_free_R1000.yaml
-```
-
-The same configuration can produce a deterministic forward model. Each
-parameter's `value` is used; if `value` is omitted, ROBERT uses that prior's
-midpoint.
-
-```bash
-python run_forward.py --config configurations/wasp69b_cloud_free_R1000.yaml
-```
-
-Set `plotting.enabled: true` to generate fit statistics and figures on rank 0
-after a successful retrieval or forward run. Plotting is disabled by default;
-it can always be run later with `postprocess_retrieval.py` or
-`postprocess_forward.py`. See [Post-processing and plotting](postprocessing.md).
-Set `plotting.leave_one_out.enabled: true` to compute pointwise PSIS-LOO after
-nested sampling; see
-[Bayesian leave-one-out cross-validation](leave_one_out.md) for the Pareto-k
-reliability rules and model-comparison API.
-
-Every executed task copies the input YAML and writes a fully resolved YAML to
-the output directory. A retrieval's UltraNest checkpoints live in the
-`ultranest/` subdirectory. Do not reuse one output directory after changing
-the data, priors, molecules, model, or resolution; create a new project/run
-directory instead.
-
-A tabulated forward-model P-T profile is selected entirely in YAML:
-
-```yaml
-atmosphere:
-  temperature:
-    model: tabulated
-    profile_path: inputs/temperature_profile.csv
-    pressure_column: pressure_bar
-    temperature_column: temperature_K
-    pressure_unit: bar
-    extrapolation: clip
-```
-
-`profile_path` is resolved relative to this YAML. New chemistry engines such
-as a photochemistry emulator should be added as another validated
-`atmosphere.chemistry.model` variant with its own explicit input paths; the
-runner itself does not need target- or machine-specific edits.
-
-For DiRAC, create an isolated project directory and submit its generated
-`submit.sbatch`. OE-only scripts request one rank; UltraNest, MultiNest, and
-hybrid scripts request 128 ranks on one node. The script uses Conda MPICH
-`mpirun`, not `srun`, and ROBERT verifies the MPI world before a sampler opens
-shared output files.
-
-```bash
-cd /scratch/dp448/dc-tayl1/my_project/<run.name>
-sbatch submit.sbatch
-```
-
-After any failed multi-writer launch, use a new self-contained run directory.
-An HDF5 checkpoint touched by independent writers must not be resumed.
+See [Forward-model generation](forward_models.md) and
+[Running retrievals](retrievals.md) for complete execution workflows.

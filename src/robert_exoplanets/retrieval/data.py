@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -12,53 +11,10 @@ from robert_exoplanets.core import RobertDataError
 from robert_exoplanets.instruments import Observation, infer_wavelength_bin_edges
 
 
-ROBERT_OBSERVATION_SCHEMA = "robert-emission-observation-v1"
+ROBERT_OBSERVATION_SCHEMA = "robert-observation-v1"
 
 
-def load_observation_npz(path: str | Path) -> Observation:
-    """Load a self-describing ROBERT spectral observation.
-
-    Unlike the legacy emission-specific loader, this entry point honors the
-    wavelength unit, value unit, observable, and instrument stored in the
-    archive. It therefore supports both eclipse- and transit-depth products.
-    """
-
-    file_path = Path(path).expanduser()
-    if not file_path.exists():
-        raise RobertDataError(f"observation NPZ does not exist: {file_path}")
-    with np.load(file_path, allow_pickle=False) as archive:
-        keys = set(archive.files)
-        wavelength_unit = (
-            str(archive["wavelength_unit"])
-            if "wavelength_unit" in keys
-            else "micron"
-        )
-        flux_unit = (
-            str(archive["flux_unit"])
-            if "flux_unit" in keys
-            else "eclipse_depth"
-        )
-        observable = (
-            str(archive["observable"])
-            if "observable" in keys
-            else "eclipse_depth"
-        )
-    observation = load_emission_observation_npz(
-        file_path,
-        wavelength_unit=wavelength_unit,
-        flux_unit=flux_unit,
-        observable=observable,
-    )
-    return replace(
-        observation,
-        metadata={
-            **dict(observation.metadata),
-            "source_format": "npz_spectral_observation",
-        },
-    )
-
-
-def load_emission_observation_npz(
+def load_observation_npz(
     path: str | Path,
     *,
     wavelength_key: str = "wavelength",
@@ -66,20 +22,21 @@ def load_emission_observation_npz(
     uncertainty_key: str = "err",
     wavelength_bin_edges_key: str | None = None,
     infer_bin_edges: bool = True,
-    wavelength_unit: str = "micron",
-    flux_unit: str = "eclipse_depth",
-    observable: str = "eclipse_depth",
+    wavelength_unit: str | None = None,
+    flux_unit: str | None = None,
+    observable: str | None = None,
     instrument: str | None = None,
 ) -> Observation:
-    """Load a 1D emission observation from an `.npz` file.
+    """Load a self-describing ROBERT spectral observation.
 
-    The default keys match the local HAT-P-32b retrieval benchmark product:
-    `wavelength`, `data`, and `err`.
+    Stored units, observable, and instrument are used by default. Keyword
+    arguments can describe older archives that contain only the wavelength,
+    data, and uncertainty arrays.
     """
 
     file_path = Path(path).expanduser()
     if not file_path.exists():
-        raise RobertDataError(f"emission observation NPZ does not exist: {file_path}")
+        raise RobertDataError(f"observation NPZ does not exist: {file_path}")
     with np.load(file_path, allow_pickle=False) as archive:
         keys = tuple(str(key) for key in archive.files)
         for key, label in (
@@ -89,7 +46,7 @@ def load_emission_observation_npz(
         ):
             if key not in keys:
                 raise RobertDataError(
-                    f"emission observation NPZ is missing {label} key {key!r}"
+                    f"observation NPZ is missing {label} key {key!r}"
                 )
         wavelength = np.array(archive[wavelength_key], dtype=float, copy=True)
         flux = np.array(archive[flux_key], dtype=float, copy=True)
@@ -100,7 +57,8 @@ def load_emission_observation_npz(
         if wavelength_bin_edges_key is not None:
             if wavelength_bin_edges_key not in keys:
                 raise RobertDataError(
-                    f"emission observation NPZ is missing wavelength-bin-edge key {wavelength_bin_edges_key!r}"
+                    "observation NPZ is missing wavelength-bin-edge key "
+                    f"{wavelength_bin_edges_key!r}"
                 )
             wavelength_bin_edges = np.array(
                 archive[wavelength_bin_edges_key], dtype=float, copy=True
@@ -120,6 +78,24 @@ def load_emission_observation_npz(
                     }
             except (json.JSONDecodeError, TypeError):
                 stored_metadata = {}
+        if wavelength_unit is None:
+            wavelength_unit = (
+                str(archive["wavelength_unit"])
+                if "wavelength_unit" in keys
+                else "micron"
+            )
+        if flux_unit is None:
+            flux_unit = (
+                str(archive["flux_unit"])
+                if "flux_unit" in keys
+                else "eclipse_depth"
+            )
+        if observable is None:
+            observable = (
+                str(archive["observable"])
+                if "observable" in keys
+                else "eclipse_depth"
+            )
         if instrument is None and "instrument" in keys:
             stored_instrument = str(archive["instrument"])
             instrument = stored_instrument or None
@@ -140,7 +116,7 @@ def load_emission_observation_npz(
         metadata={
             **stored_metadata,
             "source_path": str(file_path),
-            "source_format": "npz_emission_observation",
+            "source_format": "npz_spectral_observation",
             "wavelength_key": wavelength_key,
             "flux_key": flux_key,
             "uncertainty_key": uncertainty_key,
@@ -153,13 +129,13 @@ def load_emission_observation_npz(
     )
 
 
-def save_emission_observation_npz(
+def save_observation_npz(
     observation: Observation,
     path: str | Path,
     *,
     overwrite: bool = False,
 ) -> Path:
-    """Write an observation in ROBERT's portable emission-spectrum format."""
+    """Write a self-describing ROBERT spectral observation."""
 
     output = Path(path).expanduser()
     if output.exists() and not overwrite:
@@ -184,18 +160,7 @@ def save_emission_observation_npz(
     return output
 
 
-def save_observation_npz(
-    observation: Observation,
-    path: str | Path,
-    *,
-    overwrite: bool = False,
-) -> Path:
-    """Write any self-describing ROBERT spectral observation."""
-
-    return save_emission_observation_npz(observation, path, overwrite=overwrite)
-
-
-def load_emission_observation_table(
+def load_observation_table(
     path: str | Path,
     *,
     wavelength_column: str = "wavelength",
@@ -212,7 +177,7 @@ def load_emission_observation_table(
     """Read a named-column text table and normalize it to ROBERT units.
 
     Supported wavelength inputs are micron, nm, angstrom, and m. Supported
-    eclipse-depth inputs are fractional eclipse depth, percent, and ppm.
+    dimensionless observable inputs are fraction, percent, and ppm.
     """
 
     source = Path(path).expanduser()
@@ -248,7 +213,7 @@ def load_emission_observation_table(
         )
 
     wavelength_factor = _wavelength_to_micron_factor(wavelength_input_unit)
-    flux_factor = _eclipse_depth_factor(flux_input_unit)
+    flux_factor = _observable_value_factor(flux_input_unit)
     wavelength = (
         np.atleast_1d(np.asarray(table[wavelength_column], dtype=float))
         * wavelength_factor
@@ -286,7 +251,7 @@ def load_emission_observation_table(
         flux=flux,
         uncertainty=uncertainty,
         wavelength_unit="micron",
-        flux_unit="eclipse_depth",
+        flux_unit=observable,
         observable=observable,
         instrument=instrument,
         wavelength_bin_edges=edges,
@@ -303,7 +268,7 @@ def load_emission_observation_table(
     )
 
 
-def convert_emission_observation_table(
+def convert_observation_table(
     input_path: str | Path,
     output_path: str | Path,
     *,
@@ -312,8 +277,8 @@ def convert_emission_observation_table(
 ) -> Path:
     """Convert a named-column table directly to a ROBERT observation NPZ."""
 
-    observation = load_emission_observation_table(input_path, **table_options)
-    return save_emission_observation_npz(observation, output_path, overwrite=overwrite)
+    observation = load_observation_table(input_path, **table_options)
+    return save_observation_npz(observation, output_path, overwrite=overwrite)
 
 
 def _wavelength_to_micron_factor(unit: str) -> float:
@@ -334,7 +299,7 @@ def _wavelength_to_micron_factor(unit: str) -> float:
         raise RobertDataError(f"unsupported wavelength input unit: {unit}") from exc
 
 
-def _eclipse_depth_factor(unit: str) -> float:
+def _observable_value_factor(unit: str) -> float:
     normalized = unit.strip().lower()
     factors = {
         "eclipse_depth": 1.0,
@@ -347,16 +312,14 @@ def _eclipse_depth_factor(unit: str) -> float:
     try:
         return factors[normalized]
     except KeyError as exc:
-        raise RobertDataError(f"unsupported eclipse-depth input unit: {unit}") from exc
+        raise RobertDataError(f"unsupported observable input unit: {unit}") from exc
 
 
 __all__ = [
     "Observation",
     "ROBERT_OBSERVATION_SCHEMA",
-    "convert_emission_observation_table",
-    "load_emission_observation_npz",
+    "convert_observation_table",
     "load_observation_npz",
-    "load_emission_observation_table",
-    "save_emission_observation_npz",
+    "load_observation_table",
     "save_observation_npz",
 ]

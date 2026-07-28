@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Convert a named-column eclipse-spectrum table to ROBERT NPZ format."""
+"""Convert a named-column spectrum table to ROBERT NPZ format."""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from robert_exoplanets.retrieval import convert_emission_observation_table
+from robert_exoplanets.retrieval import convert_observation_table
 
 
 def parser() -> argparse.ArgumentParser:
@@ -34,6 +34,11 @@ def parser() -> argparse.ArgumentParser:
         default="eclipse_depth",
     )
     argument_parser.add_argument("--instrument", help="for example JWST/NIRSpec-G395H")
+    argument_parser.add_argument(
+        "--observable",
+        choices=("eclipse_depth", "transit_depth", "relative_flux"),
+        default="eclipse_depth",
+    )
     argument_parser.add_argument("--overwrite", action="store_true")
     return argument_parser
 
@@ -41,7 +46,7 @@ def parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = parser().parse_args()
     delimiters = {"whitespace": None, "comma": ",", "tab": "\t"}
-    output = convert_emission_observation_table(
+    output = convert_observation_table(
         args.input,
         args.output,
         wavelength_column=args.wavelength_column,
@@ -53,6 +58,7 @@ def main() -> None:
         wavelength_input_unit=args.wavelength_unit,
         flux_input_unit=args.flux_unit,
         instrument=args.instrument,
+        observable=args.observable,
         overwrite=args.overwrite,
     )
     print(output)

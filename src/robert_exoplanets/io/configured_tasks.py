@@ -101,8 +101,21 @@ def mpi_rank() -> int:
 
 def mpi_processes(config: TaskConfig) -> int:
     configured = config.runtime.mpi_processes
-    return (
-        int(os.environ.get("SLURM_NTASKS", "1")) if configured == "auto" else configured
+    if configured != "auto":
+        return configured
+    try:
+        from mpi4py import MPI
+
+        communicator_size = int(MPI.COMM_WORLD.Get_size())
+    except ImportError:
+        communicator_size = 1
+    if communicator_size > 1:
+        return communicator_size
+    return int(
+        os.environ.get(
+            "ROBERT_MPI_RANKS",
+            os.environ.get("SLURM_NTASKS", "1"),
+        )
     )
 
 
@@ -169,7 +182,7 @@ def load_observations(config: TaskConfig) -> ObservationCollection:
     published = loaders[config.observations.loader](
         config.observations.path,
         verify_checksum=config.observations.verify_checksum,
-        miri_offset_parameter=config.observations.miri_offset_parameter,
+        miri_offset_parameter=None,
     )
     requested = config.observations.datasets
     available = {dataset.name: dataset for dataset in published.datasets}

@@ -14,18 +14,20 @@ def test_addqueue_submit_script_is_executable_and_syntactically_valid() -> None:
     text = script.read_text(encoding="utf-8")
 
     assert script.stat().st_mode & 0o111
-    assert "CONDA_DIR" in text
-    assert "/mnt/zfsusers/jaketaylor/anaconda3" in text
+    assert "ENV_PREFIX" in text
+    assert '${ROBERT_CONDA_ROOT:-${HOME}/anaconda3}' in text
     assert "robert-exoplanets" in text
     assert "RUN_DIR" in text
     assert "configuration.yaml" in text
-    assert "${HOME}/MultiNestNew/lib:${LD_LIBRARY_PATH:-}" in text
-    assert "mpirun" not in text
+    assert "ROBERT_MULTINEST_LIB" in text
+    assert '-rmk user -launcher fork -n "${MPI_RANKS}"' in text
+    assert "PMI*|PMIX*" in text
+    assert "HYDRA" in text
     assert "sha256sum" not in text
     subprocess.run(["bash", "-n", str(script)], check=True)
 
 
-def test_addqueue_submit_script_executes_one_python_process_per_rank(
+def test_addqueue_submit_script_starts_one_hydra_world(
     tmp_path: Path,
 ) -> None:
     repository = Path(__file__).resolve().parents[1]
@@ -36,15 +38,27 @@ def test_addqueue_submit_script_executes_one_python_process_per_rank(
         "schema_version: 2\n", encoding="utf-8"
     )
     (run_directory / "run_retrieval.py").write_text("", encoding="utf-8")
-    conda_root = tmp_path / "anaconda3"
-    conda_script = conda_root / "etc" / "profile.d" / "conda.sh"
-    conda_script.parent.mkdir(parents=True)
-    conda_script.write_text("conda() { :; }\n", encoding="utf-8")
+    environment_prefix = tmp_path / "anaconda3" / "envs" / "robert-exoplanets"
+    bin_directory = environment_prefix / "bin"
+    bin_directory.mkdir(parents=True)
+    python = bin_directory / "python"
+    python.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    python.chmod(0o755)
+    mpiexec = bin_directory / "mpiexec"
+    mpiexec.write_text(
+        "#!/bin/bash\n"
+        "if [[ \"${1:-}\" == \"-version\" ]]; then echo 'HYDRA build'; exit 0; fi\n"
+        "printf '%s\\n' \"$@\" > \"${ROBERT_TEST_MPI_ARGS}\"\n",
+        encoding="utf-8",
+    )
+    mpiexec.chmod(0o755)
+    mpi_args = tmp_path / "mpi-args.txt"
     environment = {
         **os.environ,
-        "SLURM_NTASKS": "12",
-        "SLURM_PROCID": "1",
-        "ROBERT_CONDA_ROOT": str(conda_root),
+        "SLURM_CPUS_ON_NODE": "12",
+        "PMIX_RANK": "0",
+        "ROBERT_CONDA_PREFIX": str(environment_prefix),
+        "ROBERT_TEST_MPI_ARGS": str(mpi_args),
     }
 
     completed = subprocess.run(
@@ -57,3 +71,16 @@ def test_addqueue_submit_script_executes_one_python_process_per_rank(
     )
 
     assert completed.returncode == 0, completed.stderr
+    assert mpi_args.read_text(encoding="utf-8").splitlines() == [
+        "-rmk",
+        "user",
+        "-launcher",
+        "fork",
+        "-n",
+        "12",
+        str(python),
+        "-u",
+        "run_retrieval.py",
+        "--config",
+        "configuration.yaml",
+    ]

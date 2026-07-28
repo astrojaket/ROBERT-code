@@ -811,24 +811,13 @@ def pressure_grid_from_opacity(
     )
 
 
-# Backward-compatible aliases for callers using the original cloud-free names.
-ClearSkyEmissionFactoryConfig = EmissionFactoryConfig
-ParameterizedClearSkyEmissionFactoryConfig = ParameterizedEmissionFactoryConfig
-build_clear_sky_emission_model = build_emission_model
-build_parameterized_clear_sky_emission_model = build_parameterized_emission_model
-
-
 __all__ = [
-    "ClearSkyEmissionFactoryConfig",
     "EmissionFactoryConfig",
     "ExoKOpacitySource",
     "ExoKTableBinning",
     "ParameterizedEmissionFactoryConfig",
-    "ParameterizedClearSkyEmissionFactoryConfig",
-    "build_clear_sky_emission_model",
     "build_emission_model",
     "build_multi_dataset_emission_model",
     "build_parameterized_emission_model",
-    "build_parameterized_clear_sky_emission_model",
     "pressure_grid_from_opacity",
 ]

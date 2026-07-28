@@ -1,15 +1,11 @@
 # Post-processing and plotting
 
-ROBERT separates inference products from visualization. Retrievals always
-write portable `result.json` and `result_arrays.npz` files, and configured
-forward runs write `forward_model.npz`. These numerical products are the source
-of truth; plots can be regenerated with different styles without rerunning the
-forward model or sampler.
+ROBERT separates inference and forward-model products from visualization.
+Configured forward runs write `forward_model.npz`. Retrieval phases write
+`result.json` and `result_arrays.npz`. Plots can therefore be regenerated
+without rerunning radiative transfer or inference.
 
-## Automatic plotting from YAML
-
-Plotting is disabled by default. Enable it for either retrievals, forward runs,
-or both:
+## YAML settings
 
 ```yaml
 plotting:
@@ -24,9 +20,8 @@ plotting:
   posterior_predictive_seed: 0
   corner_max_parameters: 20
   dataset_colors:
-    f322w2: "#20639b"
-    f444w: "#ef5675"
-    lrs: "#2ca25f"
+    dataset_a: "#20639b"
+    dataset_b: "#ef5675"
   parameter_labels:
     metallicity: "[M/H]"
     CtoO: "C/O"
@@ -37,107 +32,97 @@ plotting:
     pareto_k_threshold: null
 ```
 
-After successful inference, MPI rank 0 post-processes every completed phase.
-A hybrid run therefore receives separate OE and nested-sampling plot folders.
-The numerical posterior summary always uses every sample.
-`max_posterior_samples` limits rendered marginal/corner samples, while
-`posterior_predictive_samples` controls the forward evaluations used for the
-68% spectral and temperature-profile credible envelopes.
+`max_posterior_samples` limits samples rendered in marginal and corner plots;
+summary statistics still use the complete weighted posterior.
+`posterior_predictive_samples` controls reproducibly resampled forward
+evaluations for spectral and temperature intervals.
 
-The benchmark configurations
-`wasp69b_cloud_free_native_pg14_R1000.yaml` and
-`wasp69b_mie_catalog_pg14_R1000.yaml` enable automatic plotting, and their
-derived MultiNest/OE/hybrid configurations inherit that setting.
+## Retrieval products
 
-## Retrieval post-processing
-
-From an isolated run directory:
+Run:
 
 ```bash
 python postprocess_retrieval.py --config configuration.yaml
 ```
 
-ROBERT discovers each completed phase and writes beneath `outputs/plots/`:
+ROBERT discovers completed `ultranest`, `multinest`,
+`optimal_estimation`, and hybrid phase directories. Each receives its own
+folder beneath `outputs/plots/` containing:
 
 - `fit_statistics.json`;
 - `posterior_summary.json`;
 - `fit_spectrum_residuals.png`;
-- `temperature_profiles.png` when the forward model exposes a T-P profile;
-- `posterior_corner.png` for nested posteriors up to `corner_max_parameters`;
 - `posterior_marginals.png` or `optimal_estimation_parameters.png`;
-- `parameter_correlation.png`; and
+- `parameter_correlation.png`;
+- `posterior_corner.png` when the state dimension permits;
+- `temperature_profiles.png` when the model exposes an atmosphere builder;
+- `posterior_predictive_quantiles.npz`; and
 - `plot_manifest.json`.
 
-The spectrum plot shows the observation-grid posterior model as open squares
-and a 68% posterior envelope. For ExoMol correlated-k configurations, ROBERT
-also evaluates and plots the median and 68% envelope on the exact native
-opacity grid. Formats for which a native-grid correlation is not defined are
-reported honestly and retain the observation-grid model rather than drawing
-an interpolated curve and calling it native.
+The predictive NPZ stores the numerical q16, q50, and q84 curves behind the
+plots. Dataset products use keys such as:
 
-When `plotting.leave_one_out.enabled` is true for a nested-sampling result,
-ROBERT additionally writes `leave_one_out.json`,
-`leave_one_out_arrays.npz`, and `leave_one_out.png`. This PSIS-LOO diagnostic
-reports expected out-of-sample predictive accuracy and Pareto-k reliability at
-individual wavelength resolution. See
-[Bayesian leave-one-out cross-validation](leave_one_out.md) for method,
-configuration, comparison, and interpretation details.
+```text
+spectrum_DATASET_wavelength_micron
+spectrum_DATASET_q16
+spectrum_DATASET_q50
+spectrum_DATASET_q84
+```
 
-Fit diagnostics include total and per-dataset chi-squared, reduced
-chi-squared, degrees of freedom, chi-squared survival probability, RMSE,
-standardized-residual diagnostics, recomputed log likelihood, AIC, AICc, and
-BIC. Nested results additionally retain evidence and timing information; the
-posterior summary records weighted quantiles and effective sample size. OE
-results use the state and covariance Gaussian approximation.
+When native-opacity-grid evaluation is supported, it also stores
+`native_wavelength_micron` and `native_q16`, `native_q50`, `native_q84`.
+Temperature products use `temperature_REGION_pressure_bar` and
+`temperature_REGION_q16_K`, `q50_K`, and `q84_K`.
 
-Process one phase or select a custom appearance without changing YAML:
+Spectrum panels distinguish observations, the best-fit residual calculation,
+the posterior median, and the central 68% posterior predictive interval.
+Parameter names and order come from the serialized result. ROBERT does not add
+truth or reference markers unless they are explicitly available.
+
+Fit diagnostics include total and per-dataset chi-squared, reduced chi-squared,
+degrees of freedom, survival probability, RMSE, standardized residuals,
+recomputed log likelihood, AIC, AICc, and BIC. Nested results retain evidence,
+timing, weighted quantiles, and effective sample size. Optimal-estimation
+results use their state and covariance Gaussian approximation.
+
+Process a particular phase or override appearance:
 
 ```bash
 python postprocess_retrieval.py \
   --config configuration.yaml \
   --result-dir outputs/multinest \
-  --style collaborator.mplstyle \
+  --style paper.mplstyle \
   --format pdf \
-  --color f322w2=mediumpurple \
-  --color f444w=darkorange \
+  --color dataset_a=mediumpurple \
   --label metallicity='[M/H]'
 ```
 
-## Forward-model post-processing
+For a headless machine:
 
-Run or replot a configured forward model with:
+```bash
+export MPLBACKEND=Agg
+export MPLCONFIGDIR="$PWD/scratch/matplotlib"
+mkdir -p "$MPLCONFIGDIR"
+python postprocess_retrieval.py --config configuration.yaml
+```
+
+The generated Slurm and Glamdring launchers set these automatically.
+
+## Forward-model products
+
+Run or regenerate forward diagnostics:
 
 ```bash
 python run_forward.py --config configuration.yaml
 python postprocess_forward.py --config configuration.yaml
 ```
 
-The post-processor writes `outputs/plots/forward/fit_statistics.json`, the
-configured parameter values, a spectrum/residual plot, and a plot manifest.
-Information criteria are included for consistency but are descriptive when
-the forward parameters were prescribed rather than fitted.
+ROBERT writes beneath `outputs/plots/forward/`:
 
-## WASP-69b sampler benchmark comparison
+- `fit_statistics.json`;
+- `forward_parameters.json`;
+- `forward_spectrum_residuals.png`; and
+- `plot_manifest.json`.
 
-After the ten clear/Mie UltraNest, MultiNest, OE, and hybrid runs finish:
-
-```bash
-python postprocess_wasp69b_sampler_benchmark.py \
-  --project-dir /scratch/dp448/dc-tayl1/my_project/wasp69b_sampler_benchmark_128core
-```
-
-The comparison directory contains JSON and CSV summaries plus runtime,
-core-hour, fit-statistic, evidence, and shared-parameter comparison plots. If a
-run lacks its individual post-processing products, the comparison script
-generates them first. By default it requires the complete ten-run matrix; use
-`--allow-incomplete` for an interim comparison.
-
-Method colours can be overridden without editing results:
-
-```bash
-python postprocess_wasp69b_sampler_benchmark.py \
-  --project-dir /path/to/project \
-  --method-color ultranest=navy \
-  --method-color multinest=crimson \
-  --format svg
-```
+Information criteria are included for a consistent schema but are descriptive
+when the parameters were prescribed rather than inferred.

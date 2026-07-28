@@ -75,7 +75,6 @@ class ObservationsConfig(ConfigModel):
     path: Path
     datasets: tuple[str, ...] = Field(min_length=1)
     verify_checksum: bool = True
-    miri_offset_parameter: str | None = None
     dataset_options: dict[str, DatasetNuisanceConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -289,12 +288,6 @@ class AtmosphereConfig(ConfigModel):
 
 class CloudFreeConfig(ConfigModel):
     model: Literal["none"] = "none"
-
-
-# Backward-compatible alias for configuration code written before the
-# cloud-free terminology was standardized.
-ClearCloudConfig = CloudFreeConfig
-
 
 class DeckHazeCloudConfig(ConfigModel):
     """Shared grey-deck and well-mixed power-law haze parameterization."""
@@ -765,8 +758,6 @@ class TaskConfig(ConfigModel):
                 )
                 if parameter is not None
             )
-        if self.observations.miri_offset_parameter is not None:
-            required.add(self.observations.miri_offset_parameter)
         radiative_transfer = self.radiative_transfer
         if radiative_transfer.model == "transmission" and disk_mode != "one_region":
             raise ValueError(

@@ -1,7 +1,7 @@
 extends: wasp69b_mie_catalog_pg14_R1000.yaml
 
 paths:
-  observations_directory: /lustre/dirac3/scratch/dp448/dc-tayl1/ROBERT-code/data/wasp80b_wiser2025
+  observations_directory: ../data/wasp80b_wiser2025
 
 run:
   name: wasp80b-mie-catalog-pg14-R1000
@@ -23,7 +23,6 @@ bodies:
 observations:
   loader: wiser2025_wasp80b
   datasets: [f322w2, f444w, lrs]
-  miri_offset_parameter: null
 
 atmosphere:
   chemistry:

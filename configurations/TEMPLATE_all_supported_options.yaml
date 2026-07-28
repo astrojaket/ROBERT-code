@@ -57,7 +57,6 @@ observations:
   loader: schlawin2024_wasp69b   # Alternatives: wiser2025_wasp80b, robert_npz
   datasets: [f322w2, f444w, lrs]
   verify_checksum: true
-  miri_offset_parameter: null    # Legacy shorthand; prefer dataset_options below.
   # Every selected dataset may have independent or shared nuisance parameters.
   # `uncertainty_scale` is a fixed multiplier. A retrieved scale multiplies it;
   # additive jitter is then combined in quadrature. Omit unused controls.

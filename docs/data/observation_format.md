@@ -1,34 +1,51 @@
-# ROBERT emission-observation format
+# Portable observation format
 
-ROBERT's portable observation product is a compressed NumPy archive (`.npz`)
-with schema identifier `robert-emission-observation-v1`. It contains these
-required arrays:
+ROBERT's portable spectral observation is a compressed NumPy archive with
+schema identifier `robert-observation-v1`. The same format represents emission,
+transmission, and relative-flux observations.
 
-- `wavelength`: one-dimensional wavelength-bin centres, in micron.
-- `data`: one-dimensional fractional eclipse depths.
-- `err`: positive symmetric 1-sigma uncertainties in fractional eclipse depth.
+Required arrays are:
 
-Optional arrays are `wavelength_bin_edges` (length `N + 1`) and `mask` (boolean,
-length `N`). The writer also records units, observable, instrument, and JSON
-metadata. Arrays must have matching lengths and wavelength must be monotonic.
+- `wavelength`: one-dimensional wavelength-bin centers;
+- `data`: one-dimensional observed values; and
+- `err`: positive symmetric one-sigma uncertainties.
 
-Convert a named-column table with:
+Optional arrays are `wavelength_bin_edges` with length `N + 1` and a boolean
+`mask` with length `N`. The archive also stores `wavelength_unit`, `flux_unit`,
+`observable`, `instrument`, and JSON metadata. Arrays must have matching
+lengths and strictly monotonic wavelengths.
+
+Convert a named-column table:
 
 ```bash
-python scripts/convert_observation_to_robert.py unity_spectrum.csv unity.npz \
+python scripts/convert_observation_to_robert.py spectrum.csv observation.npz \
   --delimiter comma \
   --wavelength-column wavelength_um \
-  --flux-column eclipse_ppm \
+  --flux-column depth_ppm \
   --uncertainty-column error_ppm \
   --wavelength-unit micron \
   --flux-unit ppm \
+  --observable transit_depth \
   --instrument JWST/NIRSpec-G395H
 ```
 
-Add `--bin-low-column` and `--bin-high-column` when the published product gives
-bin bounds. Without them, ROBERT infers contiguous edges midway between bin
-centres. Use `--help` for every supported input unit and option.
+Use `--observable eclipse_depth` for emission,
+`--observable transit_depth` for transmission, or
+`--observable relative_flux` for a normalized spectrum. Add
+`--bin-low-column` and `--bin-high-column` when the source gives bin bounds.
+Otherwise ROBERT infers contiguous midpoint edges.
 
-Python callers can use `load_emission_observation_table`,
-`save_emission_observation_npz`, and `convert_emission_observation_table` from
-`robert_exoplanets`.
+Python callers use:
+
+```python
+from robert_exoplanets import (
+    convert_observation_table,
+    load_observation_npz,
+    load_observation_table,
+    save_observation_npz,
+)
+```
+
+Legacy NPZ archives with different array keys can be read by passing
+`wavelength_key`, `flux_key`, `uncertainty_key`, units, observable, and
+instrument to `load_observation_npz`.

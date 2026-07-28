@@ -2,7 +2,7 @@ schema_version: 2
 
 paths:
   observations_directory: ../data/observations/l98_59b_bello_arufe2025
-  k_table_directory: /Users/jaketaylor/Dropbox/ktables_exomol
+  k_table_directory: ../opacity_data/ktables_exomol
 
 run:
   name: l98-59b-clr-transmission-multinest
@@ -31,8 +31,9 @@ observations:
   loader: bello_arufe2025_l9859b
   datasets: [nrs1, nrs2]
   verify_checksum: true
-  miri_offset_parameter: nrs2_offset
-  dataset_options: {}
+  dataset_options:
+    nrs2:
+      offset_parameter: nrs2_offset
 
 atmosphere:
   pressure:

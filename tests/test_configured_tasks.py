@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
+import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -21,6 +22,27 @@ from robert_exoplanets.io.task_config import TaskConfig, load_task_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_auto_mpi_processes_prefers_inner_communicator_on_glamdring(
+    monkeypatch,
+) -> None:
+    config = load_task_config(
+        ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
+    )
+    monkeypatch.setenv("SLURM_NTASKS", "1")
+    monkeypatch.setenv("ROBERT_MPI_RANKS", "12")
+    monkeypatch.setitem(
+        sys.modules,
+        "mpi4py",
+        SimpleNamespace(
+            MPI=SimpleNamespace(
+                COMM_WORLD=SimpleNamespace(Get_size=lambda: 12)
+            )
+        ),
+    )
+
+    assert configured_tasks.mpi_processes(config) == 12
 
 
 def test_smoke_evaluation_can_validate_an_explicit_oe_state() -> None:

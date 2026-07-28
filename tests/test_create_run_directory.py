@@ -31,6 +31,10 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     run_directory = create_run_directory(
         project_dir=tmp_path / "my_project",
         source_config=SOURCE_CONFIG,
+        slurm_account="dp448",
+        slurm_partition="slurm",
+        glamdring_ranks=10,
+        slurm_mail_user="researcher@example.org",
     )
     config = load_task_config(run_directory / "configuration.yaml")
 
@@ -43,12 +47,16 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert (run_directory / "postprocess_forward.py").is_file()
     assert (run_directory / "submit.sh").stat().st_mode & 0o111
     glamdring_submission = (run_directory / "submit.sh").read_text(encoding="utf-8")
-    assert "CONDA_DIR" in glamdring_submission
-    assert (
-        "python -u run_retrieval.py --config configuration.yaml" in glamdring_submission
+    assert "ENV_PREFIX" in glamdring_submission
+    assert '"${PYTHON}" -u run_retrieval.py --config configuration.yaml' in (
+        glamdring_submission
     )
-    assert "MultiNestNew/lib" in glamdring_submission
-    assert "mpirun" not in glamdring_submission
+    assert "ROBERT_MULTINEST_LIB" in glamdring_submission
+    assert '-rmk user -launcher fork -n "${MPI_RANKS}"' in glamdring_submission
+    assert "PMI*|PMIX*" in glamdring_submission
+    run_readme = (run_directory / "README.md").read_text(encoding="utf-8")
+    assert "ROBERT_MPI_RANKS=10" in run_readme
+    assert "-s -c \"48 hours\" -n 1x10" in run_readme
     assert config.outputs.directory == run_directory / "outputs"
     assert config.opacity.cache_directory == run_directory / "opacity_cache"
     assert config.runtime.scratch_directory == run_directory / "scratch"
@@ -58,11 +66,13 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     assert "#SBATCH --nodes=1" in submission
     assert "#SBATCH --ntasks=128" in submission
     assert "#SBATCH --ntasks-per-node=128" in submission
-    assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
+    assert "#SBATCH --account=dp448" in submission
+    assert "#SBATCH --partition=slurm" in submission
+    assert "#SBATCH --mail-user=researcher@example.org" in submission
     assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
     assert 'mpirun -np "${SLURM_NTASKS}"' in submission
     assert (
-        'export PYSYN_CDBS="${PYSYN_CDBS:-/scratch/dp448/dc-tayl1/grp/redcat/trds}"'
+        'export PYSYN_CDBS="${PYSYN_CDBS:?Set PYSYN_CDBS to the Synphot reference-data root}"'
         in submission
     )
     assert "--config configuration.yaml" in submission
@@ -80,9 +90,11 @@ def test_create_run_directory_uses_one_rank_for_optimal_estimation(
     assert "#SBATCH --nodes=1" in submission
     assert "#SBATCH --ntasks=1" in submission
     assert "#SBATCH --ntasks-per-node=1" in submission
-    assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
-    assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
+    assert "#SBATCH --mail-user=" not in submission
+    assert "#SBATCH --mail-type=" not in submission
     assert 'mpirun -np "${SLURM_NTASKS}"' in submission
+    readme = (run_directory / "README.md").read_text(encoding="utf-8")
+    assert "ROBERT_MPI_RANKS=1" in readme
 
 
 @pytest.mark.parametrize("config_name", NESTED_CONFIGS)
@@ -99,8 +111,10 @@ def test_create_run_directory_uses_128_ranks_for_nested_workflows(
     assert "#SBATCH --nodes=1" in submission
     assert "#SBATCH --ntasks=128" in submission
     assert "#SBATCH --ntasks-per-node=128" in submission
-    assert "#SBATCH --mail-user=jake.taylor@physics.ox.ac.uk" in submission
-    assert "#SBATCH --mail-type=BEGIN,END,FAIL" in submission
+    assert "#SBATCH --mail-user=" not in submission
+    assert "#SBATCH --mail-type=" not in submission
+    readme = (run_directory / "README.md").read_text(encoding="utf-8")
+    assert "ROBERT_MPI_RANKS=12" in readme
 
 
 def test_create_run_directory_refuses_to_mix_runs(tmp_path: Path) -> None:
