@@ -239,7 +239,7 @@ radiative_transfer:
     model: normal_emission    # Alternative: gauss_legendre_disk
     points: 4                 # Used by gauss_legendre_disk only.
   include_rayleigh: true
-  gas_combination: random_overlap  # Alternative: equivalent_extinction
+  gas_combination: random_overlap  # Alternative: sum_by_g
   thermal_integration_backend: auto # Alternatives: numpy, numba
   sh4_boundary_backend: auto       # Alternatives: scipy (reference), numba
   # Transmission-only controls:

@@ -83,7 +83,9 @@ def test_emission_model_evaluates_multi_gas_eclipse_depth() -> None:
     )
 
     assert spectrum.observable == "eclipse_depth"
-    np.testing.assert_array_equal(spectrum.spectral_grid.values, model.spectral_grid.values)
+    np.testing.assert_array_equal(
+        spectrum.spectral_grid.values, model.spectral_grid.values
+    )
     assert np.all(np.isfinite(spectrum.values))
     assert np.all(spectrum.values > 0.0)
     assert model.required_parameters == (

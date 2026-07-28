@@ -149,8 +149,8 @@ radiative_transfer:
 ```
 
 Opacity formats are `exomol_kta` and `exomol_cross_section_hdf`. Gas
-combination is `random_overlap` or `equivalent_extinction`. Emission geometry
-is `normal_emission` or `gauss_legendre_disk`. For cloudy SH4 emission,
+combination is `random_overlap` or `sum_by_g`. Emission geometry is
+`normal_emission` or `gauss_legendre_disk`. For cloudy SH4 emission,
 `sh4_boundary_backend: auto` selects the compiled batched solve when Numba is
 available. Set it to `scipy` to force the scientific reference implementation.
 

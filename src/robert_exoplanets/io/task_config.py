@@ -473,9 +473,7 @@ class RadiativeTransferConfig(ConfigModel):
     model: Literal["emission", "transmission"] = "emission"
     geometry: GeometryConfig = GeometryConfig()
     include_rayleigh: bool = True
-    gas_combination: Literal["sum_by_g", "random_overlap", "equivalent_extinction"] = (
-        "random_overlap"
-    )
+    gas_combination: Literal["sum_by_g", "random_overlap"] = "random_overlap"
     thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
     sh4_boundary_backend: Literal["auto", "scipy", "numba"] = "auto"
     reference_pressure_bar: PositiveFloat = 1.0
@@ -485,13 +483,6 @@ class RadiativeTransferConfig(ConfigModel):
 
     @model_validator(mode="after")
     def validate_model_options(self) -> "RadiativeTransferConfig":
-        if (
-            self.model == "transmission"
-            and self.gas_combination == "equivalent_extinction"
-        ):
-            raise ValueError(
-                "transmission gas_combination must be 'sum_by_g' or 'random_overlap'"
-            )
         if self.radius_scale_parameter is not None and not self.radius_scale_parameter:
             raise ValueError("radius_scale_parameter must be non-empty")
         return self

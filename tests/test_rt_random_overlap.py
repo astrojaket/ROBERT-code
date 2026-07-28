@@ -108,6 +108,41 @@ def test_numba_random_overlap_sorted_fast_path_matches_numpy() -> None:
     assert np.all(np.diff(numba_combined, axis=-1) >= 0.0)
 
 
+@pytest.mark.parametrize(
+    "weights",
+    (
+        np.array([0.7, 0.2, 0.1]),
+        np.array([0.1, 0.7, 0.2]),
+        np.array([0.1, 0.2, 0.7]),
+    ),
+)
+def test_numba_sorted_bidirectional_rebin_matches_numpy_for_each_pivot(
+    weights: np.ndarray,
+) -> None:
+    pytest.importorskip("numba")
+    rng = np.random.default_rng(7052026)
+    species_tau = np.sort(
+        np.exp(rng.uniform(-25.0, 8.0, size=(6, 1, 19, weights.size))),
+        axis=-1,
+    )
+
+    reference = random_overlap_species_tau(
+        species_tau,
+        weights,
+        cutoff=0.0,
+        backend="numpy",
+    )
+    candidate = random_overlap_species_tau(
+        species_tau,
+        weights,
+        cutoff=0.0,
+        backend="numba",
+    )
+
+    np.testing.assert_allclose(candidate, reference, rtol=3.0e-12, atol=3.0e-12)
+    assert np.all(np.diff(candidate, axis=-1) >= 0.0)
+
+
 def test_assemble_gas_optical_depth_can_use_random_overlap_combination() -> None:
     pressure_grid = PressureGrid(
         edges=np.array([1.0e-5, 1.0e-3]),
@@ -150,8 +185,7 @@ def test_fused_gas_optical_depth_matches_species_resolved_random_overlap() -> No
     pressure_grid = PressureGrid(
         edges=np.geomspace(1.0e-5, 1.0, 5),
         centers=np.sqrt(
-            np.geomspace(1.0e-5, 1.0, 5)[:-1]
-            * np.geomspace(1.0e-5, 1.0, 5)[1:]
+            np.geomspace(1.0e-5, 1.0, 5)[:-1] * np.geomspace(1.0e-5, 1.0, 5)[1:]
         ),
         unit="bar",
     )

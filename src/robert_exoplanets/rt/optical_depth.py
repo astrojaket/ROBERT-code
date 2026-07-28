@@ -53,7 +53,9 @@ class GasOpticalDepth:
         if not species or any(not item for item in species):
             raise RobertValidationError("gas optical-depth species must be non-empty")
         if species != self.opacity.prepared.species:
-            raise RobertValidationError("gas optical-depth species must match evaluated opacity")
+            raise RobertValidationError(
+                "gas optical-depth species must match evaluated opacity"
+            )
 
         n_species = len(species)
         n_layers = self.atmosphere.n_layers
@@ -90,9 +92,13 @@ class GasOpticalDepth:
         if gravity.shape != (n_layers,):
             raise RobertValidationError("gravity_m_s2 must match pressure grid layers")
         if layer_delta_p.shape != (n_layers,):
-            raise RobertValidationError("layer_pressure_thickness_pa must match pressure grid layers")
+            raise RobertValidationError(
+                "layer_pressure_thickness_pa must match pressure grid layers"
+            )
         if layer_column.shape != (n_layers,):
-            raise RobertValidationError("layer_column_density_molecules_m2 must match pressure grid layers")
+            raise RobertValidationError(
+                "layer_column_density_molecules_m2 must match pressure grid layers"
+            )
         if np.any(gravity <= 0.0):
             raise RobertValidationError("gravity_m_s2 values must be positive")
         if np.any(layer_delta_p <= 0.0):
@@ -101,17 +107,25 @@ class GasOpticalDepth:
             raise RobertValidationError("layer column densities must be positive")
         if np.any(species_column < 0.0):
             raise RobertValidationError("species column densities must be non-negative")
-        if (species_tau is not None and np.any(species_tau < 0.0)) or np.any(total_tau < 0.0):
+        if (species_tau is not None and np.any(species_tau < 0.0)) or np.any(
+            total_tau < 0.0
+        ):
             raise RobertValidationError("gas optical depths must be non-negative")
         metadata = dict(self.metadata)
         gas_combination = metadata.get("gas_combination", "sum_by_g")
         if gas_combination not in {"sum_by_g", "random_overlap"}:
-            raise RobertValidationError("gas_combination must be 'sum_by_g' or 'random_overlap'")
-        if species_tau is not None and gas_combination == "sum_by_g" and not np.allclose(
-            np.sum(species_tau, axis=0),
-            total_tau,
-            rtol=1.0e-12,
-            atol=0.0,
+            raise RobertValidationError(
+                "gas_combination must be 'sum_by_g' or 'random_overlap'"
+            )
+        if (
+            species_tau is not None
+            and gas_combination == "sum_by_g"
+            and not np.allclose(
+                np.sum(species_tau, axis=0),
+                total_tau,
+                rtol=1.0e-12,
+                atol=0.0,
+            )
         ):
             raise RobertValidationError("total_tau must equal the sum of species_tau")
         if not self.unit:
@@ -168,13 +182,17 @@ class GasOpticalDepth:
     def g_weighted_layer_tau(self) -> NDArray[np.float64]:
         """Return g-weighted mean layer optical depth, shape `(layer, wavelength)`."""
 
-        return _readonly_result(np.sum(self.total_tau * self.g_weights[None, None, :], axis=-1))
+        return _readonly_result(
+            np.sum(self.total_tau * self.g_weights[None, None, :], axis=-1)
+        )
 
     def g_weighted_cumulative_tau_from_top(self) -> NDArray[np.float64]:
         """Return g-weighted mean cumulative optical depth from the top."""
 
         cumulative = self.cumulative_tau_from_top()
-        return _readonly_result(np.sum(cumulative * self.g_weights[None, None, :], axis=-1))
+        return _readonly_result(
+            np.sum(cumulative * self.g_weights[None, None, :], axis=-1)
+        )
 
     def band_transmission_to_space(self) -> NDArray[np.float64]:
         """Return g-weighted transmission from the top through each layer."""
@@ -225,14 +243,18 @@ def assemble_gas_optical_depth(
     `N = delta_pressure / (mean_molecular_weight * atomic_mass * gravity)`.
     """
 
-    _validate_pressure_grid_match(atmosphere.pressure_grid, opacity.prepared.pressure_grid)
+    _validate_pressure_grid_match(
+        atmosphere.pressure_grid, opacity.prepared.pressure_grid
+    )
     _validate_composition_convention(atmosphere.composition_convention)
     _validate_mean_molecular_weight_unit(atmosphere.mean_molecular_weight_unit)
 
     species = opacity.prepared.species
     missing = tuple(item for item in species if item not in atmosphere.composition)
     if missing:
-        raise RobertValidationError(f"atmosphere is missing opacity species: {', '.join(missing)}")
+        raise RobertValidationError(
+            f"atmosphere is missing opacity species: {', '.join(missing)}"
+        )
 
     gravity = _gravity_profile(gravity_m_s2, atmosphere.n_layers)
     layer_delta_p_pa = _pressure_layer_thickness_pa(atmosphere.pressure_grid)
@@ -248,18 +270,14 @@ def assemble_gas_optical_depth(
         "sum_by_g" if opacity_mode == "opacity_sampling" else requested_combination
     )
     if retain_species_tau:
-        kcoeff_m2_per_molecule = _kcoeff_m2_per_molecule(
-            opacity.kcoeff, opacity.unit
-        )
-        species_tau = (
-            kcoeff_m2_per_molecule
-            * species_column_density[:, :, None, None]
-        )
+        kcoeff_m2_per_molecule = _kcoeff_m2_per_molecule(opacity.kcoeff, opacity.unit)
+        species_tau = kcoeff_m2_per_molecule * species_column_density[:, :, None, None]
         if combination == "sum_by_g":
             total_tau = np.sum(species_tau, axis=0)
         else:
             total_tau = random_overlap_species_tau(
-                species_tau, opacity.prepared.g_weights
+                species_tau,
+                opacity.prepared.g_weights,
             )
     else:
         species_tau = None
@@ -279,9 +297,9 @@ def assemble_gas_optical_depth(
                 optimize=True,
             )
 
-    if (
-        species_tau is not None and not np.all(np.isfinite(species_tau))
-    ) or not np.all(np.isfinite(total_tau)):
+    if (species_tau is not None and not np.all(np.isfinite(species_tau))) or not np.all(
+        np.isfinite(total_tau)
+    ):
         raise RobertValidationError("assembled gas optical depth must be finite")
 
     return GasOpticalDepth(
@@ -326,7 +344,9 @@ def assemble_opacity_sampling_gas_optical_depth(
     _validate_pressure_grid_match(atmosphere.pressure_grid, prepared.pressure_grid)
     _validate_composition_convention(atmosphere.composition_convention)
     _validate_mean_molecular_weight_unit(atmosphere.mean_molecular_weight_unit)
-    missing = tuple(name for name in prepared.species if name not in atmosphere.composition)
+    missing = tuple(
+        name for name in prepared.species if name not in atmosphere.composition
+    )
     if missing:
         raise RobertValidationError(
             f"atmosphere is missing opacity species: {', '.join(missing)}"
@@ -335,18 +355,16 @@ def assemble_opacity_sampling_gas_optical_depth(
     layer_delta_p_pa = _pressure_layer_thickness_pa(atmosphere.pressure_grid)
     particle_mass_kg = atmosphere.mean_molecular_weight * ATOMIC_MASS_KG
     layer_column_density = layer_delta_p_pa / (particle_mass_kg * gravity)
-    vmr = np.stack(
-        [atmosphere.composition[name] for name in prepared.species], axis=0
-    )
+    vmr = np.stack([atmosphere.composition[name] for name in prepared.species], axis=0)
     species_column_density = vmr * layer_column_density[None, :]
     mixture = provider.evaluate_mixture(atmosphere, prepared)
-    cross_section_m2 = _kcoeff_m2_per_molecule(
-        mixture.cross_section, mixture.unit
-    )
+    cross_section_m2 = _kcoeff_m2_per_molecule(mixture.cross_section, mixture.unit)
     total_tau = cross_section_m2 * layer_column_density[:, None]
     total_tau = total_tau[:, :, None]
     if not np.all(np.isfinite(total_tau)):
-        raise RobertValidationError("assembled opacity-sampling optical depth must be finite")
+        raise RobertValidationError(
+            "assembled opacity-sampling optical depth must be finite"
+        )
     return GasOpticalDepth(
         atmosphere=atmosphere,
         opacity=mixture,
@@ -374,9 +392,14 @@ def _validate_pressure_grid_match(left: PressureGrid, right: PressureGrid) -> No
     right_edges = pressure_values_in_unit(right.edges, right.unit, "pa")
     left_centers = pressure_values_in_unit(left.centers, left.unit, "pa")
     right_centers = pressure_values_in_unit(right.centers, right.unit, "pa")
-    if left_edges.shape != right_edges.shape or left_centers.shape != right_centers.shape:
+    if (
+        left_edges.shape != right_edges.shape
+        or left_centers.shape != right_centers.shape
+    ):
         raise RobertValidationError("atmosphere and opacity pressure grids must match")
-    if not np.allclose(left_edges, right_edges, rtol=1.0e-10, atol=0.0) or not np.allclose(
+    if not np.allclose(
+        left_edges, right_edges, rtol=1.0e-10, atol=0.0
+    ) or not np.allclose(
         left_centers,
         right_centers,
         rtol=1.0e-10,
@@ -388,13 +411,17 @@ def _validate_pressure_grid_match(left: PressureGrid, right: PressureGrid) -> No
 def _validate_composition_convention(convention: str) -> None:
     normalized = convention.strip().lower()
     if normalized not in {"volume_mixing_ratio", "vmr"}:
-        raise RobertValidationError("gas optical-depth assembly currently requires VMR composition")
+        raise RobertValidationError(
+            "gas optical-depth assembly currently requires VMR composition"
+        )
 
 
 def _validate_mean_molecular_weight_unit(unit: str) -> None:
     normalized = unit.strip().lower().replace(" ", "_")
     if normalized not in {"amu", "atomic_mass_unit", "atomic_mass_units", "u"}:
-        raise RobertValidationError("gas optical-depth assembly currently requires MMW in amu")
+        raise RobertValidationError(
+            "gas optical-depth assembly currently requires MMW in amu"
+        )
 
 
 def _gravity_profile(values: float | ArrayLike, n_layers: int) -> NDArray[np.float64]:
@@ -415,7 +442,9 @@ def _pressure_layer_thickness_pa(pressure_grid: PressureGrid) -> NDArray[np.floa
     edges = pressure_values_in_unit(pressure_grid.edges, pressure_grid.unit, "pa")
     thickness = np.abs(np.diff(edges))
     if not np.all(np.isfinite(thickness)) or np.any(thickness <= 0.0):
-        raise RobertValidationError("pressure layer thicknesses must be finite and positive")
+        raise RobertValidationError(
+            "pressure layer thicknesses must be finite and positive"
+        )
     thickness.setflags(write=False)
     return thickness
 
@@ -426,12 +455,24 @@ def _kcoeff_m2_per_molecule(
 ) -> NDArray[np.float64]:
     normalized = unit.strip().lower().replace(" ", "")
     kcoeff = np.array(values, dtype=float, copy=True)
-    if normalized in {"cm^2/molecule", "cm2/molecule", "cm^2molecule^-1", "cm2molecule-1"}:
+    if normalized in {
+        "cm^2/molecule",
+        "cm2/molecule",
+        "cm^2molecule^-1",
+        "cm2molecule-1",
+    }:
         kcoeff *= 1.0e-4
-    elif normalized in {"m^2/molecule", "m2/molecule", "m^2molecule^-1", "m2molecule-1"}:
+    elif normalized in {
+        "m^2/molecule",
+        "m2/molecule",
+        "m^2molecule^-1",
+        "m2molecule-1",
+    }:
         pass
     else:
-        raise RobertValidationError(f"unsupported opacity unit for gas optical depth: {unit}")
+        raise RobertValidationError(
+            f"unsupported opacity unit for gas optical depth: {unit}"
+        )
     kcoeff.setflags(write=False)
     return kcoeff
 
@@ -463,7 +504,9 @@ def _gas_combination_mode(value: str) -> str:
         return "sum_by_g"
     if normalized in {"random_overlap", "randomoverlap", "noverlap"}:
         return "random_overlap"
-    raise RobertValidationError("gas_combination must be 'sum_by_g' or 'random_overlap'")
+    raise RobertValidationError(
+        "gas_combination must be 'sum_by_g' or 'random_overlap'"
+    )
 
 
 def _top_to_bottom_order(pressure_grid: PressureGrid) -> NDArray[np.int64]:

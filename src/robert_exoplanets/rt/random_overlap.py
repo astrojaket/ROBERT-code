@@ -8,10 +8,14 @@ from numpy.typing import ArrayLike, NDArray
 from robert_exoplanets.core import RobertValidationError
 
 try:  # pragma: no cover - exercised only when the optional perf extra is installed.
-    from numba import njit, prange
+    from numba import get_num_threads, njit, prange
 except Exception:  # pragma: no cover - dependency availability is environment-specific.
     njit = None
     prange = range
+
+    def get_num_threads() -> int:
+        return 1
+
 
 _NUMBA_AVAILABLE = njit is not None
 
@@ -146,7 +150,9 @@ def fused_random_overlap_kcoeff(
 def fused_random_overlap_backend_name() -> str:
     """Return the active diagnostics-free random-overlap assembly backend."""
 
-    return "fused_numba_random_overlap" if _NUMBA_AVAILABLE else "numpy_reference_fallback"
+    return (
+        "fused_numba_random_overlap" if _NUMBA_AVAILABLE else "numpy_reference_fallback"
+    )
 
 
 def random_overlap_tau_vectors(
@@ -381,107 +387,123 @@ if _NUMBA_AVAILABLE:
                 species_scale = species_columns[0, layer_index] * unit_scale
                 for g_index in range(n_g):
                     output[layer_index, spectral_index, g_index] = (
-                        kcoeff[0, layer_index, spectral_index, g_index]
-                        * species_scale
+                        kcoeff[0, layer_index, spectral_index, g_index] * species_scale
                     )
             return output
-        for point_index in prange(n_points):
-            layer_index = point_index // n_spectral
-            spectral_index = point_index - layer_index * n_spectral
-            first_active = -1
-            for species_index in range(n_species):
-                species_scale = (
-                    species_columns[species_index, layer_index] * unit_scale
-                )
-                max_tau = 0.0
-                for g_index in range(n_g):
-                    value = (
-                        kcoeff[
-                            species_index,
-                            layer_index,
-                            spectral_index,
-                            g_index,
-                        ]
-                        * species_scale
-                    )
-                    if value > max_tau:
-                        max_tau = value
-                if max_tau >= cutoff:
-                    first_active = species_index
-                    break
-
-            if first_active < 0:
-                continue
-
+        n_threads = get_num_threads()
+        blocks_per_layer = (n_threads + n_layers - 1) // n_layers
+        if blocks_per_layer > n_spectral:
+            blocks_per_layer = n_spectral
+        block_width = (n_spectral + blocks_per_layer - 1) // blocks_per_layer
+        n_tasks = n_layers * blocks_per_layer
+        for task_index in prange(n_tasks):
+            layer_index = task_index // blocks_per_layer
+            block_index = task_index - layer_index * blocks_per_layer
+            spectral_start = block_index * block_width
+            spectral_stop = min(spectral_start + block_width, n_spectral)
+            # These workspaces are private to one parallel spectral block and
+            # reused across that block. Retrieval grids normally have enough
+            # layers for one block per layer; shallow grids retain wavelength
+            # parallelism without allocating workspaces for every point.
             combined = np.empty(n_g, dtype=np.float64)
             right_tau = np.empty(n_g, dtype=np.float64)
+            species_scales = np.empty(n_species, dtype=np.float64)
             next_combined = np.empty(n_g, dtype=np.float64)
             random_values = np.empty(n_g * n_g, dtype=np.float64)
             heap_values = np.empty(n_g, dtype=np.float64)
             heap_rows = np.empty(n_g, dtype=np.int64)
             heap_columns = np.empty(n_g, dtype=np.int64)
-            first_scale = species_columns[first_active, layer_index] * unit_scale
-            for g_index in range(n_g):
-                combined[g_index] = (
-                    kcoeff[
-                        first_active,
-                        layer_index,
-                        spectral_index,
-                        g_index,
-                    ]
-                    * first_scale
-                )
-
-            for species_index in range(first_active + 1, n_species):
-                species_scale = (
+            for species_index in range(n_species):
+                species_scales[species_index] = (
                     species_columns[species_index, layer_index] * unit_scale
                 )
-                max_tau = 0.0
-                for g_index in range(n_g):
-                    value = (
-                        kcoeff[
-                            species_index,
-                            layer_index,
-                            spectral_index,
-                            g_index,
-                        ]
-                        * species_scale
-                    )
-                    right_tau[g_index] = value
-                    if value > max_tau:
-                        max_tau = value
-                if max_tau < cutoff:
+            for spectral_index in range(spectral_start, spectral_stop):
+                first_active = -1
+                for species_index in range(n_species):
+                    species_scale = species_scales[species_index]
+                    max_tau = 0.0
+                    for g_index in range(n_g):
+                        value = (
+                            kcoeff[
+                                species_index,
+                                layer_index,
+                                spectral_index,
+                                g_index,
+                            ]
+                            * species_scale
+                        )
+                        right_tau[g_index] = value
+                        if value > max_tau:
+                            max_tau = value
+                    if max_tau >= cutoff:
+                        first_active = species_index
+                        break
+
+                if first_active < 0:
                     continue
 
-                right_is_sorted = True
-                for g_index in range(1, n_g):
-                    if right_tau[g_index] < right_tau[g_index - 1]:
-                        right_is_sorted = False
-                        break
-                if right_is_sorted:
-                    _numba_combine_sorted_distributions_into(
-                        combined,
-                        right_tau,
-                        weights,
-                        heap_values,
-                        heap_rows,
-                        heap_columns,
-                        next_combined,
-                    )
-                else:
-                    _numba_combine_two_distributions_into(
-                        combined,
-                        right_tau,
-                        weights,
-                        random_weights,
-                        random_values,
-                        next_combined,
-                    )
                 for g_index in range(n_g):
-                    combined[g_index] = next_combined[g_index]
+                    combined[g_index] = right_tau[g_index]
+                combined_is_sorted = True
+                for g_index in range(1, n_g):
+                    if combined[g_index] < combined[g_index - 1]:
+                        combined_is_sorted = False
+                        break
 
-            for g_index in range(n_g):
-                output[layer_index, spectral_index, g_index] = combined[g_index]
+                for species_index in range(first_active + 1, n_species):
+                    species_scale = species_scales[species_index]
+                    max_tau = 0.0
+                    for g_index in range(n_g):
+                        value = (
+                            kcoeff[
+                                species_index,
+                                layer_index,
+                                spectral_index,
+                                g_index,
+                            ]
+                            * species_scale
+                        )
+                        right_tau[g_index] = value
+                        if value > max_tau:
+                            max_tau = value
+                    if max_tau < cutoff:
+                        continue
+
+                    right_is_sorted = True
+                    for g_index in range(1, n_g):
+                        if right_tau[g_index] < right_tau[g_index - 1]:
+                            right_is_sorted = False
+                            break
+                    if combined_is_sorted and right_is_sorted:
+                        _numba_combine_sorted_distributions_into(
+                            combined,
+                            right_tau,
+                            weights,
+                            random_weights,
+                            heap_values,
+                            heap_rows,
+                            heap_columns,
+                            next_combined,
+                        )
+                    else:
+                        _numba_combine_two_distributions_into(
+                            combined,
+                            right_tau,
+                            weights,
+                            random_weights,
+                            random_values,
+                            next_combined,
+                        )
+                    for g_index in range(n_g):
+                        combined[g_index] = next_combined[g_index]
+                    combined_is_sorted = True
+                    for g_index in range(1, n_g):
+                        if combined[g_index] < combined[g_index - 1]:
+                            combined_is_sorted = False
+                            break
+
+                for g_index in range(n_g):
+                    output[layer_index, spectral_index, g_index] = combined[g_index]
         return output
 
     @njit(parallel=True)
@@ -493,74 +515,106 @@ if _NUMBA_AVAILABLE:
             for j_g in range(n_g):
                 random_weights[i_g * n_g + j_g] = weights[i_g] * weights[j_g]
 
-        n_points = n_layers * n_spectral
-        for point_index in prange(n_points):
-            layer_index = point_index // n_spectral
-            spectral_index = point_index - layer_index * n_spectral
-            first_active = -1
-            for species_index in range(n_species):
-                max_tau = 0.0
-                for g_index in range(n_g):
-                    value = tau[species_index, layer_index, spectral_index, g_index]
-                    if value > max_tau:
-                        max_tau = value
-                if max_tau >= cutoff:
-                    first_active = species_index
-                    break
-
-            if first_active < 0:
-                continue
-
+        n_threads = get_num_threads()
+        blocks_per_layer = (n_threads + n_layers - 1) // n_layers
+        if blocks_per_layer > n_spectral:
+            blocks_per_layer = n_spectral
+        block_width = (n_spectral + blocks_per_layer - 1) // blocks_per_layer
+        n_tasks = n_layers * blocks_per_layer
+        for task_index in prange(n_tasks):
+            layer_index = task_index // blocks_per_layer
+            block_index = task_index - layer_index * blocks_per_layer
+            spectral_start = block_index * block_width
+            spectral_stop = min(spectral_start + block_width, n_spectral)
             combined = np.empty(n_g, dtype=np.float64)
             next_combined = np.empty(n_g, dtype=np.float64)
             random_values = np.empty(n_g * n_g, dtype=np.float64)
             heap_values = np.empty(n_g, dtype=np.float64)
             heap_rows = np.empty(n_g, dtype=np.int64)
             heap_columns = np.empty(n_g, dtype=np.int64)
-            for g_index in range(n_g):
-                combined[g_index] = tau[
-                    first_active, layer_index, spectral_index, g_index
-                ]
+            for spectral_index in range(spectral_start, spectral_stop):
+                first_active = -1
+                for species_index in range(n_species):
+                    max_tau = 0.0
+                    for g_index in range(n_g):
+                        value = tau[
+                            species_index,
+                            layer_index,
+                            spectral_index,
+                            g_index,
+                        ]
+                        if value > max_tau:
+                            max_tau = value
+                    if max_tau >= cutoff:
+                        first_active = species_index
+                        break
 
-            for species_index in range(first_active + 1, n_species):
-                max_tau = 0.0
-                for g_index in range(n_g):
-                    value = tau[species_index, layer_index, spectral_index, g_index]
-                    if value > max_tau:
-                        max_tau = value
-                if max_tau < cutoff:
+                if first_active < 0:
                     continue
 
-                right_tau = tau[species_index, layer_index, spectral_index]
-                right_is_sorted = True
-                for g_index in range(1, n_g):
-                    if right_tau[g_index] < right_tau[g_index - 1]:
-                        right_is_sorted = False
-                        break
-                if right_is_sorted:
-                    _numba_combine_sorted_distributions_into(
-                        combined,
-                        right_tau,
-                        weights,
-                        heap_values,
-                        heap_rows,
-                        heap_columns,
-                        next_combined,
-                    )
-                else:
-                    _numba_combine_two_distributions_into(
-                        combined,
-                        right_tau,
-                        weights,
-                        random_weights,
-                        random_values,
-                        next_combined,
-                    )
                 for g_index in range(n_g):
-                    combined[g_index] = next_combined[g_index]
+                    combined[g_index] = tau[
+                        first_active,
+                        layer_index,
+                        spectral_index,
+                        g_index,
+                    ]
+                combined_is_sorted = True
+                for g_index in range(1, n_g):
+                    if combined[g_index] < combined[g_index - 1]:
+                        combined_is_sorted = False
+                        break
 
-            for g_index in range(n_g):
-                output[layer_index, spectral_index, g_index] = combined[g_index]
+                for species_index in range(first_active + 1, n_species):
+                    max_tau = 0.0
+                    for g_index in range(n_g):
+                        value = tau[
+                            species_index,
+                            layer_index,
+                            spectral_index,
+                            g_index,
+                        ]
+                        if value > max_tau:
+                            max_tau = value
+                    if max_tau < cutoff:
+                        continue
+
+                    right_tau = tau[species_index, layer_index, spectral_index]
+                    right_is_sorted = True
+                    for g_index in range(1, n_g):
+                        if right_tau[g_index] < right_tau[g_index - 1]:
+                            right_is_sorted = False
+                            break
+                    if combined_is_sorted and right_is_sorted:
+                        _numba_combine_sorted_distributions_into(
+                            combined,
+                            right_tau,
+                            weights,
+                            random_weights,
+                            heap_values,
+                            heap_rows,
+                            heap_columns,
+                            next_combined,
+                        )
+                    else:
+                        _numba_combine_two_distributions_into(
+                            combined,
+                            right_tau,
+                            weights,
+                            random_weights,
+                            random_values,
+                            next_combined,
+                        )
+                    for g_index in range(n_g):
+                        combined[g_index] = next_combined[g_index]
+                    combined_is_sorted = True
+                    for g_index in range(1, n_g):
+                        if combined[g_index] < combined[g_index - 1]:
+                            combined_is_sorted = False
+                            break
+
+                for g_index in range(n_g):
+                    output[layer_index, spectral_index, g_index] = combined[g_index]
         return output
 
     @njit
@@ -568,46 +622,50 @@ if _NUMBA_AVAILABLE:
         left_tau,
         right_tau,
         weights,
+        random_weights,
         heap_values,
         heap_rows,
         heap_columns,
         rebinned,
     ):
         n_g = weights.size
+        pivot_index = 0
+        pivot_weight = weights[0]
         for row_index in range(n_g):
             heap_values[row_index] = left_tau[row_index] + right_tau[0]
             heap_rows[row_index] = row_index
             heap_columns[row_index] = 0
             rebinned[row_index] = 0.0
+            if weights[row_index] > pivot_weight:
+                pivot_index = row_index
+                pivot_weight = weights[row_index]
 
         heap_size = n_g
-        for start_index in range(n_g // 2 - 1, -1, -1):
-            _numba_sift_down(
-                heap_values,
-                heap_rows,
-                heap_columns,
-                heap_size,
-                start_index,
-            )
-
+        lower_mass = 0.0
+        for g_index in range(pivot_index):
+            lower_mass += weights[g_index]
         target_index = 0
         target_left = 0.0
         target_right = weights[0]
         source_left = 0.0
         for _ in range(n_g * n_g):
+            if source_left >= lower_mass:
+                break
             value = heap_values[0]
             row_index = heap_rows[0]
             column_index = heap_columns[0]
-            source_right = source_left + weights[row_index] * weights[column_index]
-            while target_index < n_g:
+            source_right = source_left + random_weights[row_index * n_g + column_index]
+            while target_index < pivot_index:
                 overlap = min(source_right, target_right) - max(
                     source_left, target_left
                 )
                 if overlap > 0.0:
                     rebinned[target_index] += value * overlap
-                if source_right >= target_right and target_index < n_g - 1:
+                if source_right >= target_right:
                     target_left = target_right
                     target_index += 1
+                    if target_index == pivot_index:
+                        break
                     target_right = target_left + weights[target_index]
                     continue
                 break
@@ -627,8 +685,111 @@ if _NUMBA_AVAILABLE:
                 heap_columns[0] = heap_columns[heap_size]
             _numba_sift_down(heap_values, heap_rows, heap_columns, heap_size, 0)
 
+        upper_mass = 0.0
+        for g_index in range(pivot_index + 1, n_g):
+            upper_mass += weights[g_index]
+        for slot_index in range(n_g):
+            row_index = n_g - 1 - slot_index
+            heap_values[slot_index] = left_tau[row_index] + right_tau[n_g - 1]
+            heap_rows[slot_index] = row_index
+            heap_columns[slot_index] = n_g - 1
+
+        heap_size = n_g
+        target_index = n_g - 1
+        target_left = 0.0
+        target_right = weights[target_index]
+        source_left = 0.0
+        for _ in range(n_g * n_g):
+            if source_left >= upper_mass:
+                break
+            value = heap_values[0]
+            row_index = heap_rows[0]
+            column_index = heap_columns[0]
+            source_right = source_left + random_weights[row_index * n_g + column_index]
+            while target_index > pivot_index:
+                overlap = min(source_right, target_right) - max(
+                    source_left, target_left
+                )
+                if overlap > 0.0:
+                    rebinned[target_index] += value * overlap
+                if source_right >= target_right:
+                    target_left = target_right
+                    target_index -= 1
+                    if target_index == pivot_index:
+                        break
+                    target_right = target_left + weights[target_index]
+                    continue
+                break
+            source_left = source_right
+
+            next_column = column_index - 1
+            if next_column >= 0:
+                heap_values[0] = left_tau[row_index] + right_tau[next_column]
+                heap_rows[0] = row_index
+                heap_columns[0] = next_column
+            else:
+                heap_size -= 1
+                if heap_size == 0:
+                    break
+                heap_values[0] = heap_values[heap_size]
+                heap_rows[0] = heap_rows[heap_size]
+                heap_columns[0] = heap_columns[heap_size]
+            _numba_sift_down_max(
+                heap_values,
+                heap_rows,
+                heap_columns,
+                heap_size,
+                0,
+            )
+
+        total_integral = 0.0
+        resolved_integral = 0.0
         for g_index in range(n_g):
-            rebinned[g_index] /= weights[g_index]
+            total_integral += weights[g_index] * (
+                left_tau[g_index] + right_tau[g_index]
+            )
+            if g_index != pivot_index:
+                resolved_integral += rebinned[g_index]
+                rebinned[g_index] /= weights[g_index]
+        rebinned[pivot_index] = (total_integral - resolved_integral) / weights[
+            pivot_index
+        ]
+
+    @njit(inline="always")
+    def _numba_sift_down_max(
+        heap_values,
+        heap_rows,
+        heap_columns,
+        heap_size,
+        start_index,
+    ):
+        parent = start_index
+        while True:
+            left_child = 2 * parent + 1
+            if left_child >= heap_size:
+                return
+            right_child = left_child + 1
+            largest = left_child
+            if (
+                right_child < heap_size
+                and heap_values[right_child] > heap_values[left_child]
+            ):
+                largest = right_child
+            if heap_values[parent] >= heap_values[largest]:
+                return
+            heap_values[parent], heap_values[largest] = (
+                heap_values[largest],
+                heap_values[parent],
+            )
+            heap_rows[parent], heap_rows[largest] = (
+                heap_rows[largest],
+                heap_rows[parent],
+            )
+            heap_columns[parent], heap_columns[largest] = (
+                heap_columns[largest],
+                heap_columns[parent],
+            )
+            parent = largest
 
     @njit(inline="always")
     def _numba_sift_down(heap_values, heap_rows, heap_columns, heap_size, start_index):

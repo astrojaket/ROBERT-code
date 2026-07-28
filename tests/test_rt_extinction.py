@@ -6,6 +6,7 @@ import struct
 
 import numpy as np
 import pytest
+import robert_exoplanets.rt.extinction as extinction_module
 
 from robert_exoplanets import (
     AtmosphereState,
@@ -24,14 +25,21 @@ from robert_exoplanets import (
 from robert_exoplanets.core import RobertCoverageError, RobertValidationError
 
 
-def test_rayleigh_scattering_optical_depth_is_positive_and_larger_at_short_wavelengths() -> None:
-    gas_tau = _gas_tau(SpectralGrid.from_array([0.5, 1.0, 2.0], unit="micron", role="opacity"))
+def test_rayleigh_scattering_optical_depth_is_positive_and_larger_at_short_wavelengths() -> (
+    None
+):
+    gas_tau = _gas_tau(
+        SpectralGrid.from_array([0.5, 1.0, 2.0], unit="micron", role="opacity")
+    )
 
     rayleigh = rayleigh_scattering_optical_depth(gas_tau)
 
     assert isinstance(rayleigh, LayerOpticalDepth)
     assert rayleigh.kind == "scattering_extinction"
-    assert rayleigh.tau.shape == (gas_tau.atmosphere.n_layers, gas_tau.spectral_grid.size)
+    assert rayleigh.tau.shape == (
+        gas_tau.atmosphere.n_layers,
+        gas_tau.spectral_grid.size,
+    )
     assert np.all(rayleigh.tau > 0.0)
     assert np.all(rayleigh.tau[:, 0] > rayleigh.tau[:, 1])
     assert np.all(rayleigh.tau[:, 1] > rayleigh.tau[:, 2])
@@ -157,7 +165,9 @@ def test_petitradtrans_cia_hdf_loader_and_log_interpolation(tmp_path) -> None:
         handle.create_dataset("mol_mass", data=[2.01588, 2.01588])
         handle.create_dataset("DOI", data=[b"10.0000/example"])
     table = CiaTable.from_petitradtrans_hdf(path, collision_pair="H2-H2")
-    gas_tau = _gas_tau(SpectralGrid.from_array([10.0, 5.0], unit="micron", role="opacity"))
+    gas_tau = _gas_tau(
+        SpectralGrid.from_array([10.0, 5.0], unit="micron", role="opacity")
+    )
 
     cia = cia_optical_depth(
         gas_tau,
@@ -171,6 +181,45 @@ def test_petitradtrans_cia_hdf_loader_and_log_interpolation(tmp_path) -> None:
     assert np.all(table.k_cia[1] == 0.0)
     assert np.all(cia.tau > 0.0)
     assert cia.metadata["coefficient_interpolation"] == "log"
+
+
+@pytest.mark.parametrize("coefficient_interpolation", ("linear", "log"))
+def test_compiled_cia_interpolation_matches_numpy_reference(
+    coefficient_interpolation: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("numba")
+    gas_tau = _gas_tau(
+        SpectralGrid.from_array([10.0, 5.0, 2.0], unit="micron", role="opacity")
+    )
+    rng = np.random.default_rng(7052026)
+    k_cia = np.exp(rng.uniform(-8.0, 3.0, size=(4, 3, 6)))
+    k_cia[2, 1, 2] = 0.0
+    table = CiaTable(
+        wavenumber_cm_inverse=np.array([0.0, 750.0, 1500.0, 2500.0, 4000.0, 6000.0]),
+        temperature_K=np.array([500.0, 1000.0, 1500.0]),
+        k_cia=k_cia,
+        pair_order=(
+            "H2-H2_equilibrium",
+            "H2-He_equilibrium",
+            "H2-H2_normal",
+            "H2-He_normal",
+        ),
+    )
+
+    compiled = cia_optical_depth(
+        gas_tau,
+        table,
+        coefficient_interpolation=coefficient_interpolation,
+    )
+    monkeypatch.setattr(extinction_module, "_NUMBA_AVAILABLE", False)
+    reference = cia_optical_depth(
+        gas_tau,
+        table,
+        coefficient_interpolation=coefficient_interpolation,
+    )
+
+    np.testing.assert_allclose(compiled.tau, reference.tau, rtol=3.0e-14, atol=0.0)
 
 
 def test_cia_optical_depth_requires_explicit_extrapolation_policy() -> None:
