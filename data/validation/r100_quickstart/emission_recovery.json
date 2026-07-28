@@ -1,0 +1,34 @@
+{
+  "case": "r100-emission-injection-recovery",
+  "chi_square": 20.788387456313558,
+  "confidence_level": 0.95,
+  "effective_sample_size": 142.08270440509264,
+  "fit_passed": true,
+  "inference_converged": true,
+  "n_parameters": 1,
+  "n_wavelength": 18,
+  "parameter_recoveries": {
+    "log_H2O": {
+      "mean": -2.8120203943243176,
+      "median": -2.841248653955486,
+      "median_standardized_error": 0.6639158496406311,
+      "q02_5": -3.30570892032823,
+      "q16": -3.03267255175613,
+      "q84": -2.5547114750309454,
+      "q97_5": -2.3514580351683194,
+      "standard_deviation": 0.23911365594064973,
+      "truth": -3.0,
+      "truth_in_95_percent_interval": true
+    }
+  },
+  "parameters_passed": true,
+  "passed": true,
+  "reduced_chi_square": 1.222846320959621,
+  "reduced_chi_square_bounds": [
+    0.35,
+    1.9
+  ],
+  "result": "multinest/result.json",
+  "schema_version": "1.0",
+  "truth": "injection_truth.json"
+}

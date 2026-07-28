@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a monitored, local MultiNest R=100 installation-validation notebook
+  that generates emission and transmission forward truths, injects 60 ppm
+  synthetic observations, retrieves H2O on two to four MPI ranks, and checks
+  the truth against the posterior 95% credible interval.
 - Bundled CC BY-SA 4.0 ExoMolOP-derived R=100 k-tables for H2O, CO, CO2,
   CH4, NH3, and HCN over 0.3–15 microns, with automatic YAML discovery,
   complete provenance, a reproducible generator, and checksum-pinned R=1000

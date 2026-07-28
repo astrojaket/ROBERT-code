@@ -1,0 +1,34 @@
+{
+  "case": "r100-transmission-injection-recovery",
+  "chi_square": 8.978539834428474,
+  "confidence_level": 0.95,
+  "effective_sample_size": 149.2330132546941,
+  "fit_passed": true,
+  "inference_converged": true,
+  "n_parameters": 1,
+  "n_wavelength": 18,
+  "parameter_recoveries": {
+    "log_H2O": {
+      "mean": -3.308896280257655,
+      "median": -3.3088259912766875,
+      "median_standardized_error": 0.17858237398049912,
+      "q02_5": -3.404375821823023,
+      "q16": -3.3592726330485085,
+      "q84": -3.2583483837769602,
+      "q97_5": -3.2161455345599688,
+      "standard_deviation": 0.04942252183102622,
+      "truth": -3.3,
+      "truth_in_95_percent_interval": true
+    }
+  },
+  "parameters_passed": true,
+  "passed": true,
+  "reduced_chi_square": 0.5281494020252043,
+  "reduced_chi_square_bounds": [
+    0.35,
+    1.9
+  ],
+  "result": "multinest/result.json",
+  "schema_version": "1.0",
+  "truth": "injection_truth.json"
+}

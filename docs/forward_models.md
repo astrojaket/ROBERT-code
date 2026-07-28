@@ -5,6 +5,23 @@ used by retrievals. A forward run fixes every configured parameter, evaluates
 the atmosphere and radiative-transfer calculation, applies each observation's
 spectral bins, and writes a portable NumPy archive. It does not start a sampler.
 
+## New-user emission and transmission check
+
+The recommended first calculation is
+`examples/notebooks/r100_emission_transmission_validation.ipynb`. It contains
+two independent R=100 forward models:
+
+- thermal emission with a fixed non-isothermal temperature profile and an
+  injected `log_H2O = -3.0`; and
+- transmission with a fixed reference radius and an injected
+  `log_H2O = -3.3`.
+
+Each model uses the bundled H2O table over 18 bins from 1.10–1.70 microns. The
+notebook saves the forward model before adding noise, then uses that exact file
+to create the synthetic observation. This explicitly tests the same
+configuration-to-spectrum path used below while retaining a known answer for
+the retrieval stage.
+
 ## 1. Install and select the environment
 
 Create the complete environment once from the repository root:

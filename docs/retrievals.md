@@ -169,6 +169,32 @@ Set `paths.k_table_directory: ./opacity_data/ktables_exomol` for those tables.
 R=15000 data are not distributed with ROBERT; contact Jake Taylor directly for
 the validated high-resolution data workflow.
 
+### End-to-end local recovery check
+
+Run `examples/notebooks/r100_emission_transmission_validation.ipynb` before a
+larger retrieval. It generates both forward truths, adds seeded Gaussian noise
+with 60 ppm uncertainties, runs MultiNest, and compares each posterior directly
+with its injected H2O abundance.
+
+The notebook defaults to two MPI ranks. Set `CORES` to 3 or 4 when those cores
+are available on a laptop or within an interactive cluster allocation. It
+launches MultiNest as an attached foreground subprocess and streams sampling
+progress into the cell. Do not submit these short checks to a queue: watching
+the run makes MPI, compiled-library, opacity, and convergence problems visible
+immediately.
+
+A case passes only when:
+
+- MultiNest reports convergence;
+- the injected abundance lies inside the weighted posterior 95% credible
+  interval; and
+- the reduced chi-square lies between 0.35 and 1.90.
+
+The relatively wide fit interval accounts for the 17 residual degrees of
+freedom in this deliberately compact check. Passing validates the installation
+and workflow, not the adequacy of a one-molecule R=100 model for unrelated
+science data.
+
 ## 5. Run locally
 
 ### One-process optimal estimation

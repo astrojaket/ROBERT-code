@@ -61,6 +61,25 @@ conda run -n robert-exoplanets python run_retrieval.py \
   --validate-only
 ```
 
+### End-to-end installation validation
+
+Before analysing real observations, run the
+[R=100 emission and transmission validation notebook](examples/notebooks/r100_emission_transmission_validation.ipynb).
+It uses only data distributed with ROBERT and performs two complete
+injection-recovery experiments:
+
+1. generate known emission and transmission forward models;
+2. turn them into seeded 1.10–1.70 micron synthetic observations with 60 ppm
+   uncertainties;
+3. retrieve the injected H2O abundance with MultiNest on two to four local
+   MPI ranks; and
+4. require the truth to fall inside the posterior 95% credible interval.
+
+Run the retrieval cells in the foreground and monitor their live MultiNest
+output. Both tests are intentionally small and should not be submitted to a
+batch queue. Representative passing reports are stored under
+`data/validation/r100_quickstart/`.
+
 ## Forward models
 
 Start with a schema-version-2 YAML configuration. Each parameter may have a

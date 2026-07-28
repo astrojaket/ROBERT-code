@@ -8,6 +8,12 @@ resolutions between checkpoints or prepared-opacity caches. R=15000 tables are
 not distributed with ROBERT; contact Jake Taylor directly for the validated
 high-resolution data workflow.
 
+`r100_emission_validation.yaml` and `r100_transmission_validation.yaml` are
+the compact new-user injection-recovery cases used by
+`examples/notebooks/r100_emission_transmission_validation.ipynb`. They use
+MultiNest, 60 ppm uncertainties, 18 bins from 1.10–1.70 microns, and no
+external opacity or stellar files.
+
 The target defaults use PHOENIX stellar-atmosphere spectra selected by
 `effective_temperature_k`, `log_g_cgs`, and `metallicity_dex`. Set
 `PYSYN_CDBS` to the STScI Synphot reference-data root before building a forward
