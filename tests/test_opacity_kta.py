@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.util
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -18,6 +22,10 @@ from robert_exoplanets.opacity import (
     read_kta,
     read_kta_header,
 )
+from robert_exoplanets.opacity.exok import _ensure_writable_numba_cache, _import_exok
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_read_kta_header_reads_dimensions_and_coverage(tmp_path: Path) -> None:
@@ -34,7 +42,9 @@ def test_read_kta_header_reads_dimensions_and_coverage(tmp_path: Path) -> None:
     assert header.checksum_sha256
     np.testing.assert_allclose(header.pressure_bar, [1.0e-5, 1.0])
     np.testing.assert_allclose(header.temperature_K, [500.0, 1000.0, 1500.0])
-    np.testing.assert_allclose(header.wavenumber_cm_inverse, [1000.0, 2000.0, 3000.0, 4000.0])
+    np.testing.assert_allclose(
+        header.wavenumber_cm_inverse, [1000.0, 2000.0, 3000.0, 4000.0]
+    )
     assert header.spectral_coverage.min_value == 1000.0
     assert header.spectral_coverage.max_value == 4000.0
     assert header.grid_coverage.temperature_max == 1500.0
@@ -91,7 +101,9 @@ def test_convert_kta_to_robert_archive_writes_native_directory(tmp_path: Path) -
     )
 
     assert database.products[0].source == OpacityDataSource.ROBERT_ARCHIVE
-    assert database.products[0].storage_format == OpacityStorageFormat.ROBERT_NPY_DIRECTORY
+    assert (
+        database.products[0].storage_format == OpacityStorageFormat.ROBERT_NPY_DIRECTORY
+    )
     inspected = inspect_robert_npy_directory(archive_path)
     assert inspected.products[0].species == ("CH4",)
     loaded = load_robert_npy_directory(archive_path)
@@ -99,7 +111,9 @@ def test_convert_kta_to_robert_archive_writes_native_directory(tmp_path: Path) -
     np.testing.assert_allclose(loaded.arrays["g_weights"], [0.4, 0.6])
 
 
-def test_convert_kta_to_robert_archive_preserves_floor_policy_metadata(tmp_path: Path) -> None:
+def test_convert_kta_to_robert_archive_preserves_floor_policy_metadata(
+    tmp_path: Path,
+) -> None:
     missing_index = (0, 1, 2, 1)
     path, expected = _write_synthetic_kta(
         tmp_path / "NH3_incomplete_test.kta",
@@ -128,13 +142,10 @@ def test_exok_bins_correlated_k_distributions_to_observation_bins(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    pytest.importorskip("exo_k")
+    _skip_without_exok()
     cache_dir = tmp_path / "numba-cache"
     cache_dir.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache_dir))
-    import numba
-
-    monkeypatch.setattr(numba.config, "CACHE_DIR", str(cache_dir))
     path, _expected = _write_synthetic_kta(tmp_path / "H2O_exok_test.kta")
     provider = CorrelatedKOpacityProvider.from_kta_paths({"H2O": path})
     wavenumber_centres = np.array([3500.0, 2500.0, 1500.0])
@@ -158,13 +169,10 @@ def test_exok_replaces_zero_coefficients_before_correlated_k_binning(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    pytest.importorskip("exo_k")
+    _skip_without_exok()
     cache_dir = tmp_path / "numba-cache"
     cache_dir.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache_dir))
-    import numba
-
-    monkeypatch.setattr(numba.config, "CACHE_DIR", str(cache_dir))
     path, _expected = _write_synthetic_kta(
         tmp_path / "CO_exok_zero_test.kta",
         zero_index=(0, 0, 1, 0),
@@ -186,7 +194,9 @@ def test_exok_replaces_zero_coefficients_before_correlated_k_binning(
     assert float(table.metadata["exo_k_zero_floor"]) > 0.0
 
 
-def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(tmp_path: Path) -> None:
+def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(
+    tmp_path: Path,
+) -> None:
     _write_synthetic_kta(tmp_path / "TiO_custom_resolution.kta")
     _write_synthetic_kta(tmp_path / "VO_custom_resolution.kta")
 
@@ -196,10 +206,16 @@ def test_provider_discovers_arbitrary_species_from_exomol_kta_directory(tmp_path
     )
 
     assert provider.species == ("TiO", "VO")
-    assert provider.tables["TiO"].metadata["source_path"].endswith("TiO_custom_resolution.kta")
+    assert (
+        provider.tables["TiO"]
+        .metadata["source_path"]
+        .endswith("TiO_custom_resolution.kta")
+    )
 
 
-def test_provider_requires_explicit_selection_for_duplicate_species_files(tmp_path: Path) -> None:
+def test_provider_requires_explicit_selection_for_duplicate_species_files(
+    tmp_path: Path,
+) -> None:
     _write_synthetic_kta(tmp_path / "H2O_R100.kta")
     _write_synthetic_kta(tmp_path / "H2O_R1000.kta")
 
@@ -221,8 +237,8 @@ def test_provider_selects_resolution_subdirectory_and_filename(tmp_path: Path) -
         resolution="R1000",
     )
 
-    assert provider.tables["H2O"].metadata["source_path"].endswith(
-        "R1000/H2O_R1000.kta"
+    assert (
+        provider.tables["H2O"].metadata["source_path"].endswith("R1000/H2O_R1000.kta")
     )
 
 
@@ -253,9 +269,7 @@ def test_provider_accepts_flat_directory_with_resolution_filenames(
     )
 
     assert provider.species == ("CO",)
-    assert provider.tables["CO"].metadata["source_path"].endswith(
-        "CO_R1000.kta"
-    )
+    assert provider.tables["CO"].metadata["source_path"].endswith("CO_R1000.kta")
 
 
 def test_provider_reports_missing_resolution_directory(tmp_path: Path) -> None:
@@ -271,13 +285,11 @@ def test_provider_loads_and_bins_exomol_hdf5_through_exok(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    exok = pytest.importorskip("exo_k")
+    _skip_without_exok()
     cache_dir = tmp_path / "numba-cache"
     cache_dir.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache_dir))
-    import numba
-
-    monkeypatch.setattr(numba.config, "CACHE_DIR", str(cache_dir))
+    exok = _import_exok()
     kta_path, _expected = _write_synthetic_kta(tmp_path / "TiO_source.kta")
     hdf5_path = tmp_path / "TiO_exomol.h5"
     native = exok.Ktable(filename=str(kta_path), mol="TiO", remove_zeros=False)
@@ -295,6 +307,64 @@ def test_provider_loads_and_bins_exomol_hdf5_through_exok(
     assert provider.tables["TiO"].metadata["source_format"] == "exo_k:h5"
     assert binned.tables["TiO"].kcoeff.shape == (2, 3, 3, 2)
     assert np.all(np.isfinite(binned.tables["TiO"].kcoeff))
+
+
+def test_exok_import_automatically_configures_writable_numba_cache(
+    tmp_path: Path,
+) -> None:
+    _skip_without_exok()
+    environment = os.environ.copy()
+    environment.pop("NUMBA_CACHE_DIR", None)
+    environment["XDG_CACHE_HOME"] = str(tmp_path / "cache-home")
+    python_path = str(ROOT / "src")
+    if environment.get("PYTHONPATH"):
+        python_path = python_path + os.pathsep + environment["PYTHONPATH"]
+    environment["PYTHONPATH"] = python_path
+    script = """
+import os
+from pathlib import Path
+from robert_exoplanets.opacity.exok import _import_exok
+
+module = _import_exok()
+cache = Path(os.environ["NUMBA_CACHE_DIR"])
+assert module.__name__ == "exo_k"
+assert cache.is_dir()
+print(cache)
+"""
+
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    expected = tmp_path / "cache-home" / "robert-exoplanets" / "numba"
+    assert Path(completed.stdout.strip()) == expected.resolve()
+
+
+def test_numba_cache_falls_back_when_configured_path_is_not_a_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    invalid = tmp_path / "not-a-directory"
+    invalid.write_text("occupied", encoding="utf-8")
+    fallback_root = tmp_path / "fallback"
+    monkeypatch.setenv("NUMBA_CACHE_DIR", str(invalid))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(fallback_root))
+
+    selected = _ensure_writable_numba_cache()
+
+    expected = fallback_root / "robert-exoplanets" / "numba"
+    assert selected == expected.resolve()
+    assert os.environ["NUMBA_CACHE_DIR"] == str(expected.resolve())
+
+
+def _skip_without_exok() -> None:
+    if importlib.util.find_spec("exo_k") is None:
+        pytest.skip("could not import 'exo_k': optional opacity dependency is absent")
 
 
 def _write_synthetic_kta(

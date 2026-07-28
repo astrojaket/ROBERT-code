@@ -1,0 +1,169 @@
+{
+  "changes": "ROBERT truncated the ExoMolOP 0.3-50 micron R=1000 tables to 0.3-15 micron, spectrally recompressed them to R=100, and recompressed each correlated-k distribution to eight Gauss points.",
+  "effective_resolving_power": 99.9478706053842,
+  "g_points": 8,
+  "g_samples": [
+    0.019855071751231912,
+    0.10166676129318664,
+    0.2372337950418355,
+    0.4082826787521751,
+    0.591717321247825,
+    0.7627662049581645,
+    0.8983332387068134,
+    0.9801449282487681
+  ],
+  "g_weights": [
+    0.050614268145188185,
+    0.11119051722668709,
+    0.15685332293894372,
+    0.18134189168918102,
+    0.18134189168918102,
+    0.15685332293894372,
+    0.11119051722668709,
+    0.050614268145188185
+  ],
+  "license": "CC-BY-SA-4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "name": "ROBERT bundled molecular opacity",
+  "pressure_max_bar": 100.0,
+  "pressure_min_bar": 1e-05,
+  "pressure_points": 22,
+  "products": {
+    "CH4": {
+      "filename": "12C-1H4__YT34to10.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "isotopologue": "12C-1H4",
+      "line_list": "YT34to10",
+      "native_shape": [
+        22,
+        27,
+        391,
+        8
+      ],
+      "output_filename": "CH4_R100.kta",
+      "output_sha256": "6ce90a7be60f490cca6df4e6b70a79886a0ff6a1b06f6b5ce8ecccfee491c592",
+      "output_size_bytes": 7434000,
+      "source_nonfinite_replaced": 0,
+      "source_path_convention": "CH4_R1000.kta",
+      "source_sha256": "6c83b1d7b7cc93007fa90a6c8bdc673638dc7cfabae343219396cdf2e879778d",
+      "source_url": "https://www.exomol.com/db/CH4/12C-1H4/YT34to10/12C-1H4__YT34to10.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "source_zeros_seen": 12156535
+    },
+    "CO": {
+      "filename": "12C-16O__Li2015.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "isotopologue": "12C-16O",
+      "line_list": "Li2015",
+      "native_shape": [
+        22,
+        27,
+        391,
+        8
+      ],
+      "output_filename": "CO_R100.kta",
+      "output_sha256": "c2e05d960f70d01db35bb29938782acb6b00b6b64828d0f2a0253ac31e8b85d5",
+      "output_size_bytes": 7434000,
+      "source_nonfinite_replaced": 0,
+      "source_path_convention": "CO_R1000.kta",
+      "source_sha256": "f87d35061fa21a11c68e84a6dc2276f3d89e31f9321dc97b47b2c288766894d9",
+      "source_url": "https://www.exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "source_zeros_seen": 18669401
+    },
+    "CO2": {
+      "filename": "12C-16O2__UCL-4000.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "isotopologue": "12C-16O2",
+      "line_list": "UCL-4000",
+      "native_shape": [
+        22,
+        27,
+        391,
+        8
+      ],
+      "output_filename": "CO2_R100.kta",
+      "output_sha256": "a4266570b030cb838e6538110ef49b571fe085344bbfeecbeef25b3335ebc320",
+      "output_size_bytes": 7434000,
+      "source_nonfinite_replaced": 0,
+      "source_path_convention": "CO2_R1000.kta",
+      "source_sha256": "b4bc9f544115dd490ef545e03693cc758cd59195c853503920efef98287879a7",
+      "source_url": "https://www.exomol.com/db/CO2/12C-16O2/UCL-4000/12C-16O2__UCL-4000.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "source_zeros_seen": 6194059
+    },
+    "H2O": {
+      "filename": "1H2-16O__POKAZATEL__R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "isotopologue": "1H2-16O",
+      "line_list": "POKAZATEL",
+      "native_shape": [
+        22,
+        27,
+        391,
+        8
+      ],
+      "output_filename": "H2O_R100.kta",
+      "output_sha256": "06c3feff50e905c566a4315b1d6b0c3a7bfdc315a3c5b1b21fa46f92a29b3333",
+      "output_size_bytes": 7434000,
+      "source_nonfinite_replaced": 0,
+      "source_path_convention": "H2O_R1000.kta",
+      "source_sha256": "71c38634b391141177ae2a029f2fac00d78fd172fe52f4f10da361e975971d9f",
+      "source_url": "https://www.exomol.com/db/H2O/1H2-16O/POKAZATEL/1H2-16O__POKAZATEL__R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "source_zeros_seen": 0
+    },
+    "HCN": {
+      "filename": "1H-12C-14N__Harris.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "isotopologue": "1H-12C-14N",
+      "line_list": "Harris",
+      "native_shape": [
+        22,
+        27,
+        391,
+        8
+      ],
+      "output_filename": "HCN_R100.kta",
+      "output_sha256": "6bbf6c7afc00bb911c32fb2c5aa03f59726205db00c2261ba608075fa55a72c7",
+      "output_size_bytes": 7434000,
+      "source_nonfinite_replaced": 0,
+      "source_path_convention": "HCN_R1000.kta",
+      "source_sha256": "203c6b802d07becda6cee9328ab6abb4ad6b8cafed9d27f3014b06e1604f6b54",
+      "source_url": "https://www.exomol.com/db/HCN/1H-12C-14N/Harris/1H-12C-14N__Harris.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "source_zeros_seen": 9931618
+    },
+    "NH3": {
+      "filename": "14N-1H3__CoYuTe.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "isotopologue": "14N-1H3",
+      "line_list": "CoYuTe",
+      "native_shape": [
+        22,
+        27,
+        391,
+        8
+      ],
+      "output_filename": "NH3_R100.kta",
+      "output_sha256": "436c3e8e43efce46b9ce4a22a26e47554a34f2aa852cffbe33e75c0d0625db4b",
+      "output_size_bytes": 7434000,
+      "source_nonfinite_replaced": 0,
+      "source_path_convention": "NH3_R1000.kta",
+      "source_sha256": "6fcb97aee63318df3c9c3ad7e2c646d5a5b8ba8284c66259b01b87caa8e911ac",
+      "source_url": "https://www.exomol.com/db/NH3/14N-1H3/CoYuTe/14N-1H3__CoYuTe.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "source_zeros_seen": 6070680
+    }
+  },
+  "resolution": "R100",
+  "source_database": "ExoMolOP",
+  "source_database_doi": "10.1051/0004-6361/202038350",
+  "source_resolution": "R1000",
+  "source_wavelength_range_micron": [
+    0.3,
+    50.0
+  ],
+  "spectral_binning": {
+    "method": "Ktable.bin_down_cp",
+    "num": 300,
+    "remove_zeros": true,
+    "software": "exo_k",
+    "software_version": "1.3.1",
+    "use_rebin": false
+  },
+  "spectral_bins": 391,
+  "temperature_max_k": 3400.0,
+  "temperature_min_k": 100.0,
+  "temperature_points": 27,
+  "wavelength_max_micron": 15.0,
+  "wavelength_min_micron": 0.3
+}

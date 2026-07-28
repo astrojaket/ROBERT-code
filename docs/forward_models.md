@@ -34,8 +34,12 @@ For a complete list of fields, copy
 example, copy one of the target configurations:
 
 ```bash
-cp configurations/wasp69b_cloud_free_R1000.yaml my_forward_model.yaml
+cp configurations/wasp80b_cloud_free_native_pg14_R100.yaml my_forward_model.yaml
 ```
+
+That example uses the six bundled R=100 molecular tables and a blackbody
+stellar spectrum, so it runs without an external opacity or PHOENIX data
+directory.
 
 Give the run a unique name and make all machine-specific input paths valid:
 
@@ -46,7 +50,6 @@ paths:
   project_directory: .
   observations_directory: ./data/observations
   fastchem_directory: ./data/fastchem
-  k_table_directory: ./data/ktables
   optical_constants_directory: ./data/optical_constants
 
 run:
@@ -58,6 +61,36 @@ Relative paths are resolved from the YAML file. `project_directory: .`
 therefore keeps `outputs/`, `scratch/`, and `opacity_cache/` beside the
 configuration. Environment variables such as `${ROBERT_DATA_ROOT}` may be used
 inside YAML; ROBERT rejects an unresolved variable.
+
+For a first model, use the molecular opacity included with ROBERT:
+
+```yaml
+opacity:
+  format: exomol_kta
+  resolution: R100
+  species: [H2O, CO2, CO, CH4, NH3, HCN]
+  binning:
+    num: 300
+    use_rebin: false
+    remove_zeros: true
+```
+
+The bundled tables cover 0.3–15 microns and retain the complete ExoMolOP
+pressure and temperature grid with eight g-points. They require no
+`k_table_directory` and are intended for quick forward models and
+resolution-appropriate observations such as HST/WFC3.
+
+For R=1000 models, download the larger ExoMolOP parents:
+
+```bash
+robert-opacity-download --directory opacity_data/ktables_exomol
+```
+
+Add `k_table_directory: ./opacity_data/ktables_exomol` beneath `paths` and set
+`opacity.resolution: R1000`. The command writes standardized filenames beneath
+an `R1000/` subdirectory and verifies every source checksum. R=15000 data are
+not distributed with ROBERT; contact Jake Taylor directly for the validated
+high-resolution data workflow.
 
 The principal forward-model choices are:
 

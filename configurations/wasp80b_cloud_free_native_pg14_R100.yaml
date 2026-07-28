@@ -1,0 +1,20 @@
+extends: wasp80b_cloud_free_native_pg14_R1000.yaml
+
+# The R=100 starter tables ship inside robert-exoplanets. A null external path
+# deliberately replaces the R=1000 path inherited from the parent.
+paths:
+  project_directory: ..
+  k_table_directory: null
+
+run:
+  name: wasp80b-cloud-free-native-pg14-R100
+  description: Bundled-opacity cloud-free forward-model example.
+
+# A blackbody keeps this first-run example independent of PHOENIX reference
+# files. Select phoenix in a science configuration when those files are present.
+bodies:
+  star:
+    spectrum_model: blackbody
+
+opacity:
+  resolution: R100

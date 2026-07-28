@@ -154,6 +154,21 @@ They perform distinct checks:
 Do not submit a long run until all four succeed in the same environment and
 with the same input paths used by the job.
 
+ROBERT's bundled R=100 tables cover H2O, CO, CO2, CH4, NH3, and HCN from
+0.3–15 microns. They are useful for small retrieval demonstrations and
+resolution-appropriate HST/WFC3 analyses. Select `opacity.resolution: R100`
+and omit `paths.k_table_directory`. Production work should establish
+resolution convergence for the data being analysed. Download the R=1000
+parents with:
+
+```bash
+robert-opacity-download --directory opacity_data/ktables_exomol
+```
+
+Set `paths.k_table_directory: ./opacity_data/ktables_exomol` for those tables.
+R=15000 data are not distributed with ROBERT; contact Jake Taylor directly for
+the validated high-resolution data workflow.
+
 ## 5. Run locally
 
 ### One-process optimal estimation

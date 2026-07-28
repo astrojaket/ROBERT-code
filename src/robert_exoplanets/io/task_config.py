@@ -194,9 +194,7 @@ class FastChemConfig(ConfigModel):
     species: tuple[ChemistrySpeciesConfig, ...] = Field(min_length=1)
     metallicity_parameter: str = "metallicity"
     carbon_to_oxygen_parameter: str = "CtoO"
-    constant_log10_vmr_parameters: dict[str, str] | None = Field(
-        default_factory=dict
-    )
+    constant_log10_vmr_parameters: dict[str, str] | None = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_constant_overrides(self) -> "FastChemConfig":
@@ -264,9 +262,7 @@ class FreeChemistryConfig(ConfigModel):
             if not self.fill_background:
                 raise ValueError("phantom chemistry requires fill_background=true")
             if self.background_species != (self.phantom_species,):
-                raise ValueError(
-                    "phantom_species must be the sole background species"
-                )
+                raise ValueError("phantom_species must be the sole background species")
             if not self.phantom_mean_molecular_weight_parameter:
                 raise ValueError(
                     "phantom_mean_molecular_weight_parameter must be non-empty"
@@ -288,6 +284,7 @@ class AtmosphereConfig(ConfigModel):
 
 class CloudFreeConfig(ConfigModel):
     model: Literal["none"] = "none"
+
 
 class DeckHazeCloudConfig(ConfigModel):
     """Shared grey-deck and well-mixed power-law haze parameterization."""
@@ -476,9 +473,7 @@ class RadiativeTransferConfig(ConfigModel):
     model: Literal["emission", "transmission"] = "emission"
     geometry: GeometryConfig = GeometryConfig()
     include_rayleigh: bool = True
-    gas_combination: Literal[
-        "sum_by_g", "random_overlap", "equivalent_extinction"
-    ] = (
+    gas_combination: Literal["sum_by_g", "random_overlap", "equivalent_extinction"] = (
         "random_overlap"
     )
     thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
@@ -489,7 +484,10 @@ class RadiativeTransferConfig(ConfigModel):
 
     @model_validator(mode="after")
     def validate_model_options(self) -> "RadiativeTransferConfig":
-        if self.model == "transmission" and self.gas_combination == "equivalent_extinction":
+        if (
+            self.model == "transmission"
+            and self.gas_combination == "equivalent_extinction"
+        ):
             raise ValueError(
                 "transmission gas_combination must be 'sum_by_g' or 'random_overlap'"
             )
@@ -568,9 +566,7 @@ class SamplerConfig(ConfigModel):
     @model_validator(mode="after")
     def validate_engine_settings(self) -> "SamplerConfig":
         if "multinest" in self.engine and self.resume not in {"resume", "overwrite"}:
-            raise ValueError(
-                "MultiNest resume must be 'resume' or 'overwrite'"
-            )
+            raise ValueError("MultiNest resume must be 'resume' or 'overwrite'")
         temperature_prior_values = (
             self.oe_temperature_prior_sigma_k,
             self.oe_temperature_correlation_length_dex,
@@ -600,7 +596,9 @@ class LeaveOneOutConfig(ConfigModel):
     @model_validator(mode="after")
     def validate_draw_count(self) -> "LeaveOneOutConfig":
         if self.max_posterior_draws < 20:
-            raise ValueError("plotting.leave_one_out.max_posterior_draws must be at least 20")
+            raise ValueError(
+                "plotting.leave_one_out.max_posterior_draws must be at least 20"
+            )
         return self
 
 
@@ -702,7 +700,9 @@ class TaskConfig(ConfigModel):
         required: set[str] = set()
         for region in regions:
             required.update(_required_chemistry_parameters(region.atmosphere.chemistry))
-            required.update(_required_temperature_parameters(region.atmosphere.temperature))
+            required.update(
+                _required_temperature_parameters(region.atmosphere.temperature)
+            )
             required.update(_required_cloud_parameters(region.clouds))
         disk_mode = _disk_emission_mode(self.disk_emission)
         if disk_mode == "diluted_one_region":
@@ -720,9 +720,7 @@ class TaskConfig(ConfigModel):
                 configured_fraction.prior.lower < 0.0
                 or configured_fraction.prior.upper > 1.0
             ):
-                raise ValueError(
-                    f"{fraction_parameter} prior must lie within [0, 1]"
-                )
+                raise ValueError(f"{fraction_parameter} prior must lie within [0, 1]")
         if self.sampler.oe_temperature_prior_sigma_k is not None:
             if not self.sampler.engine.startswith("optimal_estimation"):
                 raise ValueError(
@@ -806,8 +804,7 @@ class TaskConfig(ConfigModel):
                         "centered_log_ratio priors within each region"
                     )
                 groups = {
-                    clr_parameters[name].group or "composition"
-                    for name in regional_clr
+                    clr_parameters[name].group or "composition" for name in regional_clr
                 }
                 if len(groups) != 1:
                     raise ValueError(
@@ -818,8 +815,9 @@ class TaskConfig(ConfigModel):
                 raise ValueError(
                     "centered_log_ratio priors require matching free chemistry parameters"
                 )
-            if self.sampler.engine == "optimal_estimation" or self.sampler.engine.startswith(
-                "optimal_estimation_to_"
+            if (
+                self.sampler.engine == "optimal_estimation"
+                or self.sampler.engine.startswith("optimal_estimation_to_")
             ):
                 raise ValueError(
                     "centered_log_ratio priors currently require direct nested sampling"
@@ -933,8 +931,7 @@ def _required_temperature_parameters(config: TemperatureConfig) -> set[str]:
         return set(
             config.parameter_names
             or tuple(
-                f"temperature_{index}"
-                for index in range(len(config.knot_pressure))
+                f"temperature_{index}" for index in range(len(config.knot_pressure))
             )
         )
     return set()
@@ -1038,9 +1035,7 @@ def _apply_configured_paths(raw: dict) -> None:
         raise ValueError("paths must be a YAML mapping")
     project_directory = path_config.get("project_directory") or "."
     derived = {
-        "opacity_cache_directory": str(
-            Path(str(project_directory)) / "opacity_cache"
-        ),
+        "opacity_cache_directory": str(Path(str(project_directory)) / "opacity_cache"),
         "output_directory": str(Path(str(project_directory)) / "outputs"),
         "scratch_directory": str(Path(str(project_directory)) / "scratch"),
     }
@@ -1069,6 +1064,16 @@ def _apply_configured_paths(raw: dict) -> None:
         if not isinstance(section, dict):
             raise ValueError("configuration sections must be YAML mappings")
         section.setdefault(keys[-1], path_config[source_key])
+    opacity = raw.get("opacity")
+    if (
+        isinstance(opacity, dict)
+        and opacity.get("format") == "exomol_kta"
+        and opacity.get("resolution") == "R100"
+        and opacity.get("path") is None
+    ):
+        from robert_exoplanets._data import bundled_k_table_directory
+
+        opacity["path"] = str(bundled_k_table_directory())
     _fill_regional_input_paths(raw, path_config)
 
 

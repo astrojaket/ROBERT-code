@@ -536,11 +536,14 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
 
 
 def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
-    assert len(DEFAULTS) == 20
+    assert len(DEFAULTS) == 21
+    resolutions = []
     for path in DEFAULTS:
         config = load_task_config(path)
         assert config.run.name.startswith(("wasp69b-", "wasp80b-"))
-        assert config.opacity.resolution == "R1000"
+        resolutions.append(config.opacity.resolution)
+    assert resolutions.count("R100") == 1
+    assert resolutions.count("R1000") == 20
 
 
 def test_all_shipped_multinest_seeds_fit_legacy_fortran_range() -> None:
@@ -573,9 +576,7 @@ def test_mie_catalog_configuration_is_valid_for_transmission() -> None:
         ("optimal_estimation_to_multinest", "optimal_estimation_to_multinest"),
     ],
 )
-@pytest.mark.parametrize(
-    "scenario", ["cloud_free_native_pg14", "mie_catalog_pg14"]
-)
+@pytest.mark.parametrize("scenario", ["cloud_free_native_pg14", "mie_catalog_pg14"])
 def test_wasp69b_inference_benchmarks_only_change_run_controls(
     scenario: str, suffix: str, engine: str
 ) -> None:
@@ -621,10 +622,7 @@ def test_complete_template_uses_one_top_level_path_block() -> None:
     assert config.paths is not None
     assert config.housekeeping is None
     assert config.observations.path == config.paths.observations_directory
-    assert (
-        config.atmosphere.chemistry.fastchem_path
-        == config.paths.fastchem_directory
-    )
+    assert config.atmosphere.chemistry.fastchem_path == config.paths.fastchem_directory
     assert config.opacity.path == config.paths.k_table_directory
     assert config.opacity.cache_directory == ROOT / "configurations" / "opacity_cache"
     assert config.outputs.directory == ROOT / "configurations" / "outputs"

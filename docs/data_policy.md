@@ -3,17 +3,21 @@
 ROBERT's Git repository primarily contains code and human-readable
 documentation. It may also contain lightweight, open-source reference inputs
 that are required for the package or maintained examples to run: published
-JWST observations, optical constants, FastChem input tables, and the packaged
-CIA reference table. Large opacity databases, generated figures, posterior
-products, and numerical benchmark outputs must not be committed.
+observations, optical constants, FastChem input tables, the packaged CIA
+reference table, and the curated R=100 molecular-opacity starter set. Large
+high-resolution opacity databases, generated figures, posterior products, and
+numerical benchmark outputs must not be committed.
 
 ## Storage policy
 
 - Source code, tests, YAML configuration, Slurm scripts, Markdown, output-free
   tutorial notebooks, and lightweight required reference inputs belong in Git.
-- K-tables, cross-section databases, generated arrays, plots, chains, and full
-  benchmark products belong in external storage. Compact, human-readable
-  benchmark summaries may stay in Git as test oracles.
+- R=100 K-tables may be packaged only for the six documented starter species
+  when they include upstream and derived-product checksums, exact generation
+  settings, attribution, and a compatible data licence.
+- R=1000 and R=15000 K-tables, cross-section databases, generated arrays,
+  plots, chains, and full benchmark products belong in external storage.
+  Compact, human-readable benchmark summaries may stay in Git as test oracles.
 - Tests should generate compact fixtures at runtime or validate a small,
   versioned JSON/CSV acceptance summary. Checks needing full archived outputs
   must be opt-in and accept an external path.
@@ -30,6 +34,7 @@ each machine or cluster.
 
 | Input | Upstream record | How ROBERT locates it |
 | --- | --- | --- |
+| R=100 H2O, CO, CO2, CH4, NH3, and HCN k-tables, 0.3–15 microns | ExoMolOP; DOI 10.1051/0004-6361/202038350; CC BY-SA 4.0 | Packaged under `src/robert_exoplanets/data/opacities/R100/`; selected automatically when YAML requests R100 without an external path. |
 | NemesisPy v1.0.1 CIA table, `exocia_hitran12_200-3800K.tab` | NemesisPy v1.0.1, BSD-3-Clause | Packaged under `src/robert_exoplanets/data/cia/`. |
 | WASP-69b Schlawin et al. (2024) spectrum | VizieR J/AJ/168/104; DOI 10.3847/1538-3881/ad58e0 | Versioned under `data/wasp69b_schlawin2024/`; pass a directory to the loader. |
 | WASP-80b Wiser et al. spectrum | Zenodo 10.5281/zenodo.13146949 | Versioned under `data/wasp80b_wiser2025/`; pass a directory to the loader. |

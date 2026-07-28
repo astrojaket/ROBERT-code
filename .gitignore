@@ -35,6 +35,8 @@ retrieval_runs/
 external_data/
 opacity_data/
 opacities/
+!src/robert_exoplanets/data/opacities/
+!src/robert_exoplanets/data/opacities/**
 input_data/
 *.npy
 *.npz

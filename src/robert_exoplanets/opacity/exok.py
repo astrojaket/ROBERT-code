@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import sys
+import tempfile
 
 import numpy as np
 
-from robert_exoplanets.core import RobertConfigError, RobertCoverageError, RobertValidationError, SpectralGrid
+from robert_exoplanets.core import (
+    RobertConfigError,
+    RobertCoverageError,
+    RobertValidationError,
+    SpectralGrid,
+)
 
 from .correlated_k import CorrelatedKTable
 from .inspectors import file_sha256
@@ -30,14 +38,20 @@ def bin_correlated_k_table_with_exok(
     """
 
     if spectral_grid.bin_edges is None:
-        raise RobertValidationError("exo_k correlated-k binning requires spectral bin edges")
+        raise RobertValidationError(
+            "exo_k correlated-k binning requires spectral bin edges"
+        )
     if int(num) < 2:
         raise RobertValidationError("exo_k binning num must be at least two")
     if not np.isfinite(zero_deltalog_min_value) or zero_deltalog_min_value <= 0.0:
-        raise RobertValidationError("exo_k zero_deltalog_min_value must be finite and positive")
+        raise RobertValidationError(
+            "exo_k zero_deltalog_min_value must be finite and positive"
+        )
     source_path = str(table.metadata.get("source_path", ""))
     if not source_path or not Path(source_path).is_file():
-        raise RobertConfigError("exo_k binning requires an exo_k-readable source opacity file")
+        raise RobertConfigError(
+            "exo_k binning requires an exo_k-readable source opacity file"
+        )
     exok = _import_exok()
     try:
         native = exok.Ktable(
@@ -48,7 +62,9 @@ def bin_correlated_k_table_with_exok(
             remove_zeros=False,
         )
     except Exception as exc:
-        raise RobertConfigError(f"exo_k could not load correlated-k table: {source_path}") from exc
+        raise RobertConfigError(
+            f"exo_k could not load correlated-k table: {source_path}"
+        ) from exc
 
     _validate_exok_source(native, table)
     native_kcoeff = table.kcoeff
@@ -66,14 +82,19 @@ def bin_correlated_k_table_with_exok(
     native.gedges = np.concatenate(([0.0], np.cumsum(native.weights)))
     native.Ng = native.weights.size
 
-    edge_grid = SpectralGrid(values=spectral_grid.bin_edges, unit=spectral_grid.unit, role="internal")
+    edge_grid = SpectralGrid(
+        values=spectral_grid.bin_edges, unit=spectral_grid.unit, role="internal"
+    )
     target_wavenumber_edges = np.sort(spectral_grid_values_in_unit(edge_grid, "cm^-1"))
     native_edges = np.asarray(native.wnedges, dtype=float)
     tolerance = 1.0e-9 * max(1.0, float(np.max(np.abs(native_edges))))
-    if target_wavenumber_edges[0] < np.min(native_edges) - tolerance or target_wavenumber_edges[-1] > np.max(
-        native_edges
-    ) + tolerance:
-        raise RobertCoverageError("requested spectral bins extend outside the native exo_k table")
+    if (
+        target_wavenumber_edges[0] < np.min(native_edges) - tolerance
+        or target_wavenumber_edges[-1] > np.max(native_edges) + tolerance
+    ):
+        raise RobertCoverageError(
+            "requested spectral bins extend outside the native exo_k table"
+        )
 
     try:
         binned = native.bin_down_cp(
@@ -85,7 +106,9 @@ def bin_correlated_k_table_with_exok(
             remove_zeros=bool(remove_zeros),
         )
     except Exception as exc:
-        raise RobertValidationError("exo_k failed while binning the correlated-k distribution") from exc
+        raise RobertValidationError(
+            "exo_k failed while binning the correlated-k distribution"
+        ) from exc
 
     target_wavenumber = spectral_grid_values_in_unit(spectral_grid, "cm^-1")
     kcoeff = np.asarray(binned.kdata, dtype=float)
@@ -94,7 +117,9 @@ def bin_correlated_k_table_with_exok(
         kcoeff = kcoeff[:, :, ::-1, :]
         exok_wavenumber = exok_wavenumber[::-1]
     if kcoeff.shape[2] != spectral_grid.size:
-        raise RobertValidationError("exo_k returned an unexpected number of spectral bins")
+        raise RobertValidationError(
+            "exo_k returned an unexpected number of spectral bins"
+        )
     center_offset = float(np.max(np.abs(exok_wavenumber - target_wavenumber)))
     return CorrelatedKTable(
         species=table.species,
@@ -141,7 +166,9 @@ def load_correlated_k_table_with_exok(
 
     table_path = Path(path).expanduser()
     if not table_path.is_file():
-        raise RobertConfigError(f"correlated-k opacity file does not exist: {table_path}")
+        raise RobertConfigError(
+            f"correlated-k opacity file does not exist: {table_path}"
+        )
     species_name = str(species).strip()
     if not species_name:
         raise RobertValidationError("correlated-k species must not be empty")
@@ -153,7 +180,9 @@ def load_correlated_k_table_with_exok(
     if not np.isfinite(nonfinite_fill_value) or nonfinite_fill_value <= 0.0:
         raise RobertValidationError("nonfinite_fill_value must be finite and positive")
     if not np.isfinite(zero_deltalog_min_value) or zero_deltalog_min_value <= 0.0:
-        raise RobertValidationError("zero_deltalog_min_value must be finite and positive")
+        raise RobertValidationError(
+            "zero_deltalog_min_value must be finite and positive"
+        )
 
     exok = _import_exok()
     try:
@@ -165,7 +194,9 @@ def load_correlated_k_table_with_exok(
             remove_zeros=False,
         )
     except Exception as exc:
-        raise RobertConfigError(f"exo_k could not load correlated-k table: {table_path}") from exc
+        raise RobertConfigError(
+            f"exo_k could not load correlated-k table: {table_path}"
+        ) from exc
     kdata = np.array(native.kdata, dtype=float, copy=True)
     nonfinite = ~np.isfinite(kdata)
     n_nonfinite = int(np.sum(nonfinite))
@@ -203,7 +234,9 @@ def load_correlated_k_table_with_exok(
             "exo_k_version": str(getattr(exok, "__version__", "unknown")),
             "kcoeff_nonfinite_policy": normalized_policy,
             "kcoeff_nonfinite_fill_value": f"{float(nonfinite_fill_value):.17g}",
-            "kcoeff_nonfinite_replaced": str(n_nonfinite if normalized_policy == "floor" else 0),
+            "kcoeff_nonfinite_replaced": str(
+                n_nonfinite if normalized_policy == "floor" else 0
+            ),
             "exo_k_remove_zeros": str(bool(remove_zeros)).lower(),
             "exo_k_zero_deltalog_min_value": f"{float(zero_deltalog_min_value):.12g}",
             "exo_k_zeros_replaced": str(zero_count if remove_zeros else 0),
@@ -213,6 +246,7 @@ def load_correlated_k_table_with_exok(
 
 
 def _import_exok():
+    cache_directory = _ensure_writable_numba_cache()
     try:
         import exo_k
     except ImportError as exc:
@@ -222,10 +256,72 @@ def _import_exok():
     except RuntimeError as exc:
         if "cannot cache function" in str(exc):
             raise RobertConfigError(
-                "exo_k/Numba could not create its cache; set NUMBA_CACHE_DIR to a writable directory"
+                "exo_k/Numba could not create its cache even after ROBERT selected "
+                f"the writable directory {cache_directory}"
             ) from exc
         raise
     return exo_k
+
+
+def _ensure_writable_numba_cache() -> Path:
+    """Select a writable Numba cache before importing cache-enabled libraries."""
+
+    candidates: list[Path] = []
+    configured = os.environ.get("NUMBA_CACHE_DIR")
+    if configured:
+        candidates.append(Path(configured).expanduser())
+
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if xdg_cache:
+        candidates.append(Path(xdg_cache).expanduser() / "robert-exoplanets" / "numba")
+    elif sys.platform == "darwin":
+        candidates.append(
+            Path.home() / "Library" / "Caches" / "robert-exoplanets" / "numba"
+        )
+    elif os.name == "nt" and local_app_data:
+        candidates.append(
+            Path(local_app_data).expanduser() / "robert-exoplanets" / "numba"
+        )
+    else:
+        candidates.append(Path.home() / ".cache" / "robert-exoplanets" / "numba")
+
+    user_token = str(os.getuid()) if hasattr(os, "getuid") else str(os.getpid())
+    candidates.append(
+        Path(tempfile.gettempdir()) / f"robert-exoplanets-{user_token}" / "numba"
+    )
+
+    attempted: list[str] = []
+    for raw_candidate in candidates:
+        try:
+            candidate = raw_candidate.resolve()
+        except (OSError, RuntimeError):
+            attempted.append(str(raw_candidate))
+            continue
+        if str(candidate) in attempted:
+            continue
+        attempted.append(str(candidate))
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                dir=candidate,
+                prefix=".robert-write-test-",
+            ):
+                pass
+        except OSError:
+            continue
+
+        os.environ["NUMBA_CACHE_DIR"] = str(candidate)
+        numba = sys.modules.get("numba")
+        numba_config = getattr(numba, "config", None)
+        if numba_config is not None:
+            numba_config.CACHE_DIR = str(candidate)
+        return candidate
+
+    raise RobertConfigError(
+        "ROBERT could not create a writable Numba cache directory; attempted "
+        + ", ".join(attempted)
+    )
 
 
 def _validate_exok_source(native, table: CorrelatedKTable) -> None:
@@ -236,8 +332,12 @@ def _validate_exok_source(native, table: CorrelatedKTable) -> None:
         (np.asarray(native.weights, dtype=float), table.g_weights, "g weight"),
     )
     for candidate, reference, label in checks:
-        if candidate.shape != reference.shape or not np.allclose(candidate, reference, rtol=1.0e-6, atol=1.0e-12):
-            raise RobertValidationError(f"exo_k and ROBERT disagree on the native {label} grid")
+        if candidate.shape != reference.shape or not np.allclose(
+            candidate, reference, rtol=1.0e-6, atol=1.0e-12
+        ):
+            raise RobertValidationError(
+                f"exo_k and ROBERT disagree on the native {label} grid"
+            )
     native_wavenumber = np.asarray(native.wns, dtype=float)
     reference_wavenumber = table.wavenumber_cm_inverse
     if native_wavenumber[0] > native_wavenumber[-1]:
@@ -250,7 +350,9 @@ def _validate_exok_source(native, table: CorrelatedKTable) -> None:
         rtol=2.0e-6,
         atol=1.0e-6,
     ):
-        raise RobertValidationError("exo_k and ROBERT disagree on the native spectral grid")
+        raise RobertValidationError(
+            "exo_k and ROBERT disagree on the native spectral grid"
+        )
 
 
 __all__ = ["bin_correlated_k_table_with_exok", "load_correlated_k_table_with_exok"]

@@ -18,6 +18,7 @@ paths:
   project_directory: .
   observations_directory: /path/to/observations
   fastchem_directory: /path/to/fastchem
+  # Omit for bundled R100. Set for downloaded R1000 or supplied R15000 data.
   k_table_directory: /path/to/opacity
   optical_constants_directory: /path/to/optical_constants
 
@@ -223,7 +224,7 @@ disk_emission:
 # =============================================================================
 opacity:
   format: exomol_kta          # Alternative: exomol_cross_section_hdf
-  resolution: R1000           # Alternative: R15000
+  resolution: R1000           # Bundled: R100. Supplied externally: R1000/R15000.
   species: [H2O, CO2, CO, CH4, NH3, SO2]
   binning:
     num: 300

@@ -35,6 +35,7 @@ dependencies = [
 ]
 
 [project.scripts]
+robert-opacity-download = "robert_exoplanets.opacity.download:main"
 robert-retrieval-status = "robert_exoplanets.retrieval.status:main"
 
 [project.optional-dependencies]
@@ -102,7 +103,10 @@ robert_exoplanets = [
   "py.typed",
   "data/cia/*.tab",
   "data/cia/*.json",
-  "data/cia/*.txt"
+  "data/cia/*.txt",
+  "data/opacities/R100/*.kta",
+  "data/opacities/R100/*.json",
+  "data/opacities/R100/*.md"
 ]
 
 [tool.pytest.ini_options]

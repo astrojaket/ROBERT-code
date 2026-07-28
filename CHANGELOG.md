@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bundled CC BY-SA 4.0 ExoMolOP-derived R=100 k-tables for H2O, CO, CO2,
+  CH4, NH3, and HCN over 0.3–15 microns, with automatic YAML discovery,
+  complete provenance, a reproducible generator, and checksum-pinned R=1000
+  downloads.
+- Made ROBERT select and verify a writable user or temporary Numba cache before
+  importing `exo_k`, with automatic fallback from invalid configured paths.
 - Reframed the public documentation around ROBERT as a general-purpose
   radiative-transfer and retrieval framework, with complete installation,
   forward-model, local, Slurm, and Oxford Glamdring workflows plus a maintained

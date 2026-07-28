@@ -100,6 +100,8 @@ from .io import (
 )
 from .likelihoods import GaussianLikelihood, MultiDatasetGaussianLikelihood
 from .opacity import (
+    BUNDLED_K_TABLE_RESOLUTION,
+    BUNDLED_K_TABLE_SPECIES,
     CorrelatedKCoverageReport,
     CorrelatedKOpacityProvider,
     CorrelatedKTable,
@@ -124,6 +126,10 @@ from .opacity import (
     PreparedOpacitySampling,
     RobertOpacityArchive,
     SpectralCoverage,
+    bundled_k_table_directory,
+    bundled_k_table_paths,
+    bundled_opacity_manifest,
+    download_exomol_r1000,
     convert_kta_to_robert_archive,
     inspect_exomol_directory,
     inspect_hitran_cia_file,
@@ -272,6 +278,8 @@ from .validation import (
 
 __all__ = [
     "__version__",
+    "BUNDLED_K_TABLE_RESOLUTION",
+    "BUNDLED_K_TABLE_SPECIES",
     "AtmosphereBuilder",
     "AbsorptionTransmissionResult",
     "AtmosphereModelSetup",
@@ -410,6 +418,10 @@ __all__ = [
     "SpectralCoverage",
     "blackbody_eclipse_depth",
     "blackbody_eclipse_depth_spectrum",
+    "bundled_k_table_directory",
+    "bundled_k_table_paths",
+    "bundled_opacity_manifest",
+    "download_exomol_r1000",
     "calculate_fit_statistics",
     "build_emission_model",
     "build_multi_dataset_emission_model",

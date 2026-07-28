@@ -25,7 +25,7 @@ def parser() -> argparse.ArgumentParser:
     argument_parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configurations/wasp69b_cloud_free_R1000.yaml"),
+        default=Path("configurations/wasp80b_cloud_free_native_pg14_R100.yaml"),
         help="schema-version-2 ROBERT YAML configuration",
     )
     argument_parser.add_argument(

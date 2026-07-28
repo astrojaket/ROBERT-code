@@ -17,13 +17,15 @@ paths:
   project_directory: .
   observations_directory: ./data/observations
   fastchem_directory: ./data/fastchem
-  k_table_directory: ./data/opacity
+  # k_table_directory: ./opacity_data/ktables_exomol
   optical_constants_directory: ./data/optical_constants
 ```
 
 Relative paths resolve from the YAML file. ROBERT expands `${VARIABLE}` and
 rejects undefined variables. Writable directories default to `outputs/`,
 `opacity_cache/`, and `scratch/` beneath `project_directory`.
+Omit `k_table_directory` when using the bundled R=100 tables. R=1000 tables
+are external and use the directory layout described below.
 
 ## Run and bodies
 
@@ -127,7 +129,7 @@ inside `[0, 1]`.
 ```yaml
 opacity:
   format: exomol_kta
-  resolution: R1000
+  resolution: R100
   species: [H2O, CO2, CO]
   binning:
     num: 300
@@ -148,6 +150,59 @@ radiative_transfer:
 Opacity formats are `exomol_kta` and `exomol_cross_section_hdf`. Gas
 combination is `random_overlap` or `equivalent_extinction`. Emission geometry
 is `normal_emission` or `gauss_legendre_disk`.
+
+### Molecular opacity locations
+
+ROBERT distributes R=100 correlated-k tables for H2O, CO, CO2, CH4, NH3, and
+HCN. They cover 0.3–15 microns on the complete 22-pressure,
+27-temperature ExoMolOP grid with eight g-points. No opacity path is needed:
+
+```yaml
+paths:
+  project_directory: .
+
+opacity:
+  format: exomol_kta
+  resolution: R100
+  species: [H2O, CO2, CO, CH4, NH3, HCN]
+```
+
+Use these tables for introductory and rapid forward models or
+resolution-appropriate data such as HST/WFC3. For R=1000, download the
+checksum-pinned ExoMolOP parents:
+
+```bash
+robert-opacity-download --directory opacity_data/ktables_exomol
+```
+
+The resulting layout is:
+
+```text
+opacity_data/ktables_exomol/
+└── R1000/
+    ├── H2O_R1000.kta
+    ├── CO_R1000.kta
+    ├── CO2_R1000.kta
+    ├── CH4_R1000.kta
+    ├── NH3_R1000.kta
+    └── HCN_R1000.kta
+```
+
+Then add:
+
+```yaml
+paths:
+  k_table_directory: ./opacity_data/ktables_exomol
+
+opacity:
+  format: exomol_kta
+  resolution: R1000
+```
+
+The downloader retains the upstream ExoMolOP source identity and verifies the
+same SHA-256 checksums used to generate the bundled tables. R=15000 data are
+not bundled or downloaded by this command; contact Jake Taylor directly for
+the validated high-resolution data workflow.
 
 For transmission, set `model: transmission` and configure
 `reference_pressure_bar`, optional `radius_scale_parameter`,

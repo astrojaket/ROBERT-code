@@ -47,12 +47,17 @@ export PYSYN_CDBS=/path/to/synphot/reference-data
 `PYSYN_CDBS` must name the directory containing `grid/phoenix`. A configuration
 with `bodies.star.spectrum_model: blackbody` does not require those files.
 
+ROBERT includes ready-to-use R=100 correlated-k tables for H2O, CO, CO2, CH4,
+NH3, and HCN from 0.3 to 15 microns. They are suitable for quick forward
+models and HST/WFC3-scale analyses. Select `opacity.resolution: R100` and omit
+`paths.k_table_directory` to use them.
+
 Verify the installation:
 
 ```bash
 conda run -n robert-exoplanets python -m pytest
 conda run -n robert-exoplanets python run_retrieval.py \
-  --config configurations/wasp69b_cloud_free_R1000.yaml \
+  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml \
   --validate-only
 ```
 
@@ -63,20 +68,33 @@ Start with a schema-version-2 YAML configuration. Each parameter may have a
 
 ```bash
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/wasp69b_cloud_free_R1000.yaml \
+  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml \
   --validate-only
 
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/wasp69b_cloud_free_R1000.yaml \
+  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml \
   --prepare-opacity
 
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/wasp69b_cloud_free_R1000.yaml
+  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml
 ```
 
 The model is written to `outputs/forward_model.npz`. With forward plotting
 enabled in YAML, ROBERT also writes fit diagnostics and a spectrum/residual
 figure under `outputs/plots/forward/`.
+
+For higher-resolution work, download the checksum-pinned ExoMolOP R=1000
+parents into the standard external-data layout:
+
+```bash
+robert-opacity-download --directory opacity_data/ktables_exomol
+```
+
+This downloads about 1.4 GB and writes `R1000/H2O_R1000.kta`,
+`R1000/CO_R1000.kta`, and the corresponding CO2, CH4, NH3, and HCN files.
+Point `paths.k_table_directory` at `opacity_data/ktables_exomol`. R=15000 data
+are not distributed with ROBERT; contact Jake Taylor directly for access to
+the validated high-resolution data workflow.
 
 See [Forward-model generation](docs/forward_models.md) for the full
 configuration-to-spectrum workflow, output schema, troubleshooting, a

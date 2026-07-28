@@ -12,9 +12,9 @@ separates:
 - spectral, pressure, temperature, species, and checksum metadata.
 
 This matters because the same physical source can appear in several storage
-formats. The local HAT-P-32b k-tables are ExoMol-derived and binned with
-`exo_k`, and the on-disk product is a `.kta` correlated-k binary table.
-ROBERT records that as:
+formats. ROBERT's bundled R=100 k-tables are derived from ExoMolOP R=1000
+tables and binned with `exo_k`; the on-disk products are `.kta` correlated-k
+binary tables. ROBERT records them as:
 
 ```python
 source = "exomol_op"
@@ -24,7 +24,15 @@ mode = "correlated_k"
 
 ## Current Scope
 
-The current opacity implementation is metadata and coverage scaffolding. It can:
+ROBERT includes R=100 molecular k-tables for H2O, CO, CO2, CH4, NH3, and HCN
+over 0.3–15 microns. These compact tables are the default for quick forward
+models and resolution-appropriate data such as HST/WFC3. They retain all 22
+pressure points, all 27 temperature points, and eight g-points. Their source
+URLs, input and output checksums, transformation settings, attribution, and
+licence are recorded in
+`src/robert_exoplanets/data/opacities/R100/provenance.json`.
+
+The opacity implementation can:
 
 - describe opacity products with typed metadata,
 - inspect ExoMol/ExoMolOP-style directories by suffix,

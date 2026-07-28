@@ -2,6 +2,14 @@
 
 from typing import Union
 
+from robert_exoplanets._data import (
+    BUNDLED_K_TABLE_RESOLUTION,
+    BUNDLED_K_TABLE_SPECIES,
+    bundled_k_table_directory,
+    bundled_k_table_paths,
+    bundled_opacity_manifest,
+)
+
 from .archive import (
     RobertOpacityArchive,
     inspect_robert_npy_directory,
@@ -18,6 +26,7 @@ from .correlated_k import (
     EvaluatedCorrelatedKOpacity,
     PreparedCorrelatedKOpacity,
 )
+from .download import download_exomol_r1000
 from .inspectors import (
     file_sha256,
     inspect_exomol_directory,
@@ -63,6 +72,8 @@ EvaluatedOpacity = Union[
 ]
 
 __all__ = [
+    "BUNDLED_K_TABLE_RESOLUTION",
+    "BUNDLED_K_TABLE_SPECIES",
     "CorrelatedKCoverageReport",
     "CorrelatedKOpacityProvider",
     "CorrelatedKTable",
@@ -89,6 +100,10 @@ __all__ = [
     "RobertOpacityArchive",
     "SpectralCoverage",
     "convert_kta_to_robert_archive",
+    "bundled_k_table_directory",
+    "bundled_k_table_paths",
+    "bundled_opacity_manifest",
+    "download_exomol_r1000",
     "file_sha256",
     "inspect_exomol_directory",
     "inspect_hitran_cia_file",
