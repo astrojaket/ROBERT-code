@@ -90,9 +90,7 @@ def _factory_config() -> EmissionFactoryConfig:
 
 
 def test_factory_builds_evaluable_model_from_python_objects() -> None:
-    model = build_emission_model(
-        _factory_config(), spectral_grid=_spectral_grid()
-    )
+    model = build_emission_model(_factory_config(), spectral_grid=_spectral_grid())
 
     spectrum = model(
         {
@@ -258,7 +256,9 @@ def test_parameterized_factory_evaluates_temperature_and_chemistry_at_runtime() 
     assert np.all(hot.values > cool.values)
 
 
-def test_parameterized_emission_supports_opacity_free_phantom_with_fitted_mass() -> None:
+def test_parameterized_emission_supports_opacity_free_phantom_with_fitted_mass() -> (
+    None
+):
     config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Phantom b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Phantom star", radius_m=7.0e8, effective_temperature_k=5500.0),
@@ -491,9 +491,9 @@ def test_parameterized_grey_cloud_model_wraps_existing_regional_hardware() -> No
     assert np.all(np.isfinite(spectrum.values))
 
 
-def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles() -> (
-    None
-):
+def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles(
+    monkeypatch,
+) -> None:
     config = ParameterizedEmissionFactoryConfig(
         planet=Planet(name="Generic b", radius_m=7.0e7, gravity_m_s2=20.0),
         star=Star(name="Generic star", radius_m=7.0e8, effective_temperature_k=5500.0),
@@ -551,8 +551,24 @@ def test_parameterized_refractive_index_cloud_model_retrieves_n_k_and_particles(
     }
 
     spectrum = cloudy(parameters)
+    build_calls = 0
+    original_build = AtmosphereBuilder.build
+
+    def counted_build(builder, values=None):
+        nonlocal build_calls
+        build_calls += 1
+        return original_build(builder, values)
+
+    monkeypatch.setattr(AtmosphereBuilder, "build", counted_build)
+    shared = MultiDatasetEmissionForwardModel(
+        {"first": cloudy, "second": replace(cloudy)}
+    )
+    shared_spectra = shared(parameters)
 
     assert cloudy.required_parameters == tuple(parameters)
+    assert build_calls == 1
+    np.testing.assert_array_equal(shared_spectra["first"].values, spectrum.values)
+    np.testing.assert_array_equal(shared_spectra["second"].values, spectrum.values)
     assert cloudy.manifest_metadata["cloud_refractive_index_parameterization"] == (
         "nodal_n_log10_k"
     )

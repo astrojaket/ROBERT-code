@@ -21,7 +21,6 @@ from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import (
     OpacityProvider,
     PreparedOpacity,
-    pressure_values_in_unit,
 )
 from robert_exoplanets.rt import (
     CiaTable,
@@ -36,6 +35,7 @@ from robert_exoplanets.rt import (
     refractive_index_from_parameters,
     solve_emission,
     solve_emission_spectrum,
+    sh4_boundary_backend_name,
     sh4_spectrum_backend_name,
     thermal_integration_backend_name,
 )
@@ -45,7 +45,7 @@ from ._atmospheric import (
     evaluate_additional_optical_depths,
     evaluate_gas_optical_depth,
 )
-from .clouds import ParameterizedCloudModel
+from .clouds import ParameterizedCloudModel, pressure_slab_layer_fractions
 
 GRAVITATIONAL_CONSTANT_M3_KG_S2 = 6.67430e-11
 
@@ -180,6 +180,7 @@ class ParameterizedEmissionModelConfig:
     cia_spectral_extrapolation: str = "zero"
     gas_combination: str = "random_overlap"
     thermal_integration_backend: str = "auto"
+    sh4_boundary_backend: str = "auto"
     stellar_spectrum_model: str = "phoenix"
     compute_diagnostics: bool = False
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -222,6 +223,11 @@ class ParameterizedEmissionModelConfig:
             self,
             "thermal_integration_backend",
             thermal_integration_backend_name(self.thermal_integration_backend),
+        )
+        object.__setattr__(
+            self,
+            "sh4_boundary_backend",
+            sh4_boundary_backend_name(self.sh4_boundary_backend),
         )
         object.__setattr__(self, "stellar_spectrum_model", stellar_model)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
@@ -688,6 +694,7 @@ class ParameterizedEmissionForwardModel:
                     bool(self.config.cia_normal_hydrogen)
                 ).lower(),
                 "thermal_integration_backend": self.config.thermal_integration_backend,
+                "sh4_boundary_backend": self.config.sh4_boundary_backend,
                 "compute_diagnostics": str(self.config.compute_diagnostics).lower(),
                 "geometry": self.geometry.name,
                 "geometry_points": str(self.geometry.n_points),
@@ -817,6 +824,7 @@ class ParameterizedEmissionForwardModel:
                 star_radius_m=self.star.radius_m,
                 stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
+                sh4_boundary_backend=self.config.sh4_boundary_backend,
                 multiple_scattering_backend=multiple_scattering_backend,
             )
         result = solve_emission(
@@ -830,9 +838,7 @@ class ParameterizedEmissionForwardModel:
             multiple_scattering_backend=multiple_scattering_backend,
         )
         if result.eclipse_depth is None:
-            raise RobertValidationError(
-                "emission solver did not return eclipse depth"
-            )
+            raise RobertValidationError("emission solver did not return eclipse depth")
         return result.eclipse_depth
 
 
@@ -871,9 +877,7 @@ class GreyScatteringCloudConfig:
 
 
 @dataclass(frozen=True)
-class ParameterizedGreyCloudEmissionForwardModel(
-    ParameterizedEmissionForwardModel
-):
+class ParameterizedGreyCloudEmissionForwardModel(ParameterizedEmissionForwardModel):
     """Parameterized emission column with a uniform gray scattering opacity."""
 
     cloud: GreyScatteringCloudConfig = field(
@@ -909,6 +913,11 @@ class ParameterizedGreyCloudEmissionForwardModel(
                 ).lower(),
                 "cloud_sh4_spectrum_backend": (
                     sh4_spectrum_backend_name(self.config.thermal_integration_backend)
+                    if self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+                    else ""
+                ),
+                "cloud_sh4_boundary_backend": (
+                    self.config.sh4_boundary_backend
                     if self.cloud.multiple_scattering_backend in {"sh4", "p3"}
                     else ""
                 ),
@@ -989,6 +998,7 @@ class ParameterizedGreyCloudEmissionForwardModel(
                 star_radius_m=self.star.radius_m,
                 stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
+                sh4_boundary_backend=self.config.sh4_boundary_backend,
             )
         result = solve_emission(
             gas_optical_depth,
@@ -1224,7 +1234,15 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                     if self.cloud.multiple_scattering_backend in {"sh4", "p3"}
                     else ""
                 ),
+                "cloud_sh4_boundary_backend": (
+                    self.config.sh4_boundary_backend
+                    if self.cloud.multiple_scattering_backend in {"sh4", "p3"}
+                    else ""
+                ),
                 "cloud_phase_function_closure": "exact_mie_legendre_moments_through_l4",
+                "cloud_boundary_treatment": (
+                    "fractional_hydrostatic_pressure_column_overlap"
+                ),
                 "cloud_refractive_index_mode": (
                     "retrieved_nodal_n_log10_k"
                     if self.cloud.fixed_refractive_index is None
@@ -1240,22 +1258,35 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
         )
 
     def __call__(self, parameters: Mapping[str, float]) -> Spectrum:
-        missing = tuple(
-            name for name in self.required_parameters if name not in parameters
-        )
-        if missing:
-            raise RobertValidationError(
-                "parameterized refractive-index cloud parameters are missing: "
-                + ", ".join(missing)
-            )
-        parameter_values = {
-            name: float(parameters[name]) for name in self.required_parameters
-        }
-        if not all(np.isfinite(value) for value in parameter_values.values()):
-            raise RobertValidationError(
-                "parameterized refractive-index cloud parameters must be finite"
-            )
+        parameter_values = self.validated_parameters(parameters)
         atmosphere = self.atmosphere_builder.build(parameter_values)
+        return self.evaluate_atmosphere(atmosphere, parameter_values)
+
+    def evaluate_atmosphere(
+        self,
+        atmosphere: AtmosphereState,
+        parameters: Mapping[str, float],
+    ) -> Spectrum:
+        """Evaluate the Mie-cloud column using an already-built atmosphere."""
+
+        parameter_values = self.validated_parameters(parameters)
+        if atmosphere.pressure_grid is not self.pressure_grid:
+            same_grid = (
+                atmosphere.pressure_grid.unit == self.pressure_grid.unit
+                and np.array_equal(
+                    atmosphere.pressure_grid.edges,
+                    self.pressure_grid.edges,
+                )
+                and np.array_equal(
+                    atmosphere.pressure_grid.centers,
+                    self.pressure_grid.centers,
+                )
+            )
+            if not same_grid:
+                raise RobertValidationError(
+                    "shared atmosphere pressure grid must match the prepared "
+                    "refractive-index cloud model"
+                )
         gas_optical_depth = evaluate_gas_optical_depth(
             self.opacity_provider,
             self.prepared_opacity,
@@ -1313,10 +1344,6 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                 parameter_values[self.cloud.log10_condensate_mass_fraction_parameter],
             )
         )
-        pressure_bar = pressure_values_in_unit(
-            self.pressure_grid.centers, self.pressure_grid.unit, "bar"
-        )
-        active = np.ones(self.pressure_grid.n_layers, dtype=bool)
         top_pressure = None
         base_pressure = None
         if self.cloud.log10_cloud_top_pressure_bar_parameter is not None:
@@ -1326,7 +1353,6 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                     parameter_values[self.cloud.log10_cloud_top_pressure_bar_parameter],
                 )
             )
-            active &= pressure_bar >= top_pressure
         if self.cloud.log10_cloud_base_pressure_bar_parameter is not None:
             base_pressure = float(
                 np.power(
@@ -1336,16 +1362,12 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                     ],
                 )
             )
-            active &= pressure_bar <= base_pressure
-        if (
-            top_pressure is not None
-            and base_pressure is not None
-            and top_pressure > base_pressure
-        ):
-            raise RobertValidationError(
-                "cloud top pressure must not exceed cloud base pressure"
-            )
-        mass_fraction = np.where(active, mass_fraction_value, 0.0)
+        layer_fractions = pressure_slab_layer_fractions(
+            self.pressure_grid,
+            top_pressure_bar=top_pressure,
+            base_pressure_bar=base_pressure,
+        )
+        mass_fraction = layer_fractions * mass_fraction_value
         additional_optical_depths.append(
             mie_cloud_from_mass_fraction(
                 gas_optical_depth,
@@ -1374,6 +1396,7 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
                 star_radius_m=self.star.radius_m,
                 stellar_spectrum=self.prepared_stellar_spectrum,
                 thermal_integration_backend=self.config.thermal_integration_backend,
+                sh4_boundary_backend=self.config.sh4_boundary_backend,
             )
         result = solve_emission(
             gas_optical_depth,

@@ -5,6 +5,9 @@ to nested-sampling workflows from one schema-version-2 YAML file. The same
 configuration defines the observations, atmosphere, opacity, radiative
 transfer, likelihood, priors, inference settings, runtime, and plotting.
 
+MultiNest is the default nested sampler. UltraNest is an explicitly selected
+compatibility option.
+
 This guide first creates and checks a run directory, then gives separate
 instructions for a local machine, a standard Slurm cluster, and the Oxford
 Physics Glamdring cluster.

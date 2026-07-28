@@ -15,6 +15,7 @@ from robert_exoplanets.io.configured_tasks import (
     prepare_opacity,
 )
 from robert_exoplanets.io.task_config import (
+    SamplerConfig,
     TaskConfig,
     configured_regions,
     initialize_task_directories,
@@ -61,6 +62,7 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     }
     assert config.sampler.live_points == 400
     assert config.sampler.max_calls is None
+    assert config.radiative_transfer.sh4_boundary_backend == "auto"
     assert config.runtime.mpi_processes == "auto"
     assert config.runtime.scratch_directory.is_absolute()
     assert config.outputs.directory.is_absolute()
@@ -209,6 +211,10 @@ def test_yaml_defaults_writable_paths_to_the_configuration_directory(
     assert parsed.outputs.directory == tmp_path / "outputs"
     assert parsed.runtime.scratch_directory == tmp_path / "scratch"
     assert parsed.opacity.cache_directory == tmp_path / "opacity_cache"
+
+
+def test_sampler_defaults_to_multinest() -> None:
+    assert SamplerConfig().engine == "multinest"
 
 
 def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:

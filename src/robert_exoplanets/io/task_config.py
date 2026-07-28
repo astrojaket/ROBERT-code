@@ -477,6 +477,7 @@ class RadiativeTransferConfig(ConfigModel):
         "random_overlap"
     )
     thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
+    sh4_boundary_backend: Literal["auto", "scipy", "numba"] = "auto"
     reference_pressure_bar: PositiveFloat = 1.0
     radius_scale_parameter: str | None = None
     gravity_model: Literal["constant", "inverse_square"] = "inverse_square"
@@ -540,7 +541,7 @@ class SamplerConfig(ConfigModel):
         "optimal_estimation",
         "optimal_estimation_to_ultranest",
         "optimal_estimation_to_multinest",
-    ] = "ultranest"
+    ] = "multinest"
     live_points: PositiveInt = 400
     max_calls: PositiveInt | None = None
     multinest_max_iterations: NonNegativeInt = 0

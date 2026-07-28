@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Accelerated cloudy SH4 retrievals with a parity-checked Numba banded solver,
+  spectrum-only contractions, shared multi-dataset atmospheric state,
+  continuous fractional cloud-layer boundaries, MultiNest evaluation
+  accounting, and an MPI scaling benchmark. MultiNest is now the default
+  sampler.
 - Added a monitored, local MultiNest R=100 installation-validation notebook
   that generates emission and transmission forward truths, injects 60 ppm
   synthetic observations, retrieves H2O on two to four MPI ranks, and checks

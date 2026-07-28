@@ -241,6 +241,7 @@ radiative_transfer:
   include_rayleigh: true
   gas_combination: random_overlap  # Alternative: equivalent_extinction
   thermal_integration_backend: auto # Alternatives: numpy, numba
+  sh4_boundary_backend: auto       # Alternatives: scipy (reference), numba
   # Transmission-only controls:
   reference_pressure_bar: 1.0
   radius_scale_parameter: null # Example: radius_scale; add it to parameters.
@@ -356,12 +357,12 @@ sampler:
   # Inference engines:
   #   ultranest, multinest, optimal_estimation,
   #   optimal_estimation_to_ultranest, optimal_estimation_to_multinest
-  engine: ultranest
+  engine: multinest
 
   # Shared nested-sampling controls. `dlogz` is UltraNest's dlogz and
   # MultiNest's evidence_tolerance.
   live_points: 400
-  max_calls: null               # UltraNest: null runs to convergence; use a positive safety cap if needed.
+  max_calls: null               # UltraNest only; null runs to convergence.
   multinest_max_iterations: 0   # MultiNest only; 0 means unlimited.
   dlogz: 0.5
   sampling_efficiency: 0.8      # MultiNest: 0.8 parameter estimation, 0.3 evidence.

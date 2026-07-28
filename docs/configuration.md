@@ -145,11 +145,14 @@ radiative_transfer:
   include_rayleigh: true
   gas_combination: random_overlap
   thermal_integration_backend: auto
+  sh4_boundary_backend: auto
 ```
 
 Opacity formats are `exomol_kta` and `exomol_cross_section_hdf`. Gas
 combination is `random_overlap` or `equivalent_extinction`. Emission geometry
-is `normal_emission` or `gauss_legendre_disk`.
+is `normal_emission` or `gauss_legendre_disk`. For cloudy SH4 emission,
+`sh4_boundary_backend: auto` selects the compiled batched solve when Numba is
+available. Set it to `scipy` to force the scientific reference implementation.
 
 ### Molecular opacity locations
 
@@ -234,9 +237,9 @@ when absent, the prior midpoint is used.
 
 ```yaml
 sampler:
-  engine: ultranest
+  engine: multinest
   live_points: 400
-  max_calls: null
+  multinest_max_iterations: 0
   dlogz: 0.5
   resume: resume
   seed: 2712
@@ -254,7 +257,8 @@ runtime:
   mpi_processes: auto
 ```
 
-Inference engines are `optimal_estimation`, `ultranest`, `multinest`,
+MultiNest is the default inference engine. Available engines are
+`optimal_estimation`, `multinest`, `ultranest`,
 `optimal_estimation_to_ultranest`, and `optimal_estimation_to_multinest`.
 With `mpi_processes: auto`, ROBERT uses the launched MPI or Slurm world and
 otherwise runs on one process.

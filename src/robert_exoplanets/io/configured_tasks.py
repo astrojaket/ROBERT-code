@@ -310,8 +310,7 @@ def _prepare_exomol_cross_section_opacity(
                         and str(saved["source_sha256"]) == source_sha
                         and str(saved.get("spectral_preparation", ""))
                         == "exomol_cross_section_wavelength_weighted_k"
-                        and saved["g_samples"].size
-                        == config.opacity.binning.g_points
+                        and saved["g_samples"].size == config.opacity.binning.g_points
                         and np.allclose(saved["wavelength_micron"], wavelength)
                     )
                 if current:
@@ -375,9 +374,7 @@ def _load_cached_table(
         )
         source_doi = str(saved["source_doi"]) if "source_doi" in saved.files else ""
         source_line_list = (
-            str(saved["source_line_list"])
-            if "source_line_list" in saved.files
-            else ""
+            str(saved["source_line_list"]) if "source_line_list" in saved.files else ""
         )
         return CorrelatedKTable(
             species=species,
@@ -496,9 +493,7 @@ def _chemistry_components(config: ChemistryConfig):
             labels=tuple(item.label for item in config.species),
             metallicity_parameter_name=config.metallicity_parameter,
             carbon_to_oxygen_parameter_name=config.carbon_to_oxygen_parameter,
-            constant_log10_vmr_parameters=(
-                config.constant_log10_vmr_parameters or {}
-            ),
+            constant_log10_vmr_parameters=(config.constant_log10_vmr_parameters or {}),
         )
         return (
             chemistry,
@@ -554,9 +549,7 @@ def _cloud_model(config: CloudsConfig):
                 config.log10_haze_mass_extinction_parameter
             ),
             haze_slope_parameter=config.haze_slope_parameter,
-            haze_reference_wavelength_micron=(
-                config.haze_reference_wavelength_micron
-            ),
+            haze_reference_wavelength_micron=(config.haze_reference_wavelength_micron),
             deck_single_scattering_albedo=config.deck_single_scattering_albedo,
             deck_asymmetry_factor=config.deck_asymmetry_factor,
             haze_single_scattering_albedo=config.haze_single_scattering_albedo,
@@ -668,6 +661,7 @@ def build_problem(
             include_rayleigh=rt.include_rayleigh,
             gas_combination=rt.gas_combination,
             thermal_integration_backend=rt.thermal_integration_backend,
+            sh4_boundary_backend=rt.sh4_boundary_backend,
             stellar_spectrum_model=star_item.spectrum_model,
             metadata={"configured_geometry": geometry_item.model},
         )
@@ -695,8 +689,8 @@ def build_problem(
             region.atmosphere.temperature,
             gravity=gravity,
         )
-        chemistry, mean_molecular_weight, opacity_free_species = (
-            _chemistry_components(region.atmosphere.chemistry)
+        chemistry, mean_molecular_weight, opacity_free_species = _chemistry_components(
+            region.atmosphere.chemistry
         )
         pressure = _pressure_grid(region, planet=planet)
         cloud = _cloud_model(region.clouds)
@@ -839,9 +833,8 @@ def build_native_emission_model(
         [dataset.observation.wavelength for dataset in observations.datasets]
     )
     native_wavelength = 10_000.0 / common_wavenumber
-    selected = (
-        (native_wavelength >= float(np.min(observed_wavelength)))
-        & (native_wavelength <= float(np.max(observed_wavelength)))
+    selected = (native_wavelength >= float(np.min(observed_wavelength))) & (
+        native_wavelength <= float(np.max(observed_wavelength))
     )
     native_wavelength = np.sort(native_wavelength[selected])
     if native_wavelength.size < 2:
@@ -874,6 +867,7 @@ def build_native_emission_model(
         include_rayleigh=rt.include_rayleigh,
         gas_combination=rt.gas_combination,
         thermal_integration_backend=rt.thermal_integration_backend,
+        sh4_boundary_backend=rt.sh4_boundary_backend,
         stellar_spectrum_model=star_item.spectrum_model,
         metadata={
             "configured_geometry": geometry_item.model,
@@ -883,8 +877,8 @@ def build_native_emission_model(
     cia = load_nemesispy_cia_table()
     regional_models = {}
     for region in configured_regions(config):
-        chemistry, mean_molecular_weight, opacity_free_species = (
-            _chemistry_components(region.atmosphere.chemistry)
+        chemistry, mean_molecular_weight, opacity_free_species = _chemistry_components(
+            region.atmosphere.chemistry
         )
         factory = ParameterizedEmissionFactoryConfig(
             planet=planet,
@@ -943,9 +937,7 @@ def smoke_evaluation(
         # unguarded OE interface so setup-time smoke failures retain their
         # actionable original exception.
         problem.gaussian_inputs_from_vector(theta)
-        raise RuntimeError(
-            "smoke evaluation returned an invalid likelihood"
-        )
+        raise RuntimeError("smoke evaluation returned an invalid likelihood")
     return {"elapsed_seconds": elapsed, "log_likelihood": float(value)}
 
 
@@ -1070,9 +1062,7 @@ def configured_temperature_prior_covariance(
         smoothed = np.array(covariance, dtype=float, copy=True)
     expected_shape = (problem.ndim, problem.ndim)
     if smoothed.shape != expected_shape:
-        raise RobertConfigError(
-            f"OE prior covariance must have shape {expected_shape}"
-        )
+        raise RobertConfigError(f"OE prior covariance must have shape {expected_shape}")
     temperature_covariance = log_pressure_correlated_covariance(
         profile.knot_pressure,
         standard_deviation=sigma,
@@ -1257,20 +1247,14 @@ def _postprocess_retrieval_outputs(
             image_format=config.plotting.image_format,
             dpi=config.plotting.dpi,
             max_posterior_samples=config.plotting.max_posterior_samples,
-            posterior_predictive_samples=(
-                config.plotting.posterior_predictive_samples
-            ),
+            posterior_predictive_samples=(config.plotting.posterior_predictive_samples),
             posterior_predictive_seed=config.plotting.posterior_predictive_seed,
             corner_max_parameters=config.plotting.corner_max_parameters,
             native_spectrum_model=native_spectrum_model,
             leave_one_out=config.plotting.leave_one_out.enabled,
-            loo_max_posterior_draws=(
-                config.plotting.leave_one_out.max_posterior_draws
-            ),
+            loo_max_posterior_draws=(config.plotting.leave_one_out.max_posterior_draws),
             loo_seed=config.plotting.leave_one_out.seed,
-            loo_pareto_k_threshold=(
-                config.plotting.leave_one_out.pareto_k_threshold
-            ),
+            loo_pareto_k_threshold=(config.plotting.leave_one_out.pareto_k_threshold),
         )
         print(
             f"Retrieval plots written to {plot_root / result_dir.name}",
