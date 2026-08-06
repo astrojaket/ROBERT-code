@@ -10,9 +10,11 @@ import numpy as np
 import pytest
 
 from robert_exoplanets.diagnostics.emission_intercomparison_v2_stage_9 import (
+    FRAMEWORKS,
     GAUSSIAN_NOISE_SEEDS,
     MULTINEST_SETTINGS,
     MULTINEST_SEED_MAX,
+    NOISE_TIERS_PPM,
     SCENARIOS,
     build_run_matrix,
     frozen_contract_payload,
@@ -36,6 +38,9 @@ SINGLE_RUN_PLOT = (
 )
 BIG_COMPARISON_PLOT = (
     ROOT / "examples/plot_emission_intercomparison_v2_stage_9_big_comparison.py"
+)
+PAPER_ATLAS_PLOT = (
+    ROOT / "examples/plot_emission_intercomparison_v2_stage_9_paper_atlas.py"
 )
 MPI_LAUNCHER = (
     ROOT / "scripts/launch_emission_intercomparison_v2_stage_9_mpi.sh"
@@ -95,6 +100,17 @@ def _load_single_run_plot_module():
 def _load_big_comparison_plot_module():
     spec = importlib.util.spec_from_file_location(
         "stage9_big_comparison_plot_for_tests", BIG_COMPARISON_PLOT
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_paper_atlas_plot_module():
+    spec = importlib.util.spec_from_file_location(
+        "stage9_paper_atlas_plot_for_tests", PAPER_ATLAS_PLOT
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -682,3 +698,234 @@ def test_big_comparison_uses_input_tp_and_four_molecular_posteriors(
         / "100ppm"
         / "data_generated_with_robert.png"
     ).stat().st_size > 0
+
+
+def test_paper_atlas_compresses_complete_cloudy_scenario(
+    tmp_path: Path,
+) -> None:
+    module = _load_paper_atlas_plot_module()
+    scenario = "grey_scattering_non_inverted"
+    project = tmp_path / "stage9-paper-atlas"
+    contracts = project / "contracts"
+    contracts.mkdir(parents=True)
+    (contracts / "common_contract.json").write_bytes(COMMON.read_bytes())
+    common = json.loads(COMMON.read_text(encoding="utf-8"))
+    parameters = json.loads(CONTRACT.read_text(encoding="utf-8"))[
+        "parameters_by_scenario"
+    ][scenario]
+    definitions = parameter_definitions(scenario)
+    names = tuple(item.name for item in definitions)
+    truths = np.asarray([item.truth for item in definitions], dtype=float)
+    truth_mapping = {item.name: item.truth for item in definitions}
+    reference_tp = module.atmospheric_state(
+        common,
+        scenario,
+        truth_mapping,
+    ).temperature_cells_k
+    pressure = np.asarray(
+        next(
+            item["centers_bar"]
+            for item in common["pressure_grids"]
+            if item["n_cells"] == 80
+        ),
+        dtype=float,
+    )
+    wavelength = np.linspace(0.8, 12.0, 110)
+    base_spectrum = (
+        1.45e-3
+        + 6.0e-4 * np.tanh((wavelength - 3.0) / 2.7)
+        + 1.2e-4 * np.sin(1.9 * wavelength) * np.exp(-wavelength / 10.0)
+    )
+    rows = []
+    for tier in NOISE_TIERS_PPM:
+        for injector_index, injector in enumerate(FRAMEWORKS):
+            observed = base_spectrum + injector_index * 7.0e-6
+            for retriever_index, retriever in enumerate(FRAMEWORKS):
+                if retriever == injector:
+                    continue
+                run_id = (
+                    f"synthetic-{scenario}-{injector}-to-{retriever}-{tier:03d}ppm"
+                )
+                run_directory = project / "runs" / retriever / scenario / run_id
+                run_directory.mkdir(parents=True)
+                direction = float(retriever_index - injector_index)
+                residual_sigma = (
+                    0.24 * np.sin(0.9 * wavelength + retriever_index)
+                    + 0.10 * direction
+                )
+                best_spectrum = observed + tier * 1.0e-6 * residual_sigma
+                width68 = tier * 1.0e-6 * (
+                    0.32 + 0.04 * np.cos(wavelength)
+                )
+                width95 = 1.9 * width68
+                np.savez(
+                    run_directory / "diagnostic_spectra.npz",
+                    wavelength_micron=wavelength,
+                    observed_eclipse_depth=observed,
+                    observational_uncertainty_eclipse_depth=np.full(
+                        wavelength.size, tier * 1.0e-6
+                    ),
+                    best_fit_eclipse_depth=best_spectrum,
+                    posterior_spectrum_q025_eclipse_depth=(
+                        best_spectrum - width95
+                    ),
+                    posterior_spectrum_q16_eclipse_depth=(
+                        best_spectrum - width68
+                    ),
+                    posterior_spectrum_q50_eclipse_depth=best_spectrum,
+                    posterior_spectrum_q84_eclipse_depth=(
+                        best_spectrum + width68
+                    ),
+                    posterior_spectrum_q975_eclipse_depth=(
+                        best_spectrum + width95
+                    ),
+                )
+                tp_offset = direction * (
+                    18.0 + 10.0 * np.sin(np.linspace(0.0, np.pi, pressure.size))
+                )
+                best_tp = reference_tp + tp_offset
+                tp_width68 = 35.0 + 7.0 * np.cos(
+                    np.linspace(0.0, np.pi, pressure.size)
+                )
+                np.savez(
+                    run_directory / "diagnostic_tp.npz",
+                    pressure_bar=pressure,
+                    best_fit_temperature_k=best_tp,
+                    posterior_temperature_q025_k=best_tp - 1.9 * tp_width68,
+                    posterior_temperature_q16_k=best_tp - tp_width68,
+                    posterior_temperature_q50_k=best_tp,
+                    posterior_temperature_q84_k=best_tp + tp_width68,
+                    posterior_temperature_q975_k=best_tp + 1.9 * tp_width68,
+                )
+                seed = 1000 + 100 * tier + 10 * injector_index + retriever_index
+                rng = np.random.default_rng(seed)
+                samples = np.tile(truths, (450, 1))
+                for parameter_index, definition in enumerate(definitions):
+                    span = definition.upper - definition.lower
+                    sample_sigma = 0.025 * span * np.sqrt(tier / 30.0)
+                    target_pull = (0.25, 1.35, 2.60)[parameter_index % 3]
+                    samples[:, parameter_index] += rng.normal(
+                        np.sign(direction) * target_pull * sample_sigma,
+                        sample_sigma,
+                        samples.shape[0],
+                    )
+                    samples[:, parameter_index] = np.clip(
+                        samples[:, parameter_index],
+                        definition.lower,
+                        definition.upper,
+                    )
+                weights = np.linspace(1.0, 2.0, samples.shape[0])
+                weights /= np.sum(weights)
+                log_likelihood = -0.5 * np.sum(
+                    ((samples - truths) / np.maximum(0.05, np.abs(truths))) ** 2,
+                    axis=1,
+                )
+                np.savez(
+                    run_directory / "result_arrays.npz",
+                    samples=samples,
+                    weights=weights,
+                    log_likelihood=log_likelihood,
+                )
+                best_parameters = dict(zip(names, truths, strict=True))
+                (run_directory / "result.json").write_text(
+                    json.dumps(
+                        {
+                            "parameter_names": names,
+                            "best_fit_parameters": best_parameters,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                reduced = float(np.mean(residual_sigma**2))
+                rms = float(
+                    np.sqrt(np.mean((best_spectrum - observed) ** 2)) * 1.0e6
+                )
+                (run_directory / "posterior_summary.json").write_text(
+                    json.dumps(
+                        {
+                            "fit_metrics": {
+                                "best_fit_reduced_chi_square": reduced,
+                                "best_fit_residual_rms_ppm": rms,
+                            }
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                np.savez(
+                    run_directory / "diagnostic_chemistry.npz",
+                    species=np.asarray(("H2", "He", "H2O", "CO", "CO2", "CH4")),
+                    best_fit_vmr=np.asarray(
+                        (0.84, 0.14, 1.0e-3, 1.0e-3, 1.0e-4, 1.0e-5)
+                    ),
+                )
+                relative_config = (
+                    Path("runs") / retriever / scenario / run_id / "run.json"
+                )
+                (project / relative_config).write_text(
+                    json.dumps(
+                        {
+                            "run_id": run_id,
+                            "scenario": scenario,
+                            "injector": injector,
+                            "retriever": retriever,
+                            "noise_ppm": tier,
+                            "noise_id": "mean",
+                            "run_directory": str(run_directory),
+                            "parameters": parameters,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                rows.append({"run_config": str(relative_config)})
+    (project / "run_index.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    pdf, manifest, created = module.generate_paper_atlas(
+        project,
+        scenario_filter=scenario,
+        dpi=140,
+    )
+
+    assert pdf.stat().st_size > 0
+    assert manifest.stat().st_size > 0
+    assert len(created) == 10
+    assert all(path.stat().st_size > 0 for path in created)
+    assert {
+        path.stem.removeprefix(f"{scenario}_")
+        for path in created
+        if path.suffix == ".png"
+    } == {
+        "spectral_residual_atlas",
+        "tp_atlas",
+        "chemistry_posterior_atlas",
+        "cloud_posterior_atlas",
+        "parameter_bias_coverage_matrix",
+    }
+    report = json.loads(
+        (project / "diagnostics/paper_atlas/parameter_bias_coverage.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    records = (
+        project / "diagnostics/paper_atlas/parameter_bias_coverage.csv"
+    ).read_text(encoding="utf-8").splitlines()
+    reported_definitions = [
+        definition
+        for definition in definitions
+        if definition.name.startswith("log10_vmr_")
+        or "cloud" in definition.name
+        or "scattering_albedo" in definition.name
+    ]
+    assert report["record_count"] == 18 * len(reported_definitions)
+    assert len(records) == 1 + report["record_count"]
+    assert len(report["aggregates"]["by_scenario_and_noise_tier"]) == 3
+    assert len(report["aggregates"]["by_directed_pair"]) == 18
+    assert {
+        item["parameter_family"]
+        for item in report["aggregates"]["by_parameter_family"]
+    } == {"chemistry", "cloud"}
+    assert module._parameter_label({"name": "log10_vmr_H2O"}) == (
+        r"$\log_{10}\,\mathrm{VMR}(\mathrm{H_2O})$"
+    )
+    assert module._parameter_label(
+        {"name": "cloud_single_scattering_albedo"}
+    ) == r"$\omega_0$"

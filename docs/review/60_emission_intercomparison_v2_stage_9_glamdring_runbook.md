@@ -387,3 +387,42 @@ available directed best-fitting spectra, the two best-fitting TP profiles and
 their central 68% envelopes against the common input TP, and exactly four
 molecular posterior panels: H2O, CO, CO2, and CH4. The multipage PDF and page
 PNGs are written beneath `diagnostics/big_comparison/`.
+
+Generate the publication atlas for all four scenarios after all 72 retrievals
+and their compact posterior-envelope products are complete:
+
+```bash
+export MPLBACKEND=Agg
+
+"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+  "$STAGE9_REPOSITORY/examples/plot_emission_intercomparison_v2_stage_9_paper_atlas.py" \
+  "$STAGE9_PROJECT_ROOT"
+```
+
+This is saved-product post-processing only: it does not load opacities,
+evaluate a forward model, start MultiNest, or require `addqueue`. It writes a
+multipage `stage9_paper_atlas.pdf`, individual PDF and PNG pages, and a machine-
+readable manifest beneath `diagnostics/paper_atlas/`. Each scenario receives a
+spectral fit plus normalized-residual atlas, TP-recovery atlas, four-molecule
+posterior atlas, optional cloud-posterior atlas, and parameter bias/truth-
+inclusion matrix. Plot labels use mathematical scientific notation and the
+frozen paper palette.
+
+The bias matrix includes molecular and retrieved cloud parameters only; the
+PG14 coordinates are excluded because thermal recovery is assessed from the
+full TP profiles. Cell text is the signed posterior-median bias divided by the
+weighted posterior standard deviation. Cell colour records whether the
+injected value lies inside the central 68% interval, only inside the central
+95% interval, or outside the central 95% interval. The accompanying
+`parameter_bias_coverage.csv` retains every per-run value, while
+`parameter_bias_coverage.json` aggregates by scenario/noise tier, directed
+pair, and parameter family. These are single-spectrum truth-inclusion
+statistics, not frequentist coverage estimates.
+
+To regenerate only one scenario while refining a figure, use for example:
+
+```bash
+"$STAGE9_ENVIRONMENT_PARENT/robert-stage9/bin/python" \
+  "$STAGE9_REPOSITORY/examples/plot_emission_intercomparison_v2_stage_9_paper_atlas.py" \
+  "$STAGE9_PROJECT_ROOT" --scenario grey_scattering_non_inverted
+```
