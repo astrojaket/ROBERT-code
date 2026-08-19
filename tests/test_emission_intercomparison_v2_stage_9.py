@@ -879,6 +879,11 @@ def test_paper_atlas_compresses_complete_cloudy_scenario(
                 rows.append({"run_config": str(relative_config)})
     (project / "run_index.json").write_text(json.dumps(rows), encoding="utf-8")
 
+    # Older completed Stage-9 runs can have all compact retrieval products but
+    # no optional fit-summary JSON. The atlas must calculate its fit metrics
+    # from the saved spectrum in that case.
+    next(project.glob("runs/*/*/*/posterior_summary.json")).unlink()
+
     pdf, manifest, created = module.generate_paper_atlas(
         project,
         scenario_filter=scenario,

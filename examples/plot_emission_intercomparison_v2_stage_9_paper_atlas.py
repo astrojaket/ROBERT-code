@@ -175,6 +175,7 @@ def _load_completed_runs(
         absent = [
             name
             for name, path in products.items()
+            if name != "summary"
             if not path.is_file() or path.stat().st_size == 0
         ]
         if absent:
@@ -270,12 +271,14 @@ def _panel_label(axis: plt.Axes, index: int) -> None:
 
 
 def _spectral_metrics(run: Mapping[str, Any]) -> tuple[float, float]:
-    summary = json.loads(Path(run["summary"]).read_text(encoding="utf-8"))
-    metrics = summary.get("fit_metrics", {})
-    reduced = metrics.get("best_fit_reduced_chi_square")
-    rms = metrics.get("best_fit_residual_rms_ppm")
-    if reduced is not None and rms is not None:
-        return float(reduced), float(rms)
+    summary_path = Path(run["summary"])
+    if summary_path.is_file() and summary_path.stat().st_size > 0:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        metrics = summary.get("fit_metrics", {})
+        reduced = metrics.get("best_fit_reduced_chi_square")
+        rms = metrics.get("best_fit_residual_rms_ppm")
+        if reduced is not None and rms is not None:
+            return float(reduced), float(rms)
     with np.load(run["spectra"], allow_pickle=False) as archive:
         observed = np.asarray(archive["observed_eclipse_depth"], dtype=float)
         uncertainty = np.asarray(
