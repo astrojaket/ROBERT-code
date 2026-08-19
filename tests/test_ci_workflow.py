@@ -8,6 +8,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+PYPROJECT = ROOT / "pyproject.toml"
 
 
 def test_ci_example_smoke_checks_reference_maintained_files() -> None:
@@ -35,3 +36,20 @@ def test_ci_quality_job_exercises_optional_diagnostics() -> None:
 
     quality_job = text.split("  test:", maxsplit=1)[0]
     assert "[dev,perf,opacity,diagnostics]" in quality_job
+
+
+def test_ci_uses_current_node24_actions() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert text.count("actions/checkout@v7") == 3
+    assert text.count("actions/setup-python@v7") == 3
+    assert "actions/checkout@v4" not in text
+    assert "actions/setup-python@v5" not in text
+
+
+def test_ci_lint_policy_is_reproducible() -> None:
+    text = PYPROJECT.read_text(encoding="utf-8")
+
+    assert text.count('"ruff==0.15.22"') == 2
+    assert '[tool.ruff]\ntarget-version = "py310"' in text
+    assert '[tool.ruff.lint]\nselect = ["E4", "E7", "E9", "F"]' in text
