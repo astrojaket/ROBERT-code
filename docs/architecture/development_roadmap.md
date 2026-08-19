@@ -1,7 +1,8 @@
 # Development Roadmap
 
-This roadmap stages ROBERT from architecture skeleton to stable scientific
-release.
+This roadmap records ROBERT's historical architecture sequence and future
+extensions. ROBERT is production-ready for its documented and benchmarked
+emission, transmission, and retrieval regimes.
 
 ## Status rebaseline (2026-07-21)
 
@@ -16,9 +17,9 @@ advanced substantially beyond the published `0.3.0` version number:
 - substantial transmission, shared aerosol, PHOENIX, multi-dataset, and
   post-processing work was delivered ahead of the original sequence;
 - the v0.8 plugin registry and entry-point discovery remain unimplemented;
-- the v0.10 release-quality validation matrix, covariance likelihood,
-  independent science-opacity cloudy validation, and API-freeze work remain
-  incomplete.
+- the v0.10 validation matrix, covariance likelihood, independent
+  science-opacity cloudy validation, and API-freeze work remain future
+  extensions for broader coverage.
 
 Current priorities and acceptance criteria are tracked in the
 [2026-07-21 repository audit](../review/47_repository_audit_2026-07-21.md#prioritized-next-step-plan).

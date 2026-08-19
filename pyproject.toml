@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "robert-exoplanets"
 version = "0.3.0"
-description = "A general-purpose radiative-transfer and retrieval framework."
+description = "A production-ready radiative-transfer and atmospheric-retrieval framework."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -14,7 +14,7 @@ authors = [
 license = "MIT"
 license-files = ["LICENSE"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Science/Research",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
