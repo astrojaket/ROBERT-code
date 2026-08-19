@@ -5,8 +5,7 @@
 - Accelerated cloudy SH4 retrievals with a parity-checked Numba banded solver,
   spectrum-only contractions, shared multi-dataset atmospheric state,
   continuous fractional cloud-layer boundaries, MultiNest evaluation
-  accounting, and an MPI scaling benchmark. MultiNest is now the default
-  sampler.
+  accounting, and regression coverage. MultiNest is now the default sampler.
 - Added a monitored, local MultiNest R=100 installation-validation notebook
   that generates emission and transmission forward truths, injects 60 ppm
   synthetic observations, retrieves H2O on two to four MPI ranks, and checks
@@ -83,9 +82,8 @@
   bolometric normalization, flux-conserving binning, immutable provenance, a
   blackbody option, and a Sun-like G-star benchmark.
 - Added general retrieval and forward-model post-processing with fit
-  statistics, residual and posterior/OE plots, a WASP-69b sampler benchmark
-  comparison, editable colour/style controls, and an optional YAML automatic
-  plotting hook.
+  statistics, residual and posterior/OE plots, editable colour/style controls,
+  and an optional YAML automatic plotting hook.
 - Added a conda-provided PyMultiNest/MultiNest backend, strict YAML selection
   for MultiNest and optimal estimation, and OE-to-UltraNest or OE-to-MultiNest
   benchmark workflows with common manifests, results, status, and timings.
