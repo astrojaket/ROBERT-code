@@ -55,7 +55,7 @@ already-staged source tree uses a different name; keep it below
 ```bash
 export SOURCE_PICASO_REFDATA="$STAGE9_REFERENCE_SOURCE/picaso-refdata"
 export SOURCE_PICASO_CK="$STAGE9_REFERENCE_SOURCE/picaso-resortrebin"
-export SOURCE_PRT_INPUT_DATA="$STAGE9_REFERENCE_SOURCE/petitradtrans-input-data"
+export SOURCE_PRT_INPUT_DATA="$STAGE9_REFERENCE_SOURCE/prt-input-data"
 export SOURCE_ROBERT_OPACITY="$SOURCE_PRT_INPUT_DATA"
 
 for source in \
