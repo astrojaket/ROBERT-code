@@ -13,12 +13,13 @@ its prior sensitivity are understood.
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
 import tempfile
 import time
+from typing import Mapping
 
 os.environ.setdefault(
     "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib")
@@ -36,7 +37,6 @@ from robert_exoplanets import (
     CorrelatedKOpacityProvider,
     FastChemEquilibriumChemistry,
     LogUniformPrior,
-    MultiDatasetEmissionForwardModel,
     MultiDatasetGaussianLikelihood,
     MultiDatasetRetrievalProblem,
     OpticalConstantsCatalog,
@@ -50,8 +50,9 @@ from robert_exoplanets import (
     RetrievalParameterSet,
     UniformPrior,
     build_parameterized_emission_model,
-    run_multinest,
+    run_ultranest,
 )
+from robert_exoplanets.core import Spectrum
 
 from retrieve_wasp69b_nircam_cloud_free import (
     FASTCHEM,
@@ -77,6 +78,16 @@ CATALOG = Path(
 ).expanduser()
 OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_mie_cloud"
 DIRECT_NK_NODES_MICRON = (2.4, 4.0, 5.5, 7.0, 9.0, 12.0)
+
+
+@dataclass(frozen=True)
+class NamedRegionalModels:
+    """Evaluate named cloud models while retaining dataset identity."""
+
+    models: Mapping[str, object]
+
+    def __call__(self, values: Mapping[str, float]) -> Mapping[str, Spectrum]:
+        return {name: model(values) for name, model in self.models.items()}
 
 
 def observations():
@@ -173,18 +184,6 @@ def build_problem(
     cia = _cia_tables()
     models = {}
     opacity_ids = {}
-    shared_temperature_profile = ParmentierGuillot2014TemperatureProfile(
-        gravity=PLANET_GRAVITY_M_S2,
-        internal_temperature=100.0,
-    )
-    shared_chemistry_model = FastChemEquilibriumChemistry(
-        fastchem_path=FASTCHEM,
-        metadata={"element_abundances": "asplund_2009"},
-    )
-    shared_mean_molecular_weight_model = CompositionMeanMolecularWeight(
-        normalization="raw_sum"
-    )
-    shared_atmosphere_builder = None
     for dataset in selected_observations.datasets:
         tables = {
             species: _load_table(dataset.name, species, opacity_resolution)
@@ -219,9 +218,17 @@ def build_problem(
         factory = ParameterizedEmissionFactoryConfig(
             planet=PLANET,
             star=STAR,
-            temperature_profile=shared_temperature_profile,
-            chemistry_model=shared_chemistry_model,
-            mean_molecular_weight_model=shared_mean_molecular_weight_model,
+            temperature_profile=ParmentierGuillot2014TemperatureProfile(
+                gravity=PLANET_GRAVITY_M_S2,
+                internal_temperature=100.0,
+            ),
+            chemistry_model=FastChemEquilibriumChemistry(
+                fastchem_path=FASTCHEM,
+                metadata={"element_abundances": "asplund_2009"},
+            ),
+            mean_molecular_weight_model=CompositionMeanMolecularWeight(
+                normalization="raw_sum"
+            ),
             pressure_grid=pressure,
             cia_table=cia,
             opacity_source=provider,
@@ -253,13 +260,6 @@ def build_problem(
             geometry=clear.geometry,
             cloud=cloud,
         )
-        if shared_atmosphere_builder is None:
-            shared_atmosphere_builder = model.atmosphere_builder
-        else:
-            model = replace(
-                model,
-                atmosphere_builder=shared_atmosphere_builder,
-            )
         models[dataset.name] = model
         opacity_ids.update(
             {
@@ -267,12 +267,11 @@ def build_problem(
                 for key, value in model.opacity_identifiers.items()
             }
         )
-    shared_models = MultiDatasetEmissionForwardModel(models)
     return MultiDatasetRetrievalProblem(
         name=f"{TARGET_SLUG}-fullband-one-region-mie-{cloud_mode}",
         observations=selected_observations,
         parameters=retrieval_parameters(cloud_mode),
-        forward_model=shared_models,
+        forward_model=NamedRegionalModels(models),
         likelihood=MultiDatasetGaussianLikelihood(include_normalization=True),
         invalid_loglike=-1.0e100,
         metadata={
@@ -300,7 +299,9 @@ def main() -> None:
     parser.add_argument(
         "--opacity-resolution",
         choices=OPACITY_RESOLUTIONS,
-        default=os.environ.get("ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION),
+        default=os.environ.get(
+            "ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION
+        ),
     )
     parser.add_argument(
         "--cloud-mode", choices=("catalog", "direct-nk"), default="catalog"
@@ -311,14 +312,7 @@ def main() -> None:
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--live-points", type=int, default=200)
-    parser.add_argument(
-        "--max-iterations",
-        "--max-ncalls",
-        dest="max_iterations",
-        type=int,
-        default=0,
-        help="MultiNest iteration limit; zero is unlimited",
-    )
+    parser.add_argument("--max-ncalls", type=int, default=100000)
     parser.add_argument("--mpi-processes", type=int, default=4)
     args = parser.parse_args()
 
@@ -356,14 +350,14 @@ def main() -> None:
         print(json.dumps(report, indent=2))
         return
 
-    result = run_multinest(
+    result = run_ultranest(
         problem,
-        output_dir=args.output / "multinest",
-        n_live_points=args.live_points,
-        max_iter=args.max_iterations,
-        evidence_tolerance=0.5,
-        resume=True,
-        verbose=False,
+        output_dir=args.output / "ultranest",
+        min_num_live_points=args.live_points,
+        max_ncalls=args.max_ncalls,
+        dlogz=0.5,
+        resume="resume",
+        show_status=False,
         mpi_nprocs=args.mpi_processes,
         seed=20260712,
     )
@@ -381,7 +375,7 @@ def main() -> None:
             "material": args.material,
             "converged": result.converged,
             "message": result.message,
-            "likelihood_evaluations": result.metadata.get("likelihood_evaluations"),
+            "ncall": result.metadata.get("ncall"),
             "log_evidence": result.log_evidence,
             "log_evidence_error": result.log_evidence_error,
             "best_fit": dict(result.best_fit_parameters),

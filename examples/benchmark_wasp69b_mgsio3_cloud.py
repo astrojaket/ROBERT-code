@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import cProfile
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -19,7 +19,7 @@ import platform
 import sys
 import tempfile
 from time import perf_counter
-from typing import Callable
+from typing import Callable, Mapping
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
@@ -31,18 +31,10 @@ import numba
 import numpy as np
 import scipy
 
-from robert_exoplanets import (
-    MultiDatasetEmissionForwardModel,
-    ParameterizedEmissionForwardModel,
-)
-from robert_exoplanets.rt import sh4_boundary_backend_name
+from robert_exoplanets import ParameterizedEmissionForwardModel
+from robert_exoplanets.core import Spectrum
 
 from retrieve_wasp69b_mie_cloud import SPECIES, build_problem
-
-try:
-    import resource
-except ImportError:  # pragma: no cover - resource is unavailable on Windows
-    resource = None
 
 
 PARAMETERS = {
@@ -59,6 +51,16 @@ PARAMETERS = {
     "log_cloud_base_pressure_bar": 0.5,
     "miri_offset": 0.0,
 }
+
+
+@dataclass(frozen=True)
+class NamedModels:
+    """Evaluate named spectral models without changing their call paths."""
+
+    models: Mapping[str, Callable[[Mapping[str, float]], Spectrum]]
+
+    def __call__(self, parameters: Mapping[str, float]) -> Mapping[str, Spectrum]:
+        return {name: model(parameters) for name, model in self.models.items()}
 
 
 def _cloud_free_counterpart(cloudy) -> ParameterizedEmissionForwardModel:
@@ -85,14 +87,6 @@ def _summary(elapsed: list[float]) -> dict[str, object]:
         "maximum_seconds": float(np.max(values)),
         "calls_per_second": float(1.0 / np.median(values)),
     }
-
-
-def _peak_resident_memory_mib() -> float | None:
-    if resource is None:
-        return None
-    maximum = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
-    divisor = 1024.0**2 if sys.platform == "darwin" else 1024.0
-    return maximum / divisor
 
 
 def _profile(call: Callable[[], object], path: Path | None) -> None:
@@ -126,7 +120,7 @@ def run(
     )
     setup_seconds = perf_counter() - setup_started
     cloudy = problem.forward_model
-    clear = MultiDatasetEmissionForwardModel(
+    clear = NamedModels(
         {
             name: _cloud_free_counterpart(model)
             for name, model in problem.forward_model.models.items()
@@ -181,11 +175,7 @@ def run(
         for name in cloud_free_spectra
     )
     maximum_spectral_difference = max(
-        float(
-            np.max(
-                np.abs(cloudy_spectra[name].values - cloud_free_spectra[name].values)
-            )
-        )
+        float(np.max(np.abs(cloudy_spectra[name].values - cloud_free_spectra[name].values)))
         for name in cloud_free_spectra
     )
     fast_reference_max_abs_difference = max(
@@ -237,10 +227,6 @@ def run(
     cloudy_median = float(cloudy_result["median_seconds"])
     models = problem.forward_model.models
     first_model = next(iter(models.values()))
-    shared_atmosphere_builder = all(
-        model.atmosphere_builder is first_model.atmosphere_builder
-        for model in models.values()
-    )
     return {
         "benchmark": "WASP-69b six-gas cloud-free versus MgSiO3 Mie SH4 emission",
         "environment": {
@@ -269,16 +255,11 @@ def run(
             "cloud_base_pressure_bar": 10.0
             ** PARAMETERS["log_cloud_base_pressure_bar"],
             "multiple_scattering_backend": "sh4",
-            "sh4_boundary_backend": sh4_boundary_backend_name(
-                first_model.config.sh4_boundary_backend
-            ),
             "phase_function": "exact Mie moments through l=4 with delta-M",
-            "shared_atmosphere_state": shared_atmosphere_builder,
             "repeats": repeats,
             "warmups": warmups,
         },
         "cloudy_problem_setup_seconds": setup_seconds,
-        "peak_resident_memory_mib": _peak_resident_memory_mib(),
         "emission": cloud_free_result,
         "mgsio3_mie_sh4_emission": cloudy_result,
         "cloudy_over_cloud_free_median_time": cloudy_median / cloud_free_median,
@@ -295,7 +276,6 @@ def run(
             "spectrum_only_reference_max_relative_difference": (
                 fast_reference_max_relative_difference
             ),
-            "shared_atmosphere_builder": shared_atmosphere_builder,
         },
         "profiles": {
             "clear": None if cloud_free_profile is None else str(cloud_free_profile),
@@ -309,12 +289,7 @@ def main() -> None:
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--output", type=Path)
-    parser.add_argument(
-        "--profile-clear",
-        "--profile-cloud-free",
-        dest="profile_clear",
-        type=Path,
-    )
+    parser.add_argument("--profile-cloud-free", type=Path)
     parser.add_argument("--profile-cloudy", type=Path)
     args = parser.parse_args()
     if args.repeats < 1 or args.warmups < 0:
