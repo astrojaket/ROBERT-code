@@ -12,6 +12,10 @@ filesystem path.
 > injections and queue only `grey_absorbing_non_inverted` and
 > `grey_scattering_non_inverted`. Export
 > `STAGE9_BRANCH=codex/stage9-numba-stronger-cloud` before the commands below.
+> This rerun needs six injection products: three frameworks for each of the two
+> cloudy scenarios. In the pilot examples, replace `clear_non_inverted` with
+> `grey_scattering_non_inverted` and use the matching cloudy run configuration.
+> The four-scenario counts in later sections apply only to the original branch.
 
 ## 1. Fixed paths and checkout
 
