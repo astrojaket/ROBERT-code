@@ -68,7 +68,9 @@ def run_multinest(
     effective_seed = _effective_multinest_seed(seed)
     invalid_floor = float(invalid_loglike_floor)
     if not np.isfinite(invalid_floor) or invalid_floor >= 0.0:
-        raise RobertConfigError("MultiNest invalid_loglike_floor must be finite and negative")
+        raise RobertConfigError(
+            "MultiNest invalid_loglike_floor must be finite and negative"
+        )
 
     try:
         import pymultinest
@@ -127,8 +129,12 @@ def run_multinest(
         for index, value in enumerate(transformed):
             cube[index] = float(value)
 
+    local_likelihood_evaluations = 0
+
     def loglike(cube, ndim, nparams, lnew) -> float:
+        nonlocal local_likelihood_evaluations
         del nparams, lnew
+        local_likelihood_evaluations += 1
         vector = np.fromiter(
             (cube[index] for index in range(ndim)), dtype=float, count=ndim
         )
@@ -204,6 +210,11 @@ def run_multinest(
                 **run_kwargs,
             )
             _mpi_barrier()
+            likelihood_callback_evaluations = _mpi_sum(local_likelihood_evaluations)
+            native_likelihood_evaluations = (
+                _native_likelihood_evaluations(Path(f"{absolute_basename}resume.dat"))
+                or likelihood_callback_evaluations
+            )
             analyzer = pymultinest.Analyzer(
                 n_params=problem.ndim,
                 outputfiles_basename=basename,
@@ -222,6 +233,8 @@ def run_multinest(
                 invalid_loglike_floor=invalid_floor,
                 attempt_id=attempt_id,
                 elapsed_seconds=max(time.monotonic() - started_monotonic, 0.0),
+                likelihood_evaluations=native_likelihood_evaluations,
+                likelihood_callback_evaluations=(likelihood_callback_evaluations),
             )
         if primary:
             final_status = {
@@ -233,6 +246,8 @@ def run_multinest(
                 "log_evidence": result.log_evidence,
                 "log_evidence_error": result.log_evidence_error,
                 "n_samples": int(result.samples.shape[0]),
+                "likelihood_evaluations": native_likelihood_evaluations,
+                "likelihood_callback_evaluations": (likelihood_callback_evaluations),
             }
             write_retrieval_status(root, final_status)
             append_retrieval_attempt_event(root, {**final_status, "event": "finished"})
@@ -242,7 +257,9 @@ def run_multinest(
             failure_status = {
                 **status_base,
                 "state": (
-                    "interrupted" if isinstance(exc, (KeyboardInterrupt, SystemExit)) else "failed"
+                    "interrupted"
+                    if isinstance(exc, (KeyboardInterrupt, SystemExit))
+                    else "failed"
                 ),
                 "elapsed_seconds": max(time.monotonic() - started_monotonic, 0.0),
                 "exception_type": type(exc).__name__,
@@ -267,6 +284,8 @@ def _result_from_analyzer(
     invalid_loglike_floor: float,
     attempt_id: str,
     elapsed_seconds: float,
+    likelihood_evaluations: int,
+    likelihood_callback_evaluations: int,
 ) -> NestedSamplerResult:
     data = np.asarray(analyzer.get_data(), dtype=float)
     if data.ndim == 1:
@@ -279,9 +298,7 @@ def _result_from_analyzer(
     weights = data[:, 0]
     log_likelihood = -0.5 * data[:, 1]
     samples = data[:, 2:]
-    evidence, evidence_error = _global_evidence(
-        analyzer, Path(f"{basename}stats.dat")
-    )
+    evidence, evidence_error = _global_evidence(analyzer, Path(f"{basename}stats.dat"))
     best = analyzer.get_best_fit()
     best_fit = problem.parameter_mapping(np.asarray(best["parameters"], dtype=float))
     converged = bool(samples.size) and max_iter == 0
@@ -311,6 +328,10 @@ def _result_from_analyzer(
             "invalid_loglike_floor": f"{invalid_loglike_floor:.17g}",
             "attempt_id": attempt_id,
             "elapsed_seconds": f"{float(elapsed_seconds):.6f}",
+            "likelihood_evaluations": str(int(likelihood_evaluations)),
+            "likelihood_callback_evaluations": str(
+                int(likelihood_callback_evaluations)
+            ),
         },
         converged=converged,
         message=message,
@@ -331,9 +352,7 @@ def _positive_float(value: object, name: str) -> float:
     return converted
 
 
-def _global_evidence(
-    analyzer: object, stats_path: Path
-) -> tuple[float, float | None]:
+def _global_evidence(analyzer: object, stats_path: Path) -> tuple[float, float | None]:
     """Read global evidence without parsing unrelated per-mode statistics.
 
     MultiNest 3.10 can write an underflowed Fortran value such as
@@ -393,6 +412,23 @@ def _effective_multinest_seed(seed: int | None) -> int:
     return int(seed) % (MULTINEST_MAX_SEED + 1)
 
 
+def _native_likelihood_evaluations(resume_path: Path) -> int | None:
+    """Read MultiNest's native evaluation count from its resume header."""
+
+    if not resume_path.is_file():
+        return None
+    lines = resume_path.read_text(encoding="utf-8").splitlines()
+    if len(lines) < 2:
+        return None
+    try:
+        fields = [int(value) for value in lines[1].split()]
+    except ValueError:
+        return None
+    if len(fields) < 2 or fields[1] < 0:
+        return None
+    return fields[1]
+
+
 def _mpi_barrier() -> None:
     try:
         from mpi4py import MPI
@@ -400,6 +436,15 @@ def _mpi_barrier() -> None:
         MPI.COMM_WORLD.Barrier()
     except ImportError:
         return
+
+
+def _mpi_sum(value: int) -> int:
+    try:
+        from mpi4py import MPI
+
+        return int(MPI.COMM_WORLD.allreduce(int(value), op=MPI.SUM))
+    except ImportError:
+        return int(value)
 
 
 @contextmanager

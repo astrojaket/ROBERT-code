@@ -48,9 +48,8 @@ except ModuleNotFoundError:
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = Path(__file__).with_name("run_picaso_jwst_transmission_injection.py")
-DEFAULT_PICASO_PYTHON = Path(
-    "/Users/jaketaylor/opt/anaconda3/envs/picaso/bin/python"
-)
+_PICASO_PYTHON = os.environ.get("ROBERT_PICASO_PYTHON")
+DEFAULT_PICASO_PYTHON = Path(_PICASO_PYTHON) if _PICASO_PYTHON else None
 N_LAYERS = 48
 TRUTH = {
     "log_H2O": -3.0,
@@ -106,12 +105,17 @@ def build_picaso_contract() -> dict[str, np.ndarray]:
 def create_fixture(
     config_path: Path,
     *,
-    picaso_python: Path = DEFAULT_PICASO_PYTHON,
+    picaso_python: Path | None = DEFAULT_PICASO_PYTHON,
     picaso_reference: Path = DEFAULT_REFERENCE,
     picaso_database: Path = DEFAULT_DATABASE,
     opacity_resample: int = 5,
 ) -> tuple[Path, Path]:
     """Generate the independent spectrum and prepare ROBERT's opacity cache."""
+
+    if picaso_python is None:
+        raise ValueError(
+            "provide picaso_python or set the ROBERT_PICASO_PYTHON environment variable"
+        )
 
     config = load_task_config(config_path)
     initialize_task_directories(config)
@@ -392,7 +396,12 @@ def _plot_posterior_truth(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
-    parser.add_argument("--picaso-python", type=Path, default=DEFAULT_PICASO_PYTHON)
+    parser.add_argument(
+        "--picaso-python",
+        type=Path,
+        default=DEFAULT_PICASO_PYTHON,
+        required=DEFAULT_PICASO_PYTHON is None,
+    )
     parser.add_argument("--picaso-reference", type=Path, default=DEFAULT_REFERENCE)
     parser.add_argument("--picaso-database", type=Path, default=DEFAULT_DATABASE)
     parser.add_argument("--opacity-resample", type=int, default=5)

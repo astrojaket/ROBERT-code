@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy.linalg import solve_banded
 
 from robert_exoplanets.rt.sh4 import (
+    _HALF_RANGE_MOMENTS,
+    _half_range_eigen_flux,
+    _half_range_particular_flux,
+    _numba_solve_banded_columns,
     henyey_greenstein_moments,
+    sh4_boundary_backend_name,
     sh4_spectrum_backend_name,
     solve_thermal_sh4,
     solve_thermal_sh4_spectrum,
@@ -257,6 +263,164 @@ def test_spectrum_backend_validation_is_explicit() -> None:
     assert sh4_spectrum_backend_name("numpy") == "numpy"
     with pytest.raises(RobertValidationError, match="SH4 spectrum backend"):
         sh4_spectrum_backend_name("fast-ish")
+
+
+def test_boundary_backend_validation_is_explicit() -> None:
+    assert sh4_boundary_backend_name("scipy") == "scipy"
+    assert sh4_boundary_backend_name("auto") in {"scipy", "numba"}
+    with pytest.raises(RobertValidationError, match="SH4 boundary backend"):
+        sh4_boundary_backend_name("fast-ish")
+
+
+def test_explicit_half_range_contractions_match_reference_einsum() -> None:
+    random = np.random.default_rng(91)
+    eigen = random.normal(size=(3, 5, 4, 4))
+    particular = random.normal(size=(3, 5, 4))
+
+    np.testing.assert_allclose(
+        _half_range_eigen_flux(eigen),
+        np.einsum("ij,lcjk->lcik", _HALF_RANGE_MOMENTS, eigen),
+        rtol=2.0e-15,
+        atol=2.0e-15,
+    )
+    np.testing.assert_allclose(
+        _half_range_particular_flux(particular),
+        np.einsum("ij,lcj->lci", _HALF_RANGE_MOMENTS, particular),
+        rtol=2.0e-15,
+        atol=2.0e-15,
+    )
+
+
+@pytest.mark.parametrize("nlayer", (1, 2, 80))
+def test_numba_boundary_solver_matches_scipy_across_layer_counts(
+    nlayer: int,
+) -> None:
+    pytest.importorskip("numba")
+    random = np.random.default_rng(818 + nlayer)
+    tau = np.exp(random.uniform(np.log(1.0e-7), np.log(80.0), (nlayer, 4, 3)))
+    omega = random.uniform(0.0, 0.999, tau.shape)
+    omega[0, 0, 0] = 0.0
+    omega[-1, -1, -1] = 1.0
+    asymmetry = random.uniform(-0.5, 0.92, tau.shape)
+    levels = np.linspace(0.0, 1.0, nlayer + 1)[:, None]
+    planck = 1.0 + 4.0 * levels + np.linspace(0.0, 0.5, 4)[None, :]
+    positional = (
+        tau,
+        omega,
+        asymmetry,
+        planck,
+        np.array([0.15, 0.5, 0.9]),
+        np.array([0.2, 0.3, 0.5]),
+        np.array([0.2, 0.3, 0.5]),
+    )
+    common = {
+        "bottom_planck_radiance": np.linspace(5.5, 6.0, 4),
+        "delta_m": True,
+        "backend": "numba",
+    }
+
+    reference = solve_thermal_sh4_spectrum(
+        *positional,
+        boundary_backend="scipy",
+        **common,
+    )
+    accelerated = solve_thermal_sh4_spectrum(
+        *positional,
+        boundary_backend="numba",
+        **common,
+    )
+
+    np.testing.assert_allclose(
+        accelerated.radiance,
+        reference.radiance,
+        rtol=2.0e-11,
+        atol=2.0e-13,
+    )
+    assert reference.boundary_backend == "scipy"
+    assert accelerated.boundary_backend == "numba"
+
+
+def test_numba_boundary_solver_matches_all_diagnostic_products() -> None:
+    pytest.importorskip("numba")
+    tau, omega, asymmetry, planck, mu, _angle_weights, _g_weights = _spectrum_case()
+    common = {
+        "bottom_planck_radiance": np.array([5.0, 6.0]),
+        "delta_m": False,
+    }
+
+    reference = solve_thermal_sh4(
+        tau,
+        omega,
+        asymmetry,
+        planck,
+        mu,
+        boundary_backend="scipy",
+        **common,
+    )
+    accelerated = solve_thermal_sh4(
+        tau,
+        omega,
+        asymmetry,
+        planck,
+        mu,
+        boundary_backend="numba",
+        **common,
+    )
+
+    for name in (
+        "moment_levels",
+        "point_radiance",
+        "point_layer_contribution_radiance",
+        "point_bottom_contribution_radiance",
+    ):
+        np.testing.assert_allclose(
+            getattr(accelerated, name),
+            getattr(reference, name),
+            rtol=2.0e-11,
+            atol=2.0e-13,
+        )
+
+
+def test_numba_banded_solver_pivots_and_reports_backward_error() -> None:
+    pytest.importorskip("numba")
+    size = 12
+    band = np.zeros((11, size, 2))
+    band[5, :, :] = 4.0
+    band[4, 1:, :] = 1.0
+    band[6, :-1, :] = 1.0
+    band[5, 0, :] = 0.0
+    band[6, 0, :] = 2.0
+    rhs = np.column_stack(
+        (
+            np.linspace(-1.0, 1.0, size),
+            np.linspace(2.0, 3.0, size),
+        )
+    )
+
+    solutions, backward_error, status = _numba_solve_banded_columns(band, rhs)
+
+    assert np.all(status == 0)
+    assert np.all(backward_error < 1.0e-14)
+    for column in range(rhs.shape[1]):
+        expected = solve_banded((5, 5), band[:, :, column], rhs[:, column])
+        np.testing.assert_allclose(
+            solutions[column],
+            expected,
+            rtol=2.0e-13,
+            atol=2.0e-13,
+        )
+
+
+def test_numba_banded_solver_marks_singular_columns() -> None:
+    pytest.importorskip("numba")
+    solutions, backward_error, status = _numba_solve_banded_columns(
+        np.zeros((11, 8, 1)),
+        np.ones((8, 1)),
+    )
+
+    assert status[0] == 1
+    assert np.isinf(backward_error[0])
+    assert np.all(np.isnan(solutions[0]))
 
 
 def _spectrum_case():

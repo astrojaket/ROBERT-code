@@ -23,6 +23,14 @@ from .archive import load_robert_npy_directory, load_robert_npz_archive
 from .kta import KtaTable, read_kta
 from .metadata import pressure_values_in_unit, spectral_grid_values_in_unit
 
+try:  # pragma: no cover - exercised when the optional perf extra is installed.
+    from numba import njit, prange
+except Exception:  # pragma: no cover - dependency availability is environment-specific.
+    njit = None
+    prange = range
+
+_NUMBA_AVAILABLE = njit is not None
+
 
 @dataclass(frozen=True)
 class CorrelatedKTable:
@@ -281,11 +289,7 @@ class CorrelatedKTable:
         modify the source molecular cross sections.
         """
 
-        if (
-            isinstance(g_points, bool)
-            or int(g_points) != g_points
-            or int(g_points) < 2
-        ):
+        if isinstance(g_points, bool) or int(g_points) != g_points or int(g_points) < 2:
             raise RobertValidationError("g_points must be an integer of at least two")
         if spectral_grid.bin_edges is None:
             raise RobertValidationError(
@@ -356,12 +360,8 @@ class CorrelatedKTable:
                 ):
                     lower = min(10000.0 / left, 10000.0 / right)
                     upper = max(10000.0 / left, 10000.0 / right)
-                    start = int(
-                        np.searchsorted(source_wavenumber, lower, side="left")
-                    )
-                    stop = int(
-                        np.searchsorted(source_wavenumber, upper, side="right")
-                    )
+                    start = int(np.searchsorted(source_wavenumber, lower, side="left"))
+                    stop = int(np.searchsorted(source_wavenumber, upper, side="right"))
                     if stop - start < int(g_points):
                         raise RobertCoverageError(
                             f"target bin {index} contains fewer than {g_points} ExoMol samples"
@@ -643,9 +643,8 @@ class CorrelatedKOpacityProvider:
             resolution_directory = root / resolution_name
             if resolution_directory.is_dir():
                 root = resolution_directory
-            elif (
-                root.name.casefold() != resolution_name.casefold()
-                and not any(root.glob(f"*_{resolution_name}.kta"))
+            elif root.name.casefold() != resolution_name.casefold() and not any(
+                root.glob(f"*_{resolution_name}.kta")
             ):
                 raise RobertValidationError(
                     "ExoMol opacity root does not contain the requested "
@@ -1123,6 +1122,18 @@ def _interpolate_pressure_temperature_log_k(
     log_k = (
         np.log(np.maximum(table.kcoeff, k_floor)) if log_kcoeff is None else log_kcoeff
     )
+    if _NUMBA_AVAILABLE:
+        return _numba_interpolate_pressure_temperature_log_k(
+            log_k,
+            pressure_lower,
+            pressure_upper,
+            pressure_weight,
+            temperature_lower,
+            temperature_upper,
+            temperature_weight,
+            spectral_index,
+        )
+
     output = np.empty(
         (atmosphere.n_layers, spectral_index.size, table.g_weights.size), dtype=float
     )
@@ -1141,6 +1152,56 @@ def _interpolate_pressure_temperature_log_k(
         )
         output[layer_index] = np.exp(values)
     return output
+
+
+if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_interpolate_pressure_temperature_log_k(
+        log_k,
+        pressure_lower,
+        pressure_upper,
+        pressure_weight,
+        temperature_lower,
+        temperature_upper,
+        temperature_weight,
+        spectral_index,
+    ):
+        n_layers = pressure_lower.size
+        n_spectral = spectral_index.size
+        n_g = log_k.shape[-1]
+        output = np.empty((n_layers, n_spectral, n_g), dtype=np.float64)
+        for layer_index in prange(n_layers):
+            wp = pressure_weight[layer_index]
+            wt = temperature_weight[layer_index]
+            p0 = pressure_lower[layer_index]
+            p1 = pressure_upper[layer_index]
+            t0 = temperature_lower[layer_index]
+            t1 = temperature_upper[layer_index]
+            for output_spectral_index in range(n_spectral):
+                native_spectral_index = spectral_index[output_spectral_index]
+                for g_index in range(n_g):
+                    value = (
+                        (1.0 - wp)
+                        * (1.0 - wt)
+                        * log_k[p0, t0, native_spectral_index, g_index]
+                        + wp
+                        * (1.0 - wt)
+                        * log_k[p1, t0, native_spectral_index, g_index]
+                        + (1.0 - wp)
+                        * wt
+                        * log_k[p0, t1, native_spectral_index, g_index]
+                        + wp * wt * log_k[p1, t1, native_spectral_index, g_index]
+                    )
+                    output[layer_index, output_spectral_index, g_index] = np.exp(value)
+        return output
+
+else:
+
+    def _numba_interpolate_pressure_temperature_log_k(*args):
+        raise RobertValidationError(
+            "compiled correlated-k interpolation requires numba"
+        )
 
 
 def _exact_spectral_indices(

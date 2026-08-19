@@ -78,9 +78,7 @@ def _factory() -> ParameterizedTransmissionFactoryConfig:
             mass_kg=mass,
         ),
         star=Star(name="Transmission star", radius_m=7.0e8),
-        temperature_profile=IsothermalTemperatureProfile(
-            parameter_name="temperature"
-        ),
+        temperature_profile=IsothermalTemperatureProfile(parameter_name="temperature"),
         chemistry_model=FreeChemistry(
             active_species=("H2O",),
             parameter_names={"H2O": "log_h2o"},
@@ -194,7 +192,6 @@ def test_transmission_model_validates_radius_and_gravity_choices() -> None:
             reference_pressure_bar=10.0,
             impact_quadrature_order=2.5,
         )
-
     model = build_parameterized_transmission_model(
         _factory(),
         spectral_grid=_spectral_grid(),

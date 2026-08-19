@@ -12,6 +12,9 @@ likelihoods, optimal estimation, UltraNest, and MultiNest. Runs produce
 portable configuration snapshots, manifests, numerical results, diagnostics,
 and plots.
 
+MultiNest is the default nested sampler. UltraNest remains available only when
+it is selected explicitly.
+
 The Python distribution is named `robert-exoplanets`.
 
 ## Installation

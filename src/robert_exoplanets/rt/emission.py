@@ -740,6 +740,7 @@ def solve_emission_spectrum(
     path_geometry: HydrostaticPathGeometry | None = None,
     multiple_scattering_backend: str = "none",
     thermal_integration_backend: str = "auto",
+    sh4_boundary_backend: str = "auto",
     planet_radius_m: float | None = None,
     star_radius_m: float | None = None,
     star_temperature_k: float | None = None,
@@ -879,9 +880,12 @@ def solve_emission_spectrum(
             ),
             delta_m=True,
             backend=thermal_integration_backend,
+            boundary_backend=sh4_boundary_backend,
         )
         rt_solver = "sh4_spectrum_only"
-        thermal_backend = f"scipy_banded_{integrated.backend}_spectrum_sh4"
+        thermal_backend = (
+            f"{integrated.boundary_backend}_banded_{integrated.backend}_spectrum_sh4"
+        )
     else:
         integrated = integrate_thermal_emission_spectrum(
             total_tau[order],
@@ -1084,9 +1088,7 @@ def _stellar_radiance_for_eclipse(
         return radiance, {"stellar_model": "blackbody"}
 
     if stellar_spectrum.unit != "W m^-3 sr^-1":
-        raise RobertValidationError(
-            "stellar_spectrum unit must be 'W m^-3 sr^-1'"
-        )
+        raise RobertValidationError("stellar_spectrum unit must be 'W m^-3 sr^-1'")
     if stellar_spectrum.observable != "stellar_spectral_radiance":
         raise RobertValidationError(
             "stellar_spectrum observable must be 'stellar_spectral_radiance'"

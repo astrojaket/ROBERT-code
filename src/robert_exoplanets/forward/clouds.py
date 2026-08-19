@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from typing import Mapping, Protocol, runtime_checkable
 
 import numpy as np
+from numpy.typing import NDArray
 
-from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core import PressureGrid, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit
 from robert_exoplanets.rt import (
@@ -46,6 +47,66 @@ class ParameterizedCloudModel(Protocol):
         """Evaluate cloud properties on an atmosphere and spectral grid."""
 
 
+def pressure_slab_layer_fractions(
+    pressure_grid: PressureGrid,
+    *,
+    top_pressure_bar: float | None,
+    base_pressure_bar: float | None,
+) -> NDArray[np.float64]:
+    """Return hydrostatic layer-column fractions inside a pressure slab.
+
+    A constant condensate mass fraction occupies the pressure interval from
+    ``top_pressure_bar`` to ``base_pressure_bar``. Because hydrostatic column
+    mass is proportional to pressure difference, boundary layers are weighted
+    by their fractional linear-pressure overlap rather than snapped to layer
+    centres.
+    """
+
+    top = (
+        None
+        if top_pressure_bar is None
+        else _positive_pressure(top_pressure_bar, "cloud top pressure")
+    )
+    base = (
+        None
+        if base_pressure_bar is None
+        else _positive_pressure(base_pressure_bar, "cloud base pressure")
+    )
+    if top is not None and base is not None and top > base:
+        raise RobertValidationError(
+            "cloud top pressure must not exceed cloud base pressure"
+        )
+    edges_bar = pressure_values_in_unit(
+        pressure_grid.edges,
+        pressure_grid.unit,
+        "bar",
+    )
+    layer_low = np.minimum(edges_bar[:-1], edges_bar[1:])
+    layer_high = np.maximum(edges_bar[:-1], edges_bar[1:])
+    slab_low = float(np.min(layer_low)) if top is None else top
+    slab_high = float(np.max(layer_high)) if base is None else base
+    overlap = np.maximum(
+        np.minimum(layer_high, slab_high) - np.maximum(layer_low, slab_low),
+        0.0,
+    )
+    fractions = np.divide(
+        overlap,
+        layer_high - layer_low,
+        out=np.zeros_like(overlap),
+        where=layer_high > layer_low,
+    )
+    fractions = np.clip(fractions, 0.0, 1.0)
+    fractions.setflags(write=False)
+    return fractions
+
+
+def _positive_pressure(value: float, name: str) -> float:
+    pressure = float(value)
+    if not np.isfinite(pressure) or pressure <= 0.0:
+        raise RobertValidationError(f"{name} must be finite and positive")
+    return pressure
+
+
 @dataclass(frozen=True)
 class ParameterizedDeckHazeCloudModel:
     """Shared finite grey-deck plus well-mixed power-law haze model.
@@ -76,7 +137,9 @@ class ParameterizedDeckHazeCloudModel:
             "log10_haze_mass_extinction_parameter",
             "haze_slope_parameter",
         )
-        parameters = tuple(str(getattr(self, name)).strip() for name in parameter_fields)
+        parameters = tuple(
+            str(getattr(self, name)).strip() for name in parameter_fields
+        )
         if any(not parameter for parameter in parameters):
             raise RobertValidationError("cloud parameter names must not be empty")
         if len(set(parameters)) != len(parameters):
@@ -108,7 +171,9 @@ class ParameterizedDeckHazeCloudModel:
             )
         for field_name, value in zip(parameter_fields, parameters, strict=True):
             object.__setattr__(self, field_name, value)
-        object.__setattr__(self, "haze_reference_wavelength_micron", reference_wavelength)
+        object.__setattr__(
+            self, "haze_reference_wavelength_micron", reference_wavelength
+        )
         object.__setattr__(self, "multiple_scattering_backend", backend)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
@@ -169,15 +234,11 @@ class ParameterizedDeckHazeCloudModel:
                 raise RobertValidationError(f"cloud parameter {name!r} must be finite")
             values[name] = value
 
-        cloud_top_pressure_bar = 10.0 ** values[
-            self.log10_cloud_top_pressure_bar_parameter
-        ]
-        cloud_optical_depth = 10.0 ** values[
-            self.log10_cloud_optical_depth_parameter
-        ]
-        haze_mass_extinction = 10.0 ** values[
-            self.log10_haze_mass_extinction_parameter
-        ]
+        cloud_top_pressure_bar = (
+            10.0 ** values[self.log10_cloud_top_pressure_bar_parameter]
+        )
+        cloud_optical_depth = 10.0 ** values[self.log10_cloud_optical_depth_parameter]
+        haze_mass_extinction = 10.0 ** values[self.log10_haze_mass_extinction_parameter]
         haze_slope = values[self.haze_slope_parameter]
         if not all(
             np.isfinite(value)
@@ -236,21 +297,32 @@ class ParameterizedMieCloudModel:
     metadata: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        wavelength = tuple(float(value) for value in self.refractive_index_wavelength_micron)
-        real_names = tuple(str(value).strip() for value in self.real_index_parameter_names)
+        wavelength = tuple(
+            float(value) for value in self.refractive_index_wavelength_micron
+        )
+        real_names = tuple(
+            str(value).strip() for value in self.real_index_parameter_names
+        )
         imaginary_names = tuple(
             str(value).strip() for value in self.log10_imaginary_index_parameter_names
         )
         if self.fixed_refractive_index is None:
-            if not wavelength or any(not np.isfinite(value) or value <= 0.0 for value in wavelength):
+            if not wavelength or any(
+                not np.isfinite(value) or value <= 0.0 for value in wavelength
+            ):
                 raise RobertValidationError(
                     "refractive-index wavelength nodes must be finite and positive"
                 )
-            if any(right <= left for left, right in zip(wavelength[:-1], wavelength[1:], strict=True)):
+            if any(
+                right <= left
+                for left, right in zip(wavelength[:-1], wavelength[1:], strict=True)
+            ):
                 raise RobertValidationError(
                     "refractive-index wavelength nodes must be strictly increasing"
                 )
-            if len(real_names) != len(wavelength) or len(imaginary_names) != len(wavelength):
+            if len(real_names) != len(wavelength) or len(imaginary_names) != len(
+                wavelength
+            ):
                 raise RobertValidationError(
                     "refractive-index parameter names must match wavelength nodes"
                 )
@@ -286,9 +358,13 @@ class ParameterizedMieCloudModel:
         extrapolation = str(self.refractive_index_extrapolation).strip().lower()
         backend = str(self.multiple_scattering_backend).strip().lower()
         if not np.isfinite(density) or density <= 0.0:
-            raise RobertValidationError("particle_density_kg_m3 must be finite and positive")
+            raise RobertValidationError(
+                "particle_density_kg_m3 must be finite and positive"
+            )
         if not np.isfinite(width) or width < 1.0:
-            raise RobertValidationError("geometric_stddev must be finite and at least one")
+            raise RobertValidationError(
+                "geometric_stddev must be finite and at least one"
+            )
         if points < 1:
             raise RobertValidationError("quadrature_points must be positive")
         if extrapolation not in {"raise", "clip"}:
@@ -296,15 +372,27 @@ class ParameterizedMieCloudModel:
                 "refractive_index_extrapolation must be 'raise' or 'clip'"
             )
         if backend not in {"two_stream", "toon_hemispheric_mean", "sh4", "p3"}:
-            raise RobertValidationError("Mie cloud requires a multiple-scattering backend")
+            raise RobertValidationError(
+                "Mie cloud requires a multiple-scattering backend"
+            )
         object.__setattr__(self, "refractive_index_wavelength_micron", wavelength)
         object.__setattr__(self, "real_index_parameter_names", real_names)
-        object.__setattr__(self, "log10_imaginary_index_parameter_names", imaginary_names)
-        object.__setattr__(self, "log10_condensate_mass_fraction_parameter", scalar_names[0])
-        object.__setattr__(self, "log10_effective_radius_micron_parameter", scalar_names[1])
+        object.__setattr__(
+            self, "log10_imaginary_index_parameter_names", imaginary_names
+        )
+        object.__setattr__(
+            self, "log10_condensate_mass_fraction_parameter", scalar_names[0]
+        )
+        object.__setattr__(
+            self, "log10_effective_radius_micron_parameter", scalar_names[1]
+        )
         object.__setattr__(self, "geometric_stddev_parameter", optional_names[0])
-        object.__setattr__(self, "log10_cloud_top_pressure_bar_parameter", optional_names[1])
-        object.__setattr__(self, "log10_cloud_base_pressure_bar_parameter", optional_names[2])
+        object.__setattr__(
+            self, "log10_cloud_top_pressure_bar_parameter", optional_names[1]
+        )
+        object.__setattr__(
+            self, "log10_cloud_base_pressure_bar_parameter", optional_names[2]
+        )
         object.__setattr__(self, "particle_density_kg_m3", density)
         object.__setattr__(self, "geometric_stddev", width)
         object.__setattr__(self, "quadrature_points", points)
@@ -350,6 +438,9 @@ class ParameterizedMieCloudModel:
                 "cloud_quadrature_points": str(self.quadrature_points),
                 "cloud_multiple_scattering_backend": self.multiple_scattering_backend,
                 "cloud_phase_function_closure": "exact_mie_legendre_moments_through_l4",
+                "cloud_boundary_treatment": (
+                    "fractional_hydrostatic_pressure_column_overlap"
+                ),
                 **dict(self.metadata),
             }
         )
@@ -390,26 +481,20 @@ class ParameterizedMieCloudModel:
             quadrature_points=self.quadrature_points,
             extrapolation=self.refractive_index_extrapolation,
         )
-        pressure_bar = pressure_values_in_unit(
-            gas_optical_depth.pressure_grid.centers,
-            gas_optical_depth.pressure_grid.unit,
-            "bar",
-        )
-        active = np.ones(gas_optical_depth.pressure_grid.n_layers, dtype=bool)
         top_pressure = None
         base_pressure = None
         if self.log10_cloud_top_pressure_bar_parameter is not None:
             top_pressure = 10.0 ** values[self.log10_cloud_top_pressure_bar_parameter]
-            active &= pressure_bar >= top_pressure
         if self.log10_cloud_base_pressure_bar_parameter is not None:
             base_pressure = 10.0 ** values[self.log10_cloud_base_pressure_bar_parameter]
-            active &= pressure_bar <= base_pressure
-        if top_pressure is not None and base_pressure is not None and top_pressure > base_pressure:
-            raise RobertValidationError("cloud top pressure must not exceed cloud base pressure")
-        mass_fraction = np.where(
-            active,
-            10.0 ** values[self.log10_condensate_mass_fraction_parameter],
-            0.0,
+        layer_fractions = pressure_slab_layer_fractions(
+            gas_optical_depth.pressure_grid,
+            top_pressure_bar=top_pressure,
+            base_pressure_bar=base_pressure,
+        )
+        mass_fraction = (
+            layer_fractions
+            * 10.0 ** values[self.log10_condensate_mass_fraction_parameter]
         )
         return (
             mie_cloud_from_mass_fraction(
@@ -424,4 +509,5 @@ __all__ = [
     "ParameterizedCloudModel",
     "ParameterizedDeckHazeCloudModel",
     "ParameterizedMieCloudModel",
+    "pressure_slab_layer_fractions",
 ]

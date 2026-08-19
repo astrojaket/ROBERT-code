@@ -66,9 +66,7 @@ class ParameterizedTransmissionModelConfig:
     def __post_init__(self) -> None:
         species = tuple(str(item).strip() for item in self.opacity_species)
         if not species or any(not item for item in species):
-            raise RobertValidationError(
-                "opacity_species must contain non-empty names"
-            )
+            raise RobertValidationError("opacity_species must contain non-empty names")
         if len(set(species)) != len(species):
             raise RobertValidationError("opacity_species must not contain duplicates")
         reference_pressure = float(self.reference_pressure_bar)
@@ -263,12 +261,8 @@ class ParameterizedTransmissionForwardModel:
                 "gas_combination": self.config.gas_combination,
                 "include_rayleigh": str(self.config.include_rayleigh).lower(),
                 "include_cia": str(bool(self.cia_tables)).lower(),
-                "impact_quadrature_order": str(
-                    self.config.impact_quadrature_order
-                ),
-                "radius_scale_parameter": (
-                    self.config.radius_scale_parameter or ""
-                ),
+                "impact_quadrature_order": str(self.config.impact_quadrature_order),
+                "radius_scale_parameter": (self.config.radius_scale_parameter or ""),
                 "pressure_grid_layers": str(self.pressure_grid.n_layers),
                 "pressure_grid_sha256": _array_signature(
                     self.pressure_grid.edges,
@@ -388,9 +382,7 @@ class ParameterizedTransmissionForwardModel:
             **dict(result.metadata),
             "forward_model": "parameterized_transmission",
             "gravity_model": self.config.gravity_model,
-            "reference_pressure_bar": (
-                f"{self.config.reference_pressure_bar:.17g}"
-            ),
+            "reference_pressure_bar": (f"{self.config.reference_pressure_bar:.17g}"),
             "reference_gravity_m_s2": f"{reference_gravity:.17g}",
         }
         transit_depth = Spectrum(

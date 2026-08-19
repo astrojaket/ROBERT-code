@@ -24,6 +24,7 @@ from robert_exoplanets.retrieval.samplers.multinest import (
     MULTINEST_MAX_SEED,
     _effective_multinest_seed,
     _global_evidence,
+    _native_likelihood_evaluations,
 )
 
 
@@ -104,6 +105,7 @@ def test_multinest_adapter_transforms_prior_and_returns_common_result(
     assert result.converged
     assert result.log_evidence == -1.2
     assert result.best_fit_parameters == {"level": 1.0}
+    assert result.metadata["likelihood_evaluations"] == "1"
     np.testing.assert_allclose(result.weights, [0.25, 0.75])
     assert (tmp_path / "chains" / "1-params.json").is_file()
     assert (tmp_path / "sampler_status.json").is_file()
@@ -145,6 +147,18 @@ def test_multinest_global_evidence_ignores_malformed_mode_errors(
 
     assert evidence == pytest.approx(-1.2)
     assert error == pytest.approx(0.1)
+
+
+def test_multinest_reads_native_likelihood_count_from_resume_header(
+    tmp_path,
+) -> None:
+    resume = tmp_path / "1-resume.dat"
+    resume.write_text(
+        " F\n         500         514           1         400\n",
+        encoding="utf-8",
+    )
+
+    assert _native_likelihood_evaluations(resume) == 514
 
 
 @pytest.mark.skipif(

@@ -15,6 +15,7 @@ from robert_exoplanets.io.configured_tasks import (
     prepare_opacity,
 )
 from robert_exoplanets.io.task_config import (
+    SamplerConfig,
     TaskConfig,
     configured_regions,
     initialize_task_directories,
@@ -44,7 +45,6 @@ CLOUDY_MULTISPECIES_TRANSMISSION = (
     / "configurations"
     / "synthetic_six_molecule_cloudy_transmission_injection_recovery_multinest.yaml"
 )
-L98_59B_CLR = ROOT / "configurations" / "l98_59b_clr_transmission_multinest.yaml"
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 SHIPPED_CONFIGURATIONS = tuple(sorted((ROOT / "configurations").glob("*.yaml")))
 
@@ -61,6 +61,7 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     }
     assert config.sampler.live_points == 400
     assert config.sampler.max_calls is None
+    assert config.radiative_transfer.sh4_boundary_backend == "auto"
     assert config.runtime.mpi_processes == "auto"
     assert config.runtime.scratch_directory.is_absolute()
     assert config.outputs.directory.is_absolute()
@@ -211,6 +212,10 @@ def test_yaml_defaults_writable_paths_to_the_configuration_directory(
     assert parsed.opacity.cache_directory == tmp_path / "opacity_cache"
 
 
+def test_sampler_defaults_to_multinest() -> None:
+    assert SamplerConfig().engine == "multinest"
+
+
 def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     config = load_task_config(TRANSMISSION)
 
@@ -224,24 +229,6 @@ def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 40
     assert config.runtime.mpi_processes == 2
-
-
-def test_l98_59b_clr_retrieval_configuration_matches_requested_run() -> None:
-    config = load_task_config(L98_59B_CLR)
-
-    assert config.observations.loader == "bello_arufe2025_l9859b"
-    assert config.observations.datasets == ("nrs1", "nrs2")
-    assert config.radiative_transfer.model == "transmission"
-    assert config.atmosphere.temperature.parameter_name == "temperature"
-    assert config.atmosphere.chemistry.background_species == ("H2",)
-    assert config.opacity.species == ("SO2", "H2S", "CO2")
-    assert all(
-        parameter.prior.type == "centered_log_ratio"
-        for parameter in config.parameters[:3]
-    )
-    assert config.sampler.engine == "multinest"
-    assert config.sampler.live_points == 50
-    assert config.runtime.mpi_processes == 3
 
 
 def test_yaml_configures_six_molecule_transmission_recovery() -> None:

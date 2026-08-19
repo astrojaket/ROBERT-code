@@ -29,8 +29,8 @@
     "invalid_loglike_floor": "-1e+100",
     "max_iter": "0",
     "mpi_nprocs": "2",
-    "output_dir": "/Users/jaketaylor/Dropbox/ROBERT-code/examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery/multinest",
-    "outputfiles_basename": "/Users/jaketaylor/Dropbox/ROBERT-code/examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery/multinest/chains/1-",
+    "output_dir": "examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery/multinest",
+    "outputfiles_basename": "examples/outputs/synthetic_six_molecule_cloudy_transmission_injection_recovery/multinest/chains/1-",
     "problem": "synthetic-six-molecule-cloudy-transmission-injection-recovery",
     "resume": "False",
     "seed": "20260717"

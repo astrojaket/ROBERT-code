@@ -76,7 +76,8 @@ def main() -> dict[str, Any]:
     parser.add_argument(
         "--petitradtrans-python",
         type=Path,
-        default=Path("/Users/jaketaylor/miniforge3/envs/petitradtrans-stable/bin/python"),
+        default=os.environ.get("ROBERT_PETITRADTRANS_PYTHON"),
+        required="ROBERT_PETITRADTRANS_PYTHON" not in os.environ,
     )
     parser.add_argument("--petitradtrans-input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)

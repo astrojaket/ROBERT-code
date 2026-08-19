@@ -18,9 +18,20 @@ from robert_exoplanets.core import (
     SpectralGrid,
 )
 from robert_exoplanets.core._immutability import immutable_mapping
-from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
+from robert_exoplanets.opacity import (
+    pressure_values_in_unit,
+    spectral_grid_values_in_unit,
+)
 
 from .optical_depth import GasOpticalDepth
+
+try:  # pragma: no cover - exercised when the optional perf extra is installed.
+    from numba import njit, prange
+except Exception:  # pragma: no cover - dependency availability is environment-specific.
+    njit = None
+    prange = range
+
+_NUMBA_AVAILABLE = njit is not None
 
 BOLTZMANN_CONSTANT_J_K = 1.380649e-23
 AMAGAT_MOLECULES_CM3 = 2.68675e19
@@ -101,15 +112,23 @@ class CiaTable:
         if np.any(wavenumber < 0.0):
             raise RobertValidationError("CIA wavenumber values must be non-negative")
         if wavenumber.size > 1 and not np.all(np.diff(wavenumber) > 0.0):
-            raise RobertValidationError("CIA wavenumber grid must be strictly increasing")
+            raise RobertValidationError(
+                "CIA wavenumber grid must be strictly increasing"
+            )
         if np.any(temperature <= 0.0):
             raise RobertValidationError("CIA temperature values must be positive")
         if temperature.size > 1 and not np.all(np.diff(temperature) > 0.0):
-            raise RobertValidationError("CIA temperature grid must be strictly increasing")
+            raise RobertValidationError(
+                "CIA temperature grid must be strictly increasing"
+            )
         if k_cia.shape != (len(self.pair_order), temperature.size, wavenumber.size):
-            raise RobertValidationError("k_cia must have shape pair x temperature x wavenumber")
+            raise RobertValidationError(
+                "k_cia must have shape pair x temperature x wavenumber"
+            )
         if not np.all(np.isfinite(k_cia)) or np.any(k_cia < 0.0):
-            raise RobertValidationError("CIA coefficients must be finite and non-negative")
+            raise RobertValidationError(
+                "CIA coefficients must be finite and non-negative"
+            )
         if not self.unit:
             raise RobertValidationError("CIA coefficient unit must not be empty")
 
@@ -158,7 +177,8 @@ class CiaTable:
                 missing = tuple(name for name in required if name not in handle)
                 if missing:
                     raise RobertValidationError(
-                        "petitRADTRANS CIA file is missing datasets: " + ", ".join(missing)
+                        "petitRADTRANS CIA file is missing datasets: "
+                        + ", ".join(missing)
                     )
                 temperature = np.asarray(handle["t"], dtype=float)
                 wavenumber = np.asarray(handle["wavenumbers"], dtype=float)
@@ -166,7 +186,8 @@ class CiaTable:
                 declared_unit = str(handle["alpha"].attrs.get("units", "")).strip()
                 molecules = "+".join(_decode_hdf_strings(handle["mol_name"]))
                 molar_masses = ",".join(
-                    f"{value:.17g}" for value in np.asarray(handle["mol_mass"], dtype=float)
+                    f"{value:.17g}"
+                    for value in np.asarray(handle["mol_mass"], dtype=float)
                 )
                 doi = _decode_hdf_first(handle.get("DOI"))
         except OSError as exc:
@@ -181,7 +202,10 @@ class CiaTable:
             raise RobertValidationError(
                 "petitRADTRANS CIA alpha must have temperature x wavenumber shape"
             )
-        k_cia = np.zeros((len(DEFAULT_CIA_PAIR_ORDER), temperature.size, wavenumber.size), dtype=float)
+        k_cia = np.zeros(
+            (len(DEFAULT_CIA_PAIR_ORDER), temperature.size, wavenumber.size),
+            dtype=float,
+        )
         for index in pair_indices[normalized_pair]:
             k_cia[index] = alpha
         return cls(
@@ -221,7 +245,9 @@ def read_cia_table(
     if not table_path.exists():
         raise FileNotFoundError(table_path)
     if dnu <= 0.0 or not np.isfinite(dnu):
-        raise RobertValidationError("CIA wavenumber spacing dnu must be finite and positive")
+        raise RobertValidationError(
+            "CIA wavenumber spacing dnu must be finite and positive"
+        )
     if n_pairs < 1:
         raise RobertValidationError("CIA table must contain at least one pair")
 
@@ -284,11 +310,15 @@ def cia_optical_depth(
     """
 
     if temperature_extrapolation not in {"raise", "clip"}:
-        raise RobertValidationError("temperature_extrapolation must be 'raise' or 'clip'")
+        raise RobertValidationError(
+            "temperature_extrapolation must be 'raise' or 'clip'"
+        )
     if spectral_extrapolation not in {"raise", "zero"}:
         raise RobertValidationError("spectral_extrapolation must be 'raise' or 'zero'")
     if coefficient_interpolation not in {"linear", "log"}:
-        raise RobertValidationError("coefficient_interpolation must be 'linear' or 'log'")
+        raise RobertValidationError(
+            "coefficient_interpolation must be 'linear' or 'log'"
+        )
 
     atmosphere = gas_optical_depth.atmosphere
     wavenumber = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "cm^-1")
@@ -299,7 +329,9 @@ def cia_optical_depth(
     )
     temperature = atmosphere.temperature
     number_density_m3 = pressure_pa / (BOLTZMANN_CONSTANT_J_K * temperature)
-    path_length_m = gas_optical_depth.layer_column_density_molecules_m2 / number_density_m3
+    path_length_m = (
+        gas_optical_depth.layer_column_density_molecules_m2 / number_density_m3
+    )
     xlen_cm = path_length_m * 100.0
     total_amount_cm2 = gas_optical_depth.layer_column_density_molecules_m2 * 1.0e-4
     amagat_density = total_amount_cm2 / xlen_cm / AMAGAT_MOLECULES_CM3
@@ -325,33 +357,46 @@ def cia_optical_depth(
         (8, h2 * ch4),
     )
 
-    tau = np.zeros((atmosphere.n_layers, gas_optical_depth.spectral_grid.size), dtype=float)
+    mixing_factors = np.zeros((cia_table.n_pairs, atmosphere.n_layers), dtype=float)
     active_pairs: list[str] = []
-    for layer_index in range(atmosphere.n_layers):
-        coefficients = _interpolate_cia_coefficients(
+    for pair_index, mixing_factor in pair_terms:
+        if pair_index >= cia_table.n_pairs:
+            if np.any(mixing_factor > 0.0):
+                raise RobertValidationError(
+                    "CIA table does not contain a required active pair"
+                )
+            continue
+        mixing_factors[pair_index] += mixing_factor
+        if np.any(mixing_factor > 0.0):
+            active_pairs.append(cia_table.pair_order[pair_index])
+
+    if _NUMBA_AVAILABLE:
+        tau = _numba_cia_optical_depth(
             cia_table,
-            temperature[layer_index],
+            temperature,
             wavenumber,
+            mixing_factors,
+            tau_path,
             temperature_extrapolation=temperature_extrapolation,
             spectral_extrapolation=spectral_extrapolation,
             coefficient_interpolation=coefficient_interpolation,
         )
-        layer_coeff = np.zeros_like(wavenumber)
-        for pair_index, mixing_factor in pair_terms:
-            if pair_index >= cia_table.n_pairs:
-                if mixing_factor[layer_index] > 0.0:
-                    raise RobertValidationError(
-                        "CIA table does not contain a required active pair"
-                    )
-                continue
-            if mixing_factor[layer_index] <= 0.0:
-                continue
-            layer_coeff += coefficients[pair_index] * mixing_factor[layer_index]
-            active_pairs.append(cia_table.pair_order[pair_index])
-        tau[layer_index] = layer_coeff * tau_path[layer_index]
+    else:
+        tau = _numpy_cia_optical_depth(
+            cia_table,
+            temperature,
+            wavenumber,
+            mixing_factors,
+            tau_path,
+            temperature_extrapolation=temperature_extrapolation,
+            spectral_extrapolation=spectral_extrapolation,
+            coefficient_interpolation=coefficient_interpolation,
+        )
 
     if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
-        raise RobertValidationError("CIA optical-depth calculation produced invalid values")
+        raise RobertValidationError(
+            "CIA optical-depth calculation produced invalid values"
+        )
     return LayerOpticalDepth(
         name=name,
         tau=tau,
@@ -390,10 +435,14 @@ def rayleigh_scattering_optical_depth(
     if default_h2_fraction_of_h2_he is not None:
         default_fraction = float(default_h2_fraction_of_h2_he)
         if not np.isfinite(default_fraction) or not 0.0 <= default_fraction <= 1.0:
-            raise RobertValidationError("default_h2_fraction_of_h2_he must be in [0, 1]")
+            raise RobertValidationError(
+                "default_h2_fraction_of_h2_he must be in [0, 1]"
+            )
 
     atmosphere = gas_optical_depth.atmosphere
-    wavelength_micron = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
+    wavelength_micron = spectral_grid_values_in_unit(
+        gas_optical_depth.spectral_grid, "micron"
+    )
     h2 = _composition_profile(atmosphere.composition, "H2", atmosphere.n_layers)
     he = _composition_profile(atmosphere.composition, "He", atmosphere.n_layers)
     h2_he_fraction = h2 + he
@@ -433,10 +482,7 @@ def rayleigh_scattering_optical_depth(
     faniso = 1.0
 
     common_factor = (
-        32.0
-        * np.pi**3
-        * faniso
-        / (3.0 * (n0 * lambda_m[None, :] ** 2) ** 2)
+        32.0 * np.pi**3 * faniso / (3.0 * (n0 * lambda_m[None, :] ** 2) ** 2)
     )
     cross_section_h2_m2 = common_factor * refractivity_h2[None, :] ** 2
     cross_section_he_m2 = common_factor * refractivity_he[None, :] ** 2
@@ -444,7 +490,9 @@ def rayleigh_scattering_optical_depth(
         h2[:, None] * cross_section_h2_m2 + he[:, None] * cross_section_he_m2
     )
     if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
-        raise RobertValidationError("Rayleigh optical-depth calculation produced invalid values")
+        raise RobertValidationError(
+            "Rayleigh optical-depth calculation produced invalid values"
+        )
 
     return LayerOpticalDepth(
         name=name,
@@ -476,19 +524,31 @@ def _read_cia_table_with_endian(
 ) -> CiaTable:
     file_size = path.stat().st_size
     with path.open("rb") as handle:
-        temperature_record = _read_fortran_record(handle, endian=endian, file_size=file_size)
-        coefficients_record = _read_fortran_record(handle, endian=endian, file_size=file_size)
+        temperature_record = _read_fortran_record(
+            handle, endian=endian, file_size=file_size
+        )
+        coefficients_record = _read_fortran_record(
+            handle, endian=endian, file_size=file_size
+        )
 
     if len(temperature_record) % 8 != 0:
         raise RobertValidationError("CIA temperature record is not float64-aligned")
-    temperature = np.frombuffer(temperature_record, dtype=np.dtype(f"{endian}f8")).astype(float)
-    coefficients = np.frombuffer(coefficients_record, dtype=np.dtype(f"{endian}f4")).astype(float)
+    temperature = np.frombuffer(
+        temperature_record, dtype=np.dtype(f"{endian}f8")
+    ).astype(float)
+    coefficients = np.frombuffer(
+        coefficients_record, dtype=np.dtype(f"{endian}f4")
+    ).astype(float)
     denominator = n_pairs * temperature.size
     if denominator <= 0 or coefficients.size % denominator != 0:
-        raise RobertValidationError("CIA coefficient record has inconsistent dimensions")
+        raise RobertValidationError(
+            "CIA coefficient record has inconsistent dimensions"
+        )
     n_wavenumber = coefficients.size // denominator
     wavenumber = np.linspace(0.0, dnu * (n_wavenumber - 1), n_wavenumber)
-    k_cia = coefficients.reshape(n_wavenumber, temperature.size, n_pairs).transpose(2, 1, 0)
+    k_cia = coefficients.reshape(n_wavenumber, temperature.size, n_pairs).transpose(
+        2, 1, 0
+    )
     pair_order = DEFAULT_CIA_PAIR_ORDER[:n_pairs]
     if len(pair_order) != n_pairs:
         pair_order = tuple(f"pair_{index}" for index in range(n_pairs))
@@ -509,7 +569,9 @@ def _read_cia_table_with_endian(
 def _read_fortran_record(handle, *, endian: str, file_size: int) -> bytes:
     prefix = handle.read(4)
     if len(prefix) != 4:
-        raise RobertValidationError("unexpected end of CIA table while reading record marker")
+        raise RobertValidationError(
+            "unexpected end of CIA table while reading record marker"
+        )
     (record_size,) = struct.unpack(f"{endian}i", prefix)
     if record_size <= 0 or record_size > file_size - 8:
         raise RobertValidationError("invalid CIA Fortran record size")
@@ -523,6 +585,122 @@ def _read_fortran_record(handle, *, endian: str, file_size: int) -> bytes:
     return record
 
 
+def _numba_cia_optical_depth(
+    table: CiaTable,
+    temperature_k: NDArray[np.float64],
+    wavenumber_cm_inverse: NDArray[np.float64],
+    mixing_factors: NDArray[np.float64],
+    tau_path: NDArray[np.float64],
+    *,
+    temperature_extrapolation: str,
+    spectral_extrapolation: str,
+    coefficient_interpolation: str,
+) -> NDArray[np.float64]:
+    (
+        temperature_lower,
+        temperature_upper,
+        temperature_fraction,
+    ) = _interpolation_coordinates(
+        temperature_k,
+        table.temperature_K,
+        extrapolation=temperature_extrapolation,
+        quantity="atmosphere temperature",
+    )
+    (
+        spectral_lower,
+        spectral_upper,
+        spectral_fraction,
+    ) = _interpolation_coordinates(
+        wavenumber_cm_inverse,
+        table.wavenumber_cm_inverse,
+        extrapolation=spectral_extrapolation,
+        quantity="requested spectrum",
+    )
+    spectral_inside = (wavenumber_cm_inverse >= table.wavenumber_cm_inverse[0]) & (
+        wavenumber_cm_inverse <= table.wavenumber_cm_inverse[-1]
+    )
+    return _numba_cia_optical_depth_kernel(
+        table.k_cia,
+        temperature_lower,
+        temperature_upper,
+        temperature_fraction,
+        spectral_lower,
+        spectral_upper,
+        spectral_fraction,
+        spectral_inside,
+        mixing_factors,
+        tau_path,
+        coefficient_interpolation == "log",
+    )
+
+
+def _numpy_cia_optical_depth(
+    table: CiaTable,
+    temperature_k: NDArray[np.float64],
+    wavenumber_cm_inverse: NDArray[np.float64],
+    mixing_factors: NDArray[np.float64],
+    tau_path: NDArray[np.float64],
+    *,
+    temperature_extrapolation: str,
+    spectral_extrapolation: str,
+    coefficient_interpolation: str,
+) -> NDArray[np.float64]:
+    tau = np.zeros((temperature_k.size, wavenumber_cm_inverse.size), dtype=float)
+    for layer_index, layer_temperature in enumerate(temperature_k):
+        coefficients = _interpolate_cia_coefficients(
+            table,
+            layer_temperature,
+            wavenumber_cm_inverse,
+            temperature_extrapolation=temperature_extrapolation,
+            spectral_extrapolation=spectral_extrapolation,
+            coefficient_interpolation=coefficient_interpolation,
+        )
+        tau[layer_index] = (
+            np.einsum(
+                "pw,p->w",
+                coefficients,
+                mixing_factors[:, layer_index],
+                optimize=True,
+            )
+            * tau_path[layer_index]
+        )
+    return tau
+
+
+def _interpolation_coordinates(
+    values: NDArray[np.float64],
+    grid: NDArray[np.float64],
+    *,
+    extrapolation: str,
+    quantity: str,
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.float64]]:
+    below = values < grid[0]
+    above = values > grid[-1]
+    if np.any(below | above) and extrapolation == "raise":
+        if quantity == "atmosphere temperature":
+            raise RobertCoverageError(
+                "atmosphere temperature is outside the CIA table temperature grid"
+            )
+        raise RobertCoverageError(
+            "requested spectrum is outside the CIA table wavenumber grid"
+        )
+
+    clipped = np.clip(values, grid[0], grid[-1])
+    if grid.size == 1:
+        indices = np.zeros(values.size, dtype=np.int64)
+        return indices, indices.copy(), np.zeros(values.size, dtype=float)
+
+    upper = np.searchsorted(grid, clipped, side="left")
+    upper = np.clip(upper, 1, grid.size - 1).astype(np.int64)
+    lower = upper - 1
+    fraction = (clipped - grid[lower]) / (grid[upper] - grid[lower])
+    at_lower_boundary = clipped <= grid[0]
+    lower[at_lower_boundary] = 0
+    upper[at_lower_boundary] = 0
+    fraction[at_lower_boundary] = 0.0
+    return lower, upper, fraction
+
+
 def _interpolate_cia_coefficients(
     table: CiaTable,
     temperature_k: float,
@@ -534,7 +712,9 @@ def _interpolate_cia_coefficients(
 ) -> NDArray[np.float64]:
     temperature = float(temperature_k)
     if not np.isfinite(temperature) or temperature <= 0.0:
-        raise RobertValidationError("CIA interpolation temperature must be finite and positive")
+        raise RobertValidationError(
+            "CIA interpolation temperature must be finite and positive"
+        )
     if temperature < table.temperature_K[0] or temperature > table.temperature_K[-1]:
         if temperature_extrapolation == "raise":
             raise RobertCoverageError(
@@ -568,7 +748,9 @@ def _interpolate_cia_coefficients(
         requested_min < float(table.wavenumber_cm_inverse[0])
         or requested_max > float(table.wavenumber_cm_inverse[-1])
     ) and spectral_extrapolation == "raise":
-        raise RobertCoverageError("requested spectrum is outside the CIA table wavenumber grid")
+        raise RobertCoverageError(
+            "requested spectrum is outside the CIA table wavenumber grid"
+        )
     coefficients = np.vstack(
         [
             np.interp(
@@ -585,6 +767,94 @@ def _interpolate_cia_coefficients(
     return coefficients
 
 
+if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_cia_optical_depth_kernel(
+        k_cia,
+        temperature_lower,
+        temperature_upper,
+        temperature_fraction,
+        spectral_lower,
+        spectral_upper,
+        spectral_fraction,
+        spectral_inside,
+        mixing_factors,
+        tau_path,
+        use_log_temperature,
+    ):
+        n_pairs, _, _ = k_cia.shape
+        n_layers = temperature_lower.size
+        n_spectral = spectral_lower.size
+        tau = np.zeros((n_layers, n_spectral), dtype=np.float64)
+        for layer_index in prange(n_layers):
+            lower_temperature = temperature_lower[layer_index]
+            upper_temperature = temperature_upper[layer_index]
+            temperature_weight = temperature_fraction[layer_index]
+            for spectral_index in range(n_spectral):
+                if not spectral_inside[spectral_index]:
+                    continue
+                lower_spectral = spectral_lower[spectral_index]
+                upper_spectral = spectral_upper[spectral_index]
+                spectral_weight = spectral_fraction[spectral_index]
+                coefficient = 0.0
+                for pair_index in range(n_pairs):
+                    mixing_factor = mixing_factors[pair_index, layer_index]
+                    if mixing_factor <= 0.0:
+                        continue
+                    lower_left = k_cia[
+                        pair_index,
+                        lower_temperature,
+                        lower_spectral,
+                    ]
+                    upper_left = k_cia[
+                        pair_index,
+                        upper_temperature,
+                        lower_spectral,
+                    ]
+                    lower_right = k_cia[
+                        pair_index,
+                        lower_temperature,
+                        upper_spectral,
+                    ]
+                    upper_right = k_cia[
+                        pair_index,
+                        upper_temperature,
+                        upper_spectral,
+                    ]
+                    if use_log_temperature and lower_left > 0.0 and upper_left > 0.0:
+                        left_value = np.exp(
+                            (1.0 - temperature_weight) * np.log(lower_left)
+                            + temperature_weight * np.log(upper_left)
+                        )
+                    else:
+                        left_value = (
+                            1.0 - temperature_weight
+                        ) * lower_left + temperature_weight * upper_left
+                    if use_log_temperature and lower_right > 0.0 and upper_right > 0.0:
+                        right_value = np.exp(
+                            (1.0 - temperature_weight) * np.log(lower_right)
+                            + temperature_weight * np.log(upper_right)
+                        )
+                    else:
+                        right_value = (
+                            1.0 - temperature_weight
+                        ) * lower_right + temperature_weight * upper_right
+                    interpolated = (
+                        1.0 - spectral_weight
+                    ) * left_value + spectral_weight * right_value
+                    coefficient += interpolated * mixing_factor
+                tau[layer_index, spectral_index] = coefficient * tau_path[layer_index]
+        return tau
+
+else:
+
+    def _numba_cia_optical_depth_kernel(*args):
+        raise RobertValidationError(
+            "compiled CIA optical-depth interpolation requires numba"
+        )
+
+
 def _composition_profile(
     composition: Mapping[str, NDArray[np.float64]],
     species: str,
@@ -596,9 +866,13 @@ def _composition_profile(
         return profile
     profile = np.array(composition[species], dtype=float, copy=True)
     if profile.shape != (n_layers,):
-        raise RobertValidationError(f"{species} composition must match pressure grid layers")
+        raise RobertValidationError(
+            f"{species} composition must match pressure grid layers"
+        )
     if not np.all(np.isfinite(profile)) or np.any(profile < 0.0):
-        raise RobertValidationError(f"{species} composition must be finite and non-negative")
+        raise RobertValidationError(
+            f"{species} composition must be finite and non-negative"
+        )
     profile.setflags(write=False)
     return profile
 
@@ -673,7 +947,9 @@ def _readonly_phase_function_moments(
             "(5, layer, spectral)"
         )
     if not np.all(np.isfinite(array)):
-        raise RobertValidationError("phase_function_moments must contain only finite values")
+        raise RobertValidationError(
+            "phase_function_moments must contain only finite values"
+        )
     limits = (2.0 * np.arange(5) + 1.0)[:, None, None]
     if np.any(np.abs(array) > limits * (1.0 + 1.0e-10)):
         raise RobertValidationError("phase_function_moments exceed physical bounds")

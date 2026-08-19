@@ -26,16 +26,15 @@ that external forward-model check.
 Reproduce with:
 
 ```bash
-/Users/jaketaylor/miniforge3/envs/robert-exoplanets/bin/python \
+conda run -n robert-exoplanets python \
   examples/synthetic_six_molecule_transmission_injection_recovery.py \
   --config configurations/synthetic_six_molecule_transmission_injection_recovery_multinest.yaml
 
-/Users/jaketaylor/miniforge3/envs/robert-exoplanets/bin/mpirun -np 2 \
-  /Users/jaketaylor/miniforge3/envs/robert-exoplanets/bin/python \
+conda run -n robert-exoplanets mpirun -np 2 python \
   run_retrieval.py \
   --config configurations/synthetic_six_molecule_transmission_injection_recovery_multinest.yaml
 
-/Users/jaketaylor/miniforge3/envs/robert-exoplanets/bin/python \
+conda run -n robert-exoplanets python \
   examples/synthetic_six_molecule_transmission_injection_recovery.py \
   --config configurations/synthetic_six_molecule_transmission_injection_recovery_multinest.yaml \
   --evaluate-result \

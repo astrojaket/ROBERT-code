@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import robert_exoplanets.opacity.correlated_k as correlated_k_module
 
 from robert_exoplanets import (
     AtmosphereState,
@@ -232,6 +233,52 @@ def test_correlated_k_cached_log_coefficients_match_uncached_interpolation() -> 
     assert cached_prepared.metadata["log_kcoeff_cache"] == "enabled"
     assert uncached_prepared.metadata["log_kcoeff_cache"] == "disabled"
     np.testing.assert_array_equal(cached_values, uncached_values)
+
+
+def test_compiled_correlated_k_interpolation_matches_numpy_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("numba")
+    rng = np.random.default_rng(7052026)
+    table = CorrelatedKTable(
+        species="H2O",
+        pressure_bar=np.array([1.0e-5, 1.0e-2, 1.0]),
+        temperature_K=np.array([500.0, 1000.0, 1500.0]),
+        wavenumber_cm_inverse=np.array([1000.0, 2000.0]),
+        g_samples=np.array([0.25, 0.75]),
+        g_weights=np.array([0.4, 0.6]),
+        kcoeff=np.exp(rng.uniform(-70.0, -35.0, size=(3, 3, 2, 2))),
+    )
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0e-6, 1.0e-4, 1.0e-2, 1.0]),
+        centers=np.array([1.0e-5, 1.0e-3, 1.0e-1]),
+        unit="bar",
+    )
+    spectral_grid = SpectralGrid.from_array(
+        [1000.0, 2000.0],
+        unit="cm^-1",
+        role="opacity",
+    )
+    atmosphere = _atmosphere(
+        pressure_grid,
+        temperature=[600.0, 900.0, 1400.0],
+    )
+    provider = CorrelatedKOpacityProvider(
+        {"H2O": table},
+        interpolation="log_pressure_temperature_log_k",
+    )
+    prepared = provider.prepare(spectral_grid, pressure_grid, species=("H2O",))
+
+    compiled = provider.evaluate(atmosphere, prepared)
+    monkeypatch.setattr(correlated_k_module, "_NUMBA_AVAILABLE", False)
+    reference = provider.evaluate(atmosphere, prepared)
+
+    np.testing.assert_allclose(
+        compiled.kcoeff,
+        reference.kcoeff,
+        rtol=3.0e-14,
+        atol=0.0,
+    )
 
 
 def test_correlated_k_interpolation_rejects_out_of_range_temperature() -> None:

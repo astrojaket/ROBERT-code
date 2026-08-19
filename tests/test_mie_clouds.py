@@ -27,6 +27,7 @@ from robert_exoplanets import (
     refractive_index_from_parameters,
 )
 from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.forward.clouds import pressure_slab_layer_fractions
 
 
 def test_refractive_index_interpolates_n_and_positive_k_in_log_space() -> None:
@@ -41,13 +42,17 @@ def test_refractive_index_interpolates_n_and_positive_k_in_log_space() -> None:
 
     np.testing.assert_allclose(evaluated.real, [1.5])
     np.testing.assert_allclose(evaluated.imag, [1.0e-3])
-    with pytest.raises(RobertValidationError, match="outside refractive-index coverage"):
+    with pytest.raises(
+        RobertValidationError, match="outside refractive-index coverage"
+    ):
         index.evaluate([0.5])
     clipped = index.evaluate([0.5], extrapolation="clip")
     np.testing.assert_allclose(clipped, [1.4 + 1.0e-4j])
 
 
-def test_refractive_index_readers_support_headerless_and_csv_tables(tmp_path: Path) -> None:
+def test_refractive_index_readers_support_headerless_and_csv_tables(
+    tmp_path: Path,
+) -> None:
     text_path = tmp_path / "material.txt"
     text_path.write_text("1000 1.5 0.01\n2000 1.6 0.02\n", encoding="utf-8")
     csv_path = tmp_path / "material.csv"
@@ -67,7 +72,9 @@ def test_refractive_index_readers_support_headerless_and_csv_tables(tmp_path: Pa
 
 def test_exo_skryer_catalog_selects_material_and_records_provenance() -> None:
     root = Path(__file__).resolve().parents[1]
-    catalog = OpticalConstantsCatalog(root / "data" / "optical_constants" / "exo_skryer")
+    catalog = OpticalConstantsCatalog(
+        root / "data" / "optical_constants" / "exo_skryer"
+    )
 
     material = catalog.load("MgSiO3")
 
@@ -87,7 +94,9 @@ def test_small_particle_mie_solution_matches_rayleigh_limit() -> None:
     expected_scattering = (8.0 / 3.0) * size_parameter**4 * abs(polarizability) ** 2
     expected_absorption = 4.0 * size_parameter * polarizability.imag
 
-    extinction, scattering, asymmetry = mie_efficiencies(size_parameter, refractive_index)
+    extinction, scattering, asymmetry = mie_efficiencies(
+        size_parameter, refractive_index
+    )
 
     assert extinction == pytest.approx(expected_absorption + expected_scattering)
     assert scattering == pytest.approx(expected_scattering)
@@ -128,7 +137,13 @@ def test_mie_phase_moments_match_independent_miepython_reference() -> None:
     # miepython 3.2.0, 256-point Gauss-Legendre integration of its normalized
     # unpolarized phase function using the passive n-ik convention.
     expected = np.array(
-        [1.0, 2.324914198318782, 3.181268856917814, 3.596168330101814, 3.979001987734556]
+        [
+            1.0,
+            2.324914198318782,
+            3.181268856917814,
+            3.596168330101814,
+            3.979001987734556,
+        ]
     )
     np.testing.assert_allclose(moments, expected, rtol=8.0e-13, atol=2.0e-13)
     assert moments[1] / 3.0 == pytest.approx(
@@ -193,7 +208,9 @@ def test_retrieved_refractive_index_uses_n_and_log10_k_nodes() -> None:
     assert index.metadata["parameterization"] == "nodal_n_log10_k"
 
 
-def test_parameterized_mie_cloud_is_geometry_independent_and_matches_core_physics() -> None:
+def test_parameterized_mie_cloud_is_geometry_independent_and_matches_core_physics() -> (
+    None
+):
     spectral_grid = SpectralGrid.from_array([2.0, 4.0], unit="micron", role="opacity")
     index = RefractiveIndexSpectrum(
         wavelength_micron=[1.0, 5.0],
@@ -240,6 +257,49 @@ def test_parameterized_mie_cloud_is_geometry_independent_and_matches_core_physic
         expected.single_scattering_albedo,
     )
     assert model.manifest_metadata["cloud_geometry_independent"] == "true"
+    assert model.manifest_metadata["cloud_boundary_treatment"] == (
+        "fractional_hydrostatic_pressure_column_overlap"
+    )
+
+
+def test_pressure_slab_fractionally_covers_boundary_layers_by_column_mass() -> None:
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0, 10.0, 100.0]),
+        centers=np.array([5.5, 55.0]),
+        unit="bar",
+    )
+
+    fractions = pressure_slab_layer_fractions(
+        pressure_grid,
+        top_pressure_bar=5.0,
+        base_pressure_bar=50.0,
+    )
+
+    np.testing.assert_allclose(fractions, [5.0 / 9.0, 40.0 / 90.0])
+    layer_pressure_width = np.abs(np.diff(pressure_grid.edges))
+    assert np.sum(fractions * layer_pressure_width) == pytest.approx(45.0)
+
+
+def test_pressure_slab_is_continuous_across_a_layer_edge() -> None:
+    pressure_grid = PressureGrid(
+        edges=np.array([1.0, 10.0, 100.0]),
+        centers=np.array([5.5, 55.0]),
+        unit="bar",
+    )
+    epsilon = 1.0e-8
+
+    below = pressure_slab_layer_fractions(
+        pressure_grid,
+        top_pressure_bar=10.0 * (1.0 - epsilon),
+        base_pressure_bar=100.0,
+    )
+    above = pressure_slab_layer_fractions(
+        pressure_grid,
+        top_pressure_bar=10.0 * (1.0 + epsilon),
+        base_pressure_bar=100.0,
+    )
+
+    assert np.max(np.abs(above - below)) < 3.0e-8
 
 
 def _zero_gas_tau(spectral_grid: SpectralGrid):
