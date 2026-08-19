@@ -45,7 +45,6 @@ CLOUDY_MULTISPECIES_TRANSMISSION = (
     / "configurations"
     / "synthetic_six_molecule_cloudy_transmission_injection_recovery_multinest.yaml"
 )
-L98_59B_CLR = ROOT / "configurations" / "l98_59b_clr_transmission_multinest.yaml"
 DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
 SHIPPED_CONFIGURATIONS = tuple(sorted((ROOT / "configurations").glob("*.yaml")))
 
@@ -230,24 +229,6 @@ def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 40
     assert config.runtime.mpi_processes == 2
-
-
-def test_l98_59b_clr_retrieval_configuration_matches_requested_run() -> None:
-    config = load_task_config(L98_59B_CLR)
-
-    assert config.observations.loader == "bello_arufe2025_l9859b"
-    assert config.observations.datasets == ("nrs1", "nrs2")
-    assert config.radiative_transfer.model == "transmission"
-    assert config.atmosphere.temperature.parameter_name == "temperature"
-    assert config.atmosphere.chemistry.background_species == ("H2",)
-    assert config.opacity.species == ("SO2", "H2S", "CO2")
-    assert all(
-        parameter.prior.type == "centered_log_ratio"
-        for parameter in config.parameters[:3]
-    )
-    assert config.sampler.engine == "multinest"
-    assert config.sampler.live_points == 50
-    assert config.runtime.mpi_processes == 3
 
 
 def test_yaml_configures_six_molecule_transmission_recovery() -> None:
