@@ -62,9 +62,10 @@ For ROBERT, the absorbing-cloud effect becomes 94.8 ppm RMS with a 364.8 ppm
 maximum. The scattering-cloud effect becomes 183.9 ppm RMS with a 517.9 ppm
 maximum. This is 3.88 and 4.29 times the original RMS effect.
 
-Use new scenario names and a new output root for the rerun. Do not replace the
-frozen Stage 9 products. The rerun should contain only the two grey-cloud
-scenarios, which gives 36 directed cross-framework retrievals across the three
+Use this dedicated Git branch and a new output root for the rerun. Do not
+replace the frozen Stage 9 products. The scenario identifiers stay unchanged
+so the tested Stage 9 launch tools remain usable. Queue only the two grey-cloud
+scenarios. This gives 36 directed cross-framework retrievals across the three
 noise tiers.
 
 ## Cluster adapter requirements
@@ -82,7 +83,9 @@ The stronger-cloud truth must be supplied from the scenario definition rather
 than hard-coded in `parameter_definitions()`. Generate a new contract and new
 injections. Keep the original contract and results read-only.
 
-Reproduce the one-process check with:
+Run the optional one-process check only on a suitably provisioned Glamdring
+node. The script refuses the full case when its measured and estimated memory
+guard fails:
 
 ```bash
 conda run -n robert-exoplanets env \
@@ -94,3 +97,10 @@ conda run -n robert-exoplanets env \
   --cloud-tau-5um 3 --cloud-top-pressure-bar 0.003 \
   --output /tmp/stage9-robert-stronger-grey-cloud.json
 ```
+
+Use a new deployment root such as
+`/mnt/users/jaketaylor/ROBERT-stage9-stronger-cloud`. Generate new injections
+for `grey_absorbing_non_inverted` and `grey_scattering_non_inverted`, then queue
+only those six retriever/scenario shards. Do not use an execution-contract
+refresh against the original `/mnt/users/jaketaylor/ROBERT-stage9` tree because
+the cloud truth changed.

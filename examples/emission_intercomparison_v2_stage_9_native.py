@@ -447,6 +447,7 @@ class RobertNativeForward(NativeForward):
                 self.common["derived_quantities"]["surface_gravity_m_s2"]
             ),
             gas_combination="random_overlap",
+            retain_species_tau=False,
         )
         additions = [
             cia_optical_depth(
@@ -503,7 +504,8 @@ class RobertNativeForward(NativeForward):
             self.g_weights,
             bottom_planck_radiance=levels[-1],
             delta_m=False,
-            backend="numpy",
+            backend="numba",
+            boundary_backend="numba",
         )
         return self.wavelength, np.pi * np.asarray(result.radiance)
 

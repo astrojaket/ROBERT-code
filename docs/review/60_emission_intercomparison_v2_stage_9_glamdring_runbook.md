@@ -5,6 +5,13 @@ scenario batches. All filesystem paths live below `/mnt/users/jaketaylor/`.
 The `redwood` name is a scheduler queue argument only; it is not part of a
 filesystem path.
 
+> **Stronger grey-cloud rerun:** On branch
+> `codex/stage9-numba-stronger-cloud`, set `STAGE9_PROJECT_ROOT` to
+> `/mnt/users/jaketaylor/ROBERT-stage9-stronger-cloud`. Do not refresh or write
+> to the original `/mnt/users/jaketaylor/ROBERT-stage9` tree. Prepare new
+> injections and queue only `grey_absorbing_non_inverted` and
+> `grey_scattering_non_inverted`.
+
 ## 1. Fixed paths and checkout
 
 ```bash

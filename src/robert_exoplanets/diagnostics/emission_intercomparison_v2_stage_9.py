@@ -94,8 +94,8 @@ SCENARIOS = (
         "pg14_non_inverted",
         "grey_absorbing",
         0.5,
-        cloud_tau_truth=1.0,
-        cloud_top_pressure_bar_truth=1.0e-2,
+        cloud_tau_truth=3.0,
+        cloud_top_pressure_bar_truth=3.0e-3,
         cloud_single_scattering_albedo_truth=0.0,
     ),
     ScenarioDefinition(
@@ -103,8 +103,8 @@ SCENARIOS = (
         "pg14_non_inverted",
         "grey_isotropic_scattering",
         0.5,
-        cloud_tau_truth=1.0,
-        cloud_top_pressure_bar_truth=1.0e-2,
+        cloud_tau_truth=3.0,
+        cloud_top_pressure_bar_truth=3.0e-3,
         cloud_single_scattering_albedo_truth=0.9,
     ),
 )
@@ -139,25 +139,51 @@ def parameter_definitions(
         for name, value in _COMMON_GAS_TRUTH.items()
     )
     if item.cloudy:
+        if item.cloud_tau_truth is None or item.cloud_tau_truth <= 0.0:
+            raise RobertValidationError(
+                f"cloudy Stage-9 scenario {item.name} must define a positive "
+                "cloud_tau_truth"
+            )
+        if (
+            item.cloud_top_pressure_bar_truth is None
+            or item.cloud_top_pressure_bar_truth <= 0.0
+        ):
+            raise RobertValidationError(
+                f"cloudy Stage-9 scenario {item.name} must define a positive "
+                "cloud_top_pressure_bar_truth"
+            )
         parameters.extend(
             (
                 ParameterDefinition(
-                    "log10_cloud_tau_5um", -1.0, 1.0, 0.0, "log10 tau_cloud(5 um)"
+                    "log10_cloud_tau_5um",
+                    -1.0,
+                    1.0,
+                    math.log10(item.cloud_tau_truth),
+                    "log10 tau_cloud(5 um)",
                 ),
                 ParameterDefinition(
                     "log10_cloud_top_pressure_bar",
                     -3.0,
                     -1.0,
-                    -2.0,
+                    math.log10(item.cloud_top_pressure_bar_truth),
                     "log10 P_cloud,top",
                     "bar",
                 ),
             )
         )
     if item.cloud == "grey_isotropic_scattering":
+        if item.cloud_single_scattering_albedo_truth is None:
+            raise RobertValidationError(
+                f"scattering Stage-9 scenario {item.name} must define a "
+                "cloud_single_scattering_albedo_truth"
+            )
         parameters.append(
             ParameterDefinition(
-                "cloud_single_scattering_albedo", 0.5, 0.99, 0.9, "omega_0"
+                "cloud_single_scattering_albedo",
+                0.5,
+                0.99,
+                item.cloud_single_scattering_albedo_truth,
+                "omega_0",
             )
         )
     return tuple(parameters)

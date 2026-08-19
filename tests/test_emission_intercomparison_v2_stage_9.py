@@ -151,14 +151,46 @@ def test_stage_9_parameters_exclude_area_and_retrieve_clouds() -> None:
         "grey_absorbing_non_inverted": 11,
         "grey_scattering_non_inverted": 12,
     }
+    cloudy_truths = {
+        scenario.name: (
+            scenario.cloud_tau_truth,
+            scenario.cloud_top_pressure_bar_truth,
+        )
+        for scenario in SCENARIOS
+        if scenario.cloudy
+    }
+    assert cloudy_truths == {
+        "grey_absorbing_non_inverted": (3.0, 3.0e-3),
+        "grey_scattering_non_inverted": (3.0, 3.0e-3),
+    }
     for scenario in SCENARIOS:
-        names = {item.name for item in parameter_definitions(scenario)}
+        definitions = parameter_definitions(scenario)
+        names = {item.name for item in definitions}
         assert "area_scale" not in names
         assert "log10_area_scale" not in names
         if scenario.cloudy:
             assert {"log10_cloud_tau_5um", "log10_cloud_top_pressure_bar"} <= names
+            truth_by_name = {item.name: item.truth for item in definitions}
+            np.testing.assert_allclose(
+                truth_by_name["log10_cloud_tau_5um"],
+                np.log10(scenario.cloud_tau_truth),
+            )
+            np.testing.assert_allclose(
+                truth_by_name["log10_cloud_top_pressure_bar"],
+                np.log10(scenario.cloud_top_pressure_bar_truth),
+            )
         if scenario.cloud == "grey_isotropic_scattering":
             assert "cloud_single_scattering_albedo" in names
+            assert {item.name: item.truth for item in definitions}[
+                "cloud_single_scattering_albedo"
+            ] == scenario.cloud_single_scattering_albedo_truth
+
+
+def test_stage_9_robert_cloud_path_selects_compiled_cpu_backends() -> None:
+    source = NATIVE.read_text(encoding="utf-8")
+    assert "retain_species_tau=False" in source
+    assert 'backend="numba"' in source
+    assert 'boundary_backend="numba"' in source
 
 
 def test_picaso_projection_uses_native_bin_support_without_interpolation() -> None:
