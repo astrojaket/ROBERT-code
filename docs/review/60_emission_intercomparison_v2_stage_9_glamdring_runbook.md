@@ -10,7 +10,8 @@ filesystem path.
 > `/mnt/users/jaketaylor/ROBERT-stage9-stronger-cloud`. Do not refresh or write
 > to the original `/mnt/users/jaketaylor/ROBERT-stage9` tree. Prepare new
 > injections and queue only `grey_absorbing_non_inverted` and
-> `grey_scattering_non_inverted`.
+> `grey_scattering_non_inverted`. Export
+> `STAGE9_BRANCH=codex/stage9-numba-stronger-cloud` before the commands below.
 
 ## 1. Fixed paths and checkout
 
@@ -18,13 +19,14 @@ filesystem path.
 export STAGE9_USER_ROOT=/mnt/users/jaketaylor
 export STAGE9_REPOSITORY="$STAGE9_USER_ROOT/ROBERT-code"
 export STAGE9_ENVIRONMENT_PARENT="$STAGE9_USER_ROOT/stage9-environments"
-export STAGE9_PROJECT_ROOT="$STAGE9_USER_ROOT/ROBERT-stage9"
+export STAGE9_PROJECT_ROOT="${STAGE9_PROJECT_ROOT:-$STAGE9_USER_ROOT/ROBERT-stage9}"
 export STAGE9_REFERENCE_SOURCE="$STAGE9_USER_ROOT/stage9-reference-source"
+export STAGE9_BRANCH="${STAGE9_BRANCH:-codex/emission-intercomparison-v2-stage-9-setup}"
 
 cd "$STAGE9_REPOSITORY"
 git fetch origin
-git switch codex/emission-intercomparison-v2-stage-9-setup
-git pull --ff-only origin codex/emission-intercomparison-v2-stage-9-setup
+git switch "$STAGE9_BRANCH"
+git pull --ff-only origin "$STAGE9_BRANCH"
 git log -1 --oneline
 ```
 
