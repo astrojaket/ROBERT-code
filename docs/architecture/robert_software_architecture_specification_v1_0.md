@@ -1336,7 +1336,8 @@ with migration notes.
 
 ### v0.1: Skeleton
 
-Status: current repository stage.
+Status: historical v0.1 milestone. README.md documents the current production
+status.
 
 Includes:
 

@@ -4,12 +4,13 @@ Guidance for coding agents working in the ROBERT repository.
 
 ## Project Intent
 
-ROBERT is an early-stage Python package for JWST exoplanet atmospheric
-retrievals, initially focused on emission. It includes typed domain containers,
-correlated-k and opacity-sampling preparation, cloud-free and cloudy emission,
-absorption-dominated transmission, likelihood and optimal-estimation
-infrastructure, and optional UltraNest and MultiNest adapters. These components
-support validation retrievals but are not yet a production science model.
+ROBERT is a production-ready Python package for exoplanet atmospheric
+radiative transfer and retrievals in its documented and benchmarked regimes.
+It includes typed domain containers, correlated-k and opacity-sampling
+preparation, cloud-free and cloudy emission, absorption-dominated
+transmission, likelihood and optimal-estimation infrastructure, and optional
+UltraNest and MultiNest adapters. The documentation states the validation
+boundaries and unsupported scope for each workflow.
 
 The Python distribution name is `robert-exoplanets`; avoid introducing packaging or documentation that assumes the distribution is named `robert`.
 
@@ -58,7 +59,7 @@ conda run -n robert-exoplanets python examples/stub_emission_retrieval.py
 
 ## Current Scope Boundaries
 
-The following are deliberately out of scope for the initial skeleton:
+The following remain outside the supported production scope:
 
 - JWST pipeline calibration products.
 - Calibrated JWST pipeline products and multi-instrument covariance.
