@@ -361,17 +361,6 @@ The cloud-scattering benchmark bridge:
 python examples/benchmark_cloud_scattering_picaso_virga.py
 ```
 
-The Taylor et al. (2021) Figures 1–2 thermal-scattering reproduction is run with:
-
-```bash
-python examples/benchmark_taylor2021_figures_1_2.py
-```
-
-It overlays ROBERT against the archived NEMESIS Figure 1 forward spectra and
-recreates Figure 2 using the archived TP profiles. ROBERT uses the existing
-petitRADTRANS HDF5 H2O/CO and CIA tables; see
-`docs/review/24_taylor2021_cloud_figures_1_2.md` for provenance and scope.
-
 loads `ROBERT_CLOUD_PROPERTY_FILE` when set, accepting either dense `.npz`
 arrays, long-table `.csv` files with PICASO/Virga-style aliases such as
 `tau_ext`, `omega0`, and `g`, or PICASO `.cld` cloud tables. Index-style

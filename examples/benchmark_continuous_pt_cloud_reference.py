@@ -51,7 +51,8 @@ def main() -> dict[str, object]:
     parser.add_argument(
         "--picaso-python",
         type=Path,
-        default=Path("/Users/jaketaylor/opt/anaconda3/envs/picaso/bin/python"),
+        default=os.environ.get("ROBERT_PICASO_PYTHON"),
+        required="ROBERT_PICASO_PYTHON" not in os.environ,
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(

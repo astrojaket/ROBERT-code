@@ -76,7 +76,8 @@ def main() -> dict[str, Any]:
     parser.add_argument(
         "--picaso-python",
         type=Path,
-        default=Path("/Users/jaketaylor/opt/anaconda3/envs/picaso/bin/python"),
+        default=os.environ.get("ROBERT_PICASO_PYTHON"),
+        required="ROBERT_PICASO_PYTHON" not in os.environ,
     )
     parser.add_argument("--picaso-reference", type=Path, default=DEFAULT_REFERENCE)
     parser.add_argument("--picaso-database", type=Path, default=DEFAULT_DATABASE)

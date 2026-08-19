@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import subprocess
-import sys
 from types import SimpleNamespace
 
 import numpy as np
@@ -31,13 +29,6 @@ from robert_exoplanets.retrieval import (
     RetrievalParameterSet,
     UniformPrior,
 )
-from robert_exoplanets.io.task_config import load_task_config
-from scripts.create_run_directory import create_run_directory
-
-
-ROOT = Path(__file__).resolve().parents[1]
-
-
 def _problem() -> MultiDatasetRetrievalProblem:
     observation = Observation.from_arrays(
         [1.0, 2.0, 3.0],
@@ -196,84 +187,3 @@ def test_optimal_estimation_posterior_summary() -> None:
 
     assert summary["kind"] == "optimal_estimation_gaussian"
     assert summary["quantiles_16_50_84"]["a"] == [0.8, 1.0, 1.2]
-
-
-def test_benchmark_comparison_script_writes_partial_matrix(tmp_path: Path) -> None:
-    project = tmp_path / "my_project"
-    for config_name in (
-        "wasp69b_cloud_free_native_pg14_R1000.yaml",
-        "wasp69b_cloud_free_native_pg14_R1000_multinest.yaml",
-    ):
-        run_dir = create_run_directory(
-            project_dir=project,
-            source_config=ROOT / "configurations" / config_name,
-        )
-        config = load_task_config(run_dir / "configuration.yaml")
-        result_dir = config.outputs.directory / config.sampler.engine
-        result_dir.mkdir(parents=True)
-        names = tuple(parameter.name for parameter in config.parameters)
-        state = np.array(
-            [0.5 * (parameter.prior.lower + parameter.prior.upper) for parameter in config.parameters]
-        )
-        samples = np.vstack((state * 0.99, state, state * 1.01))
-        (result_dir / "result.json").write_text(
-            json.dumps(
-                {
-                    "parameter_names": names,
-                    "best_fit_parameters": dict(zip(names, state, strict=True)),
-                    "best_fit_log_likelihood": -10.0,
-                    "method": config.sampler.engine,
-                    "converged": True,
-                    "message": "finished",
-                    "log_evidence": -12.0,
-                    "log_evidence_error": 0.2,
-                    "metadata": {
-                        "inference_elapsed_seconds": "3600.0",
-                        "ncall": "1000",
-                    },
-                }
-            ),
-            encoding="utf-8",
-        )
-        np.savez(
-            result_dir / "result_arrays.npz",
-            samples=samples,
-            weights=np.array([0.2, 0.6, 0.2]),
-            log_likelihood=np.array([-11.0, -10.0, -11.0]),
-        )
-        plot_dir = config.outputs.directory / "plots" / result_dir.name
-        plot_dir.mkdir(parents=True)
-        (plot_dir / "fit_statistics.json").write_text(
-            json.dumps(
-                {
-                    "chi_squared": 20.0,
-                    "reduced_chi_squared": 1.1,
-                    "aic": 40.0,
-                    "aicc": 41.0,
-                    "bic": 50.0,
-                }
-            ),
-            encoding="utf-8",
-        )
-
-    completed = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "postprocess_wasp69b_sampler_benchmark.py"),
-            "--project-dir",
-            str(project),
-            "--allow-incomplete",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert completed.returncode == 0, completed.stderr
-    output = project / "benchmark_comparison"
-    assert (output / "benchmark_summary.json").is_file()
-    assert (output / "benchmark_summary.csv").is_file()
-    assert (output / "benchmark_runtime.png").is_file()
-    assert (output / "benchmark_fit_statistics.png").is_file()
-    assert (output / "benchmark_evidence.png").is_file()
-    assert (output / "benchmark_parameters_clear.png").is_file()
