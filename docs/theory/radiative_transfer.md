@@ -282,11 +282,11 @@ Primary theory and validation sources:
   for the four-term spherical-harmonics thermal solution and its high-stream
   validation.
 
-Passing `thermal_integration_backend="auto"` uses the Numba thermal-integration
-kernel when available and falls back to the NumPy reference path otherwise.
-Use `thermal_integration_backend="numpy"` to force the readable reference
-backend. Direct-beam single-scattering source runs currently remain on the
-NumPy path.
+ROBERT uses the Numba thermal-integration and SH4 kernels by default. Use
+`thermal_integration_backend="numpy"` to force the readable scientific
+reference. The `"auto"` option selects Numba when it is available and otherwise
+falls back to NumPy. Direct-beam single-scattering source runs currently remain
+on the NumPy path.
 
 ## Geometry and Source Function
 

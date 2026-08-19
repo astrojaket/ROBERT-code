@@ -24,6 +24,9 @@ except Exception:  # pragma: no cover - dependency availability is environment-s
     prange = range
 
 _NUMBA_AVAILABLE = njit is not None
+_SH4_LOWER_BANDWIDTH = 5
+_SH4_UPPER_BANDWIDTH = 5
+_SH4_BACKWARD_ERROR_LIMIT = 1.0e-11
 
 
 _HALF_RANGE_MOMENTS = np.pi * np.array(
@@ -49,6 +52,7 @@ class ThermalSH4Result:
     scaled_extinction_tau: NDArray[np.float64]
     scaled_single_scattering_albedo: NDArray[np.float64]
     delta_m_applied: bool
+    boundary_backend: str = "numba"
 
 
 @dataclass(frozen=True)
@@ -57,6 +61,7 @@ class ThermalSH4SpectrumResult:
 
     radiance: NDArray[np.float64]
     backend: str
+    boundary_backend: str = "numba"
 
     def __post_init__(self) -> None:
         radiance = _finite_array(self.radiance, "radiance", ndim=1)
@@ -65,6 +70,10 @@ class ThermalSH4SpectrumResult:
         if self.backend not in {"numpy", "numba"}:
             raise RobertValidationError(
                 "SH4 spectrum backend must be 'numpy' or 'numba'"
+            )
+        if self.boundary_backend not in {"scipy", "numba"}:
+            raise RobertValidationError(
+                "SH4 boundary backend must be 'scipy' or 'numba'"
             )
         radiance.setflags(write=False)
         object.__setattr__(self, "radiance", radiance)
@@ -86,6 +95,25 @@ def sh4_spectrum_backend_name(value: str) -> str:
         return "numba"
     raise RobertValidationError(
         "SH4 spectrum backend must be 'auto', 'numpy', or 'numba'"
+    )
+
+
+def sh4_boundary_backend_name(value: str) -> str:
+    """Normalize and validate the SH4 multilayer boundary-solve backend."""
+
+    normalized = str(value).strip().lower().replace("-", "_")
+    if normalized == "auto":
+        return "numba" if _NUMBA_AVAILABLE else "scipy"
+    if normalized == "scipy":
+        return "scipy"
+    if normalized == "numba":
+        if not _NUMBA_AVAILABLE:
+            raise RobertValidationError(
+                "SH4 boundary backend 'numba' requires the optional numba package"
+            )
+        return "numba"
+    raise RobertValidationError(
+        "SH4 boundary backend must be 'auto', 'scipy', or 'numba'"
     )
 
 
@@ -120,6 +148,7 @@ def solve_thermal_sh4(
     delta_m_forward_fraction: ArrayLike | None = None,
     delta_m: bool = True,
     source_quadrature_order: int = 6,
+    boundary_backend: str = "numba",
 ) -> ThermalSH4Result:
     """Solve thermal multiple scattering with a four-term P3 expansion.
 
@@ -149,6 +178,7 @@ def solve_thermal_sh4(
         delta_m=delta_m,
         source_quadrature_order=source_quadrature_order,
     )
+    selected_boundary_backend = sh4_boundary_backend_name(boundary_backend)
     coefficients, eigen_top, eigen_bottom, particular_top, particular_bottom = (
         _layer_solution(
             scaled_tau,
@@ -156,6 +186,7 @@ def solve_thermal_sh4(
             scaled_moments,
             planck,
             bottom_planck,
+            backend=selected_boundary_backend,
         )
     )
     moment_levels = _moment_levels(
@@ -203,6 +234,7 @@ def solve_thermal_sh4(
         scaled_extinction_tau=scaled_tau,
         scaled_single_scattering_albedo=scaled_omega,
         delta_m_applied=delta_m,
+        boundary_backend=selected_boundary_backend,
     )
 
 
@@ -220,14 +252,16 @@ def solve_thermal_sh4_spectrum(
     delta_m_forward_fraction: ArrayLike | None = None,
     delta_m: bool = True,
     source_quadrature_order: int = 6,
-    backend: str = "auto",
+    backend: str = "numba",
+    boundary_backend: str = "numba",
 ) -> ThermalSH4SpectrumResult:
     """Return only disk- and g-integrated SH4 radiance.
 
-    The boundary-value system is identical to :func:`solve_thermal_sh4` and is
-    solved by the SciPy reference path. The optional Numba backend compiles
-    only source reconstruction and directly accumulates the final spectrum,
-    avoiding moment-level and contribution-function output arrays.
+    The boundary-value system is identical to :func:`solve_thermal_sh4`.
+    ``boundary_backend="scipy"`` retains the reference solve, while
+    ``boundary_backend="numba"`` batches the independent wavelength/g
+    systems in a compiled banded solver. The separate reconstruction backend
+    controls whether the final spectrum is accumulated with NumPy or Numba.
     """
 
     (
@@ -260,12 +294,14 @@ def solve_thermal_sh4_spectrum(
         scaled_tau.shape[2],
         "g_weights",
     )
+    selected_boundary_backend = sh4_boundary_backend_name(boundary_backend)
     coefficients, _, _, _, _ = _layer_solution(
         scaled_tau,
         scaled_omega,
         scaled_moments,
         planck,
         bottom_planck,
+        backend=selected_boundary_backend,
     )
     selected_backend = sh4_spectrum_backend_name(backend)
     nodes, node_weights = np.polynomial.legendre.leggauss(source_quadrature_order)
@@ -315,6 +351,7 @@ def solve_thermal_sh4_spectrum(
     return ThermalSH4SpectrumResult(
         radiance=np.maximum(radiance, 0.0),
         backend=selected_backend,
+        boundary_backend=selected_boundary_backend,
     )
 
 
@@ -461,6 +498,8 @@ def _layer_solution(
     moments: NDArray[np.float64],
     planck: NDArray[np.float64],
     bottom_planck: NDArray[np.float64],
+    *,
+    backend: str = "scipy",
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -571,12 +610,17 @@ def _layer_solution(
     particular_top[..., 1] = thermal_factor * slope / a[1]
     particular_bottom[..., 1] = particular_top[..., 1]
 
-    flux_top = np.einsum("ij,lcjk->lcik", _HALF_RANGE_MOMENTS, eigen_top)
-    flux_bottom = np.einsum("ij,lcjk->lcik", _HALF_RANGE_MOMENTS, eigen_bottom)
-    particular_flux_top = np.einsum("ij,lcj->lci", _HALF_RANGE_MOMENTS, particular_top)
-    particular_flux_bottom = np.einsum(
-        "ij,lcj->lci", _HALF_RANGE_MOMENTS, particular_bottom
-    )
+    selected_backend = sh4_boundary_backend_name(backend)
+    if selected_backend == "numba":
+        flux_top = _numba_half_range_eigen_flux(eigen_top)
+        flux_bottom = _numba_half_range_eigen_flux(eigen_bottom)
+        particular_flux_top = _numba_half_range_particular_flux(particular_top)
+        particular_flux_bottom = _numba_half_range_particular_flux(particular_bottom)
+    else:
+        flux_top = _half_range_eigen_flux(eigen_top)
+        flux_bottom = _half_range_eigen_flux(eigen_bottom)
+        particular_flux_top = _half_range_particular_flux(particular_top)
+        particular_flux_bottom = _half_range_particular_flux(particular_bottom)
 
     size = 4 * nlayer
     band = np.zeros((11, size, ncolumn), dtype=float)
@@ -596,24 +640,371 @@ def _layer_solution(
     target = np.repeat(target[:, :, None], ng, axis=2).reshape(2, ncolumn)
     rhs[bottom_row:] = target - particular_flux_bottom[-1, :, 2:].T
 
-    coefficients = np.empty((nlayer, ncolumn, 4), dtype=float)
-    for column in range(ncolumn):
-        try:
-            coefficients[:, column, :] = solve_banded(
-                (5, 5),
-                band[:, :, column],
-                rhs[:, column],
-                check_finite=False,
-            ).reshape(nlayer, 4)
-        except np.linalg.LinAlgError as error:
+    if selected_backend == "numba":
+        coefficients_flat, backward_error, status = _numba_solve_banded_columns(
+            band,
+            rhs,
+        )
+        failed = np.flatnonzero(status)
+        if failed.size:
             raise RobertValidationError(
-                "SH4 multilayer boundary system is singular"
-            ) from error
+                "SH4 multilayer boundary system is singular or non-finite "
+                f"at flattened spectral column {int(failed[0])}"
+            )
+        inaccurate = np.flatnonzero(
+            ~np.isfinite(backward_error) | (backward_error > _SH4_BACKWARD_ERROR_LIMIT)
+        )
+        if inaccurate.size:
+            column = int(inaccurate[0])
+            raise RobertValidationError(
+                "SH4 compiled multilayer solve exceeded the normalized "
+                f"backward-error limit at flattened spectral column {column}: "
+                f"{backward_error[column]:.3e}"
+            )
+        coefficients = coefficients_flat.reshape(ncolumn, nlayer, 4).transpose(
+            1,
+            0,
+            2,
+        )
+    else:
+        coefficients = np.empty((nlayer, ncolumn, 4), dtype=float)
+        for column in range(ncolumn):
+            try:
+                coefficients[:, column, :] = solve_banded(
+                    (_SH4_LOWER_BANDWIDTH, _SH4_UPPER_BANDWIDTH),
+                    band[:, :, column],
+                    rhs[:, column],
+                    check_finite=False,
+                ).reshape(nlayer, 4)
+            except np.linalg.LinAlgError as error:
+                raise RobertValidationError(
+                    "SH4 multilayer boundary system is singular"
+                ) from error
     if not np.all(np.isfinite(coefficients)):
         raise RobertValidationError(
             "SH4 multilayer solve produced non-finite coefficients"
         )
     return coefficients, eigen_top, eigen_bottom, particular_top, particular_bottom
+
+
+def _half_range_eigen_flux(
+    eigen: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Apply the fixed half-range moment matrix without general einsum dispatch."""
+
+    flux = np.empty_like(eigen)
+    flux[..., 0, :] = np.pi * (
+        eigen[..., 0, :] - 2.0 * eigen[..., 1, :] + 1.25 * eigen[..., 2, :]
+    )
+    flux[..., 1, :] = np.pi * (
+        -0.25 * eigen[..., 0, :] + 1.25 * eigen[..., 2, :] - 2.0 * eigen[..., 3, :]
+    )
+    flux[..., 2, :] = np.pi * (
+        eigen[..., 0, :] + 2.0 * eigen[..., 1, :] + 1.25 * eigen[..., 2, :]
+    )
+    flux[..., 3, :] = np.pi * (
+        -0.25 * eigen[..., 0, :] + 1.25 * eigen[..., 2, :] + 2.0 * eigen[..., 3, :]
+    )
+    return flux
+
+
+def _half_range_particular_flux(
+    particular: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Apply the fixed half-range matrix to particular-source moments."""
+
+    flux = np.empty_like(particular)
+    flux[..., 0] = np.pi * (
+        particular[..., 0] - 2.0 * particular[..., 1] + 1.25 * particular[..., 2]
+    )
+    flux[..., 1] = np.pi * (
+        -0.25 * particular[..., 0]
+        + 1.25 * particular[..., 2]
+        - 2.0 * particular[..., 3]
+    )
+    flux[..., 2] = np.pi * (
+        particular[..., 0] + 2.0 * particular[..., 1] + 1.25 * particular[..., 2]
+    )
+    flux[..., 3] = np.pi * (
+        -0.25 * particular[..., 0]
+        + 1.25 * particular[..., 2]
+        + 2.0 * particular[..., 3]
+    )
+    return flux
+
+
+def _numba_half_range_eigen_flux(
+    eigen: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    if not _NUMBA_AVAILABLE:
+        raise RobertValidationError(
+            "SH4 boundary backend 'numba' requires the optional numba package"
+        )
+    return _numba_half_range_eigen_flux_kernel(np.ascontiguousarray(eigen))
+
+
+def _numba_half_range_particular_flux(
+    particular: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    if not _NUMBA_AVAILABLE:
+        raise RobertValidationError(
+            "SH4 boundary backend 'numba' requires the optional numba package"
+        )
+    return _numba_half_range_particular_flux_kernel(np.ascontiguousarray(particular))
+
+
+if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_half_range_eigen_flux_kernel(
+        eigen: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        nlayer, ncolumn, _nmoment, nmode = eigen.shape
+        flux = np.empty_like(eigen)
+        for flattened in prange(nlayer * ncolumn):
+            layer = flattened // ncolumn
+            column = flattened - layer * ncolumn
+            for mode in range(nmode):
+                value0 = eigen[layer, column, 0, mode]
+                value1 = eigen[layer, column, 1, mode]
+                value2 = eigen[layer, column, 2, mode]
+                value3 = eigen[layer, column, 3, mode]
+                flux[layer, column, 0, mode] = np.pi * (
+                    value0 - 2.0 * value1 + 1.25 * value2
+                )
+                flux[layer, column, 1, mode] = np.pi * (
+                    -0.25 * value0 + 1.25 * value2 - 2.0 * value3
+                )
+                flux[layer, column, 2, mode] = np.pi * (
+                    value0 + 2.0 * value1 + 1.25 * value2
+                )
+                flux[layer, column, 3, mode] = np.pi * (
+                    -0.25 * value0 + 1.25 * value2 + 2.0 * value3
+                )
+        return flux
+
+    @njit(parallel=True)
+    def _numba_half_range_particular_flux_kernel(
+        particular: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        nlayer, ncolumn, _nmoment = particular.shape
+        flux = np.empty_like(particular)
+        for flattened in prange(nlayer * ncolumn):
+            layer = flattened // ncolumn
+            column = flattened - layer * ncolumn
+            value0 = particular[layer, column, 0]
+            value1 = particular[layer, column, 1]
+            value2 = particular[layer, column, 2]
+            value3 = particular[layer, column, 3]
+            flux[layer, column, 0] = np.pi * (value0 - 2.0 * value1 + 1.25 * value2)
+            flux[layer, column, 1] = np.pi * (
+                -0.25 * value0 + 1.25 * value2 - 2.0 * value3
+            )
+            flux[layer, column, 2] = np.pi * (value0 + 2.0 * value1 + 1.25 * value2)
+            flux[layer, column, 3] = np.pi * (
+                -0.25 * value0 + 1.25 * value2 + 2.0 * value3
+            )
+        return flux
+
+else:
+
+    def _numba_half_range_eigen_flux_kernel(*args):
+        raise RobertValidationError(
+            "SH4 boundary backend 'numba' requires the optional numba package"
+        )
+
+    def _numba_half_range_particular_flux_kernel(*args):
+        raise RobertValidationError(
+            "SH4 boundary backend 'numba' requires the optional numba package"
+        )
+
+
+def _numba_solve_banded_columns(
+    band: NDArray[np.float64],
+    rhs: NDArray[np.float64],
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.int64],
+]:
+    """Solve independent SH4 band systems and report normalized residuals."""
+
+    if not _NUMBA_AVAILABLE:
+        raise RobertValidationError(
+            "SH4 boundary backend 'numba' requires the optional numba package"
+        )
+    return _numba_solve_banded_columns_kernel(
+        np.ascontiguousarray(band),
+        np.ascontiguousarray(rhs),
+    )
+
+
+if _NUMBA_AVAILABLE:
+
+    @njit(parallel=True)
+    def _numba_solve_banded_columns_kernel(
+        compact_band: NDArray[np.float64],
+        right_hand_side: NDArray[np.float64],
+    ) -> tuple[
+        NDArray[np.float64],
+        NDArray[np.float64],
+        NDArray[np.int64],
+    ]:
+        """Pivoted LU for SciPy-format band systems, parallel over columns."""
+
+        size = right_hand_side.shape[0]
+        ncolumn = right_hand_side.shape[1]
+        lower = _SH4_LOWER_BANDWIDTH
+        upper = _SH4_UPPER_BANDWIDTH
+        diagonal = lower + upper
+        expanded_rows = 2 * lower + upper + 1
+        solutions = np.empty((ncolumn, size), dtype=np.float64)
+        backward_errors = np.empty(ncolumn, dtype=np.float64)
+        statuses = np.zeros(ncolumn, dtype=np.int64)
+
+        for spectral_column in prange(ncolumn):
+            expanded = np.zeros((expanded_rows, size), dtype=np.float64)
+            vector = np.empty(size, dtype=np.float64)
+            pivots = np.zeros(size, dtype=np.int64)
+            for column in range(size):
+                vector[column] = right_hand_side[column, spectral_column]
+                for band_row in range(lower + upper + 1):
+                    expanded[band_row + lower, column] = compact_band[
+                        band_row, column, spectral_column
+                    ]
+
+            last_updated_column = -1
+            failed = False
+            for column in range(size):
+                rows_below = min(lower, size - column - 1)
+                pivot_offset = 0
+                pivot_magnitude = abs(expanded[diagonal, column])
+                for offset in range(1, rows_below + 1):
+                    candidate = abs(expanded[diagonal + offset, column])
+                    if candidate > pivot_magnitude:
+                        pivot_magnitude = candidate
+                        pivot_offset = offset
+                pivots[column] = pivot_offset
+                if pivot_magnitude == 0.0 or not np.isfinite(pivot_magnitude):
+                    statuses[spectral_column] = 1
+                    failed = True
+                    break
+
+                last_updated_column = max(
+                    last_updated_column,
+                    min(size - 1, column + upper + pivot_offset),
+                )
+                if pivot_offset:
+                    pivot_row = column + pivot_offset
+                    for target_column in range(column, last_updated_column + 1):
+                        first_index = diagonal + column - target_column
+                        second_index = diagonal + pivot_row - target_column
+                        temporary = expanded[first_index, target_column]
+                        expanded[first_index, target_column] = expanded[
+                            second_index, target_column
+                        ]
+                        expanded[second_index, target_column] = temporary
+
+                pivot = expanded[diagonal, column]
+                if pivot == 0.0 or not np.isfinite(pivot):
+                    statuses[spectral_column] = 1
+                    failed = True
+                    break
+                for offset in range(1, rows_below + 1):
+                    expanded[diagonal + offset, column] /= pivot
+
+                for target_column in range(column + 1, last_updated_column + 1):
+                    pivot_row_value = expanded[
+                        diagonal + column - target_column,
+                        target_column,
+                    ]
+                    for offset in range(1, rows_below + 1):
+                        target_index = diagonal + column + offset - target_column
+                        expanded[target_index, target_column] -= (
+                            expanded[diagonal + offset, column] * pivot_row_value
+                        )
+
+            if failed:
+                backward_errors[spectral_column] = np.inf
+                for row in range(size):
+                    solutions[spectral_column, row] = np.nan
+                continue
+
+            # Apply the LU row pivots and forward-substitute through L.
+            for column in range(size - 1):
+                pivot_offset = pivots[column]
+                if pivot_offset:
+                    pivot_row = column + pivot_offset
+                    temporary = vector[column]
+                    vector[column] = vector[pivot_row]
+                    vector[pivot_row] = temporary
+                rows_below = min(lower, size - column - 1)
+                for offset in range(1, rows_below + 1):
+                    vector[column + offset] -= (
+                        expanded[diagonal + offset, column] * vector[column]
+                    )
+
+            # Back-substitute through U, whose pivoting fill extends the upper band.
+            for column in range(size - 1, -1, -1):
+                pivot = expanded[diagonal, column]
+                if pivot == 0.0 or not np.isfinite(pivot):
+                    statuses[spectral_column] = 1
+                    failed = True
+                    break
+                vector[column] /= pivot
+                rows_above = min(diagonal, column)
+                for offset in range(1, rows_above + 1):
+                    vector[column - offset] -= (
+                        expanded[diagonal - offset, column] * vector[column]
+                    )
+
+            if failed:
+                backward_errors[spectral_column] = np.inf
+                for row in range(size):
+                    solutions[spectral_column, row] = np.nan
+                continue
+
+            residual = np.empty(size, dtype=np.float64)
+            row_norms = np.zeros(size, dtype=np.float64)
+            maximum_solution = 0.0
+            maximum_rhs = 0.0
+            for row in range(size):
+                solutions[spectral_column, row] = vector[row]
+                residual[row] = -right_hand_side[row, spectral_column]
+                maximum_solution = max(maximum_solution, abs(vector[row]))
+                maximum_rhs = max(
+                    maximum_rhs,
+                    abs(right_hand_side[row, spectral_column]),
+                )
+            for column in range(size):
+                for band_row in range(lower + upper + 1):
+                    row = column + band_row - upper
+                    if 0 <= row < size:
+                        value = compact_band[band_row, column, spectral_column]
+                        residual[row] += value * vector[column]
+                        row_norms[row] += abs(value)
+            maximum_residual = 0.0
+            matrix_infinity_norm = 0.0
+            for row in range(size):
+                maximum_residual = max(maximum_residual, abs(residual[row]))
+                matrix_infinity_norm = max(
+                    matrix_infinity_norm,
+                    row_norms[row],
+                )
+            denominator = matrix_infinity_norm * maximum_solution + maximum_rhs
+            if denominator == 0.0:
+                backward_errors[spectral_column] = maximum_residual
+            else:
+                backward_errors[spectral_column] = maximum_residual / denominator
+
+        return solutions, backward_errors, statuses
+
+else:
+
+    def _numba_solve_banded_columns_kernel(*args):
+        raise RobertValidationError(
+            "SH4 boundary backend 'numba' requires the optional numba package"
+        )
 
 
 def _put_banded(

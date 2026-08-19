@@ -400,7 +400,7 @@ class RadiativeTransferConfig(ConfigModel):
     ] = (
         "random_overlap"
     )
-    thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
+    thermal_integration_backend: Literal["auto", "numpy", "numba"] = "numba"
     reference_pressure_bar: PositiveFloat = 1.0
     radius_scale_parameter: str | None = None
     gravity_model: Literal["constant", "inverse_square"] = "inverse_square"

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Made Numba a required dependency and the default ROBERT CPU backend for
+  thermal integration and SH4, added a pivoted compiled SH4 band solver with
+  backward-error checks, and kept NumPy/SciPy as explicit reference backends.
 - Added a geometry-independent parameterized grey cloud deck plus well-mixed
   power-law haze model, shared CIA/Rayleigh/cloud extinction assembly for
   emission and transmission, and schema-v2 YAML integration for both modes.

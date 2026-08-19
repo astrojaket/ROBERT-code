@@ -28,15 +28,25 @@ class ThermalEmissionIntegrationResult:
 
     def __post_init__(self) -> None:
         layer = np.array(self.point_layer_contribution_radiance, dtype=float, copy=True)
-        bottom = np.array(self.point_bottom_contribution_radiance, dtype=float, copy=True)
+        bottom = np.array(
+            self.point_bottom_contribution_radiance, dtype=float, copy=True
+        )
         if layer.ndim != 3:
-            raise RobertValidationError("point_layer_contribution_radiance must be three-dimensional")
+            raise RobertValidationError(
+                "point_layer_contribution_radiance must be three-dimensional"
+            )
         if bottom.shape != (layer.shape[0], layer.shape[2]):
-            raise RobertValidationError("point_bottom_contribution_radiance has incorrect shape")
+            raise RobertValidationError(
+                "point_bottom_contribution_radiance has incorrect shape"
+            )
         if not np.all(np.isfinite(layer)) or np.any(layer < 0.0):
-            raise RobertValidationError("point layer thermal contributions must be non-negative")
+            raise RobertValidationError(
+                "point layer thermal contributions must be non-negative"
+            )
         if not np.all(np.isfinite(bottom)) or np.any(bottom < 0.0):
-            raise RobertValidationError("point bottom thermal contributions must be non-negative")
+            raise RobertValidationError(
+                "point bottom thermal contributions must be non-negative"
+            )
         if not self.backend:
             raise RobertValidationError("thermal integration backend must not be empty")
 
@@ -76,7 +86,9 @@ def thermal_integration_backend_name(value: str) -> str:
                 "thermal_integration_backend='numba' requires the optional numba package"
             )
         return "numba"
-    raise RobertValidationError("thermal_integration_backend must be 'auto', 'numpy', or 'numba'")
+    raise RobertValidationError(
+        "thermal_integration_backend must be 'auto', 'numpy', or 'numba'"
+    )
 
 
 def integrate_thermal_emission(
@@ -88,7 +100,7 @@ def integrate_thermal_emission(
     level_source_ordered: ArrayLike | None = None,
     bottom_source: ArrayLike | None = None,
     bottom_visible: ArrayLike | None = None,
-    backend: str = "auto",
+    backend: str = "numba",
 ) -> ThermalEmissionIntegrationResult:
     """Integrate thermal layer and bottom-boundary emission for each disc point.
 
@@ -141,7 +153,9 @@ def integrate_thermal_emission(
         else:
             visible = np.array(bottom_visible, dtype=np.bool_, copy=True)
             if visible.shape != (path_factors.shape[0],):
-                raise RobertValidationError("bottom_visible must match the emission-point axis")
+                raise RobertValidationError(
+                    "bottom_visible must match the emission-point axis"
+                )
 
     selected_backend = thermal_integration_backend_name(backend)
     if selected_backend == "numba":
@@ -182,7 +196,7 @@ def integrate_thermal_emission_spectrum(
     level_source_ordered: ArrayLike | None = None,
     bottom_source: ArrayLike | None = None,
     bottom_visible: ArrayLike | None = None,
-    backend: str = "auto",
+    backend: str = "numba",
 ) -> ThermalEmissionSpectrumIntegrationResult:
     """Integrate only disk-averaged radiance, omitting contribution arrays."""
 
@@ -197,9 +211,7 @@ def integrate_thermal_emission_spectrum(
         )
         if np.any(level_source < 0.0):
             raise RobertValidationError("level_source_ordered must be non-negative")
-    weights = _normalized_nonnegative_weights(
-        g_weights, tau.shape[2], "g_weights"
-    )
+    weights = _normalized_nonnegative_weights(g_weights, tau.shape[2], "g_weights")
     raw_paths = np.array(emission_path_factors, dtype=float, copy=True)
     if raw_paths.ndim != 2:
         raise RobertValidationError("emission_path_factors must be two-dimensional")
@@ -296,7 +308,9 @@ def _numpy_integrate_thermal_emission(
                 * linear_weight
             )
         layer_radiance_by_g = transmission_before * emitted
-        point_layer[point_index] = np.sum(layer_radiance_by_g * weights[None, None, :], axis=-1)
+        point_layer[point_index] = np.sum(
+            layer_radiance_by_g * weights[None, None, :], axis=-1
+        )
         if bottom_visible[point_index]:
             total_transmission = np.exp(-np.sum(slant_tau, axis=0))
             point_bottom[point_index] = (
@@ -490,10 +504,13 @@ if _NUMBA_AVAILABLE:
                     cumulative_tau = 0.0
                     weight = weights[g_index]
                     for layer_index in range(n_layers):
-                        slant_tau = tau[layer_index, spectral_index, g_index] * path_factors[
-                            point_index,
-                            layer_index,
-                        ]
+                        slant_tau = (
+                            tau[layer_index, spectral_index, g_index]
+                            * path_factors[
+                                point_index,
+                                layer_index,
+                            ]
+                        )
                         transmission_before = np.exp(-cumulative_tau)
                         escape = -np.expm1(-slant_tau)
                         if use_linear_source:
@@ -524,7 +541,9 @@ if _NUMBA_AVAILABLE:
                         cumulative_tau += slant_tau
                     if bottom_visible[point_index]:
                         point_bottom[point_index, spectral_index] += (
-                            np.exp(-cumulative_tau) * weight * bottom_source[spectral_index]
+                            np.exp(-cumulative_tau)
+                            * weight
+                            * bottom_source[spectral_index]
                         )
         return point_layer, point_bottom
 

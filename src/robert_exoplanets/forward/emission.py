@@ -68,7 +68,7 @@ class EmissionModelConfig:
     helium_fraction_of_background: float = 0.16
     include_rayleigh: bool = True
     gas_combination: str = "random_overlap"
-    thermal_integration_backend: str = "auto"
+    thermal_integration_backend: str = "numba"
     stellar_spectrum_model: str = "phoenix"
     compute_diagnostics: bool = False
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -179,7 +179,7 @@ class ParameterizedEmissionModelConfig:
     cia_temperature_extrapolation: str = "clip"
     cia_spectral_extrapolation: str = "zero"
     gas_combination: str = "random_overlap"
-    thermal_integration_backend: str = "auto"
+    thermal_integration_backend: str = "numba"
     stellar_spectrum_model: str = "phoenix"
     compute_diagnostics: bool = False
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -826,9 +826,7 @@ class ParameterizedEmissionForwardModel:
             multiple_scattering_backend=multiple_scattering_backend,
         )
         if result.eclipse_depth is None:
-            raise RobertValidationError(
-                "emission solver did not return eclipse depth"
-            )
+            raise RobertValidationError("emission solver did not return eclipse depth")
         return result.eclipse_depth
 
 
@@ -867,9 +865,7 @@ class GreyScatteringCloudConfig:
 
 
 @dataclass(frozen=True)
-class ParameterizedGreyCloudEmissionForwardModel(
-    ParameterizedEmissionForwardModel
-):
+class ParameterizedGreyCloudEmissionForwardModel(ParameterizedEmissionForwardModel):
     """Parameterized emission column with a uniform gray scattering opacity."""
 
     cloud: GreyScatteringCloudConfig = field(

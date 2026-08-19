@@ -194,7 +194,7 @@ radiative_transfer:
     points: 4                 # Used by gauss_legendre_disk only.
   include_rayleigh: true
   gas_combination: random_overlap  # Alternative: equivalent_extinction
-  thermal_integration_backend: auto # Alternatives: numpy, numba
+  thermal_integration_backend: numba # Alternatives: auto, numpy
   # Transmission-only controls:
   reference_pressure_bar: 1.0
   radius_scale_parameter: null # Example: radius_scale; add it to parameters.
