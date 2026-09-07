@@ -119,3 +119,46 @@ physical and external-input identity; a callable cannot identify its own science
 Real Metal hardware, long shared-VMR HRS/LRS target runs, and broad posterior
 calibration across seeds remain separate release checks. The local passes do
 not certify those regimes or independent science-grade cloudy agreement.
+
+## Repository consolidation
+
+The `codex/production-consolidation-20260907` branch gathers the existing
+uncommitted LBL/HRS and accelerator work with this retrieval cleanup. It also
+contains both production-status and reproducible-CI commits from GitHub main.
+The large total change against main includes that earlier feature work; it is
+not a measure of code added by the folder cleanup.
+
+The 36 maintained YAML files now live under `configurations/quickstart/`,
+`configurations/examples/`, and `configurations/targets/`. Two redundant
+MultiNest wrappers were removed in addition to the two obsolete UltraNest
+wrappers. Maintained runners, tests, and documentation use the new locations.
+Use `paths` for runtime directories; the stale `housekeeping` alias is rejected.
+Scientific settings and instrument-specific grids were retained. Existing
+prepared caches from the old schema require `--prepare-opacity` once.
+
+A complete, verified Git bundle records the old refs under the ignored local
+`external_data/consolidation/20260907/` directory. Cleanup removed 17 obsolete
+local branch refs and two obsolete remote refs. Eight local branches remain;
+unique paper, performance, and research histories were retained. No Git object
+garbage collection was run. Heavy inputs, local research projects, and runtime
+caches are excluded from the consolidation commit.
+
+Five completed tasks were archived. Archiving the HAT-P-32b proposal test task
+also deleted its managed worktree. The app snapshot restored its code and three
+scripts, but not ignored simulation outputs. The user accepted rerunning those
+closed test simulations if needed. The restored task remains open. This cleanup
+does not mark unfinished research as complete.
+
+The next research actions are Stage 9 posterior post-processing and paper
+interpretation, CLR trial reconciliation and predictive checks, WASP-178b exact
+refits/covariance assessment, and the deferred real-data HRS/LRS validation in
+the development roadmap.
+
+After configuration consolidation, the full suite passed **840 tests**, with
+**27 optional checks skipped**, including native MultiNest start/resume.
+All 36 maintained configurations loaded, the focused configuration suite passed
+63 tests, and the bundled three-instrument forward example passed after cache
+preparation. The five CI-policy tests also passed after merging GitHub main.
+A separate JAX CPU run passed **24 tests**. Ruff, scoped mypy, dependency
+checks, wheel/source builds, and archive-content checks passed. The package
+retains the production classifier and excludes UltraNest and generated caches.
