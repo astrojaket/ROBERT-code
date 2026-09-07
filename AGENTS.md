@@ -4,19 +4,24 @@ Guidance for coding agents working in the ROBERT repository.
 
 ## Project Intent
 
-ROBERT is an early-stage Python package for JWST exoplanet atmospheric
-retrievals, initially focused on emission. It includes typed domain containers,
-correlated-k and opacity-sampling preparation, cloud-free and cloudy emission,
-absorption-dominated transmission, likelihood and optimal-estimation
-infrastructure, and optional UltraNest and MultiNest adapters. These components
-support validation retrievals but are not yet a production science model.
+ROBERT is a production-ready radiative-transfer and atmospheric-retrieval
+framework for its documented and benchmarked regimes. It combines typed planet, star, atmosphere, opacity, observation,
+instrument, forward-model, likelihood, and inference components behind a
+strict YAML workflow. It supports thermal-emission and transmission spectra,
+correlated-k and opacity-sampling inputs, equilibrium and free chemistry,
+cloud-free and cloudy atmospheres, one- and two-region emission, instrument
+binning, Gaussian likelihoods, optimal estimation and PyMultiNest.
+These workflows produce portable configuration snapshots, manifests, numerical
+results, diagnostics, and plots; use the documented validation boundaries when
+assessing science results. Implemented features do not by themselves establish
+scientific validation.
 
 The Python distribution name is `robert-exoplanets`; avoid introducing packaging or documentation that assumes the distribution is named `robert`.
 
 ## Working Guidelines
 
-- Always run Python, tests, package installation, retrievals, examples, and
-  scientific validation in the `robert-exoplanets` Conda environment. Prefer
+- When running Python, tests, package installation, retrievals, examples, or
+  scientific validation, use the `robert-exoplanets` Conda environment. Prefer
   explicit commands such as `conda run -n robert-exoplanets python ...` and
   `conda run -n robert-exoplanets python -m pytest ...`; do not rely on the
   currently activated shell environment.
@@ -31,7 +36,18 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
 - Follow `docs/data_policy.md`: retain required lightweight inputs and compact
   benchmark test oracles, but do not commit heavy opacity data or generated
   scientific products.
-- Follow `docs/rfcs/0001-robert-architectural-specification.md` and the companion docs in `docs/architecture/` for package boundaries, dependency rules, data models, plugin design, configuration, and testing philosophy.
+- Use `opacity_data/ktables_exomol/` as the default R=1000 source for JWST
+  work. The local tables were copied from Dropbox and verified by checksum.
+  Keep each instrument's wavelength coverage and bin edges separate. Use
+  bundled R=100 only when explicitly selected for quick validation.
+- After retrieval, use 100 weighted posterior draws for median and central
+  1-sigma/2-sigma spectra, T-P, VMR, and cloud profiles. Use the same draws
+  across products and save their numerical values. Use `mediumpurple` for
+  posterior curves and bands, unless the user selects another colour.
+- When changing package boundaries, data models, interfaces, plugin design,
+  configuration, or testing design, read the relevant guidance in
+  `docs/rfcs/0001-robert-architectural-specification.md` and
+  `docs/architecture/`.
 
 ## Repository Layout
 
@@ -58,10 +74,11 @@ conda run -n robert-exoplanets python examples/stub_emission_retrieval.py
 
 ## Current Scope Boundaries
 
-The following are deliberately out of scope for the initial skeleton:
+The following remain outside the supported scope of current workflows:
 
-- JWST pipeline calibration products.
-- Calibrated JWST pipeline products and multi-instrument covariance.
+- Calibrated JWST pipeline products and general cross-instrument covariance
+  in configured workflows. Python APIs support covariance within declared
+  observation blocks.
 - Production-complete chemistry, clouds, and opacity databases.
 - Science-grade multiple-scattering and instrument throughput/line-spread models.
 - Broad sampler support and fully validated long-run posterior workflows.

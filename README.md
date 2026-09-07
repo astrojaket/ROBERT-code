@@ -8,12 +8,20 @@ strict YAML workflow.
 ROBERT supports thermal-emission and transmission spectra, correlated-k and
 opacity-sampling inputs, equilibrium and free chemistry, cloud-free and cloudy
 atmospheres, one- and two-region emission, instrument binning, Gaussian
-likelihoods, optimal estimation, UltraNest, and MultiNest. Runs produce
+likelihoods, optimal estimation and PyMultiNest. Runs produce
 portable configuration snapshots, manifests, numerical results, diagnostics,
 and plots.
 
-MultiNest is the default nested sampler. UltraNest remains available only when
-it is selected explicitly.
+The standard YAML runners cover the configured emission and transmission
+workflows. Line-by-line opacity, high-resolution observations, covariance
+likelihoods, and accelerator paths also have Python APIs and dedicated scripts;
+they are not all options in the standard YAML schema. See the
+[capability audit](docs/review/53_repository_audit_2026-09-07.md) and
+[development roadmap](docs/architecture/development_roadmap.md) for current
+interfaces, validation limits, and next steps.
+
+PyMultiNest is the supported nested sampler. Optimal Estimation supports
+deterministic retrievals and future detailed sounding models.
 
 The Python distribution is named `robert-exoplanets`.
 
@@ -29,7 +37,7 @@ conda activate robert-exoplanets
 ```
 
 This environment includes the compiled MPICH, MultiNest, and PyMultiNest
-libraries as well as UltraNest, FastChem, opacity, plotting, notebook, and test
+libraries as well as FastChem, opacity, plotting, notebook, and test
 dependencies.
 
 For a smaller editable installation into an existing Python 3.10–3.14
@@ -40,7 +48,7 @@ python -m pip install -e ".[dev,opacity,retrieval]"
 ```
 
 MultiNest itself is a compiled library and is supplied by `environment.yml`;
-the pip retrieval extra installs UltraNest and mpi4py. PHOENIX stellar spectra
+the pip retrieval extra installs PyMultiNest and mpi4py. PHOENIX stellar spectra
 also require the STScI Synphot reference data:
 
 ```bash
@@ -50,7 +58,13 @@ export PYSYN_CDBS=/path/to/synphot/reference-data
 `PYSYN_CDBS` must name the directory containing `grid/phoenix`. A configuration
 with `bodies.star.spectrum_model: blackbody` does not require those files.
 
-ROBERT includes ready-to-use R=100 correlated-k tables for H2O, CO, CO2, CH4,
+JWST configurations default to R=1000 tables in
+`opacity_data/ktables_exomol/`. The local collection contains 16 tables copied
+from `Dropbox/NemesisPy-Docker/ktables_exomol/`; its checksum manifest is
+`opacity_data/ktables_exomol/local_copy_manifest.json`. These large files stay
+outside Git. Each instrument retains its own wavelength coverage and bin edges.
+
+ROBERT also includes ready-to-use R=100 correlated-k tables for H2O, CO, CO2, CH4,
 NH3, and HCN from 0.3 to 15 microns. They are suitable for quick forward
 models and HST/WFC3-scale analyses. Select `opacity.resolution: R100` and omit
 `paths.k_table_directory` to use them.
@@ -60,9 +74,12 @@ Verify the installation:
 ```bash
 conda run -n robert-exoplanets python -m pytest
 conda run -n robert-exoplanets python run_retrieval.py \
-  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml \
+  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml \
   --validate-only
 ```
+
+The bundled quickstart configuration is stored at
+`configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml`.
 
 ### End-to-end installation validation
 
@@ -90,15 +107,15 @@ Start with a schema-version-2 YAML configuration. Each parameter may have a
 
 ```bash
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml \
+  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml \
   --validate-only
 
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml \
+  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml \
   --prepare-opacity
 
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/wasp80b_cloud_free_native_pg14_R100.yaml
+  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml
 ```
 
 The model is written to `outputs/forward_model.npz`. With forward plotting
@@ -148,7 +165,7 @@ and an Oxford Glamdring launcher:
 ```bash
 conda run -n robert-exoplanets python scripts/create_run_directory.py \
   --project-dir /path/to/runs \
-  --config configurations/wasp69b_cloud_free_R1000.yaml
+  --config configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml
 ```
 
 See [Running retrievals](docs/retrievals.md) for detailed local, standard
@@ -161,4 +178,4 @@ and post-processing.
 - [Configuration reference](docs/configuration.md)
 - [Portable observation format](docs/data/observation_format.md)
 - [Post-processing and plotting](docs/postprocessing.md)
-- [Complete annotated YAML](configurations/TEMPLATE_all_supported_options.yaml)
+- [Complete annotated YAML](configurations/examples/TEMPLATE_all_supported_options.yaml)

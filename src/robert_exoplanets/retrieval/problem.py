@@ -8,12 +8,18 @@ from typing import Callable, Mapping, Protocol
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from robert_exoplanets.core import RobertError, RobertValidationError, Spectrum
+from robert_exoplanets.core import (
+    RobertConfigError,
+    RobertError,
+    RobertValidationError,
+    Spectrum,
+)
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.instruments import Observation
 from robert_exoplanets.likelihoods import GaussianLikelihood
 
 from .priors import RetrievalParameterSet
+from .protocols import OptimalEstimationProblem, SamplerRetrievalProblem
 
 
 class ObservedSpectrumPrediction(Protocol):
@@ -101,6 +107,12 @@ class RetrievalProblem:
     ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """Return masked Gaussian model, data, and uncertainty for a vector."""
 
+        if not _supports_optimal_estimation(self.likelihood):
+            raise RobertConfigError(
+                "optimal estimation requires a supported independent Gaussian "
+                "likelihood; correlated or profiled likelihoods are unsupported"
+            )
+
         parameter_values = self.parameter_mapping(vector)
         prediction = self.predict(parameter_values)
         model, data, uncertainty = self.likelihood.effective_inputs(
@@ -162,3 +174,19 @@ class RetrievalProblem:
         if not np.isfinite(log_likelihood):
             return float("-inf")
         return float(log_prior + log_likelihood)
+
+
+def _supports_optimal_estimation(likelihood: object) -> bool:
+    """Return whether a likelihood opts into the current OE input contract."""
+
+    return bool(getattr(likelihood, "supports_optimal_estimation", False))
+
+
+__all__ = [
+    "ForwardEvaluator",
+    "ForwardPrediction",
+    "ObservedSpectrumPrediction",
+    "OptimalEstimationProblem",
+    "RetrievalProblem",
+    "SamplerRetrievalProblem",
+]

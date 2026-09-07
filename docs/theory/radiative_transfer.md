@@ -104,7 +104,7 @@ prepared opacity identity, and hashes of the pressure, spectral, and base
 temperature grids.
 
 For a complete target configuration, copy
-`configurations/wasp69b_cloud_free_R1000.yaml` and change the science inputs
+`configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml` and change the science inputs
 rather than copying or editing the retrieval implementation.
 
 ## Current Scope

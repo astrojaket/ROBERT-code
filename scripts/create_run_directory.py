@@ -58,7 +58,7 @@ scripts, and the Slurm submission script.
 `configuration.yaml` is the file to edit before preparation or submission. Its
 writable paths are deliberately local to this directory:
 
-- `outputs/` — UltraNest checkpoints and run products;
+- `outputs/` — MultiNest checkpoints and run products;
 - `opacity_cache/` — K-tables prepared onto the selected observation bins; and
 - `scratch/` — Numba and Matplotlib runtime files.
 
@@ -109,7 +109,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        default=ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml",
+        default=(
+            ROOT
+            / "configurations"
+            / "targets"
+            / "WASP-69b"
+            / "wasp69b_cloud_free_R1000.yaml"
+        ),
         help="source task YAML; its run.name becomes the folder name",
     )
     parser.add_argument("--slurm-account", help="optional Slurm account")
@@ -169,7 +175,7 @@ def create_run_directory(
         shutil.copy2(ROOT / filename, run_directory / filename)
 
     generated = config.model_dump(mode="json", exclude_none=True)
-    configured_paths = config.paths or config.housekeeping
+    configured_paths = config.paths
     paths = (
         {}
         if configured_paths is None
@@ -203,7 +209,6 @@ def create_run_directory(
     generated["opacity"].pop("cache_directory", None)
     generated.pop("outputs", None)
     generated["runtime"].pop("scratch_directory", None)
-    generated.pop("housekeeping", None)
     generated.pop("paths", None)
     generated = {
         "schema_version": generated.pop("schema_version"),

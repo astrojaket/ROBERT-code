@@ -13,6 +13,8 @@ from robert_exoplanets.core import PressureGrid, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import pressure_values_in_unit
 
+from ._validation import _gravity_profile
+
 BOLTZMANN_CONSTANT_J_K = 1.380649e-23
 ATOMIC_MASS_KG = 1.66053906660e-27
 
@@ -373,20 +375,6 @@ def _shell_path_lengths(
     path = np.where(impact_parameter_m < shell_outer_radius_m, outer - inner, 0.0)
     path = np.maximum(path, 0.0)
     return path
-
-
-def _gravity_profile(values: float | ArrayLike, n_layers: int) -> NDArray[np.float64]:
-    array = np.array(values, dtype=float, copy=True)
-    if array.ndim == 0:
-        array = np.full(n_layers, float(array), dtype=float)
-    if array.ndim != 1:
-        raise RobertValidationError("gravity_m_s2 must be scalar or one-dimensional")
-    if array.shape != (n_layers,):
-        raise RobertValidationError("gravity_m_s2 must match pressure grid layers")
-    if not np.all(np.isfinite(array)) or np.any(array <= 0.0):
-        raise RobertValidationError("gravity_m_s2 values must be finite and positive")
-    array.setflags(write=False)
-    return array
 
 
 def _positive_float(value: float, name: str) -> float:

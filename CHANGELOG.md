@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Removed UltraNest execution, configuration, dependencies, and stale example
+  loops. PyMultiNest is the supported sampler; Optimal Estimation remains
+  available. Added checked retrieval contracts, explicit resume settings, and
+  portable best-fit predictions. Shared factory opacity preparation and made
+  R=1000 the default resolution for JWST configurations.
+
+- Rejected unsupported covariance/profiled likelihoods and CLR priors in
+  optimal estimation, and rejected scalar CLR density calls. Preserved the
+  nested-sampling CLR transform. Removed a stale Metal accounting hook,
+  froze optical-depth metadata, corrected opacity diagnostic labels, and
+  shared duplicate RT/interpolation helpers.
+
+- Audited the working-tree capability boundaries, shortened the roadmap and
+  repeated benchmark text, and distinguished standard YAML workflows from
+  specialized Python APIs. See the 2026-09-07 repository audit for findings
+  and verification limits.
+
 - Accelerated cloudy SH4 retrievals with a parity-checked Numba banded solver,
   spectrum-only contractions, shared multi-dataset atmospheric state,
   continuous fractional cloud-layer boundaries, MultiNest evaluation

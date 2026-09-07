@@ -26,6 +26,7 @@ from robert_exoplanets.opacity import (
 from robert_exoplanets.rt import (
     AbsorptionTransmissionResult,
     CiaTable,
+    HMinusContinuumConfig,
     hydrostatic_path_geometry,
     inverse_square_hydrostatic_path_geometry,
     solve_absorption_transmission,
@@ -62,6 +63,7 @@ class ParameterizedTransmissionModelConfig:
     gas_combination: str = "random_overlap"
     impact_quadrature_order: int = 8
     metadata: Mapping[str, str] = field(default_factory=dict)
+    hminus_continuum: HMinusContinuumConfig | None = None
 
     def __post_init__(self) -> None:
         species = tuple(str(item).strip() for item in self.opacity_species)
@@ -105,6 +107,13 @@ class ParameterizedTransmissionModelConfig:
         ):
             raise RobertValidationError(
                 "impact_quadrature_order must be an integer of at least two"
+            )
+        if self.hminus_continuum is not None and not isinstance(
+            self.hminus_continuum,
+            HMinusContinuumConfig,
+        ):
+            raise RobertValidationError(
+                "hminus_continuum must be an HMinusContinuumConfig or None"
             )
         object.__setattr__(self, "opacity_species", species)
         object.__setattr__(self, "reference_pressure_bar", reference_pressure)
@@ -261,6 +270,18 @@ class ParameterizedTransmissionForwardModel:
                 "gas_combination": self.config.gas_combination,
                 "include_rayleigh": str(self.config.include_rayleigh).lower(),
                 "include_cia": str(bool(self.cia_tables)).lower(),
+                "include_hminus_continuum": str(
+                    self.config.hminus_continuum is not None
+                ).lower(),
+                "hminus_continuum_species": ""
+                if self.config.hminus_continuum is None
+                else ",".join(self.config.hminus_continuum.species),
+                "hminus_temperature_extrapolation": ""
+                if self.config.hminus_continuum is None
+                else self.config.hminus_continuum.temperature_extrapolation,
+                "hminus_spectral_extrapolation": ""
+                if self.config.hminus_continuum is None
+                else self.config.hminus_continuum.spectral_extrapolation,
                 "impact_quadrature_order": str(self.config.impact_quadrature_order),
                 "radius_scale_parameter": (self.config.radius_scale_parameter or ""),
                 "pressure_grid_layers": str(self.pressure_grid.n_layers),
@@ -368,6 +389,7 @@ class ParameterizedTransmissionForwardModel:
             cia_normal_hydrogen=self.config.cia_normal_hydrogen,
             cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
             cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+            hminus_continuum=self.config.hminus_continuum,
             cloud_model=self.cloud_model,
             parameters=parameter_values,
         )

@@ -8,7 +8,7 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core import RobertConfigError, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
 
 
@@ -141,13 +141,17 @@ class CenteredLogRatioPrior:
         )
 
     def log_probability(self, value: float) -> float:
-        number = float(value)
-        return 0.0 if self.lower <= number <= self.upper else float("-inf")
+        """Reject a scalar density for a joint transform-only prior."""
+
+        raise RobertConfigError(
+            "CLR prior density is not implemented; use the joint prior transform "
+            "with nested sampling"
+        )
 
     def gaussian_approximation(self) -> tuple[float, float]:
         """Return a bounded diagnostic approximation.
 
-        Optimal estimation is rejected for configured CLR retrievals because
+        Optimal estimation is rejected for CLR retrievals because
         this scalar approximation does not encode the joint simplex geometry.
         """
 

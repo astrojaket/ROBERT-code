@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "comparison": "ROBERT_vs_petitRADTRANS3_R1e6_CO_H2O_K_band_emission",
+  "status": "pass",
+  "command": "conda run -n robert-exoplanets python examples/benchmark_lbl_kband_emission.py",
+  "clear_atmosphere": true,
+  "included_opacity": [
+    "CO__HITEMP",
+    "H2O__POKAZATEL"
+  ],
+  "input_tables": {
+    "H2O": {
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_2.3-2.3mu.xsec.petitRADTRANS.h5",
+      "file_bytes": 2702736,
+      "sha256": "9bdf7fbe170fb31a241a177d22b8498d0ac56080ebcb53ce0240786e904c5ba9"
+    },
+    "CO": {
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "file_bytes": 4753927800,
+      "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad"
+    }
+  },
+  "excluded_opacity": [
+    "CIA",
+    "Rayleigh",
+    "clouds",
+    "scattering"
+  ],
+  "native_resolving_power": 1000000,
+  "lsf": {
+    "profile": "Gaussian",
+    "resolving_power": 100000,
+    "kernel_support_sigma": 4.0
+  },
+  "wavelength_native_micron": [
+    2.298799629992875,
+    2.303781922577252
+  ],
+  "n_wavelength_native": 2166,
+  "wavelength_R100000_micron": [
+    2.298838763037074,
+    2.303740508107616
+  ],
+  "n_wavelength_R100000": 214,
+  "gravity_m_s2": 15.0,
+  "pressure_bar": [
+    1e-05,
+    100.0
+  ],
+  "pressure_points": [
+    80,
+    160
+  ],
+  "temperature_profile_K": "900 + 900 * (log10(P_bar) + 5) / 7",
+  "composition": {
+    "H2": 0.8499682615433444,
+    "He": 0.14965399727079137,
+    "H2O__POKAZATEL": 0.00012898479517314042,
+    "CO__HITEMP": 0.00024875639069105653
+  },
+  "mean_molar_mass_amu": 2.3217263131165273,
+  "metrics": {
+    "petitradtrans_80_vs_160_native": {
+      "median_signed_relative_error": 9.975992091348918e-05,
+      "rms_relative_error": 0.00011775906683222675,
+      "p95_absolute_relative_error": 0.00017877650044689775,
+      "max_absolute_relative_error": 0.0003214394857020686,
+      "integrated_flux_relative_error": 0.00010543686285702236
+    },
+    "petitradtrans_80_vs_160_R100000": {
+      "median_signed_relative_error": 0.00010061696844798629,
+      "rms_relative_error": 0.00011273075844960322,
+      "p95_absolute_relative_error": 0.0001592208017725638,
+      "max_absolute_relative_error": 0.00024283323867257955,
+      "integrated_flux_relative_error": 0.00010533017884206686
+    },
+    "robert_vs_petitradtrans_80_native": {
+      "median_signed_relative_error": -0.0010294837428656556,
+      "rms_relative_error": 0.004598992333355617,
+      "p95_absolute_relative_error": 0.008374301036172122,
+      "max_absolute_relative_error": 0.0439812286681609,
+      "integrated_flux_relative_error": -0.0007026128223228678
+    },
+    "robert_vs_petitradtrans_160_native": {
+      "median_signed_relative_error": -0.0004679616239276485,
+      "rms_relative_error": 0.004606075916808087,
+      "p95_absolute_relative_error": 0.008711483541886694,
+      "max_absolute_relative_error": 0.044616948068136875,
+      "integrated_flux_relative_error": -0.0001439948124788426
+    },
+    "robert_vs_petitradtrans_160_R100000": {
+      "median_signed_relative_error": -0.0002559438708765738,
+      "rms_relative_error": 0.0032200193482863453,
+      "p95_absolute_relative_error": 0.005567930987934693,
+      "max_absolute_relative_error": 0.02165237741749193,
+      "integrated_flux_relative_error": -0.00018324098778943476
+    }
+  },
+  "acceptance": {
+    "petitradtrans_pressure_convergence_R100000": true,
+    "robert_end_to_end_R100000": true,
+    "memory_below_2_GiB": true,
+    "cpu_threads_at_most_3": true
+  },
+  "resources": {
+    "cpu_thread_limit": 3,
+    "thread_values": {
+      "OMP_NUM_THREADS": 3,
+      "OPENBLAS_NUM_THREADS": 3,
+      "MKL_NUM_THREADS": 3,
+      "NUMEXPR_NUM_THREADS": 3,
+      "VECLIB_MAXIMUM_THREADS": 3,
+      "NUMBA_NUM_THREADS": 3,
+      "OMP_THREAD_LIMIT": 3
+    },
+    "memory_limit_bytes": 2040109465,
+    "measured_peak_rss_bytes": 500645888,
+    "robert_80": {
+      "n_layers": 80,
+      "n_wavelength": 2166,
+      "provider_memory_estimate_bytes": 14659488,
+      "benchmark_memory_estimate_bytes": 416173984,
+      "provider_metadata": {
+        "opacity_mode": "line_by_line",
+        "spectral_coordinate": "physical_wavelength",
+        "physical_sample_axis": "singleton",
+        "interpolation": "log_pressure_temperature_log_xsec",
+        "sample_count": "2166",
+        "estimated_memory_bytes": "14659488",
+        "storage_strategy": "hdf5_hyperslab",
+        "source_read": "exact_narrow_window",
+        "native_sampling_stride": "1",
+        "native_sampling_accuracy": "requires_convergence_validation",
+        "native_sampling_convergence_validation": "required",
+        "native_sampling_validation": "required",
+        "wavelength_window_micron": ""
+      },
+      "gas_metadata": {
+        "opacity_mode": "line_by_line",
+        "opacity_unit": "cm^2/molecule",
+        "column_model": "hydrostatic_plane_parallel",
+        "gas_combination": "sum_by_g",
+        "requested_gas_combination": "random_overlap",
+        "species_tau_diagnostics": "enabled",
+        "assembly_backend": "species_resolved_reference"
+      },
+      "duration_seconds": 0.7086644170340151
+    },
+    "robert_160": {
+      "n_layers": 160,
+      "n_wavelength": 2166,
+      "provider_memory_estimate_bytes": 14659488,
+      "benchmark_memory_estimate_bytes": 549253024,
+      "provider_metadata": {
+        "opacity_mode": "line_by_line",
+        "spectral_coordinate": "physical_wavelength",
+        "physical_sample_axis": "singleton",
+        "interpolation": "log_pressure_temperature_log_xsec",
+        "sample_count": "2166",
+        "estimated_memory_bytes": "14659488",
+        "storage_strategy": "hdf5_hyperslab",
+        "source_read": "exact_narrow_window",
+        "native_sampling_stride": "1",
+        "native_sampling_accuracy": "requires_convergence_validation",
+        "native_sampling_convergence_validation": "required",
+        "native_sampling_validation": "required",
+        "wavelength_window_micron": ""
+      },
+      "gas_metadata": {
+        "opacity_mode": "line_by_line",
+        "opacity_unit": "cm^2/molecule",
+        "column_model": "hydrostatic_plane_parallel",
+        "gas_combination": "sum_by_g",
+        "requested_gas_combination": "random_overlap",
+        "species_tau_diagnostics": "enabled",
+        "assembly_backend": "species_resolved_reference"
+      },
+      "duration_seconds": 0.044646707945503294
+    },
+    "petitradtrans_160": {
+      "cpu_threads": 3,
+      "max_memory_bytes": 2040109465,
+      "estimated_peak_bytes": 474240512,
+      "measured_peak_rss_bytes": 242647040
+    }
+  },
+  "artifacts": {
+    "spectrum_npz": "examples/outputs/lbl_kband/lbl_kband_validation_spectra.npz",
+    "figure_png": "examples/outputs/lbl_kband/lbl_kband_validation.png"
+  }
+}

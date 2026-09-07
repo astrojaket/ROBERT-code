@@ -1,0 +1,326 @@
+{
+  "method": "three process blocks;24 varied-state evaluations per block; one numerical thread; same cached R1000 tables; blackbody star;80 layers; three independent instrument grids",
+  "baseline": "pre-follow-up audit wheel from /tmp/robert-audit-dist-final",
+  "baseline_wheel_sha256": "d20e26e95e09e9f38b81ff33ff3ef00273b9d5a9a9571486d88b33dd7fd0a125",
+  "cases": {
+    "clear": {
+      "array_parity": "bit-for-bit equal across all states, spectra, log likelihoods and instrument grids",
+      "maximum_absolute_difference": 0.0,
+      "datasets": {
+        "f322w2": {
+          "points": 144,
+          "wavelength_range_micron": [
+            2.45477,
+            3.88426
+          ],
+          "resolving_power_range": [
+            235.65523809522918,
+            396.15094339622385
+          ]
+        },
+        "f444w": {
+          "points": 102,
+          "wavelength_range_micron": [
+            3.95442,
+            4.96444
+          ],
+          "resolving_power_range": [
+            366.4893419833152,
+            505.7835630423916
+          ]
+        },
+        "lrs": {
+          "points": 28,
+          "wavelength_range_micron": [
+            5.125,
+            11.875
+          ],
+          "resolving_power_range": [
+            20.5,
+            47.5
+          ]
+        }
+      },
+      "forward": {
+        "before": {
+          "median_seconds": 0.1660518129938282,
+          "q25_seconds": 0.1655727815523278,
+          "q75_seconds": 0.1668558648088947,
+          "evaluations": 72
+        },
+        "after": {
+          "median_seconds": 0.16696508351014927,
+          "q25_seconds": 0.16572247925796546,
+          "q75_seconds": 0.1735881352215074,
+          "evaluations": 72
+        },
+        "change_percent": 0.5499912947984464
+      },
+      "likelihood": {
+        "before": {
+          "median_seconds": 0.1661470835097134,
+          "q25_seconds": 0.16544286400312558,
+          "q75_seconds": 0.1669949892675504,
+          "evaluations": 72
+        },
+        "after": {
+          "median_seconds": 0.16756749950582162,
+          "q25_seconds": 0.16580430176691152,
+          "q75_seconds": 0.16971483323141,
+          "evaluations": 72
+        },
+        "change_percent": 0.8549147936293133
+      },
+      "setup_seconds": {
+        "before": [
+          0.5940422500716522,
+          0.5950802920851856,
+          0.5848044169833884
+        ],
+        "after": [
+          0.5708962499629706,
+          0.5733008340466768,
+          0.5832249580416828
+        ]
+      },
+      "peak_rss_bytes": {
+        "before": 810008576,
+        "after": 819429376
+      }
+    },
+    "cloudy": {
+      "array_parity": "bit-for-bit equal across all states, spectra, log likelihoods and instrument grids",
+      "maximum_absolute_difference": 0.0,
+      "datasets": {
+        "f322w2": {
+          "points": 144,
+          "wavelength_range_micron": [
+            2.45477,
+            3.88426
+          ],
+          "resolving_power_range": [
+            235.65523809522918,
+            396.15094339622385
+          ]
+        },
+        "f444w": {
+          "points": 102,
+          "wavelength_range_micron": [
+            3.95442,
+            4.96444
+          ],
+          "resolving_power_range": [
+            366.4893419833152,
+            505.7835630423916
+          ]
+        },
+        "lrs": {
+          "points": 28,
+          "wavelength_range_micron": [
+            5.125,
+            11.875
+          ],
+          "resolving_power_range": [
+            20.5,
+            47.5
+          ]
+        }
+      },
+      "forward": {
+        "before": {
+          "median_seconds": 0.5522102289833128,
+          "q25_seconds": 0.5405001150502358,
+          "q75_seconds": 0.5585001454746816,
+          "evaluations": 72
+        },
+        "after": {
+          "median_seconds": 0.5391013334738091,
+          "q25_seconds": 0.5317044057301246,
+          "q75_seconds": 0.5491091869480442,
+          "evaluations": 72
+        },
+        "change_percent": -2.373895813853155
+      },
+      "likelihood": {
+        "before": {
+          "median_seconds": 0.5451138954958878,
+          "q25_seconds": 0.5389122397755273,
+          "q75_seconds": 0.5525149894820061,
+          "evaluations": 72
+        },
+        "after": {
+          "median_seconds": 0.5477161454618908,
+          "q25_seconds": 0.5401050415530335,
+          "q75_seconds": 0.5586552396998741,
+          "evaluations": 72
+        },
+        "change_percent": 0.477377294452519
+      },
+      "setup_seconds": {
+        "before": [
+          0.5867047499632463,
+          0.6208539170911536,
+          0.5929580420488492
+        ],
+        "after": [
+          0.5960571670439094,
+          0.590849458007142,
+          0.9198932920116931
+        ]
+      },
+      "peak_rss_bytes": {
+        "before": 2308636672,
+        "after": 2267250688
+      }
+    }
+  },
+  "r1000_inputs": {
+    "destination_directory": "opacity_data/ktables_exomol",
+    "resolution": "R1000",
+    "files": [
+      {
+        "file": "C2H2_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "7b052d1f4096831c872469d4b5d7c45d52077cdf6c0e39d94a7fcf0b10604c2f"
+      },
+      {
+        "file": "CH4_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "6c83b1d7b7cc93007fa90a6c8bdc673638dc7cfabae343219396cdf2e879778d"
+      },
+      {
+        "file": "CO2_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "b4bc9f544115dd490ef545e03693cc758cd59195c853503920efef98287879a7"
+      },
+      {
+        "file": "CO_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "f87d35061fa21a11c68e84a6dc2276f3d89e31f9321dc97b47b2c288766894d9"
+      },
+      {
+        "file": "CP_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "e42121b4723b22512e534c7ca9fcb2360473fe543e6ec4fee58cf36e0644c7bb"
+      },
+      {
+        "file": "H2O_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "71c38634b391141177ae2a029f2fac00d78fd172fe52f4f10da361e975971d9f"
+      },
+      {
+        "file": "H2S_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "b2d7107e60c1c2bd7c69853975616d143d3c4812b6ffc32b3f06566e0ffb47dc"
+      },
+      {
+        "file": "HCN_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "203c6b802d07becda6cee9328ab6abb4ad6b8cafed9d27f3014b06e1604f6b54"
+      },
+      {
+        "file": "K_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "d5478ccb94c0d538c7df50e545a7da654077cf0db310a505a89d5d6fdb803081"
+      },
+      {
+        "file": "NH3_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "6fcb97aee63318df3c9c3ad7e2c646d5a5b8ba8284c66259b01b87caa8e911ac"
+      },
+      {
+        "file": "Na_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "a395ddcc61f6441974b3c6f227064403e721d6d0839064788a7e949eeb8ef861"
+      },
+      {
+        "file": "PH3_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "507c35a31cf4b573ab9c00faf35fc5fa3a5787ca73c183c0085d1e838f48a55e"
+      },
+      {
+        "file": "PN_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "57130d82ec428e482d9973071d60108543de37a1c32fbb21acc8e344cb5bb529"
+      },
+      {
+        "file": "PO_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "60334b9abffc6b59d014149264c80c740ebcc8d53ac6879a8607ffddb4f06a4b"
+      },
+      {
+        "file": "PS_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "e1074cd199199669893d6f6ac65ad24f9565295816eddde6429d16f489ecdc6f"
+      },
+      {
+        "file": "SO2_R1000.kta",
+        "bytes": 243275760,
+        "sha256": "dcbde137f1b7e9ed8bb79e0a72a964acfef9b8bfd1163dd2c705227da80a088d"
+      }
+    ],
+    "copied_bytes": 3892412160
+  },
+  "final_setup_checks": {
+    "before": {
+      "clear": {
+        "seconds": [
+          0.5719873750349507,
+          0.5685058749513701,
+          0.5638744999887422,
+          0.5670824999688193
+        ],
+        "median_seconds": 0.5677941874600947
+      },
+      "cloudy": {
+        "seconds": [
+          0.5666356249712408,
+          0.5695332080358639,
+          0.5698534169932827,
+          0.575797832920216
+        ],
+        "median_seconds": 0.5696933125145733
+      }
+    },
+    "after": {
+      "clear": {
+        "seconds": [
+          0.6103145420784131,
+          0.5818917090073228,
+          0.6168146249838173,
+          0.6007207080256194
+        ],
+        "median_seconds": 0.6055176250520162
+      },
+      "cloudy": {
+        "seconds": [
+          0.6231651250272989,
+          0.6221179580315948,
+          0.6068775000749156,
+          0.6153657499235123
+        ],
+        "median_seconds": 0.6187418539775535
+      }
+    }
+  },
+  "interpretation": "No material repeated-likelihood speed change. Final preparation identity checks add about40-50ms to construction, outside the likelihood loop. Posterior100-model plotting is extra work after inference.",
+  "cloudy_reference_solver_parity": {
+    "passed": true,
+    "rtol": 1e-08,
+    "atol": 1e-14,
+    "datasets": {
+      "f322w2": {
+        "max_absolute_difference": 0.0,
+        "max_relative_difference": 0.0
+      },
+      "f444w": {
+        "max_absolute_difference": 0.0,
+        "max_relative_difference": 0.0
+      },
+      "lrs": {
+        "max_absolute_difference": 0.0,
+        "max_relative_difference": 0.0
+      }
+    }
+  }
+}

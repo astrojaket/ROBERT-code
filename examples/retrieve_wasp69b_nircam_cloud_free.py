@@ -1,20 +1,23 @@
-"""NIRCam-only cloud-free one-region retrieval for a configured target.
+"""Shared NIRCam cloud-free builders and the current YAML entry point.
 
 WASP-69b is the default configuration. Following ROBERT's default
 multi-instrument workflow, opacity is recompressed into each mode's published
 observation bins with exo_k before inference. The user supplies an ExoMol KTA
-root and selects its model resolution explicitly.
+root and selects its model resolution explicitly. Use the strict YAML runner
+for retrieval execution; the functions in this module remain reusable by
+benchmarks that compare forward-model construction paths.
 """
 
 from __future__ import annotations
 
-import argparse
 from dataclasses import replace
 from importlib import import_module
-import json
 import os
 from pathlib import Path
+import runpy
+import sys
 import tempfile
+from typing import Sequence
 
 os.environ.setdefault(
     "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib")
@@ -25,10 +28,6 @@ os.environ.setdefault(
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("NUMBA_NUM_THREADS", "1")
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 
 from robert_exoplanets import (
@@ -50,7 +49,6 @@ from robert_exoplanets import (
     UniformPrior,
     build_multi_dataset_emission_model,
     load_nemesispy_cia_table,
-    run_ultranest,
 )
 
 
@@ -79,11 +77,10 @@ FASTCHEM = Path(
     )
 ).expanduser()
 CACHE = TARGET.CACHE_DIRECTORY
-OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_nircam_cloud_free"
 SPECIES = ("H2O", "CO2", "CO", "CH4", "NH3", "HCN")
 OPACITY_RESOLUTIONS = ("R1000", "R15000")
 DEFAULT_OPACITY_RESOLUTION = "R1000"
-CALLS_PER_ATTEMPT = 5000
+DEFAULT_CONFIG = ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_nircam_pg14_R1000.yaml"
 
 
 def nircam_observations() -> ObservationCollection:
@@ -332,225 +329,31 @@ def build_problem(
     )
 
 
-def _write_products(
-    problem: MultiDatasetRetrievalProblem,
-    result,
-    output: Path,
-    *,
-    live_points: int = 50,
-    max_ncalls: int = 5000,
-    mpi_processes: int = 2,
+def _run_current_configuration(
+    default_config: Path = DEFAULT_CONFIG,
+    argv: Sequence[str] | None = None,
 ) -> None:
-    output.mkdir(parents=True, exist_ok=True)
-    weights = np.array(result.weights, dtype=float, copy=True)
-    weights /= np.sum(weights)
-    rng = np.random.default_rng(20260711)
-    draw_indices = rng.choice(
-        result.samples.shape[0], size=300, replace=True, p=weights
-    )
-    draws = result.samples[draw_indices]
-    spectra = {name: [] for name in problem.observations.names}
-    for draw in draws:
-        prediction = problem.model_spectra(draw)
-        for name in spectra:
-            spectra[name].append(prediction[name].values)
-    envelopes = {
-        name: np.percentile(np.asarray(values), [16.0, 50.0, 84.0], axis=0)
-        for name, values in spectra.items()
-    }
-    best = result.best_fit_parameters
-    best_spectra = problem.model_spectra(best)
-    chi2 = 0.0
-    for dataset in problem.observations.datasets:
-        residual = (
-            dataset.observation.flux - best_spectra[dataset.name].values
-        ) / dataset.observation.uncertainty
-        chi2 += float(np.sum(residual**2))
-    dof = problem.observations.n_points - problem.ndim
-    quantiles = {}
-    for index, name in enumerate(problem.parameter_names):
-        order = np.argsort(result.samples[:, index])
-        values = result.samples[order, index]
-        cumulative = np.cumsum(weights[order])
-        quantiles[name] = np.interp([0.16, 0.5, 0.84], cumulative, values).tolist()
-    summary = {
-        "selection": str(
-            problem.metadata.get(
-                "dataset_selection",
-                "NIRCam only (F322W2, overlap average, F444W)",
-            )
-        ),
-        "n_points": problem.observations.n_points,
-        "n_parameters": problem.ndim,
-        "live_points": live_points,
-        "max_ncalls": max_ncalls,
-        "mpi_processes": mpi_processes,
-        "converged": result.converged,
-        "message": result.message,
-        "log_evidence": result.log_evidence,
-        "log_evidence_error": result.log_evidence_error,
-        "best_fit": dict(best),
-        "posterior_16_50_84": quantiles,
-        "chi_squared": chi2,
-        "degrees_of_freedom": dof,
-        "reduced_chi_squared": chi2 / dof,
-        "paper_full_band_cloud_free_one_region": {
-            "metallicity_16_50_84": [1.28, 1.30, 1.32],
-            "CtoO_16_50_84": [0.10, 0.11, 0.13],
-            "reduced_chi_squared": 14.5,
-            "log_evidence": -588,
-        },
-        "comparison_warning": (
-            "Literature evidence values are not directly comparable unless the data, "
-            "priors, chemistry, temperature profile, opacity, and likelihood match."
-        ),
-    }
-    (output / "summary.json").write_text(
-        json.dumps(summary, indent=2), encoding="utf-8"
-    )
-    np.savez_compressed(
-        output / "posterior_products.npz",
-        samples=result.samples,
-        weights=weights,
-        log_likelihood=result.log_likelihood,
-        **{f"{name}_q16": value[0] for name, value in envelopes.items()},
-        **{f"{name}_q50": value[1] for name, value in envelopes.items()},
-        **{f"{name}_q84": value[2] for name, value in envelopes.items()},
-    )
-    _plot(
-        problem.observations,
-        envelopes,
-        best_spectra,
-        summary,
-        output / "spectrum_1sigma.png",
-    )
+    """Delegate execution to the repository's strict YAML retrieval runner."""
 
-
-def _plot(observations, envelopes, best_spectra, summary, path: Path) -> None:
-    colors = {
-        "f322w2": "#20639b",
-        "avg": "#7a5195",
-        "f444w": "#ef5675",
-        "lrs": "#2ca25f",
-    }
-    fig, (axis, residual_axis) = plt.subplots(
-        2, 1, figsize=(10, 7), sharex=True, gridspec_kw={"height_ratios": [3, 1]}
-    )
-    for dataset in observations.datasets:
-        name = dataset.name
-        obs = dataset.observation
-        q16, q50, q84 = envelopes[name]
-        color = colors[name]
-        axis.fill_between(
-            obs.wavelength, 1.0e6 * q16, 1.0e6 * q84, color=color, alpha=0.22
-        )
-        axis.plot(obs.wavelength, 1.0e6 * q50, color=color, linewidth=1.5)
-        axis.errorbar(
-            obs.wavelength,
-            1.0e6 * obs.flux,
-            yerr=1.0e6 * obs.uncertainty,
-            fmt=".",
-            color=color,
-            alpha=0.75,
-            markersize=3,
-            label=obs.instrument,
-        )
-        residual = (obs.flux - best_spectra[name].values) / obs.uncertainty
-        residual_axis.plot(obs.wavelength, residual, ".", color=color, markersize=3)
-    axis.set_ylabel("Eclipse depth (ppm)")
-    axis.set_title(f"{PLANET.name}: ROBERT cloud-free one-region retrieval")
-    axis.text(
-        0.02,
-        0.97,
-        "Shading: posterior 68% (1-sigma) spectrum envelope\n"
-        f"ROBERT reduced chi-square = {summary['reduced_chi_squared']:.2f}\n"
-        "Literature comparisons require matched model assumptions.",
-        transform=axis.transAxes,
-        va="top",
-        fontsize=9,
-    )
-    axis.legend(loc="lower right", fontsize=8)
-    residual_axis.axhline(0.0, color="black", linewidth=0.8)
-    residual_axis.axhline(1.0, color="0.6", linewidth=0.6, linestyle="--")
-    residual_axis.axhline(-1.0, color="0.6", linewidth=0.6, linestyle="--")
-    residual_axis.set_ylabel("Residual / sigma")
-    residual_axis.set_xlabel("Wavelength (micron)")
-    fig.tight_layout()
-    fig.savefig(path, dpi=180)
-    plt.close(fig)
-
-
-def _next_cumulative_call_limit(log_dir: Path) -> int:
-    """Advance UltraNest's cumulative call ceiling in fixed-size resume chunks."""
-
-    status_path = log_dir / "sampler_status.json"
-    if not status_path.exists():
-        return CALLS_PER_ATTEMPT
-    status = json.loads(status_path.read_text(encoding="utf-8"))
-    completed_calls = max(int(status.get("ncall", 0)), 0)
-    return completed_calls + CALLS_PER_ATTEMPT
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    configured_kta_path = os.environ.get("ROBERT_KTABLE_PATH")
-    parser.add_argument(
-        "--kta-path",
-        type=Path,
-        default=configured_kta_path,
-        required=configured_kta_path is None,
-        help="KTA root containing R1000/R15000, or the selected resolution directory",
-    )
-    parser.add_argument(
-        "--opacity-resolution",
-        choices=OPACITY_RESOLUTIONS,
-        default=os.environ.get(
-            "ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION
-        ),
-    )
-    parser.add_argument("--prepare-only", action="store_true")
-    parser.add_argument("--output", type=Path, default=OUTPUT)
-    parser.add_argument("--mpi-processes", type=int, default=1)
-    args = parser.parse_args()
-    observations = nircam_observations()
-    if args.prepare_only:
-        prepare_opacity_cache(
-            observations,
-            kta_path=args.kta_path,
-            resolution=args.opacity_resolution,
-        )
-        return
-    problem = build_problem(
-        observations,
-        opacity_resolution=args.opacity_resolution,
-    )
-    max_ncalls = _next_cumulative_call_limit(args.output / "ultranest")
-    result = run_ultranest(
-        problem,
-        output_dir=args.output / "ultranest",
-        min_num_live_points=50,
-        max_ncalls=max_ncalls,
-        dlogz=0.5,
-        resume="resume",
-        show_status=False,
-        mpi_nprocs=args.mpi_processes,
-        seed=20260711,
-    )
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if not any(
+        argument == "--config" or argument.startswith("--config=")
+        for argument in arguments
+    ):
+        arguments = ["--config", str(default_config), *arguments]
+    runner = ROOT / "run_retrieval.py"
+    previous_argv = sys.argv
+    sys.argv = [str(runner), *arguments]
     try:
-        from mpi4py import MPI
+        runpy.run_path(str(runner), run_name="__main__")
+    finally:
+        sys.argv = previous_argv
 
-        is_primary = MPI.COMM_WORLD.Get_rank() == 0
-    except ImportError:
-        is_primary = True
-    if is_primary:
-        _write_products(
-            problem,
-            result,
-            args.output,
-            live_points=50,
-            max_ncalls=max_ncalls,
-            mpi_processes=args.mpi_processes,
-        )
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Run the selected current YAML retrieval workflow."""
+
+    _run_current_configuration(argv=argv)
 
 
 if __name__ == "__main__":

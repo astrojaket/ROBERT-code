@@ -48,6 +48,25 @@ DEFAULT_CIA_PAIR_ORDER = (
     "H2-CH4",
 )
 
+# The H-minus fits below follow the implementation used by
+# petitRADTRANS 3.3.3.  The bound-free polynomial is from Gray (2008),
+# pp. 155--156.  Keep the coefficients in Angstrom in the source convention.
+# The helpers below convert the Gray/pRT cm^2 result to m^2 before it is
+# combined with ROBERT's SI molecular column density.
+HMINUS_BOUND_FREE_COEFFICIENTS = (
+    1.99654,
+    -1.18267e-5,
+    2.64243e-6,
+    -4.40524e-10,
+    3.23992e-14,
+    -1.39568e-18,
+    2.78701e-23,
+)
+HMINUS_BOUND_FREE_THRESHOLD_ANGSTROM = 1.64e4
+HMINUS_FREE_FREE_MIN_ANGSTROM = 2600.0
+HMINUS_FREE_FREE_MAX_ANGSTROM = 113900.0
+HMINUS_FREE_FREE_MIN_TEMPERATURE_K = 2500.0
+
 
 @dataclass(frozen=True)
 class LayerOpticalDepth:
@@ -92,6 +111,77 @@ class LayerOpticalDepth:
         order = _top_to_bottom_order(self.pressure_grid)
         cumulative = np.cumsum(self.tau[order], axis=0)
         return _restore_layer_order(cumulative, order)
+
+
+@dataclass(frozen=True)
+class HMinusContinuumConfig:
+    """Configuration for explicit H-minus continuum abundances.
+
+    The three species are read from the atmospheric VMR composition.  This
+    class does not calculate an equilibrium abundance and does not introduce
+    an additional retrieval scale.  To retrieve these quantities, include
+    ``H-``, ``H``, and ``e-`` in a :class:`~robert_exoplanets.atmosphere.FreeChemistry`
+    model (or provide equivalent profiles from another chemistry model).
+
+    The Gray (2008) free-free fit is evaluated only for temperatures at or
+    above 2500 K.  ``temperature_extrapolation="zero"`` matches the current
+    petitRADTRANS behaviour below that bound.  ``"raise"`` is available for
+    strict coverage checks.  The free-free wavelength fit is valid from
+    2600 to 113900 Angstrom (0.26 to 11.39 micron); the spectral policy
+    controls requests outside this range.
+    """
+
+    hminus_species: str = "H-"
+    hydrogen_species: str = "H"
+    electron_species: str = "e-"
+    temperature_extrapolation: str = "zero"
+    spectral_extrapolation: str = "zero"
+    name: str = "H-minus bound-free/free-free continuum"
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        species = tuple(
+            str(value).strip()
+            for value in (
+                self.hminus_species,
+                self.hydrogen_species,
+                self.electron_species,
+            )
+        )
+        if any(not value for value in species):
+            raise RobertValidationError(
+                "H-minus continuum species names must not be empty"
+            )
+        if len(set(species)) != len(species):
+            raise RobertValidationError(
+                "H-minus continuum species names must be unique"
+            )
+        temperature_policy = str(self.temperature_extrapolation).strip().lower()
+        if temperature_policy not in {"zero", "raise"}:
+            raise RobertValidationError(
+                "H-minus temperature_extrapolation must be 'zero' or 'raise'"
+            )
+        spectral_policy = str(self.spectral_extrapolation).strip().lower()
+        if spectral_policy not in {"zero", "raise"}:
+            raise RobertValidationError(
+                "H-minus spectral_extrapolation must be 'zero' or 'raise'"
+            )
+        name = str(self.name).strip()
+        if not name:
+            raise RobertValidationError("H-minus continuum name must not be empty")
+        object.__setattr__(self, "hminus_species", species[0])
+        object.__setattr__(self, "hydrogen_species", species[1])
+        object.__setattr__(self, "electron_species", species[2])
+        object.__setattr__(self, "temperature_extrapolation", temperature_policy)
+        object.__setattr__(self, "spectral_extrapolation", spectral_policy)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+    @property
+    def species(self) -> tuple[str, str, str]:
+        """Return H-minus, neutral-H, and electron composition keys."""
+
+        return (self.hminus_species, self.hydrogen_species, self.electron_species)
 
 
 @dataclass(frozen=True)
@@ -167,6 +257,8 @@ class CiaTable:
             ) from exc
 
         normalized_pair = collision_pair.strip().upper().replace("_", "-")
+        while "--" in normalized_pair:
+            normalized_pair = normalized_pair.replace("--", "-")
         pair_indices = {"H2-H2": (0, 2), "H2-HE": (1, 3)}
         if normalized_pair not in pair_indices:
             raise RobertValidationError("collision_pair must be 'H2-H2' or 'H2-He'")
@@ -414,6 +506,300 @@ def cia_optical_depth(
             "active_pairs": ",".join(sorted(set(active_pairs))),
         },
     )
+
+
+def hminus_optical_depth(
+    gas_optical_depth: GasOpticalDepth,
+    config: HMinusContinuumConfig | None = None,
+) -> LayerOpticalDepth:
+    """Compute H-minus bound-free and free-free optical depth.
+
+    The calculation uses explicit number fractions from the atmosphere
+    composition.  It never derives H-minus or electron abundances from a
+    Saha or other equilibrium closure.  For each layer, the bound-free term
+    is ``sigma_bf * N(H-)``.  The free-free term is
+    ``sigma_ff(lambda, T, p_e) * N(H)``, where ``p_e = P * x_e`` and the
+    Gray fit receives the electron partial pressure in dyn cm^-2.
+
+    The bound-free cross-section is the Gray (2008) polynomial used by
+    petitRADTRANS.  The source polynomial is evaluated in its cm^2
+    convention, then returned by the helper in m^2 per H-minus particle.  It
+    is zero above the 16400 Angstrom threshold.  The free-free fit is the
+    corresponding Gray polynomial used by petitRADTRANS and is valid for
+    2600--113900 Angstrom and temperatures at least 2500 K.  The returned
+    optical depth is dimensionless on the gas layer and spectral axes, and
+    works for correlated-k, opacity-sampling, and line-by-line gas optical
+    depths because it uses only their physical column density.
+
+    ``config`` defaults to the petitRADTRANS composition keys ``H-``, ``H``,
+    and ``e-``.  All three keys must be present when this contribution is
+    enabled.  Missing keys are an error rather than an implicit zero or an
+    equilibrium assumption.
+    """
+
+    continuum = HMinusContinuumConfig() if config is None else config
+    if not isinstance(continuum, HMinusContinuumConfig):
+        raise RobertValidationError(
+            "hminus config must be an HMinusContinuumConfig"
+        )
+
+    gas = gas_optical_depth
+    atmosphere = gas.atmosphere
+    n_layers = atmosphere.n_layers
+    hminus = _required_vmr_profile(
+        atmosphere.composition,
+        continuum.hminus_species,
+        n_layers,
+        context="H-minus continuum",
+    )
+    hydrogen = _required_vmr_profile(
+        atmosphere.composition,
+        continuum.hydrogen_species,
+        n_layers,
+        context="H-minus continuum",
+    )
+    electron = _required_vmr_profile(
+        atmosphere.composition,
+        continuum.electron_species,
+        n_layers,
+        context="H-minus continuum",
+    )
+    layer_column = np.asarray(
+        gas.layer_column_density_molecules_m2,
+        dtype=float,
+    )
+    if layer_column.shape != (n_layers,) or not np.all(np.isfinite(layer_column)):
+        raise RobertValidationError(
+            "H-minus continuum requires finite layer molecular columns"
+        )
+    if np.any(layer_column <= 0.0):
+        raise RobertValidationError(
+            "H-minus continuum requires positive layer molecular columns"
+        )
+
+    wavelength_micron = spectral_grid_values_in_unit(
+        gas.spectral_grid,
+        "micron",
+    )
+    wavelength_angstrom = wavelength_micron * 1.0e4
+    if continuum.spectral_extrapolation == "raise":
+        outside = (wavelength_angstrom < HMINUS_FREE_FREE_MIN_ANGSTROM) | (
+            wavelength_angstrom > HMINUS_FREE_FREE_MAX_ANGSTROM
+        )
+        if np.any(outside):
+            raise RobertCoverageError(
+                "requested spectrum is outside the H-minus free-free wavelength "
+                "range 2600--113900 Angstrom"
+            )
+    temperature = np.asarray(atmosphere.temperature, dtype=float)
+    if continuum.temperature_extrapolation == "raise" and np.any(
+        temperature < HMINUS_FREE_FREE_MIN_TEMPERATURE_K
+    ):
+        raise RobertCoverageError(
+            "atmosphere temperature is below the H-minus free-free fit range "
+            "of 2500 K"
+        )
+
+    if gas.spectral_grid.bin_edges is None:
+        bound_free = _hminus_bound_free_point_cross_section(
+            wavelength_angstrom
+        )
+        bound_free_sampling = "point_evaluation_without_bin_edges"
+    else:
+        edge_grid = SpectralGrid.from_array(
+            gas.spectral_grid.bin_edges,
+            unit=gas.spectral_grid.unit,
+            role="hminus-bin-edges",
+        )
+        edge_wavelength_angstrom = (
+            spectral_grid_values_in_unit(edge_grid, "micron") * 1.0e4
+        )
+        bound_free = _hminus_bound_free_bin_cross_section(
+            edge_wavelength_angstrom
+        )
+        bound_free_sampling = "gray_polynomial_bin_average"
+
+    pressure_pa = pressure_values_in_unit(
+        atmosphere.pressure_grid.centers,
+        atmosphere.pressure_grid.unit,
+        "pa",
+    )
+    tau_bound_free = layer_column[:, None] * hminus[:, None] * bound_free[None, :]
+    tau_free_free = np.zeros_like(tau_bound_free)
+    for layer_index, layer_temperature in enumerate(temperature):
+        electron_partial_pressure_dyn_cm2 = (
+            pressure_pa[layer_index] * 10.0 * electron[layer_index]
+        )
+        cross_section_cm2 = _hminus_free_free_cross_section(
+            wavelength_angstrom,
+            float(layer_temperature),
+            float(electron_partial_pressure_dyn_cm2),
+        )
+        # The fit returns cm^2 per H particle after multiplication by p_e.
+        # Convert cm^2 to m^2 before multiplying the SI molecular column.
+        tau_free_free[layer_index] = (
+            layer_column[layer_index]
+            * hydrogen[layer_index]
+            * cross_section_cm2
+            * 1.0e-4
+        )
+
+    tau = tau_bound_free + tau_free_free
+    if not np.all(np.isfinite(tau)) or np.any(tau < 0.0):
+        raise RobertValidationError(
+            "H-minus optical-depth calculation produced invalid values"
+        )
+    return LayerOpticalDepth(
+        name=continuum.name,
+        tau=tau,
+        spectral_grid=gas.spectral_grid,
+        pressure_grid=gas.pressure_grid,
+        kind="absorption_continuum",
+        metadata={
+            "source": "Gray (2008), pp. 155-156, as implemented by petitRADTRANS",
+            "source_convention": "petitRADTRANS 3.3.3 H-minus bound/free-free fits",
+            "hminus_species": continuum.hminus_species,
+            "hydrogen_species": continuum.hydrogen_species,
+            "electron_species": continuum.electron_species,
+            "composition_source": "explicit_atmosphere_vmr",
+            "equilibrium_closure": "none",
+            "bound_free_cross_section_unit": "m^2 per H- particle",
+            "bound_free_threshold_angstrom": f"{HMINUS_BOUND_FREE_THRESHOLD_ANGSTROM:g}",
+            "bound_free_sampling": bound_free_sampling,
+            "free_free_cross_section_unit": (
+                "m^2 per H particle after electron-pressure multiplication"
+            ),
+            "free_free_electron_pressure_unit": "dyn cm^-2",
+            "free_free_wavelength_range_angstrom": (
+                f"{HMINUS_FREE_FREE_MIN_ANGSTROM:g}-"
+                f"{HMINUS_FREE_FREE_MAX_ANGSTROM:g}"
+            ),
+            "free_free_temperature_min_K": f"{HMINUS_FREE_FREE_MIN_TEMPERATURE_K:g}",
+            "temperature_extrapolation": continuum.temperature_extrapolation,
+            "spectral_extrapolation": continuum.spectral_extrapolation,
+            **dict(continuum.metadata),
+        },
+    )
+
+
+def _hminus_bound_free_bin_cross_section(
+    wavelengths_bin_edges_angstrom: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return Gray H-minus bound-free cross-section bin averages in m^2."""
+
+    edges = np.asarray(wavelengths_bin_edges_angstrom, dtype=float)
+    if edges.ndim != 1 or edges.size < 2:
+        raise RobertValidationError(
+            "H-minus wavelength bin edges must contain at least two values"
+        )
+    if not np.all(np.isfinite(edges)) or np.any(edges <= 0.0):
+        raise RobertValidationError(
+            "H-minus wavelength bin edges must be finite and positive"
+        )
+    differences = np.diff(edges)
+    if not (np.all(differences > 0.0) or np.all(differences < 0.0)):
+        raise RobertValidationError(
+            "H-minus wavelength bin edges must be strictly monotonic"
+        )
+    if np.all(differences < 0.0):
+        # Evaluate in the canonical ascending orientation and restore the
+        # caller's order.  The bin average is orientation independent, while
+        # directly applying the source masks to descending edges can mishandle
+        # a bin that straddles the 16400 Angstrom threshold.
+        return _hminus_bound_free_bin_cross_section(edges[::-1])[::-1]
+
+    left = edges[:-1]
+    right = edges[1:]
+    threshold = HMINUS_BOUND_FREE_THRESHOLD_ANGSTROM
+    # This is the source algorithm for ascending wavelength edges.  It keeps
+    # the pRT midpoint treatment for bins that straddle the threshold.
+    integral = np.zeros_like(right)
+    below_threshold = right <= threshold
+    for index, coefficient in enumerate(HMINUS_BOUND_FREE_COEFFICIENTS):
+        power = index + 1
+        integral[below_threshold] += coefficient * (
+            right[below_threshold] ** power - left[below_threshold] ** power
+        ) / power
+    bracketed = (left < threshold) & (right > threshold)
+    for index, coefficient in enumerate(HMINUS_BOUND_FREE_COEFFICIENTS):
+        power = index + 1
+        integral[bracketed] += coefficient * (
+            threshold**power - left[bracketed] ** power
+        ) / power
+    cross_section = integral
+    cross_section[0.5 * (left + right) > threshold] = 0.0
+    cross_section[cross_section < 0.0] = 0.0
+    # The Gray polynomial has a 1e-18 cm^2 scale.  Convert cm^2 to m^2 before
+    # multiplying by ROBERT's SI molecular column density.
+    return cross_section * 1.0e-18 * 1.0e-4 / differences
+
+
+def _hminus_bound_free_point_cross_section(
+    wavelengths_angstrom: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return Gray H-minus bound-free cross-sections at point samples in m^2."""
+
+    wavelengths = np.asarray(wavelengths_angstrom, dtype=float)
+    if wavelengths.ndim != 1 or not np.all(np.isfinite(wavelengths)):
+        raise RobertValidationError(
+            "H-minus wavelengths must be a finite one-dimensional array"
+        )
+    if np.any(wavelengths <= 0.0):
+        raise RobertValidationError("H-minus wavelengths must be positive")
+    cross_section = np.zeros_like(wavelengths)
+    active = wavelengths <= HMINUS_BOUND_FREE_THRESHOLD_ANGSTROM
+    for index, coefficient in enumerate(HMINUS_BOUND_FREE_COEFFICIENTS):
+        # The integrated pRT expression contains lambda**(i+1)/(i+1), so its
+        # point polynomial is a_i * lambda**i.
+        cross_section[active] += coefficient * wavelengths[active] ** index
+    # The Gray polynomial has a 1e-18 cm^2 scale; return SI m^2.
+    cross_section *= 1.0e-18 * 1.0e-4
+    cross_section[cross_section < 0.0] = 0.0
+    return cross_section
+
+
+def _hminus_free_free_cross_section(
+    wavelengths_angstrom: NDArray[np.float64],
+    temperature_K: float,
+    electron_partial_pressure_dyn_cm2: float,
+) -> NDArray[np.float64]:
+    """Return Gray H-minus free-free cross-section in cm^2 per H particle."""
+
+    wavelengths = np.asarray(wavelengths_angstrom, dtype=float)
+    cross_section = np.zeros_like(wavelengths)
+    if temperature_K < HMINUS_FREE_FREE_MIN_TEMPERATURE_K:
+        return cross_section
+    active = (wavelengths >= HMINUS_FREE_FREE_MIN_ANGSTROM) & (
+        wavelengths <= HMINUS_FREE_FREE_MAX_ANGSTROM
+    )
+    if not np.any(active):
+        return cross_section
+    log_wavelength = np.log10(wavelengths[active])
+    theta = 5040.0 / temperature_K
+    log_theta = np.log10(theta)
+    f0 = (
+        -2.2763
+        - 1.6850 * log_wavelength
+        + 0.76661 * log_wavelength**2
+        - 0.053346 * log_wavelength**3
+    )
+    f1 = (
+        15.2827
+        - 9.2846 * log_wavelength
+        + 1.99381 * log_wavelength**2
+        - 0.142631 * log_wavelength**3
+    )
+    f2 = (
+        -197.789
+        + 190.266 * log_wavelength
+        - 67.9775 * log_wavelength**2
+        + 10.6913 * log_wavelength**3
+        - 0.625151 * log_wavelength**4
+    )
+    cross_section[active] = 1.0e-26 * electron_partial_pressure_dyn_cm2 * 10.0 ** (
+        f0 + f1 * log_theta + f2 * log_theta**2
+    )
+    return cross_section
 
 
 def rayleigh_scattering_optical_depth(
@@ -872,6 +1258,36 @@ def _composition_profile(
     if not np.all(np.isfinite(profile)) or np.any(profile < 0.0):
         raise RobertValidationError(
             f"{species} composition must be finite and non-negative"
+        )
+    profile.setflags(write=False)
+    return profile
+
+
+def _required_vmr_profile(
+    composition: Mapping[str, NDArray[np.float64]],
+    species: str,
+    n_layers: int,
+    *,
+    context: str,
+) -> NDArray[np.float64]:
+    """Return one required, physical VMR profile from an atmosphere."""
+
+    if species not in composition:
+        raise RobertValidationError(
+            f"{context} requires explicit composition species: {species}"
+        )
+    profile = np.array(composition[species], dtype=float, copy=True)
+    if profile.shape != (n_layers,):
+        raise RobertValidationError(
+            f"{context} species {species} must match pressure-grid layers"
+        )
+    if not np.all(np.isfinite(profile)) or np.any(profile < 0.0):
+        raise RobertValidationError(
+            f"{context} species {species} must be finite and non-negative"
+        )
+    if np.any(profile > 1.0):
+        raise RobertValidationError(
+            f"{context} species {species} VMR must not exceed one"
         )
     profile.setflags(write=False)
     return profile

@@ -28,7 +28,7 @@ def test_auto_mpi_processes_prefers_inner_communicator_on_glamdring(
     monkeypatch,
 ) -> None:
     config = load_task_config(
-        ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
     )
     monkeypatch.setenv("SLURM_NTASKS", "1")
     monkeypatch.setenv("ROBERT_MPI_RANKS", "12")
@@ -96,7 +96,7 @@ def _table(species: str) -> CorrelatedKTable:
 
 def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
     config = load_task_config(
-        ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
     )
     observation = Observation.from_arrays(
         wavelength=[2.0, 2.5],
@@ -141,7 +141,7 @@ def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
 
 def test_configured_two_region_problem_builds_independent_columns(monkeypatch) -> None:
     base = load_task_config(
-        ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
     )
     raw = deepcopy(base.model_dump(mode="python"))
     species = tuple(raw["opacity"]["species"])

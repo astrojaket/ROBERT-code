@@ -1,0 +1,725 @@
+{
+  "claim": "independent ROBERT fixed-template comparison on Smith et al. WASP-77Ab HRS/LRS data; no truth-recovery claim and not a Smith-method reproduction",
+  "data": {
+    "abundance_state": "fixed template; no ROBERT abundance parameters; VMR-only policy retained",
+    "hrs_model_resolution_note": "Smith used R=250,000; this workflow carries the public R=500,000 template through the response stages",
+    "hrs_response": "Gray rotation vsini=4.2 km s^-1 followed by Gaussian R=45,000 LSF; no pixel integration; detector interpolation is performed by the temporal PCA likelihood",
+    "hrs_response_template": {
+      "hrs_crop_bounds_micron": "1.451935900809642,2.4491211530271708",
+      "hrs_final_mapping": "linear interpolation by TimeResolvedHighResolutionLikelihood",
+      "hrs_gaussian_kernel_support_sigma": "4",
+      "hrs_gaussian_resolving_power": "45000",
+      "hrs_input_resolution": "R=500,000",
+      "hrs_pixel_integration": "not applied; Smith interpolates the convolved model",
+      "hrs_query_bounds_micron": "1.4520164880366861,2.4489880697503623",
+      "hrs_response_output_bounds_micron": "1.4520114176662824,2.4489937780432296",
+      "hrs_response_output_resolution": "approximately R=45,000 plus rotation",
+      "hrs_response_stage_order": "gray_rotation_then_gaussian_lsf",
+      "hrs_rotation_limb_darkening": "0.6",
+      "hrs_rotation_vsin_km_s": "4.2",
+      "hrs_smith_model_resolution": "Smith used R=250,000; this public template carrier is R=500,000",
+      "hrs_source_points_after_crop": "261417",
+      "hrs_velocity_bounds_km_s": "35.365239503303471,231.70833077369076"
+    },
+    "hrs_role": "Smith et al. 2024 primary 2020-12-14 pre-eclipse IGRINS",
+    "hrs_template_crop": "full Kp/dVsys prior velocity range plus rotation/LSF support margins; recorded on the prepared HRS template metadata",
+    "lrs_response": "original R=500,000 template with top-hat averages over the published 150 NIRSpec bins",
+    "lrs_role": "August et al. 2023 NIRSpec G395H comparison input",
+    "nirspec_count_note": "reconciled: August table has 150 rows and the public Zenodo best-fit template reproduces Smith's reported NIRSpec chi2/N when binned to those 150 rows; Smith's N=160 text count is retained as a manuscript discrepancy",
+    "nirspec_detector_terms": [
+      "NRS1",
+      "NRS2"
+    ],
+    "nirspec_point_count": 150,
+    "source_hashes": {
+      "hrs_cube": {
+        "expected_md5": "3fd41560b7dbcc60851ef3a0972c852f",
+        "expected_sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+        "expected_size_bytes": 77591894,
+        "md5": "3fd41560b7dbcc60851ef3a0972c852f",
+        "name": "cube14v3.pic",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/cube14v3.pic",
+        "role": "Smith et al. (2024) primary pre-eclipse IGRINS cube",
+        "sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+        "size_bytes": 77591894,
+        "url": "https://zenodo.org/api/records/10382053/files/cube14v3.pic/content",
+        "verified": true
+      },
+      "hrs_metadata": {
+        "expected_md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+        "expected_sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+        "expected_size_bytes": 7261,
+        "md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+        "name": "20201214_info.csv",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/20201214_info.csv",
+        "role": "Smith et al. (2024) primary pre-eclipse frame metadata",
+        "sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+        "size_bytes": 7261,
+        "url": "https://zenodo.org/api/records/10382053/files/20201214_info.csv/content",
+        "verified": true
+      },
+      "nirspec_table": {
+        "expected_md5": null,
+        "expected_sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f",
+        "expected_size_bytes": 27329,
+        "md5": "d85a43c8250a8b7eadea1513c6864716",
+        "name": "WASP_77_A_b_3.11569_5329_1.tbl",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/data/jwst_emission_spectra/spectra/76/89/90/56/WASP_77_A_b_3.11569_5329_1.tbl",
+        "role": "August et al. (2023) / Smith et al. (2024) NIRSpec comparison table",
+        "sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f",
+        "size_bytes": 27329,
+        "url": "https://doi.org/10.17909/3fmp-zj55",
+        "verified": true
+      },
+      "official_template": {
+        "expected_md5": "93841125cab0a2c74ae4730ebf36b7dc",
+        "expected_sha256": "fe1fb7cd37b6dec52173a19ee1fd7ea1529c421946c76d728d0bdcf4285ad34d",
+        "expected_size_bytes": 72672825,
+        "md5": "93841125cab0a2c74ae4730ebf36b7dc",
+        "name": "w77_pre_nirspec_best_fit_R500K_scaled.txt",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/w77_pre_nirspec_best_fit_R500K_scaled.txt",
+        "role": "Smith et al. (2024) official R=500,000 NIRSpec template",
+        "sha256": "fe1fb7cd37b6dec52173a19ee1fd7ea1529c421946c76d728d0bdcf4285ad34d",
+        "size_bytes": 72672825,
+        "url": "https://zenodo.org/api/records/10382053/files/w77_pre_nirspec_best_fit_R500K_scaled.txt/content",
+        "verified": true
+      }
+    },
+    "target": "WASP-77Ab",
+    "template_role": "official Smith R=500,000 template"
+  },
+  "modes": [
+    "hrs_only",
+    "lrs_only",
+    "joint"
+  ],
+  "plot": {
+    "path": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/reference_lrs.png",
+    "sha256": "7fcfc8d46e55d0c3e6e495f8caea723b685b7b5a74de7422db69b8e774721778"
+  },
+  "problems": {
+    "hrs_only": {
+      "component_metadata": {
+        "hrs": {
+          "dataset": "Smith et al. 2024 IGRINS 2020-12-14 pre-eclipse",
+          "mask_policy": "Zenodo cube is already the Smith-cleaned 44-order/1848-pixel product; no additional edge/order mask is inferred",
+          "observation_embedded": "true",
+          "pca_components": "4",
+          "pca_sigma_clip": "3-sigma residual zero-fill used by this ROBERT comparison; not stated as a separate data-cleaning step in Smith et al.",
+          "statistic": "ROBERT prepared Smith/Brogi-Line comparison statistic; not a claim of exact Smith likelihood reproduction",
+          "template_response": "official R=500,000 template convolved with Gray rotation and Gaussian LSF before detector-grid interpolation; no pixel integration is applied",
+          "velocity_terms": "fixed RV column (gamma plus barycentric correction) + Kp*sin(2*pi*phase) + dVsys"
+        }
+      },
+      "component_names": [
+        "hrs"
+      ],
+      "metadata": {
+        "abundance_state": "fixed official template; no VMR retrieval",
+        "comparison_claim": "independent fixed-template comparison, not truth recovery",
+        "data_date": "2020-12-14",
+        "data_role": "Smith et al. pre-eclipse primary IGRINS HRS",
+        "model_response": "R=500,000 template convolved with 4.2 km s^-1 Gray rotation and Gaussian R=45,000 LSF before PCA likelihood interpolation",
+        "phase_offset": "dphi fixed to zero; not a retrieval parameter",
+        "smith_model_resolution_note": "Smith used R=250,000; the public fixed-template carrier is R=500,000 before the same response stages",
+        "target": "WASP-77Ab",
+        "template_role": "official Smith R=500,000 template",
+        "velocity_fixed_terms": "Zenodo RV [km/s] column is used as the fixed gamma plus barycentric term",
+        "velocity_parameterization": "absolute Kp in [172, 212] km s^-1; equivalent to Smith dKp=Kp-192 km s^-1"
+      },
+      "name": "wasp77ab-smith2024-hrs-only",
+      "opacity_identifiers": {
+        "template": "smith2024-w77-pre-nirspec-best-fit-R500K"
+      },
+      "parameter_names": [
+        "Kp",
+        "dVsys",
+        "log10_a_hrs"
+      ],
+      "parameter_priors": {
+        "Kp": {
+          "lower": 172.0,
+          "unit": "km s^-1",
+          "upper": 212.0
+        },
+        "dVsys": {
+          "lower": -20.0,
+          "unit": "km s^-1",
+          "upper": 20.0
+        },
+        "log10_a_hrs": {
+          "lower": -2.0,
+          "unit": "log10",
+          "upper": 2.0
+        }
+      },
+      "prediction_keys": [
+        "hrs"
+      ]
+    },
+    "joint": {
+      "component_metadata": {
+        "hrs": {
+          "dataset": "Smith et al. 2024 IGRINS 2020-12-14 pre-eclipse",
+          "mask_policy": "Zenodo cube is already the Smith-cleaned 44-order/1848-pixel product; no additional edge/order mask is inferred",
+          "observation_embedded": "true",
+          "pca_components": "4",
+          "pca_sigma_clip": "3-sigma residual zero-fill used by this ROBERT comparison; not stated as a separate data-cleaning step in Smith et al.",
+          "statistic": "ROBERT prepared Smith/Brogi-Line comparison statistic; not a claim of exact Smith likelihood reproduction",
+          "template_response": "official R=500,000 template convolved with Gray rotation and Gaussian LSF before detector-grid interpolation; no pixel integration is applied",
+          "velocity_terms": "fixed RV column (gamma plus barycentric correction) + Kp*sin(2*pi*phase) + dVsys"
+        },
+        "nirspec_g395h_nrs1": {
+          "covariance": "not published; detector terms treated independently",
+          "dataset": "nirspec_g395h_nrs1",
+          "detector": "NRS1",
+          "likelihood": "independent Gaussian with symmetrised published uncertainty"
+        },
+        "nirspec_g395h_nrs2": {
+          "covariance": "not published; detector terms treated independently",
+          "dataset": "nirspec_g395h_nrs2",
+          "detector": "NRS2",
+          "likelihood": "independent Gaussian with symmetrised published uncertainty"
+        }
+      },
+      "component_names": [
+        "hrs",
+        "nirspec_g395h_nrs1",
+        "nirspec_g395h_nrs2"
+      ],
+      "metadata": {
+        "abundance_state": "fixed official template; no VMR retrieval",
+        "comparison_claim": "independent fixed-template comparison, not truth recovery",
+        "data_role": "Smith pre-eclipse IGRINS plus August NIRSpec",
+        "detector_terms": "NRS1 and NRS2 retained separately",
+        "lrs_model_binning": "top-hat average of the official R=500,000 template over the 150 published NIRSpec bins",
+        "model_response": "R=500,000 template convolved with 4.2 km s^-1 Gray rotation and Gaussian R=45,000 LSF before PCA likelihood interpolation",
+        "shared_template": "true",
+        "smith_lrs_method_note": "Smith reports R=100,000 model spectra and approximately R=250 data bins; this fixed-template comparison uses the public R=500,000 product and is not a reproduction",
+        "smith_model_resolution_note": "Smith used R=250,000; the public fixed-template carrier is R=500,000 before the same response stages",
+        "target": "WASP-77Ab",
+        "template_scale_prior": "Uniform(0.5, 1.5), dimensionless template scale",
+        "velocity_parameterization": "absolute Kp in [172, 212] km s^-1; equivalent to Smith dKp=Kp-192 km s^-1"
+      },
+      "name": "wasp77ab-smith2024-joint",
+      "opacity_identifiers": {
+        "template": "smith2024-w77-pre-nirspec-best-fit-R500K"
+      },
+      "parameter_names": [
+        "Kp",
+        "dVsys",
+        "log10_a_hrs",
+        "lrs_template_scale"
+      ],
+      "parameter_priors": {
+        "Kp": {
+          "lower": 172.0,
+          "unit": "km s^-1",
+          "upper": 212.0
+        },
+        "dVsys": {
+          "lower": -20.0,
+          "unit": "km s^-1",
+          "upper": 20.0
+        },
+        "log10_a_hrs": {
+          "lower": -2.0,
+          "unit": "log10",
+          "upper": 2.0
+        },
+        "lrs_template_scale": {
+          "lower": 0.5,
+          "unit": "dimensionless",
+          "upper": 1.5
+        }
+      },
+      "prediction_keys": [
+        "hrs",
+        "nirspec_g395h_nrs1",
+        "nirspec_g395h_nrs2"
+      ]
+    },
+    "lrs_only": {
+      "component_metadata": {
+        "nirspec_g395h_nrs1": {
+          "covariance": "not published; detector terms treated independently",
+          "dataset": "nirspec_g395h_nrs1",
+          "detector": "NRS1",
+          "likelihood": "independent Gaussian with symmetrised published uncertainty"
+        },
+        "nirspec_g395h_nrs2": {
+          "covariance": "not published; detector terms treated independently",
+          "dataset": "nirspec_g395h_nrs2",
+          "detector": "NRS2",
+          "likelihood": "independent Gaussian with symmetrised published uncertainty"
+        }
+      },
+      "component_names": [
+        "nirspec_g395h_nrs1",
+        "nirspec_g395h_nrs2"
+      ],
+      "metadata": {
+        "abundance_state": "fixed official template; no VMR retrieval",
+        "comparison_claim": "independent fixed-template comparison, not truth recovery",
+        "data_role": "August 2023 NIRSpec G395H comparison input",
+        "detector_terms": "NRS1 and NRS2 retained separately",
+        "lrs_model_binning": "top-hat average of the official R=500,000 template over the 150 published NIRSpec bins",
+        "smith_lrs_method_note": "Smith reports R=100,000 model spectra and approximately R=250 data bins; this fixed-template comparison uses the public R=500,000 product and is not a reproduction",
+        "target": "WASP-77Ab",
+        "template_role": "official Smith R=500,000 template",
+        "template_scale_prior": "Uniform(0.5, 1.5), dimensionless template scale"
+      },
+      "name": "wasp77ab-smith2024-lrs-only",
+      "opacity_identifiers": {
+        "template": "smith2024-w77-pre-nirspec-best-fit-R500K"
+      },
+      "parameter_names": [
+        "lrs_template_scale"
+      ],
+      "parameter_priors": {
+        "lrs_template_scale": {
+          "lower": 0.5,
+          "unit": "dimensionless",
+          "upper": 1.5
+        }
+      },
+      "prediction_keys": [
+        "nirspec_g395h_nrs1",
+        "nirspec_g395h_nrs2"
+      ]
+    }
+  },
+  "resources": {
+    "configured_process_rss_limit_bytes": 2040109465,
+    "gate_passed": true,
+    "mpi_pass": true,
+    "mpi_processes_configured": 1,
+    "mpi_world_size_observed": 1,
+    "peak_rss_bytes": 1261125632,
+    "process_rss_hard_limit_bytes": 2147483648,
+    "process_rss_pass": true,
+    "thread_limit": 3,
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    },
+    "threads_pass": true
+  },
+  "runs": {
+    "hrs_only": {
+      "evidence_comparison": {
+        "combined_error": 0.22753519192787927,
+        "delta_log_evidence": 0.3614405244588852,
+        "finite_evidence": true,
+        "finite_reported_errors": true,
+        "gate_passed": true,
+        "repeatability_limit": 0.5,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "within_combined_error": false
+      },
+      "gate_passed": true,
+      "mode": "hrs_only",
+      "runs": [
+        {
+          "backend": "MultiNest",
+          "best_fit_log_likelihood": -23375130.89460659,
+          "best_fit_parameters": {
+            "Kp": 192.41613167473994,
+            "dVsys": -5.805801675575218,
+            "log10_a_hrs": -0.05295052571641978
+          },
+          "calls": 1207,
+          "converged": true,
+          "effective_multinest_seed": 24680,
+          "log_evidence": -23375142.413511876,
+          "log_evidence_error": 0.052460976045061995,
+          "message": "converged",
+          "mode": "hrs_only",
+          "output_dir": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/hrs_only/seed-24680",
+          "peak_rss_bytes": 1261125632,
+          "per_component": {
+            "hrs": {
+              "chi_square": null,
+              "effective_residual_rank": 6423648,
+              "loglike": -23375130.89460659,
+              "observation_embedded": true,
+              "prediction_key": "hrs",
+              "reduced_chi_square": null
+            }
+          },
+          "posterior": {
+            "Kp": {
+              "lower_90": 190.3188935611453,
+              "median": 192.28624975024093,
+              "upper_90": 194.24840573572615
+            },
+            "dVsys": {
+              "lower_90": -6.98972025578827,
+              "median": -5.672052018415546,
+              "upper_90": -4.396873666044272
+            },
+            "log10_a_hrs": {
+              "lower_90": -0.08159615891459777,
+              "median": -0.049376822774679696,
+              "upper_90": -0.021893455082345782
+            }
+          },
+          "resource_gate_passed": true,
+          "sampler": "PyMultiNest",
+          "seed": 24680,
+          "status": "pass",
+          "wall_time_seconds": 2395.309764000005
+        },
+        {
+          "backend": "MultiNest",
+          "best_fit_log_likelihood": -23375130.915436827,
+          "best_fit_parameters": {
+            "Kp": 192.14380788940235,
+            "dVsys": -5.534818974133389,
+            "log10_a_hrs": -0.049445310556115674
+          },
+          "calls": 1230,
+          "converged": true,
+          "effective_multinest_seed": 24681,
+          "log_evidence": -23375142.05207135,
+          "log_evidence_error": 0.2214048544139362,
+          "message": "converged",
+          "mode": "hrs_only",
+          "output_dir": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/hrs_only/seed-24681",
+          "peak_rss_bytes": 1261125632,
+          "per_component": {
+            "hrs": {
+              "chi_square": null,
+              "effective_residual_rank": 6423648,
+              "loglike": -23375130.915436827,
+              "observation_embedded": true,
+              "prediction_key": "hrs",
+              "reduced_chi_square": null
+            }
+          },
+          "posterior": {
+            "Kp": {
+              "lower_90": 190.56327047471973,
+              "median": 192.27619661432226,
+              "upper_90": 194.22460480693366
+            },
+            "dVsys": {
+              "lower_90": -6.931926958439194,
+              "median": -5.702956006931619,
+              "upper_90": -4.5594587220281015
+            },
+            "log10_a_hrs": {
+              "lower_90": -0.07822509819281784,
+              "median": -0.051329001084391895,
+              "upper_90": -0.023308944816694224
+            }
+          },
+          "resource_gate_passed": true,
+          "sampler": "PyMultiNest",
+          "seed": 24681,
+          "status": "pass",
+          "wall_time_seconds": 2120.739852166036
+        }
+      ]
+    },
+    "joint": {
+      "evidence_comparison": {
+        "combined_error": 0.07405638396036493,
+        "delta_log_evidence": 0.28602783381938934,
+        "finite_evidence": true,
+        "finite_reported_errors": true,
+        "gate_passed": true,
+        "repeatability_limit": 0.5,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "within_combined_error": false
+      },
+      "gate_passed": true,
+      "mode": "joint",
+      "runs": [
+        {
+          "backend": "MultiNest",
+          "best_fit_log_likelihood": -23375184.62229018,
+          "best_fit_parameters": {
+            "Kp": 192.0898310382782,
+            "dVsys": -5.483315643966648,
+            "log10_a_hrs": -0.04678423256110653,
+            "lrs_template_scale": 0.9966285147339429
+          },
+          "calls": 1835,
+          "converged": true,
+          "effective_multinest_seed": 24680,
+          "log_evidence": -23375201.080312476,
+          "log_evidence_error": 0.060950531369112326,
+          "message": "converged",
+          "mode": "joint",
+          "output_dir": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/joint/seed-24680",
+          "peak_rss_bytes": 1261125632,
+          "per_component": {
+            "hrs": {
+              "chi_square": null,
+              "effective_residual_rank": 6423648,
+              "loglike": -23375130.95590221,
+              "observation_embedded": true,
+              "prediction_key": "hrs",
+              "reduced_chi_square": null
+            },
+            "nirspec_g395h_nrs1": {
+              "chi_square": 53.44667663340607,
+              "effective_residual_rank": 70,
+              "loglike": -26.72333831670304,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs1",
+              "reduced_chi_square": 0.763523951905801
+            },
+            "nirspec_g395h_nrs2": {
+              "chi_square": 53.88609930181208,
+              "effective_residual_rank": 80,
+              "loglike": -26.94304965090604,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs2",
+              "reduced_chi_square": 0.673576241272651
+            }
+          },
+          "posterior": {
+            "Kp": {
+              "lower_90": 190.18308416633442,
+              "median": 192.2598601514113,
+              "upper_90": 194.27548303648655
+            },
+            "dVsys": {
+              "lower_90": -6.858627343836414,
+              "median": -5.675933674281732,
+              "upper_90": -4.3255678348843265
+            },
+            "log10_a_hrs": {
+              "lower_90": -0.07676684195408434,
+              "median": -0.052409959800799065,
+              "upper_90": -0.023836595987857923
+            },
+            "lrs_template_scale": {
+              "lower_90": 0.9927617943144432,
+              "median": 0.9966006598110422,
+              "upper_90": 1.001148201629022
+            }
+          },
+          "resource_gate_passed": true,
+          "sampler": "PyMultiNest",
+          "seed": 24680,
+          "status": "pass",
+          "wall_time_seconds": 3270.882451749989
+        },
+        {
+          "backend": "MultiNest",
+          "best_fit_log_likelihood": -23375184.64801278,
+          "best_fit_parameters": {
+            "Kp": 192.51591862379087,
+            "dVsys": -5.7888515500473385,
+            "log10_a_hrs": -0.05315619482501077,
+            "lrs_template_scale": 0.9952994824348949
+          },
+          "calls": 2126,
+          "converged": true,
+          "effective_multinest_seed": 24681,
+          "log_evidence": -23375200.79428464,
+          "log_evidence_error": 0.04206400754930337,
+          "message": "converged",
+          "mode": "joint",
+          "output_dir": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/joint/seed-24681",
+          "peak_rss_bytes": 1261125632,
+          "per_component": {
+            "hrs": {
+              "chi_square": null,
+              "effective_residual_rank": 6423648,
+              "loglike": -23375130.904336292,
+              "observation_embedded": true,
+              "prediction_key": "hrs",
+              "reduced_chi_square": null
+            },
+            "nirspec_g395h_nrs1": {
+              "chi_square": 54.35533165274829,
+              "effective_residual_rank": 70,
+              "loglike": -27.177665826374145,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs1",
+              "reduced_chi_square": 0.7765047378964042
+            },
+            "nirspec_g395h_nrs2": {
+              "chi_square": 53.13202132406408,
+              "effective_residual_rank": 80,
+              "loglike": -26.566010662032035,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs2",
+              "reduced_chi_square": 0.664150266550801
+            }
+          },
+          "posterior": {
+            "Kp": {
+              "lower_90": 190.42667186444513,
+              "median": 192.2696950966128,
+              "upper_90": 194.10059742803324
+            },
+            "dVsys": {
+              "lower_90": -6.8761396557664,
+              "median": -5.696764320967123,
+              "upper_90": -4.440680570819091
+            },
+            "log10_a_hrs": {
+              "lower_90": -0.08272117036780324,
+              "median": -0.05046644669212012,
+              "upper_90": -0.023470757148218738
+            },
+            "lrs_template_scale": {
+              "lower_90": 0.9919024394826919,
+              "median": 0.9964080680561856,
+              "upper_90": 1.00146671565111
+            }
+          },
+          "resource_gate_passed": true,
+          "sampler": "PyMultiNest",
+          "seed": 24681,
+          "status": "pass",
+          "wall_time_seconds": 3785.7963228749577
+        }
+      ]
+    },
+    "lrs_only": {
+      "evidence_comparison": {
+        "combined_error": 0.09902806041310898,
+        "delta_log_evidence": 0.06953350590468688,
+        "finite_evidence": true,
+        "finite_reported_errors": true,
+        "gate_passed": true,
+        "repeatability_limit": 0.5,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "within_combined_error": true
+      },
+      "gate_passed": true,
+      "mode": "lrs_only",
+      "runs": [
+        {
+          "backend": "MultiNest",
+          "best_fit_log_likelihood": -53.665219055936205,
+          "best_fit_parameters": {
+            "lrs_template_scale": 0.9964831886108918
+          },
+          "calls": 534,
+          "converged": true,
+          "effective_multinest_seed": 24680,
+          "log_evidence": -58.613028352452716,
+          "log_evidence_error": 0.06172754851065792,
+          "message": "converged",
+          "mode": "lrs_only",
+          "output_dir": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/lrs_only/seed-24680",
+          "peak_rss_bytes": 1261125632,
+          "per_component": {
+            "nirspec_g395h_nrs1": {
+              "chi_square": 53.53691662880442,
+              "effective_residual_rank": 70,
+              "loglike": -26.76845831440221,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs1",
+              "reduced_chi_square": 0.764813094697206
+            },
+            "nirspec_g395h_nrs2": {
+              "chi_square": 53.79352148306798,
+              "effective_residual_rank": 80,
+              "loglike": -26.896760741533996,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs2",
+              "reduced_chi_square": 0.6724190185383497
+            }
+          },
+          "posterior": {
+            "lrs_template_scale": {
+              "lower_90": 0.9912851950995036,
+              "median": 0.9967179989304031,
+              "upper_90": 1.0016727395886929
+            }
+          },
+          "resource_gate_passed": true,
+          "sampler": "PyMultiNest",
+          "seed": 24680,
+          "status": "pass",
+          "wall_time_seconds": 0.2840229580178857
+        },
+        {
+          "backend": "MultiNest",
+          "best_fit_log_likelihood": -53.665219025275974,
+          "best_fit_parameters": {
+            "lrs_template_scale": 0.9964840536665555
+          },
+          "calls": 547,
+          "converged": true,
+          "effective_multinest_seed": 24681,
+          "log_evidence": -58.54349484654803,
+          "log_evidence_error": 0.07743556356123933,
+          "message": "converged",
+          "mode": "lrs_only",
+          "output_dir": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/lrs_only/seed-24681",
+          "peak_rss_bytes": 1261125632,
+          "per_component": {
+            "nirspec_g395h_nrs1": {
+              "chi_square": 53.53637284952244,
+              "effective_residual_rank": 70,
+              "loglike": -26.768186424761225,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs1",
+              "reduced_chi_square": 0.7648053264217491
+            },
+            "nirspec_g395h_nrs2": {
+              "chi_square": 53.79406520102949,
+              "effective_residual_rank": 80,
+              "loglike": -26.89703260051475,
+              "observation_embedded": false,
+              "prediction_key": "nirspec_g395h_nrs2",
+              "reduced_chi_square": 0.6724258150128686
+            }
+          },
+          "posterior": {
+            "lrs_template_scale": {
+              "lower_90": 0.9920331888000109,
+              "median": 0.9966451423730692,
+              "upper_90": 1.0013426929861433
+            }
+          },
+          "resource_gate_passed": true,
+          "sampler": "PyMultiNest",
+          "seed": 24681,
+          "status": "pass",
+          "wall_time_seconds": 0.2662373749772087
+        }
+      ]
+    }
+  },
+  "sampler_policy": {
+    "backend": "MultiNest",
+    "evidence_tolerance": 0.5,
+    "max_iter": 0,
+    "mpi_processes": 1,
+    "n_live_points": 64,
+    "sampler": "PyMultiNest",
+    "sampling_efficiency": 0.8,
+    "seeds": [
+      24680,
+      24681
+    ],
+    "ultranest_allowed": false
+  },
+  "schema_version": "1.0",
+  "status": "pass",
+  "truth_recovery_claim": false
+}

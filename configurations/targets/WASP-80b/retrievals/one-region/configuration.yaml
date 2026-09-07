@@ -1,0 +1,28 @@
+extends: ../../wasp80b_mie_catalog_pg14_R1000.yaml
+
+paths:
+  observations_directory: ../../../../../data/wasp80b_wiser2025
+  fastchem_directory: ../../../../../data/chemistry/fastchem
+  k_table_directory: ../../../../../opacity_data/ktables_exomol
+  optical_constants_directory: ../../../../../data/optical_constants/exo_skryer
+
+run:
+  name: one-region
+  description: WASP-80b homogeneous one-region MgSiO3 cloud retrieval using all native datasets.
+
+disk_emission:
+  model: one_region
+
+sampler:
+  engine: multinest
+  live_points: 1000
+  multinest_max_iterations: 0
+  resume: resume
+  show_status: false
+  seed: 8002
+
+runtime:
+  mpi_processes: 128
+
+plotting:
+  enabled: true

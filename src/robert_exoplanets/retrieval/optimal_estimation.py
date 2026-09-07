@@ -11,10 +11,8 @@ from numpy.typing import ArrayLike, NDArray
 from robert_exoplanets.core import RobertConfigError, RobertError, RobertValidationError
 from robert_exoplanets.core._immutability import immutable_mapping
 
-from .multi_dataset import MultiDatasetRetrievalProblem
-from .problem import RetrievalProblem
-
-RetrievalProblemLike = RetrievalProblem | MultiDatasetRetrievalProblem
+from .priors import CenteredLogRatioPrior
+from .protocols import OptimalEstimationProblem
 
 
 def log_pressure_correlated_covariance(
@@ -95,7 +93,7 @@ class OptimalEstimationResult:
 
 
 def run_optimal_estimation(
-    problem: RetrievalProblemLike,
+    problem: OptimalEstimationProblem,
     *,
     initial_state: ArrayLike | None = None,
     prior_state: ArrayLike | None = None,
@@ -127,6 +125,24 @@ def run_optimal_estimation(
         )
     if not np.isfinite(damping) or damping < 0.0:
         raise RobertValidationError("damping must be finite and non-negative")
+    if not callable(getattr(problem, "gaussian_inputs_from_vector", None)):
+        raise RobertConfigError(
+            "optimal estimation requires a problem implementing the explicit "
+            "gaussian_inputs_from_vector capability"
+        )
+    if not bool(getattr(getattr(problem, "likelihood", None), "supports_optimal_estimation", False)):
+        raise RobertConfigError(
+            "optimal estimation requires a supported independent Gaussian "
+            "likelihood; correlated or profiled likelihoods are unsupported"
+        )
+    if any(
+        isinstance(parameter.prior, CenteredLogRatioPrior)
+        for parameter in problem.parameters.parameters
+    ):
+        raise RobertConfigError(
+            "CLR priors require direct nested sampling; optimal estimation "
+            "does not represent their joint composition geometry"
+        )
     uncertainty_parameters = _state_dependent_uncertainty_parameters(problem)
     retrieved_uncertainty_parameters = sorted(
         uncertainty_parameters.intersection(problem.parameter_names)
@@ -161,7 +177,7 @@ def run_optimal_estimation(
     x = _clip_to_bounds(x, bounds)
     x_a = _clip_to_bounds(x_a, bounds)
     s_a = _prior_covariance(problem, prior_covariance)
-    s_a_inv = np.linalg.pinv(s_a)
+    s_a_inv = np.asarray(np.linalg.pinv(s_a), dtype=np.float64)
     _, y, uncertainty = problem.gaussian_inputs_from_vector(x)
     s_e_inv = np.diag(1.0 / np.square(uncertainty))
 
@@ -194,7 +210,10 @@ def run_optimal_estimation(
         if not np.all(np.isfinite(gain_left)) or not np.all(np.isfinite(rhs)):
             message = "non-finite optimal-estimation linear system"
             break
-        proposed = x_a + np.linalg.pinv(gain_left) @ rhs
+        proposed = np.asarray(
+            x_a + np.linalg.pinv(gain_left) @ rhs,
+            dtype=np.float64,
+        )
         proposed = _clip_to_bounds(proposed, bounds)
         step = _backtracking_step(
             problem,
@@ -208,7 +227,8 @@ def run_optimal_estimation(
             message = "no valid improving optimal-estimation step"
             break
         x_next, cost = step
-        step_norm = float(np.linalg.norm(x_next - x) / max(1.0, np.linalg.norm(x)))
+        state_norm = float(np.linalg.norm(x))
+        step_norm = float(np.linalg.norm(x_next - x) / max(1.0, state_norm))
         cost_change = (
             abs(previous_cost - cost) / max(1.0, abs(previous_cost))
             if np.isfinite(previous_cost)
@@ -264,7 +284,7 @@ def run_optimal_estimation(
 
 
 def _finite_difference_jacobian(
-    problem: RetrievalProblemLike,
+    problem: OptimalEstimationProblem,
     state: NDArray[np.float64],
     bounds: NDArray[np.float64],
     *,
@@ -301,7 +321,7 @@ def _finite_difference_jacobian(
 
 
 def _prior_covariance(
-    problem: RetrievalProblemLike,
+    problem: OptimalEstimationProblem,
     prior_covariance: ArrayLike | None,
 ) -> NDArray[np.float64]:
     if prior_covariance is not None:
@@ -327,7 +347,7 @@ def _prior_covariance(
 
 
 def _cost(
-    problem: RetrievalProblemLike,
+    problem: OptimalEstimationProblem,
     state: NDArray[np.float64],
     prior_state: NDArray[np.float64],
     prior_precision: NDArray[np.float64],
@@ -341,7 +361,7 @@ def _cost(
 
 
 def _backtracking_step(
-    problem: RetrievalProblemLike,
+    problem: OptimalEstimationProblem,
     *,
     current: NDArray[np.float64],
     proposed: NDArray[np.float64],
@@ -366,12 +386,14 @@ def _backtracking_step(
 
 
 def _state_dependent_uncertainty_parameters(
-    problem: RetrievalProblemLike,
+    problem: OptimalEstimationProblem,
 ) -> set[str]:
-    if isinstance(problem, MultiDatasetRetrievalProblem):
+    observations = getattr(problem, "observations", None)
+    datasets = getattr(observations, "datasets", None)
+    if datasets is not None:
         return {
             parameter
-            for dataset in problem.observations.datasets
+            for dataset in datasets
             for parameter in (
                 dataset.jitter_parameter,
                 dataset.uncertainty_scale_parameter,
@@ -381,8 +403,8 @@ def _state_dependent_uncertainty_parameters(
     return {
         parameter
         for parameter in (
-            problem.likelihood.jitter_parameter,
-            problem.likelihood.uncertainty_scale_parameter,
+            getattr(problem.likelihood, "jitter_parameter", None),
+            getattr(problem.likelihood, "uncertainty_scale_parameter", None),
         )
         if parameter is not None
     }
@@ -391,7 +413,10 @@ def _state_dependent_uncertainty_parameters(
 def _clip_to_bounds(
     values: NDArray[np.float64], bounds: NDArray[np.float64]
 ) -> NDArray[np.float64]:
-    return np.clip(values, bounds[:, 0], bounds[:, 1])
+    return np.asarray(
+        np.clip(values, bounds[:, 0], bounds[:, 1]),
+        dtype=np.float64,
+    )
 
 
 def _readonly_array(values: ArrayLike, name: str, ndim: int) -> NDArray[np.float64]:

@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Mapping
+from typing import Callable, Mapping, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from robert_exoplanets.core import RobertError, RobertValidationError, Spectrum
+from robert_exoplanets.core import (
+    RobertConfigError,
+    RobertError,
+    RobertValidationError,
+    Spectrum,
+)
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.instruments import ObservationCollection
-from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
+from robert_exoplanets.likelihoods import (
+    MultiDatasetGaussianLikelihood,
+    MultiDatasetLikelihood,
+)
 
 from .priors import RetrievalParameterSet
+from .problem import _supports_optimal_estimation
 
 MultiDatasetEvaluator = Callable[[Mapping[str, float]], object]
 
@@ -26,8 +35,11 @@ class MultiDatasetRetrievalProblem:
     observations: ObservationCollection
     parameters: RetrievalParameterSet
     forward_model: MultiDatasetEvaluator
-    likelihood: MultiDatasetGaussianLikelihood = field(
-        default_factory=MultiDatasetGaussianLikelihood
+    likelihood: MultiDatasetLikelihood = field(
+        default_factory=lambda: cast(
+            MultiDatasetLikelihood,
+            MultiDatasetGaussianLikelihood(),
+        )
     )
     invalid_loglike: float = float("-inf")
     metadata: Mapping[str, str] = field(default_factory=dict)
@@ -103,6 +115,12 @@ class MultiDatasetRetrievalProblem:
         vector: ArrayLike,
     ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """Return deterministic flattened Gaussian arrays for optimal estimation."""
+
+        if not _supports_optimal_estimation(self.likelihood):
+            raise RobertConfigError(
+                "optimal estimation requires a supported independent Gaussian "
+                "likelihood; correlated or profiled likelihoods are unsupported"
+            )
 
         parameters = self.parameter_mapping(vector)
         inputs = self.likelihood.effective_inputs_by_dataset(

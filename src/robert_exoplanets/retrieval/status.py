@@ -79,11 +79,6 @@ def load_retrieval_status(output_dir: str | Path) -> dict[str, object]:
         metadata = result.get("metadata")
         if isinstance(metadata, Mapping) and metadata.get("ncall") not in (None, ""):
             status.setdefault("ncall", int(metadata["ncall"]))
-    hdf5_ncall = _read_ultranest_ncall(directory)
-    if hdf5_ncall is not None:
-        found_artifact = True
-        status["ncall_checkpointed"] = hdf5_ncall
-        status.setdefault("ncall", hdf5_ncall)
     events = _read_json_lines(directory / RETRIEVAL_ATTEMPTS_FILENAME)
     found_artifact = found_artifact or bool(events)
     if not found_artifact:
@@ -149,22 +144,6 @@ def _read_json_lines(path: Path) -> list[dict[str, Any]]:
         return [dict(value) for line in lines if isinstance((value := json.loads(line)), Mapping)]
     except (OSError, json.JSONDecodeError) as exc:
         raise RobertDataError(f"failed to read retrieval attempt journal: {path}") from exc
-
-
-def _read_ultranest_ncall(directory: Path) -> int | None:
-    candidates = [directory / "results" / "points.hdf5"]
-    candidates.extend(sorted(directory.glob("run*/results/points.hdf5"), reverse=True))
-    existing = next((path for path in candidates if path.exists()), None)
-    if existing is None:
-        return None
-    try:
-        import h5py
-
-        with h5py.File(existing, "r") as store:
-            value = store.attrs.get("ncalls")
-            return None if value is None else int(value)
-    except (ImportError, OSError, ValueError, TypeError):
-        return None
 
 
 def _json_value(value: Any) -> Any:

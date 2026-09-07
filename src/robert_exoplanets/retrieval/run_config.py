@@ -66,87 +66,6 @@ class OptimalEstimationRunConfig:
 
 
 @dataclass(frozen=True)
-class UltraNestRunConfig:
-    """Settings for a reproducible UltraNest run."""
-
-    min_num_live_points: int = 400
-    max_ncalls: int | None = None
-    dlogz: float = 0.5
-    resume: str = "resume"
-    show_status: bool = True
-    mpi_nprocs: int | None = None
-    seed: int | None = None
-    invalid_loglike_floor: float = -1.0e100
-    extra_run_kwargs: Mapping[str, object] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        live_points = int(self.min_num_live_points)
-        if isinstance(self.min_num_live_points, bool) or live_points < 1:
-            raise RobertConfigError("min_num_live_points must be a positive integer")
-        max_ncalls = None if self.max_ncalls is None else int(self.max_ncalls)
-        if max_ncalls is not None and max_ncalls < 1:
-            raise RobertConfigError("max_ncalls must be positive when provided")
-        dlogz = float(self.dlogz)
-        if not np.isfinite(dlogz) or dlogz <= 0.0:
-            raise RobertConfigError("dlogz must be finite and positive")
-        resume = str(self.resume).strip().lower()
-        allowed_resume_modes = {"resume", "resume-similar", "overwrite", "subfolder"}
-        if resume not in allowed_resume_modes:
-            raise RobertConfigError(
-                "resume must be one of: " + ", ".join(sorted(allowed_resume_modes))
-            )
-        mpi_nprocs = None if self.mpi_nprocs is None else int(self.mpi_nprocs)
-        if mpi_nprocs is not None and mpi_nprocs < 1:
-            raise RobertConfigError("mpi_nprocs must be positive when provided")
-        seed = None if self.seed is None else int(self.seed)
-        if seed is not None and seed < 0:
-            raise RobertConfigError("seed must be non-negative when provided")
-        invalid_floor = float(self.invalid_loglike_floor)
-        if not np.isfinite(invalid_floor) or invalid_floor >= 0.0:
-            raise RobertConfigError("invalid_loglike_floor must be finite and negative")
-        reserved = {
-            "min_num_live_points",
-            "max_ncalls",
-            "dlogz",
-            "resume",
-            "show_status",
-            "mpi_nprocs",
-            "seed",
-            "invalid_loglike_floor",
-            "output_dir",
-        }
-        overlap = reserved.intersection(self.extra_run_kwargs)
-        if overlap:
-            raise RobertConfigError(
-                "extra_run_kwargs contains reserved settings: " + ", ".join(sorted(overlap))
-            )
-        object.__setattr__(self, "min_num_live_points", live_points)
-        object.__setattr__(self, "max_ncalls", max_ncalls)
-        object.__setattr__(self, "dlogz", dlogz)
-        object.__setattr__(self, "resume", resume)
-        object.__setattr__(self, "mpi_nprocs", mpi_nprocs)
-        object.__setattr__(self, "seed", seed)
-        object.__setattr__(self, "invalid_loglike_floor", invalid_floor)
-        object.__setattr__(self, "extra_run_kwargs", immutable_mapping(self.extra_run_kwargs))
-
-    @property
-    def method(self) -> str:
-        return "ultranest"
-
-    def kwargs(self) -> dict[str, object]:
-        return {
-            "min_num_live_points": self.min_num_live_points,
-            "max_ncalls": self.max_ncalls,
-            "dlogz": self.dlogz,
-            "resume": self.resume,
-            "show_status": self.show_status,
-            "mpi_nprocs": self.mpi_nprocs,
-            "invalid_loglike_floor": self.invalid_loglike_floor,
-            **dict(self.extra_run_kwargs),
-        }
-
-
-@dataclass(frozen=True)
 class MultiNestRunConfig:
     """Settings for a reproducible conda-provided PyMultiNest run."""
 
@@ -244,7 +163,7 @@ class MultiNestRunConfig:
         }
 
 
-InferenceRunConfig = OptimalEstimationRunConfig | UltraNestRunConfig | MultiNestRunConfig
+InferenceRunConfig = OptimalEstimationRunConfig | MultiNestRunConfig
 
 
 @dataclass(frozen=True)
@@ -304,7 +223,7 @@ def run_configured_retrieval(config: RetrievalRunConfig) -> RetrievalResult:
     problem = build_retrieval_problem(config)
     seed = (
         config.inference.seed
-        if isinstance(config.inference, (UltraNestRunConfig, MultiNestRunConfig))
+        if isinstance(config.inference, MultiNestRunConfig)
         else None
     )
     return run_retrieval(
@@ -321,7 +240,6 @@ __all__ = [
     "MultiNestRunConfig",
     "OptimalEstimationRunConfig",
     "RetrievalRunConfig",
-    "UltraNestRunConfig",
     "build_retrieval_problem",
     "run_configured_retrieval",
 ]

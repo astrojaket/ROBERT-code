@@ -1,7 +1,22 @@
 # Interface Specification
 
-This document specifies the stable interfaces ROBERT components must implement.
-The examples are protocol-shaped pseudocode, not production code.
+This document describes target interfaces. The examples are protocol-shaped
+pseudocode, not the current public API or a compatibility guarantee. Use the
+implemented protocols and constructors for integration. General plugin
+registration and entry-point discovery are not implemented.
+
+The implemented retrieval contracts are in `retrieval/protocols.py`.
+`SamplerRetrievalProblem` is shared by single-dataset, multi-dataset,
+heterogeneous, and device problems. `OptimalEstimationProblem` adds explicit
+Gaussian inputs. CI checks concrete problem classes against these protocols
+with `python -m mypy`; this is a scoped check, not whole-package type coverage.
+
+The current optimal-estimation adapter accepts likelihoods that explicitly
+declare `supports_optimal_estimation = True`. This declares that their
+effective model, data, and uncertainty arrays define independent Gaussian
+errors for OE. Covariance and profiled likelihoods must not opt in by exposing
+diagonal diagnostic errors. Mixed likelihoods opt in only when every component
+does. Other solvers can continue to use the full scalar likelihood.
 
 ## 1. General Interface Rules
 

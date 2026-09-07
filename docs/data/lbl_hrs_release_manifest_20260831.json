@@ -1,0 +1,898 @@
+{
+  "abundance_contract": {
+    "mass_fractions_in_robert_state": false,
+    "pRT_boundary_conversion": "private deterministic conversion from the same ROBERT VMR state for the external pRT oracle",
+    "retrieval_fields": "VMR or log10(VMR)",
+    "robert_state": "VMR only"
+  },
+  "artifacts": {
+    "base_spectrum": {
+      "bytes": 51038,
+      "path": "examples/outputs/lbl_kband/lbl_kband_validation_spectra.npz",
+      "sha256": "76874b2daf8f17eee886e4adcea4eb3cf109bff7273fb5a427bdb155e47ebd7b"
+    },
+    "hminus_oracle_outputs": {
+      "hrs_native_archive_path": {
+        "bytes": 361431,
+        "path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_hrs_native.npz",
+        "sha256": "19fd260b09d5090b65daa346d16b443d20f98d61526a1ad5687e017cd732d29d"
+      },
+      "lrs_archive_path": {
+        "bytes": 417642,
+        "path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_lrs.npz",
+        "sha256": "2053ec1d41c3afad230424e58efbd2e59e765db7d9ea3d86e47746db63e4b00c"
+      },
+      "oracle_json_path": {
+        "bytes": 19140,
+        "path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_oracle.json",
+        "sha256": "573b0ad8b4adbff71d9df4038acd66092f4884e761a4396d686e6a5b44c5c291"
+      }
+    },
+    "science_oracle_outputs": {
+      "background_only": {
+        "bytes": 29696,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_background_only.npz",
+        "sha256": "9f3fdffb9f42575733a7634e45affe580205bd1de780358f81bc03657ad99e52"
+      },
+      "baseline": {
+        "bytes": 32952,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_baseline.npz",
+        "sha256": "db1d4aa21d474e7057038c9743af3c6e7e938ffdd12e0504bb158f62068eb8e7"
+      },
+      "co_only": {
+        "bytes": 32779,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_co_only.npz",
+        "sha256": "b6ec68ed1d137b315ebb9b078559dbc65ccb6db93b05a502020622a0e591701a"
+      },
+      "h2o_only": {
+        "bytes": 32945,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_h2o_only.npz",
+        "sha256": "f768e0a330b94f8cbf330212418817f1c578e309893370c181141f3238966c92"
+      },
+      "high_gravity": {
+        "bytes": 32948,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_high_gravity.npz",
+        "sha256": "b57c4f15260f6a1b5fc50510347cad249124c15a91067a569d932a22526c4e0e"
+      },
+      "inversion": {
+        "bytes": 33065,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_inversion.npz",
+        "sha256": "67054d92ca030d69c5fc79402aa97748a20ff9c1097ead3f47bb87337dd87f65"
+      },
+      "isothermal": {
+        "bytes": 27348,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_isothermal.npz",
+        "sha256": "dca2e11ca9f886e345b33542a37ad928a0849582959da2b3825a09da0d69bae3"
+      },
+      "low_abundance": {
+        "bytes": 32864,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_low_abundance.npz",
+        "sha256": "7c34a9dc80858e5d02c1b65b1c4973c075569f6096d249f56d2d60236668a978"
+      },
+      "medium_160": {
+        "bytes": 179186,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_medium_reference_160.npz",
+        "sha256": "bee38b3c03805863992b68c596b55b858527eb05d0a1caf4f28298b236e53191"
+      },
+      "medium_80": {
+        "bytes": 178338,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_medium_reference_80.npz",
+        "sha256": "2f82d18c324b979f43971d4a4628f0323cc8a824eaa5cd521c5694ad39971674"
+      },
+      "wide": {
+        "bytes": 350637,
+        "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_wide_reference.npz",
+        "sha256": "dcf0df3cf29de2623728467d6d4813c0df6371b845579a6e645b1030c0752b98"
+      }
+    }
+  },
+  "environment": {
+    "cpu_count_available": 14,
+    "machine": "arm64",
+    "optional_package_versions": {
+      "mpi4py": "4.1.2",
+      "petitRADTRANS": "not installed in the ROBERT environment",
+      "pymultinest": "2.12"
+    },
+    "platform": "macOS-15.7.7-arm64-arm-64bit",
+    "processor": "arm",
+    "python_executable": "/opt/miniconda3/envs/robert-exoplanets/bin/python",
+    "python_implementation": "CPython",
+    "python_version": "3.12.13",
+    "release": "24.6.0",
+    "robert_exoplanets_version": "0.3.0",
+    "system": "Darwin"
+  },
+  "git": {
+    "commit": "cede240e7df4a21e3572d2e3c112aaeadfb7261f",
+    "dirty": true,
+    "dirty_path_count": 231,
+    "dirty_paths": [
+      ".github/workflows/ci.yml",
+      "docs/data_policy.md",
+      "docs/postprocessing.md",
+      "examples/BENCHMARKS.md",
+      "pyproject.toml",
+      "src/robert_exoplanets/__init__.py",
+      "src/robert_exoplanets/diagnostics/benchmark_style.py",
+      "src/robert_exoplanets/diagnostics/leave_one_out.py",
+      "src/robert_exoplanets/forward/__init__.py",
+      "src/robert_exoplanets/forward/_atmospheric.py",
+      "src/robert_exoplanets/forward/emission.py",
+      "src/robert_exoplanets/forward/factory.py",
+      "src/robert_exoplanets/forward/transmission.py",
+      "src/robert_exoplanets/instruments/__init__.py",
+      "src/robert_exoplanets/likelihoods/__init__.py",
+      "src/robert_exoplanets/likelihoods/gaussian.py",
+      "src/robert_exoplanets/opacity/__init__.py",
+      "src/robert_exoplanets/postprocessing.py",
+      "src/robert_exoplanets/retrieval/manifest.py",
+      "src/robert_exoplanets/retrieval/multi_dataset.py",
+      "src/robert_exoplanets/rt/__init__.py",
+      "src/robert_exoplanets/rt/extinction.py",
+      "src/robert_exoplanets/rt/optical_depth.py",
+      "src/robert_exoplanets/validation/__init__.py",
+      "src/robert_exoplanets/validation/injection.py",
+      "tests/test_postprocessing.py",
+      "tests/test_rt_extinction.py",
+      "tests/test_validation_injection.py",
+      "Solar_System_Models/Earth/earth_spectrum.csv",
+      "Solar_System_Models/Earth/earth_spectrum.png",
+      "Solar_System_Models/Jupiter/jupiter_spectrum.csv",
+      "Solar_System_Models/Jupiter/jupiter_spectrum.png",
+      "Solar_System_Models/Mars/mars_spectrum.csv",
+      "Solar_System_Models/Mars/mars_spectrum.png",
+      "Solar_System_Models/Neptune/neptune_spectrum.csv",
+      "Solar_System_Models/Neptune/neptune_spectrum.png",
+      "Solar_System_Models/README.md",
+      "Solar_System_Models/Saturn/saturn_spectrum.csv",
+      "Solar_System_Models/Saturn/saturn_spectrum.png",
+      "Solar_System_Models/Uranus/uranus_spectrum.csv",
+      "Solar_System_Models/Uranus/uranus_spectrum.png",
+      "Solar_System_Models/Venus/venus_spectrum.csv",
+      "Solar_System_Models/Venus/venus_spectrum.png",
+      "Solar_System_Models/all_planets_overview.png",
+      "Solar_System_Models/model_manifest.json",
+      "docs/data/combined_resolution_full_pymultinest_20260831.json",
+      "docs/data/combined_resolution_recovery_20260830.json",
+      "docs/data/high_resolution_observation_pipeline_20260831.json",
+      "docs/data/hminus_continuum_validation_20260831.json",
+      "docs/data/jax_opacity_sampling_m4pro_20260803.json",
+      "docs/data/lbl_hrs_release_manifest_20260831.json",
+      "docs/data/lbl_kband_science_grid_20260830.json",
+      "docs/data/lbl_kband_validation_20260829.json",
+      "docs/review/48_jax_metal_backend.md",
+      "docs/review/49_cloud_free_jax_metal_phase1.md",
+      "docs/review/50_jax_opacity_sampling_accelerator.md",
+      "docs/review/51_line_by_line_high_resolution_retrieval_methods.md",
+      "docs/rfcs/0002-line-by-line-high-resolution.md",
+      "emission-intercomparison-paper/",
+      "examples/benchmark_bundled_cloud_free_metal.py",
+      "examples/benchmark_high_resolution_observation_pipeline.py",
+      "examples/benchmark_hminus_continuum.py",
+      "examples/benchmark_lbl_kband_emission.py",
+      "examples/benchmark_lbl_kband_science_grid.py",
+      "examples/combined_resolution_full_pymultinest.py",
+      "examples/combined_resolution_injection_recovery.py",
+      "examples/finalize_lbl_hrs_release.py",
+      "examples/run_petitradtrans3_hminus_oracle.py",
+      "examples/run_petitradtrans3_lbl_kband_reference.py",
+      "examples/run_petitradtrans3_lbl_kband_science_grid.py",
+      "examples/solar_system_emission.py",
+      "literature-clr-retrievals/GJ-486b/README.md",
+      "literature-clr-retrievals/GJ-486b/configuration.yaml",
+      "literature-clr-retrievals/GJ-486b/prepare_observation.py",
+      "literature-clr-retrievals/GJ-486b/scratch/matplotlib/fontlist-v390.json",
+      "literature-clr-retrievals/GJ-486b/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.1.nbc",
+      "literature-clr-retrievals/GJ-486b/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.nbi",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023.zip",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/ForwardModels/GJ486b_1000xSolar_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/ForwardModels/GJ486b_co2_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/ForwardModels/GJ486b_methane_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/ForwardModels/GJ486b_water_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/StellarSpectra/GJ486_StellarSpectraAndModels.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/TransmissionSpectra/GJ486b_TransmissionSpectra.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V1_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V1_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V2_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V2_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest.zip",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/ForwardModels/GJ486b_1000xSolar_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/ForwardModels/GJ486b_co2_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/ForwardModels/GJ486b_methane_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/ForwardModels/GJ486b_water_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/StellarSpectra/GJ486_StellarSpectraAndModels.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/TransmissionSpectra/GJ486b_TransmissionSpectra.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V1_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V1_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V2_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/GJ486b_Eureka!_WLC_V2_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/FIREFly_visit1_nrs1_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/FIREFly_visit1_nrs2_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/FIREFly_visit2_nrs1_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/FIREFly_visit2_nrs2_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/Tiberius_nrs1_visit1_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/Tiberius_nrs1_visit2_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/Tiberius_nrs2_visit1_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/Tiberius_nrs2_visit2_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_1000xSolar_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_co2_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_methane_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_water_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/StellarSpectra/._GJ486_StellarSpectraAndModels.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/TransmissionSpectra/._GJ486b_TransmissionSpectra.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V1_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V1_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V2_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V2_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/._.DS_Store",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/._FIREFly_visit1_nrs1_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/._FIREFly_visit1_nrs2_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/._FIREFly_visit2_nrs1_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/FIREFLy/._FIREFly_visit2_nrs2_transit_wlc_fixsis.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/._Tiberius_nrs1_visit1_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/._Tiberius_nrs1_visit2_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/._Tiberius_nrs2_visit1_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/GJ486b_Zenodo_2023_latest/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Tiberius/._Tiberius_nrs2_visit2_WLC.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/._.DS_Store",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_1000xSolar_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_co2_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_methane_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/ForwardModels/._GJ486b_water_model.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/StellarSpectra/._GJ486_StellarSpectraAndModels.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/TransmissionSpectra/._GJ486b_TransmissionSpectra.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/._.DS_Store",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V1_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V1_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V2_NRS1.txt",
+      "literature-clr-retrievals/GJ-486b/source/__MACOSX/GJ486b_Zenodo_2023/WhiteLightCurves/Eureka!/._GJ486b_Eureka!_WLC_V2_NRS2.txt",
+      "literature-clr-retrievals/GJ-486b/source/paper.pdf",
+      "literature-clr-retrievals/L98-59b/README.md",
+      "literature-clr-retrievals/L98-59b/configuration.yaml",
+      "literature-clr-retrievals/L98-59b/scratch/matplotlib/fontlist-v390.json",
+      "literature-clr-retrievals/L98-59b/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.1.nbc",
+      "literature-clr-retrievals/L98-59b/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.nbi",
+      "literature-clr-retrievals/L98-59b/source/L9859b_combined_spectrum_eureka.txt",
+      "literature-clr-retrievals/L98-59b/source/paper.pdf",
+      "literature-clr-retrievals/L98-59d/README.md",
+      "literature-clr-retrievals/L98-59d/configuration.yaml",
+      "literature-clr-retrievals/L98-59d/prepare_observation.py",
+      "literature-clr-retrievals/L98-59d/scratch/matplotlib/fontlist-v390.json",
+      "literature-clr-retrievals/L98-59d/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.1.nbc",
+      "literature-clr-retrievals/L98-59d/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.nbi",
+      "literature-clr-retrievals/L98-59d/source/L98-59d.txt",
+      "literature-clr-retrievals/L98-59d/source/paper.pdf",
+      "literature-clr-retrievals/LHS-475b/README.md",
+      "literature-clr-retrievals/LHS-475b/configuration.yaml",
+      "literature-clr-retrievals/LHS-475b/prepare_observation.py",
+      "literature-clr-retrievals/LHS-475b/scratch/matplotlib/fontlist-v390.json",
+      "literature-clr-retrievals/LHS-475b/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.1.nbc",
+      "literature-clr-retrievals/LHS-475b/scratch/numba/util_44cee144617b038f91b2034585dd8e330c5c49ee/interp.bin_down_corrk_numba-461.py312.nbi",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files.zip",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/1_Light_Curves/whitelight_transit1_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/1_Light_Curves/whitelight_transit2_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/2_Transmission_Spectra/transit_spectrum_HR_eureka_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/2_Transmission_Spectra/transit_spectrum_HR_firefly_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/2_Transmission_Spectra/transit_spectrum_HR_tiberius_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/2_Transmission_Spectra/transit_spectrum_LR_firefly_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_1000xsolar_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_100xsolar_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_10xsolar_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_1xsolar_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_ch4_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_clear_titanlike_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_clear_venuslike_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_cloudy_venuslike_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_co2_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_earthlike_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_h2o_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_hazy_titanlike_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/LHS47b_Zenodo_Files/3_Models/lhs_475b_marslike_model_ecsv.txt",
+      "literature-clr-retrievals/LHS-475b/source/paper.pdf",
+      "literature-clr-retrievals/comparison_report.md",
+      "literature-clr-retrievals/literature_inventory.md",
+      "scripts/benchmark_metal_backend.py",
+      "scripts/benchmark_opacity_sampling_jax.py",
+      "src/robert_exoplanets/forward/high_resolution.py",
+      "src/robert_exoplanets/instruments/high_resolution.py",
+      "src/robert_exoplanets/instruments/high_resolution_observation.py",
+      "src/robert_exoplanets/likelihoods/correlated.py",
+      "src/robert_exoplanets/likelihoods/high_resolution.py",
+      "src/robert_exoplanets/likelihoods/mixed.py",
+      "src/robert_exoplanets/metal/__init__.py",
+      "src/robert_exoplanets/metal/cloud_free.py",
+      "src/robert_exoplanets/metal/forward.py",
+      "src/robert_exoplanets/metal/likelihood.py",
+      "src/robert_exoplanets/metal/mie.py",
+      "src/robert_exoplanets/metal/opacity_sampling.py",
+      "src/robert_exoplanets/metal/problem.py",
+      "src/robert_exoplanets/metal/random_overlap.py",
+      "src/robert_exoplanets/metal/resources.py",
+      "src/robert_exoplanets/metal/runtime.py",
+      "src/robert_exoplanets/metal/sh4.py",
+      "src/robert_exoplanets/opacity/line_by_line.py",
+      "src/robert_exoplanets/validation/multi_dataset.py",
+      "tests/test_benchmark_lbl_kband_emission.py",
+      "tests/test_benchmark_lbl_kband_science_grid.py",
+      "tests/test_combined_resolution_full_pymultinest.py",
+      "tests/test_correlated_likelihood.py",
+      "tests/test_finalize_lbl_hrs_release.py",
+      "tests/test_high_resolution_likelihoods.py",
+      "tests/test_high_resolution_observation.py",
+      "tests/test_high_resolution_observation_workflow.py",
+      "tests/test_high_resolution_response.py",
+      "tests/test_hminus_continuum.py",
+      "tests/test_hminus_workflow.py",
+      "tests/test_line_by_line_factory.py",
+      "tests/test_line_by_line_opacity.py",
+      "tests/test_metal_backend.py",
+      "tests/test_metal_cloud_free.py",
+      "tests/test_metal_forward.py",
+      "tests/test_metal_hardware.py",
+      "tests/test_metal_mie.py",
+      "tests/test_metal_opacity_sampling.py",
+      "tests/test_metal_resources.py",
+      "tests/test_metal_sh4.py",
+      "tests/test_mixed_multi_dataset_likelihood.py",
+      "tests/test_multi_dataset_injection.py",
+      "tests/test_parameterized_high_resolution_forward.py",
+      "tests/test_petitradtrans3_lbl_kband_reference.py",
+      "tests/test_petitradtrans3_lbl_kband_science_grid.py",
+      "tests/test_public_high_resolution_api.py"
+    ]
+  },
+  "manifest_name": "lbl_hrs_release_manifest_20260831",
+  "opacity_inputs": [
+    {
+      "bytes": 4753927800,
+      "licence": "not recorded in the compact report; verify the upstream licence before archive publication",
+      "licence_status": "not_recorded",
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad",
+      "sha256_source": "recorded compact report; not recomputed for large opacity tables",
+      "source": "petitRADTRANS input-data release",
+      "source_url": "https://petitradtrans.readthedocs.io/en/latest/content/notebooks/high_resolution_spectra.html"
+    },
+    {
+      "bytes": 4681348920,
+      "licence": "not recorded in the compact report; verify the upstream licence before archive publication",
+      "licence_status": "not_recorded",
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73",
+      "sha256_source": "recorded compact report; not recomputed for large opacity tables",
+      "source": "petitRADTRANS input-data release",
+      "source_url": "https://petitradtrans.readthedocs.io/en/latest/content/notebooks/high_resolution_spectra.html"
+    },
+    {
+      "bytes": 2702736,
+      "licence": "not recorded in the compact report; verify the upstream licence before archive publication",
+      "licence_status": "not_recorded",
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_2.3-2.3mu.xsec.petitRADTRANS.h5",
+      "sha256": "9bdf7fbe170fb31a241a177d22b8498d0ac56080ebcb53ce0240786e904c5ba9",
+      "sha256_source": "recorded compact report; not recomputed for large opacity tables",
+      "source": "petitRADTRANS input-data release",
+      "source_url": "https://petitradtrans.readthedocs.io/en/latest/content/notebooks/high_resolution_spectra.html"
+    }
+  ],
+  "plots": {
+    "hminus": {
+      "command": "conda run -n robert-exoplanets python examples/benchmark_hminus_continuum.py --max-memory-gib 1.8 --run-pymultinest --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+      "input_data_path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_lrs.npz",
+      "input_data_sha256": "2053ec1d41c3afad230424e58efbd2e59e765db7d9ea3d86e47746db63e4b00c",
+      "input_report_path": "docs/data/hminus_continuum_validation_20260831.json",
+      "input_report_sha256": "79b4c04181ec0c13bff3def1d0fa46c3af16159a808e4eaebfe06e637227e19c",
+      "output_path": "examples/outputs/hminus_continuum/hminus_validation.png",
+      "output_sha256": "4143d42123d977bcaa1ae34d47213a71578855073cfe1a85dc00c0a04a2f33be",
+      "source_script": "examples/benchmark_hminus_continuum.py"
+    },
+    "kband": {
+      "command": "conda run -n robert-exoplanets python examples/benchmark_lbl_kband_emission.py",
+      "input_data_path": "examples/outputs/lbl_kband/lbl_kband_validation_spectra.npz",
+      "input_data_sha256": "76874b2daf8f17eee886e4adcea4eb3cf109bff7273fb5a427bdb155e47ebd7b",
+      "input_report_path": "docs/data/lbl_kband_validation_20260829.json",
+      "input_report_sha256": "eaabde47bf4e9f8630f0b7882e53808e03fef302184551062d498a0826abd5fd",
+      "output_path": "examples/outputs/lbl_kband/lbl_kband_validation.png",
+      "output_sha256": "65681cc60c6af1dbb8e4b2756555b4e21399d6a6b080d4f0950cb01580b87526",
+      "source_script": "examples/benchmark_lbl_kband_emission.py"
+    },
+    "summary": {
+      "command": "examples/finalize_lbl_hrs_release.py --summary-plot examples/outputs/lbl_kband/lbl_hrs_release_summary.png",
+      "input_report_sha256": {
+        "full": "3261d14d8ce48e5d4e6929a9ede6dcc2d413089f0b7a49c5f5704decd495a5b8",
+        "hminus": "79b4c04181ec0c13bff3def1d0fa46c3af16159a808e4eaebfe06e637227e19c",
+        "science": "f62f51904507c0bd479e8516a81ac33be01c06481de8c6e5ff495d80cd6f6537"
+      },
+      "output_path": "examples/outputs/lbl_kband/lbl_hrs_release_summary.png",
+      "output_sha256": "c6245108a6d750fede9ff6ea1f93331ccdbf2c6b46cd67c96a05ee810283fb69",
+      "source_script": "examples/finalize_lbl_hrs_release.py"
+    }
+  },
+  "provenance_contract": {
+    "external_tables_hashed_from_report": true,
+    "plot_inputs_are_compact_reports_or_small_artifacts": true,
+    "sampler_backend": "PyMultiNest/MultiNest",
+    "sampler_chain_files_read": false
+  },
+  "report_hashes": {
+    "base": "eaabde47bf4e9f8630f0b7882e53808e03fef302184551062d498a0826abd5fd",
+    "full": "3261d14d8ce48e5d4e6929a9ede6dcc2d413089f0b7a49c5f5704decd495a5b8",
+    "hminus": "79b4c04181ec0c13bff3def1d0fa46c3af16159a808e4eaebfe06e637227e19c",
+    "science": "f62f51904507c0bd479e8516a81ac33be01c06481de8c6e5ff495d80cd6f6537"
+  },
+  "reports": {
+    "base": {
+      "command": "conda run -n robert-exoplanets python examples/benchmark_lbl_kband_emission.py",
+      "path": "docs/data/lbl_kband_validation_20260829.json",
+      "schema_version": 1,
+      "sha256": "eaabde47bf4e9f8630f0b7882e53808e03fef302184551062d498a0826abd5fd",
+      "status": "pass"
+    },
+    "combined_proof": {
+      "command": "examples/combined_resolution_injection_recovery.py --max-memory-gib 1.9 --run-pymultinest --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+      "path": "docs/data/combined_resolution_recovery_20260830.json",
+      "schema_version": "1.0",
+      "sha256": "c1cc632ba0e99697dbf31c79b132f5f7bce8b1445669b77b14f005409abcfc7e",
+      "status": "pass"
+    },
+    "full": {
+      "command": "examples/combined_resolution_full_pymultinest.py --run-pymultinest --run-native-stride-comparison --seed 24680 --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+      "path": "docs/data/combined_resolution_full_pymultinest_20260831.json",
+      "schema_version": "1.0",
+      "sha256": "3261d14d8ce48e5d4e6929a9ede6dcc2d413089f0b7a49c5f5704decd495a5b8",
+      "status": "pass_native_stride_1_stride_2_rejected"
+    },
+    "hminus": {
+      "command": "conda run -n robert-exoplanets python examples/benchmark_hminus_continuum.py --max-memory-gib 1.8 --run-pymultinest --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+      "path": "docs/data/hminus_continuum_validation_20260831.json",
+      "schema_version": 1,
+      "sha256": "79b4c04181ec0c13bff3def1d0fa46c3af16159a808e4eaebfe06e637227e19c",
+      "status": "pass"
+    },
+    "science": {
+      "command": "conda run -n robert-exoplanets python examples/benchmark_lbl_kband_science_grid.py",
+      "path": "docs/data/lbl_kband_science_grid_20260830.json",
+      "schema_version": 1,
+      "sha256": "f62f51904507c0bd479e8516a81ac33be01c06481de8c6e5ff495d80cd6f6537",
+      "status": "pass"
+    }
+  },
+  "resources": {
+    "configured_process_memory_bytes_by_report": {
+      "base:$.resources.memory_limit_bytes": 2040109465,
+      "base:$.resources.petitradtrans_160.max_memory_bytes": 2040109465,
+      "combined_proof:$.resources.max_memory_bytes": 2040109465,
+      "full:$.resources.max_memory_bytes": 1992294400,
+      "hminus:$.oracle.process_memory_ceiling_bytes": 1986422374,
+      "hminus:$.resource_policy.process_memory_ceiling_bytes": 1932735283,
+      "science:$.resources.memory_limit_bytes": 2040109465
+    },
+    "mpi_processes": 1,
+    "mpi_processes_at_most_3": true,
+    "mpi_processes_by_report": {
+      "base": {
+        "count": 1,
+        "source": "default_for_non_sampler_report"
+      },
+      "combined_proof": {
+        "count": 1,
+        "source": "reported"
+      },
+      "full": {
+        "count": 1,
+        "source": "reported"
+      },
+      "hminus": {
+        "count": 1,
+        "source": "reported"
+      },
+      "science": {
+        "count": 1,
+        "source": "default_for_non_sampler_report"
+      }
+    },
+    "observed_peak_rss_bytes_by_report": {
+      "base:$.resources.measured_peak_rss_bytes": 500645888,
+      "base:$.resources.petitradtrans_160.measured_peak_rss_bytes": 242647040,
+      "combined_proof:$.resources.measured_peak_rss_bytes": 801226752,
+      "full:$.native_stride_comparison.nested_posterior_comparison.paired_runs[0].stride_1.peak_rss_bytes": 693878784,
+      "full:$.native_stride_comparison.nested_posterior_comparison.paired_runs[0].stride_2.peak_rss_bytes": 883752960,
+      "full:$.native_stride_comparison.nested_posterior_comparison.paired_runs[1].stride_1.peak_rss_bytes": 694009856,
+      "full:$.native_stride_comparison.nested_posterior_comparison.paired_runs[1].stride_2.peak_rss_bytes": 883752960,
+      "full:$.native_stride_comparison.stride_2_nested.runs[0].peak_rss_bytes": 883752960,
+      "full:$.native_stride_comparison.stride_2_nested.runs[1].peak_rss_bytes": 883752960,
+      "full:$.pymultinest.runs[0].peak_rss_bytes": 693878784,
+      "full:$.pymultinest.runs[1].peak_rss_bytes": 694009856,
+      "full:$.resources.measured_peak_rss_bytes": 883752960,
+      "hminus:$.hrs_native_and_gaussian_R100000.measured_peak_rss_bytes": 497319936,
+      "hminus:$.lrs.measured_peak_rss_bytes": 440074240,
+      "hminus:$.oracle.measured_peak_rss_bytes": 415186944,
+      "hminus:$.resource_policy.measured_peak_rss_bytes": 562872320,
+      "science:$.resources.measured_peak_rss_bytes": 928579584
+    },
+    "strict_process_memory_limit_bytes": 2147483648,
+    "strict_process_memory_under_2_gib": true,
+    "thread_values": {
+      "MKL_NUM_THREADS": 3,
+      "NUMBA_NUM_THREADS": 3,
+      "NUMEXPR_NUM_THREADS": 3,
+      "OMP_NUM_THREADS": 3,
+      "OMP_THREAD_LIMIT": 3,
+      "OPENBLAS_NUM_THREADS": 3,
+      "VECLIB_MAXIMUM_THREADS": 3
+    },
+    "thread_values_by_report": {
+      "base": {
+        "source": "reported.thread_values",
+        "values": {
+          "MKL_NUM_THREADS": 3,
+          "NUMBA_NUM_THREADS": 3,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 3,
+          "OMP_THREAD_LIMIT": 3,
+          "OPENBLAS_NUM_THREADS": 3,
+          "VECLIB_MAXIMUM_THREADS": 3
+        }
+      },
+      "combined_proof": {
+        "source": "inferred_from_cpu_thread_limit",
+        "values": {
+          "MKL_NUM_THREADS": 3,
+          "NUMBA_NUM_THREADS": 3,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 3,
+          "OMP_THREAD_LIMIT": 3,
+          "OPENBLAS_NUM_THREADS": 3,
+          "VECLIB_MAXIMUM_THREADS": 3
+        }
+      },
+      "full": {
+        "source": "reported.thread_values",
+        "values": {
+          "MKL_NUM_THREADS": 3,
+          "NUMBA_NUM_THREADS": 3,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 3,
+          "OMP_THREAD_LIMIT": 3,
+          "OPENBLAS_NUM_THREADS": 3,
+          "VECLIB_MAXIMUM_THREADS": 3
+        }
+      },
+      "hminus": {
+        "source": "reported.thread_values",
+        "values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 1,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        }
+      },
+      "science": {
+        "source": "reported.thread_values",
+        "values": {
+          "MKL_NUM_THREADS": 3,
+          "NUMBA_NUM_THREADS": 3,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 3,
+          "OMP_THREAD_LIMIT": 3,
+          "OPENBLAS_NUM_THREADS": 3,
+          "VECLIB_MAXIMUM_THREADS": 3
+        }
+      }
+    },
+    "thread_variables": [
+      "OMP_NUM_THREADS",
+      "OPENBLAS_NUM_THREADS",
+      "MKL_NUM_THREADS",
+      "NUMEXPR_NUM_THREADS",
+      "VECLIB_MAXIMUM_THREADS",
+      "NUMBA_NUM_THREADS",
+      "OMP_THREAD_LIMIT"
+    ],
+    "threads_at_most_3": true
+  },
+  "samplers": {
+    "combined_proof": {
+      "backend": "PyMultiNest/MultiNest",
+      "elapsed_seconds": 32.520812625065446,
+      "peak_rss_bytes": 801226752,
+      "peak_rss_source": "report_aggregate",
+      "runs": [
+        {
+          "converged": true,
+          "likelihood_calls": 681,
+          "peak_rss_bytes": 801226752,
+          "peak_rss_source": "sampler_or_report_aggregate",
+          "seed": 24680,
+          "status": "completed",
+          "wall_time_seconds": 17.104194166953675
+        },
+        {
+          "converged": true,
+          "likelihood_calls": 679,
+          "peak_rss_bytes": 801226752,
+          "peak_rss_source": "sampler_or_report_aggregate",
+          "seed": 24681,
+          "status": "completed",
+          "wall_time_seconds": 15.394249208038673
+        }
+      ],
+      "scope": "one-dimensional radial-velocity PyMultiNest slice",
+      "settings": {
+        "evidence_tolerance": 0.5,
+        "max_iter": 0,
+        "mpi_nprocs": 1,
+        "n_live_points": 64,
+        "resume": false,
+        "sampling_efficiency": 0.8,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "verbose": false
+      },
+      "status": "pass"
+    },
+    "full": {
+      "backend": "PyMultiNest/MultiNest",
+      "elapsed_seconds": 190.06291487510316,
+      "peak_rss_bytes": 693878784,
+      "peak_rss_source": "report_aggregate",
+      "runs": [
+        {
+          "converged": true,
+          "likelihood_calls": 2338,
+          "peak_rss_bytes": 693878784,
+          "peak_rss_source": "run",
+          "seed": 24680,
+          "status": "completed",
+          "wall_time_seconds": 93.89860737498384
+        },
+        {
+          "converged": true,
+          "likelihood_calls": 2385,
+          "peak_rss_bytes": 694009856,
+          "peak_rss_source": "run",
+          "seed": 24681,
+          "status": "completed",
+          "wall_time_seconds": 96.16427879198454
+        }
+      ],
+      "scope": "full four-parameter atmospheric posterior",
+      "settings": {
+        "evidence_tolerance": 0.5,
+        "max_iter": 0,
+        "mpi_nprocs": 1,
+        "n_live_points": 64,
+        "resume": false,
+        "sampling_efficiency": 0.8,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "verbose": false
+      },
+      "status": "pass"
+    },
+    "hminus": {
+      "backend": "PyMultiNest/MultiNest",
+      "elapsed_seconds": 22.68266337492969,
+      "peak_rss_bytes": 497319936,
+      "peak_rss_source": "report_aggregate",
+      "runs": [
+        {
+          "converged": true,
+          "likelihood_calls": 648,
+          "peak_rss_bytes": 497319936,
+          "peak_rss_source": "sampler_or_report_aggregate",
+          "seed": 24680,
+          "status": "completed",
+          "wall_time_seconds": 11.086805250030011
+        },
+        {
+          "converged": true,
+          "likelihood_calls": 699,
+          "peak_rss_bytes": 497319936,
+          "peak_rss_source": "sampler_or_report_aggregate",
+          "seed": 24681,
+          "status": "completed",
+          "wall_time_seconds": 11.377645749947987
+        }
+      ],
+      "scope": "two-seed one-dimensional LRS log10(H-) VMR injection recovery",
+      "settings": {
+        "evidence_tolerance": 0.5,
+        "max_iter": 0,
+        "mpi_nprocs": 1,
+        "n_live_points": 64,
+        "noise_seed": 20260831,
+        "resume": false,
+        "sampler_seed_pair": [
+          24680,
+          24681
+        ],
+        "sampling_efficiency": 0.8,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "verbose": false
+      },
+      "status": "pass"
+    }
+  },
+  "schema_version": 1,
+  "status": "complete_with_rejected_stride_2_candidate",
+  "stride_policy": {
+    "candidate_stride": 2,
+    "comparison_status": "fail",
+    "evidence_differences_stride_2_minus_stride_1": [
+      -5.364510096732687,
+      -5.408633898061311
+    ],
+    "evidence_tolerance": 0.5,
+    "nested_status": "fail",
+    "paired_run_count": 2,
+    "reference_stride": 1,
+    "stride_1_approval": {
+      "production_default": true,
+      "status": "approved_reference"
+    },
+    "stride_2_rejection": {
+      "completed_negative_result": true,
+      "reason": "reported evidence disagreement with the stride-1 reference",
+      "status": "rejected"
+    }
+  },
+  "validation": {
+    "full_four_parameter_pymultinest": {
+      "gate": {
+        "best_fit_truth_recovery": true,
+        "chi_square": true,
+        "completed_runs": 2,
+        "evidence": {
+          "allowed_difference": 0.5,
+          "combined_reported_error": 0.06550433152327766,
+          "difference": 0.01287064766995627,
+          "passed": true
+        },
+        "evidence_agreement": true,
+        "max_iter_zero": true,
+        "natural_convergence": true,
+        "passed": true,
+        "required_completed_runs": 2,
+        "truth_inside_posterior_intervals": true
+      },
+      "runs": 2,
+      "scope": "full four-parameter atmospheric posterior",
+      "status": "pass"
+    },
+    "hminus": {
+      "component_gate_count": 90,
+      "gate_paths": [
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_bound_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_bound_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_free_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_free_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_gray_cloud.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_gray_cloud.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_off.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_off.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_total.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g10_total.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_bound_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_bound_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_free_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_free_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_gray_cloud.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_gray_cloud.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_off.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_off.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_total.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T2500_g30_total.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_bound_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_bound_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_free_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_free_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_gray_cloud.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_gray_cloud.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_off.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_off.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_total.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g10_total.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_bound_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_bound_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_free_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_free_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_gray_cloud.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_gray_cloud.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_off.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_off.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_total.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3000_g30_total.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_bound_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_bound_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_free_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_free_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_gray_cloud.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_gray_cloud.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_off.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_off.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_total.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g10_total.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_bound_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_bound_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_free_free.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_free_free.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_gray_cloud.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_gray_cloud.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_off.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_off.native_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_total.gaussian_R100000_gate_passed",
+        "$.hrs_native_and_gaussian_R100000.metrics.T3500_g30_total.native_gate_passed",
+        "$.lrs.metrics.T2500_g10_bound_free.native_gate_passed",
+        "$.lrs.metrics.T2500_g10_free_free.native_gate_passed",
+        "$.lrs.metrics.T2500_g10_gray_cloud.native_gate_passed",
+        "$.lrs.metrics.T2500_g10_off.native_gate_passed",
+        "$.lrs.metrics.T2500_g10_total.native_gate_passed",
+        "$.lrs.metrics.T2500_g30_bound_free.native_gate_passed",
+        "$.lrs.metrics.T2500_g30_free_free.native_gate_passed",
+        "$.lrs.metrics.T2500_g30_gray_cloud.native_gate_passed",
+        "$.lrs.metrics.T2500_g30_off.native_gate_passed",
+        "$.lrs.metrics.T2500_g30_total.native_gate_passed",
+        "$.lrs.metrics.T3000_g10_bound_free.native_gate_passed",
+        "$.lrs.metrics.T3000_g10_free_free.native_gate_passed",
+        "$.lrs.metrics.T3000_g10_gray_cloud.native_gate_passed",
+        "$.lrs.metrics.T3000_g10_off.native_gate_passed",
+        "$.lrs.metrics.T3000_g10_total.native_gate_passed",
+        "$.lrs.metrics.T3000_g30_bound_free.native_gate_passed",
+        "$.lrs.metrics.T3000_g30_free_free.native_gate_passed",
+        "$.lrs.metrics.T3000_g30_gray_cloud.native_gate_passed",
+        "$.lrs.metrics.T3000_g30_off.native_gate_passed",
+        "$.lrs.metrics.T3000_g30_total.native_gate_passed",
+        "$.lrs.metrics.T3500_g10_bound_free.native_gate_passed",
+        "$.lrs.metrics.T3500_g10_free_free.native_gate_passed",
+        "$.lrs.metrics.T3500_g10_gray_cloud.native_gate_passed",
+        "$.lrs.metrics.T3500_g10_off.native_gate_passed",
+        "$.lrs.metrics.T3500_g10_total.native_gate_passed",
+        "$.lrs.metrics.T3500_g30_bound_free.native_gate_passed",
+        "$.lrs.metrics.T3500_g30_free_free.native_gate_passed",
+        "$.lrs.metrics.T3500_g30_gray_cloud.native_gate_passed",
+        "$.lrs.metrics.T3500_g30_off.native_gate_passed",
+        "$.lrs.metrics.T3500_g30_total.native_gate_passed"
+      ],
+      "status": "pass"
+    },
+    "mpi_processes": 1,
+    "mpi_processes_at_most_3": true,
+    "native": {
+      "base": {
+        "gates": {
+          "cpu_threads_at_most_3": true,
+          "memory_below_2_GiB": true,
+          "petitradtrans_pressure_convergence_R100000": true,
+          "robert_end_to_end_R100000": true
+        },
+        "status": "pass"
+      },
+      "science": {
+        "gates": {
+          "all_narrow_cases_R100000": true,
+          "bounded_prepared_slice_cache": true,
+          "cpu_threads_at_most_3": true,
+          "fused_low_memory_path": true,
+          "memory_below_2_GiB": true,
+          "pressure_80_vs_160_R100000": true,
+          "stride_2_R100000": true,
+          "wide_band_R100000": true
+        },
+        "status": "pass"
+      }
+    },
+    "numerical_threads_at_most_3": true,
+    "pending_token_absent": true,
+    "strict_process_memory_under_2_gib": true
+  }
+}

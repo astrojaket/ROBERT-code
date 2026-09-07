@@ -5,6 +5,7 @@ from .clouds import (
     ParameterizedDeckHazeCloudModel,
     ParameterizedMieCloudModel,
 )
+from robert_exoplanets.rt import HMinusContinuumConfig
 
 from .emission import (
     EmissionForwardModel,
@@ -21,6 +22,7 @@ from .factory import (
     ExoKOpacitySource,
     ExoKTableBinning,
     ExoMolOpacitySamplingSource,
+    LineByLineOpacitySource,
     ParameterizedEmissionFactoryConfig,
     ParameterizedTransmissionFactoryConfig,
     build_emission_model,
@@ -28,6 +30,11 @@ from .factory import (
     build_parameterized_emission_model,
     build_parameterized_transmission_model,
     pressure_grid_from_opacity,
+)
+from .high_resolution import (
+    ParameterizedMultiDatasetResponseForwardModel,
+    RuntimeSpectrumResponse,
+    VelocityParameterizedHighResolutionResponse,
 )
 from .transmission import (
     ParameterizedTransmissionForwardModel,
@@ -56,7 +63,9 @@ __all__ = [
     "ExoKOpacitySource",
     "ExoKTableBinning",
     "ExoMolOpacitySamplingSource",
+    "LineByLineOpacitySource",
     "GreyScatteringCloudConfig",
+    "HMinusContinuumConfig",
     "MultiDatasetEmissionForwardModel",
     "MultiDatasetDilutedEmissionModel",
     "MultiDatasetTwoRegionEmissionModel",
@@ -70,6 +79,9 @@ __all__ = [
     "ParameterizedTransmissionFactoryConfig",
     "ParameterizedTransmissionForwardModel",
     "ParameterizedTransmissionModelConfig",
+    "ParameterizedMultiDatasetResponseForwardModel",
+    "RuntimeSpectrumResponse",
+    "VelocityParameterizedHighResolutionResponse",
     "ParameterizedGreyCloudEmissionForwardModel",
     "ParameterizedRefractiveIndexCloudEmissionForwardModel",
     "RefractiveIndexCloudConfig",

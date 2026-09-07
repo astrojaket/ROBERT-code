@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, ClassVar, Mapping
 
 import numpy as np
 
@@ -26,6 +26,10 @@ def _prediction_spectrum(prediction: Spectrum | Any) -> Spectrum:
 class GaussianLikelihood:
     """Independent Gaussian log likelihood with optional offset and jitter."""
 
+    # OE currently consumes the independent effective-input contract directly.
+    # Other likelihoods must opt in only after their statistic and Jacobian
+    # semantics are validated for that solver.
+    supports_optimal_estimation: ClassVar[bool] = True
     name: str = "independent-gaussian"
     include_normalization: bool = False
     offset_parameter: str | None = "offset"
@@ -102,6 +106,49 @@ class GaussianLikelihood:
         output = np.array(terms, dtype=float, copy=True)
         output.setflags(write=False)
         return output
+
+    def chi_square(
+        self,
+        prediction: Spectrum | Any,
+        observation: Observation,
+        parameters: Mapping[str, float] | None = None,
+    ) -> float:
+        """Return the exact independent-Gaussian residual statistic."""
+
+        model, data, uncertainty = self.effective_inputs(
+            prediction,
+            observation,
+            parameters,
+        )
+        if not np.all(np.isfinite(model)):
+            raise RobertValidationError("chi-square requires a finite model")
+        residual = (data - model) / uncertainty
+        value = float(np.dot(residual, residual))
+        if not np.isfinite(value) or value < 0.0:
+            raise RobertValidationError("chi-square must be finite and non-negative")
+        return value
+
+    def effective_residual_rank(
+        self,
+        observation: Observation,
+    ) -> int:
+        """Return the number of retained independent residual dimensions.
+
+        Every unmasked datum contributes one residual dimension for an
+        independent Gaussian likelihood.
+        """
+
+        valid = (
+            np.ones(observation.n_points, dtype=bool)
+            if observation.mask is None
+            else np.asarray(observation.mask, dtype=bool)
+        )
+        count = int(np.count_nonzero(valid))
+        if count <= 0:
+            raise RobertValidationError(
+                "likelihood mask excludes all observation points"
+            )
+        return count
 
     def effective_inputs(
         self,

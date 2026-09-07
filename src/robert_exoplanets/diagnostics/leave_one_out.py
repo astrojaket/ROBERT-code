@@ -470,22 +470,34 @@ def plot_leave_one_out_result(
 
     import matplotlib.pyplot as plt
 
+    from robert_exoplanets.diagnostics.benchmark_style import (
+        PURPLE_PALETTE,
+        RESIDUAL_COLOR,
+        ROBERT_MATPLOTLIB_STYLE,
+    )
+
     target = Path(path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
-    with plt.style.context(style):
+    styles: list[object] = [ROBERT_MATPLOTLIB_STYLE]
+    if style not in {"default", "robert"}:
+        styles.append(style)
+    with plt.style.context(styles):
         figure, axes = plt.subplots(2, 1, figsize=(8.0, 6.0), sharex=True)
-        for dataset in dict.fromkeys(result.dataset_names):
+        for index, dataset in enumerate(dict.fromkeys(result.dataset_names)):
             selected = np.asarray(result.dataset_names) == dataset
+            color = PURPLE_PALETTE[index % len(PURPLE_PALETTE)]
             axes[0].scatter(
                 result.wavelength[selected],
                 result.pointwise_elpd[selected],
                 s=18,
+                color=color,
                 label=dataset,
             )
             axes[1].scatter(
                 result.wavelength[selected],
                 result.pareto_k[selected],
                 s=18,
+                color=color,
                 label=dataset,
             )
         axes[0].axhline(0.0, color="0.5", linewidth=0.8)
@@ -495,7 +507,7 @@ def plot_leave_one_out_result(
         )
         axes[1].axhline(
             result.pareto_k_threshold,
-            color="#c44e52",
+            color=RESIDUAL_COLOR,
             linestyle="--",
             linewidth=1.0,
             label=f"reliability threshold ({result.pareto_k_threshold:.2f})",

@@ -47,11 +47,11 @@ test -d "$PYSYN_CDBS/grid/phoenix"
 ## 2. Choose and copy a configuration
 
 For a complete list of fields, copy
-`configurations/TEMPLATE_all_supported_options.yaml`. For a shorter working
+`configurations/examples/TEMPLATE_all_supported_options.yaml`. For a shorter working
 example, copy one of the target configurations:
 
 ```bash
-cp configurations/wasp80b_cloud_free_native_pg14_R100.yaml my_forward_model.yaml
+cp configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml my_forward_model.yaml
 ```
 
 That example uses the six bundled R=100 molecular tables and a blackbody

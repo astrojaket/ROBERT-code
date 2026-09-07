@@ -1,0 +1,416 @@
+{
+  "claim": "real-data ROBERT shared-VMR workflow for WASP-77Ab; real data have no truth-recovery claim",
+  "composition_policy": {
+    "chemistry": [
+      "H2O",
+      "CO",
+      "H-",
+      "H",
+      "e-",
+      "H2",
+      "He"
+    ],
+    "fixed_neutral_h_vmr": 0.1,
+    "mass_fraction_parameters": false,
+    "mass_fraction_parameters_in_robert": false,
+    "robert_convention": "volume_mixing_ratio",
+    "shared_atmosphere": true
+  },
+  "data": {
+    "hrs_order_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "hrs_point_count": 2773848,
+    "hrs_response": {
+      "coverage_guard": "output response grid covers all sampled wavelengths",
+      "gaussian_resolving_power": 45000.0,
+      "rotation_vsin_km_s": 4.2,
+      "stage_order": "Gray rotation then Gaussian LSF",
+      "template_query_bounds_micron": "1.9464427668335595,2.4489880697503623",
+      "velocity_prior_bounds_km_s": "35.365239503303471,231.70833077369076"
+    },
+    "hrs_subset": "Smith et al. 2024 2020-12-14 pre-eclipse IGRINS orders wholly inside 1.90-2.45 micron",
+    "lrs_detectors": [
+      "NRS1",
+      "NRS2"
+    ],
+    "lrs_point_count": 150,
+    "source_hashes": {
+      "august_nirspec_table": {
+        "detectors": [
+          "NRS1",
+          "NRS2"
+        ],
+        "expected_sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f",
+        "name": "WASP_77_A_b_3.11569_5329_1.tbl",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/data/jwst_emission_spectra/spectra/76/89/90/56/WASP_77_A_b_3.11569_5329_1.tbl",
+        "role": "August et al. 2023 NIRSpec G395H comparison table",
+        "sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f",
+        "size_bytes": 27329,
+        "verified": true
+      },
+      "cia": {
+        "name": "NEMESISPY CIA table",
+        "role": "H2-H2/H2-He collision-induced absorption",
+        "sha256": "5b519f02f98b205f20628ee5ec7f2829528d0bd356b449c4221ba8b2ef86ea0e",
+        "source_project": "NEMESISPY",
+        "verified": true
+      },
+      "co_lbl": {
+        "expected_sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad",
+        "name": "12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+        "role": "pRT CO HITEMP R=1e6 tabulated LBL cross sections",
+        "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad",
+        "size_bytes": 4753927800,
+        "verified": true
+      },
+      "h2o_lbl": {
+        "expected_sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73",
+        "name": "1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+        "role": "pRT H2O POKAZATEL R=1e6 tabulated LBL cross sections",
+        "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73",
+        "size_bytes": 4681348920,
+        "verified": true
+      },
+      "lbl_stride_report": {
+        "expected_sha256": null,
+        "name": "wasp77ab_lbl_sampling_20260831.json",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/docs/data/wasp77ab_lbl_sampling_20260831.json",
+        "role": "passing real-grid LBL stride-selection benchmark",
+        "sha256": "365b4cc05a9e84576f6d494d526bffc4856d0a314bc0ae902f0e8713b8864106",
+        "size_bytes": 22680,
+        "verified": true
+      },
+      "phoenix_catalog": {
+        "expected_sha256": "c5cb54e12ca20f8cba38624c460b743d0783ab92fcc0ad53b8288819d1d4d471",
+        "expected_size_bytes": 1497600,
+        "name": "catalog.fits",
+        "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+        "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/catalog.fits",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix/grid/phoenix/catalog.fits",
+        "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix",
+        "relative_path": "grid/phoenix/catalog.fits",
+        "role": "official STScI PHOENIX grid catalogue",
+        "sha256": "c5cb54e12ca20f8cba38624c460b743d0783ab92fcc0ad53b8288819d1d4d471",
+        "size_bytes": 1497600,
+        "verified": true
+      },
+      "phoenix_phoenixm00_5600": {
+        "expected_sha256": "688a5acf69c9ec65a1b5398084d6c62e43ad63d2799588e5a005f715123686ca",
+        "expected_size_bytes": 9901440,
+        "name": "phoenixm00/phoenixm00_5600.fits",
+        "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+        "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix/grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+        "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix",
+        "relative_path": "grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+        "role": "official STScI PHOENIX [M/H]=0.0, 5600 K spectrum",
+        "sha256": "688a5acf69c9ec65a1b5398084d6c62e43ad63d2799588e5a005f715123686ca",
+        "size_bytes": 9901440,
+        "verified": true
+      },
+      "phoenix_phoenixm00_5700": {
+        "expected_sha256": "373a945f3c16f36473fdca542d5a97c090a16871ad598f7b069fd15bb4bbe027",
+        "expected_size_bytes": 9901440,
+        "name": "phoenixm00/phoenixm00_5700.fits",
+        "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+        "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix/grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+        "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix",
+        "relative_path": "grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+        "role": "official STScI PHOENIX [M/H]=0.0, 5700 K spectrum",
+        "sha256": "373a945f3c16f36473fdca542d5a97c090a16871ad598f7b069fd15bb4bbe027",
+        "size_bytes": 9901440,
+        "verified": true
+      },
+      "smith_cube14v3": {
+        "expected_md5": "3fd41560b7dbcc60851ef3a0972c852f",
+        "expected_sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+        "expected_size_bytes": 77591894,
+        "name": "cube14v3.pic",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/cube14v3.pic",
+        "role": "Smith et al. 2024 cleaned pre-eclipse IGRINS cube",
+        "sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+        "size_bytes": 77591894,
+        "verified": true
+      },
+      "smith_info14": {
+        "expected_md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+        "expected_sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+        "expected_size_bytes": 7261,
+        "name": "20201214_info.csv",
+        "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/20201214_info.csv",
+        "role": "Smith et al. 2024 frame phases and fixed RV terms",
+        "sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+        "size_bytes": 7261,
+        "verified": true
+      }
+    }
+  },
+  "diagnostics": {
+    "abundance_posterior_intervals": "CO, H2O, H-, and electron log10-VMR 90-percent intervals are recorded per seed",
+    "best_fit_log_likelihood_by_component": "recorded in each seed diagnostic using the exact heterogeneous likelihood dispatch",
+    "hrs_chi_square": "not defined for the Smith PCA/Brogi-Line statistic",
+    "hrs_statistic": "Smith/Brogi-Line local log-likelihood and retained rank are recorded per seed; this statistic is not a chi-square",
+    "lrs_chi_square": "recorded per detector from the actual Gaussian likelihood chi_square hook",
+    "lrs_residuals": "NRS1/NRS2 residual RMS, exact child-likelihood weighted chi-square, and retained rank are recorded per seed; no diagonal covariance fallback is used",
+    "posterior_predictive": "compact best-fit model summaries are recorded per seed; full posterior-predictive arrays are not retained",
+    "real_data_truth_recovery": false,
+    "residual_products": "compact per-component residual/model summaries are recorded per seed; full residual arrays are not retained",
+    "rv_diagnostic": "best-fit HRS Kp/dVsys and compact per-frame velocity summaries are recorded per seed; no separate RV time-series product is produced"
+  },
+  "hminus_enabled": true,
+  "hminus_policy": {
+    "bound_free_cutoff_micron": 1.6421,
+    "bound_free_in_window": "zero",
+    "continuum_amplitude_parameter": "none",
+    "enabled": true,
+    "free_free_control": "fixed H and retrieved electron VMR",
+    "hminus_vmr_status": "prior_dominated_in_selected_window",
+    "same_parameterization_for_on_off_comparison": true,
+    "window_micron": [
+      1.9,
+      5.17
+    ]
+  },
+  "memory_checkpoints": {
+    "broadening": 1268318208,
+    "hrs_grid": 407568384,
+    "hrs_model_preparation": 919961600,
+    "hrs_prep": 442564608,
+    "hrs_provider": 388153344,
+    "joint_hrs_loglike": 1549975552,
+    "joint_likelihood_preparation": 1268318208,
+    "joint_nirspec_g395h_nrs1_loglike": 1549975552,
+    "joint_nirspec_g395h_nrs2_loglike": 1549975552,
+    "joint_null_hrs_loglike": 1549975552,
+    "joint_null_nirspec_g395h_nrs1_loglike": 1549975552,
+    "joint_null_nirspec_g395h_nrs2_loglike": 1549975552,
+    "joint_null_prediction": 1549975552,
+    "joint_prediction": 1549975552,
+    "load_complete": 1268318208,
+    "lrs_grid": 442482688,
+    "lrs_model_preparation": 952647680,
+    "lrs_prep": 442580992,
+    "lrs_provider": 388153344,
+    "source_load": 327516160,
+    "table_metadata": 388104192
+  },
+  "modes": [
+    "joint"
+  ],
+  "opacity_policy": {
+    "hrs": "tabulated H2O POKAZATEL and CO HITEMP R=1e6 LBL",
+    "lrs": "same tabulated LBL tables on a measured/provisional sparse native grid, then top-hat NIRSpec bins",
+    "lrs_production_stride_policy": "report-validated stride 100 for the laptop joint process; the finer report selection remains recorded as accuracy-preferred",
+    "lrs_uncertainty_model": "symmetric Gaussian sigma from the mean of absolute published asymmetric errors; original errors remain in source metadata",
+    "opacity_memory_limit_bytes": 1072693248,
+    "stride_report": "/Users/jaketaylor/Developer/ROBERT-code/docs/data/wasp77ab_lbl_sampling_20260831.json"
+  },
+  "preflight": {
+    "joint": {
+      "finite_injection_operator": true,
+      "finite_null": true,
+      "finite_prediction": true,
+      "injection_operator": {
+        "applicable": true,
+        "derived_from": "prediction_loglike_by_component",
+        "finite": true,
+        "full_diagnostic_cubes_stored": false,
+        "operator": "streaming exact Smith/Brogi-Line loglike",
+        "statistic": -9919678.231521856
+      },
+      "memory_checkpoints": {
+        "hrs_loglike": 1549975552,
+        "nirspec_g395h_nrs1_loglike": 1549975552,
+        "nirspec_g395h_nrs2_loglike": 1549975552,
+        "null_hrs_loglike": 1549975552,
+        "null_nirspec_g395h_nrs1_loglike": 1549975552,
+        "null_nirspec_g395h_nrs2_loglike": 1549975552,
+        "null_prediction": 1549975552,
+        "prediction": 1549975552
+      },
+      "message": "real HRS/LRS operators accept finite model, streaming HRS injection, and null predictions; this is not injection recovery",
+      "n_hrs_points": 2773848,
+      "null_loglike_by_component": {
+        "hrs": -9919564.704247218,
+        "nirspec_g395h_nrs1": -26658.993988765236,
+        "nirspec_g395h_nrs2": -28925.90297076641
+      },
+      "prediction_loglike_by_component": {
+        "hrs": -9919678.231521856,
+        "nirspec_g395h_nrs1": -51098.32489226375,
+        "nirspec_g395h_nrs2": -27857.01451764217
+      },
+      "status": "pass"
+    }
+  },
+  "problems": {
+    "joint": {
+      "component_names": [
+        "hrs",
+        "nirspec_g395h_nrs1",
+        "nirspec_g395h_nrs2"
+      ],
+      "composition_convention": "volume_mixing_ratio",
+      "hminus": {
+        "bound_free_cutoff_micron": 1.6421,
+        "bound_free_in_selected_window": "zero",
+        "continuum_amplitude_parameter": "none",
+        "enabled": true,
+        "free_free_controls": [
+          "fixed H",
+          "e-"
+        ],
+        "hminus_vmr_identifiability": "prior_dominated",
+        "species": [
+          "H-",
+          "H",
+          "e-"
+        ]
+      },
+      "lrs_opacity_mode": "tabulated_LBL_on_native_grid_then_top_hat_bins",
+      "mass_fraction_parameters": "none",
+      "name": "wasp77ab-robert-joint",
+      "neutral_h_vmr": {
+        "reason": "break the H*electron free-free degeneracy",
+        "retrieval": "fixed",
+        "value": 0.1
+      },
+      "opacity_mode": "tabulated_H2O_CO_line_by_line",
+      "parameter_names": [
+        "temperature_K",
+        "log10_H2O_VMR",
+        "log10_CO_VMR",
+        "log10_Hminus_VMR",
+        "log10_electron_VMR",
+        "Kp",
+        "dVsys",
+        "log10_a_hrs",
+        "lrs_scale"
+      ]
+    }
+  },
+  "real_data_loaded": true,
+  "resources": {
+    "configured_process_rss_limit_bytes": 2040109465,
+    "gate_passed": true,
+    "memory_checkpoints": {
+      "broadening": 1268318208,
+      "hrs_grid": 407568384,
+      "hrs_model_preparation": 919961600,
+      "hrs_prep": 442564608,
+      "hrs_provider": 388153344,
+      "joint_hrs_loglike": 1549975552,
+      "joint_likelihood_preparation": 1268318208,
+      "joint_nirspec_g395h_nrs1_loglike": 1549975552,
+      "joint_nirspec_g395h_nrs2_loglike": 1549975552,
+      "joint_null_hrs_loglike": 1549975552,
+      "joint_null_nirspec_g395h_nrs1_loglike": 1549975552,
+      "joint_null_nirspec_g395h_nrs2_loglike": 1549975552,
+      "joint_null_prediction": 1549975552,
+      "joint_prediction": 1549975552,
+      "load_complete": 1268318208,
+      "lrs_grid": 442482688,
+      "lrs_model_preparation": 952647680,
+      "lrs_prep": 442580992,
+      "lrs_provider": 388153344,
+      "source_load": 327516160,
+      "table_metadata": 388104192
+    },
+    "mpi_pass": true,
+    "mpi_processes_configured": 1,
+    "mpi_world_size_observed": 1,
+    "peak_rss_bytes": 1549975552,
+    "process_rss_hard_limit_bytes": 2147483648,
+    "process_rss_pass": true,
+    "thread_limit": 6,
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    },
+    "threads_pass": true
+  },
+  "runs": {},
+  "sampler_policy": {
+    "backend": "MultiNest",
+    "evidence_tolerance": 0.5,
+    "max_iter": 0,
+    "max_threads": 6,
+    "mpi_processes": 1,
+    "n_live_points": 64,
+    "sampler": "PyMultiNest",
+    "sampling_efficiency": 0.8,
+    "seeds": [
+      24680,
+      24681
+    ],
+    "thread_variables": [
+      "OMP_NUM_THREADS",
+      "OPENBLAS_NUM_THREADS",
+      "MKL_NUM_THREADS",
+      "NUMEXPR_NUM_THREADS",
+      "VECLIB_MAXIMUM_THREADS",
+      "NUMBA_NUM_THREADS",
+      "OMP_THREAD_LIMIT"
+    ]
+  },
+  "schema_version": "1.0",
+  "status": "preflight_pass",
+  "stellar_policy": {
+    "model": "phoenix",
+    "phoenix_subset": "three exact STScI files verified before opacity preparation",
+    "pysyn_cdbs_required": true,
+    "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix"
+  },
+  "stride_selection": {
+    "hrs": 2,
+    "lrs": 100,
+    "lrs_accuracy_preferred": 25,
+    "lrs_policy": "report_validated_laptop_memory_safe_override",
+    "lrs_production": 100,
+    "lrs_validation": {
+      "estimated_savings_bytes_vs_accuracy_preferred": 115152624,
+      "max_absolute_sigma": 0.2570330977642441,
+      "preparation_estimate_bytes": 38390400,
+      "report": "/Users/jaketaylor/Developer/ROBERT-code/docs/data/wasp77ab_lbl_sampling_20260831.json",
+      "rms_sigma": 0.07970951513528207
+    },
+    "release_claim": true,
+    "sources": {
+      "hrs": "measured_stride_report:/Users/jaketaylor/Developer/ROBERT-code/docs/data/wasp77ab_lbl_sampling_20260831.json",
+      "lrs": "measured_stride_report:/Users/jaketaylor/Developer/ROBERT-code/docs/data/wasp77ab_lbl_sampling_20260831.json;report_validated_laptop_memory_safe_override:25->100;rms_sigma=0.079709515135282072;max_absolute_sigma=0.2570330977642441;estimate_bytes=38390400"
+    }
+  },
+  "target": {
+    "name": "WASP-77Ab",
+    "nirspec_input_role": "August et al. 2023 public NIRSpec table used for the Smith comparison",
+    "paper": "https://arxiv.org/abs/2312.13069",
+    "zenodo": "https://zenodo.org/records/10382053"
+  }
+}

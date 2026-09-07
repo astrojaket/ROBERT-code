@@ -13,7 +13,6 @@ from robert_exoplanets import (
     RetrievalParameterSet,
     RetrievalRunConfig,
     Spectrum,
-    UltraNestRunConfig,
     UniformPrior,
     build_retrieval_problem,
     run_configured_retrieval,
@@ -100,23 +99,10 @@ def test_run_config_rejects_missing_model_parameters(tmp_path) -> None:
 
 
 def test_inference_configs_validate_and_expose_runner_settings() -> None:
-    nested = UltraNestRunConfig(
-        min_num_live_points=40,
-        max_ncalls=10000,
-        dlogz=1.5,
-        seed=42,
-    )
-
-    assert nested.method == "ultranest"
-    assert nested.kwargs()["min_num_live_points"] == 40
-    assert nested.resume == "resume"
-    assert nested.seed == 42
     with pytest.raises(RobertConfigError, match="positive"):
         OptimalEstimationRunConfig(max_iterations=0)
     with pytest.raises(RobertConfigError, match="reserved"):
-        UltraNestRunConfig(extra_run_kwargs={"dlogz": 0.1})
-    with pytest.raises(RobertConfigError, match="resume must be one of"):
-        UltraNestRunConfig(resume="sometimes")
+        MultiNestRunConfig(extra_run_kwargs={"n_live_points": 50})
 
     multinest = MultiNestRunConfig(
         n_live_points=50,

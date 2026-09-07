@@ -11,18 +11,33 @@ from robert_exoplanets.io.task_config import load_task_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_CONFIG = ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
+SOURCE_CONFIG = (
+    ROOT
+    / "configurations"
+    / "targets"
+    / "WASP-69b"
+    / "wasp69b_cloud_free_R1000.yaml"
+)
 OE_CONFIG = (
     ROOT
     / "configurations"
+    / "targets"
+    / "WASP-69b"
     / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml"
 )
 NESTED_CONFIGS = (
-    "wasp69b_cloud_free_native_pg14_R1000_multinest.yaml",
-    "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_ultranest.yaml",
-    "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml",
+    ROOT
+    / "configurations"
+    / "targets"
+    / "WASP-69b"
+    / "wasp69b_cloud_free_native_pg14_R1000.yaml",
+    ROOT
+    / "configurations"
+    / "targets"
+    / "WASP-69b"
+    / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml",
 )
-TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
+TEMPLATE = ROOT / "configurations" / "examples" / "TEMPLATE_all_supported_options.yaml"
 
 
 def test_create_run_directory_copies_runners_and_isolates_writable_paths(
@@ -97,14 +112,14 @@ def test_create_run_directory_uses_one_rank_for_optimal_estimation(
     assert "ROBERT_MPI_RANKS=1" in readme
 
 
-@pytest.mark.parametrize("config_name", NESTED_CONFIGS)
+@pytest.mark.parametrize("config_path", NESTED_CONFIGS)
 def test_create_run_directory_uses_128_ranks_for_nested_workflows(
     tmp_path: Path,
-    config_name: str,
+    config_path: Path,
 ) -> None:
     run_directory = create_run_directory(
         project_dir=tmp_path / "my_project",
-        source_config=ROOT / "configurations" / config_name,
+        source_config=config_path,
     )
 
     submission = (run_directory / "submit.sbatch").read_text(encoding="utf-8")
@@ -136,7 +151,6 @@ def test_create_run_directory_uses_top_level_paths_and_local_writable_defaults(
 
     assert config.paths is not None
     assert config.paths.project_directory == run_directory
-    assert config.housekeeping is None
     assert config.outputs.directory == run_directory / "outputs"
     assert config.opacity.cache_directory == run_directory / "opacity_cache"
     assert config.runtime.scratch_directory == run_directory / "scratch"

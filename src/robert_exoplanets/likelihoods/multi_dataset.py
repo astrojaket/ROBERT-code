@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, ClassVar, Mapping
 
 import numpy as np
 
@@ -31,6 +31,7 @@ def _prediction_mapping(prediction: Any) -> Mapping[str, Spectrum]:
 class MultiDatasetGaussianLikelihood:
     """Sum independent Gaussian terms with dataset-specific offset/jitter."""
 
+    supports_optimal_estimation: ClassVar[bool] = True
     name: str = "multi-dataset-independent-gaussian"
     include_normalization: bool = False
     invalid_model_loglike: float = float("-inf")

@@ -129,6 +129,50 @@ def test_spectrum_only_integration_matches_summed_diagnostics() -> None:
     np.testing.assert_allclose(spectrum_only.radiance, expected, rtol=1.0e-12)
 
 
+def test_spectrum_only_numpy_and_numba_backends_match() -> None:
+    pytest.importorskip("numba")
+    tau = np.array(
+        [
+            [[0.1, 0.2], [0.3, 0.4]],
+            [[0.5, 0.6], [0.7, 0.8]],
+        ]
+    )
+    source = np.array([[2.0, 3.0], [4.0, 5.0]])
+    weights = np.array([0.4, 0.6])
+    paths = np.array([[1.0, 1.0], [2.0, 1.5]])
+    point_weights = np.array([0.3, 0.7])
+    bottom = np.array([7.0, 8.0])
+
+    numpy_result = integrate_thermal_emission_spectrum(
+        tau,
+        source,
+        weights,
+        paths,
+        point_weights,
+        bottom_source=bottom,
+        bottom_visible=np.array([True, False]),
+        backend="numpy",
+    )
+    numba_result = integrate_thermal_emission_spectrum(
+        tau,
+        source,
+        weights,
+        paths,
+        point_weights,
+        bottom_source=bottom,
+        bottom_visible=np.array([True, False]),
+        backend="numba",
+    )
+
+    assert numba_result.backend == "numba"
+    np.testing.assert_allclose(
+        numba_result.radiance,
+        numpy_result.radiance,
+        rtol=2.0e-12,
+        atol=0.0,
+    )
+
+
 def test_linear_source_matches_exact_rutten_formal_integral() -> None:
     tau_value = 0.7
     mu = 0.43

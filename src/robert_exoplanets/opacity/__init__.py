@@ -42,6 +42,14 @@ from .kta import (
     read_kta,
     read_kta_header,
 )
+from .line_by_line import (
+    EvaluatedLineByLineMixture,
+    EvaluatedLineByLineOpacity,
+    LineByLineCoverageReport,
+    LineByLineOpacityProvider,
+    LineByLineTable,
+    PreparedLineByLineOpacity,
+)
 from .metadata import (
     GridCoverage,
     OpacityCoverageReport,
@@ -63,10 +71,20 @@ from .opacity_sampling import (
     PreparedOpacitySampling,
 )
 
-OpacityProvider = Union[CorrelatedKOpacityProvider, OpacitySamplingProvider]
-PreparedOpacity = Union[PreparedCorrelatedKOpacity, PreparedOpacitySampling]
+OpacityProvider = Union[
+    CorrelatedKOpacityProvider,
+    LineByLineOpacityProvider,
+    OpacitySamplingProvider,
+]
+PreparedOpacity = Union[
+    PreparedCorrelatedKOpacity,
+    PreparedLineByLineOpacity,
+    PreparedOpacitySampling,
+]
 EvaluatedOpacity = Union[
     EvaluatedCorrelatedKOpacity,
+    EvaluatedLineByLineOpacity,
+    EvaluatedLineByLineMixture,
     EvaluatedOpacitySampling,
     EvaluatedOpacitySamplingMixture,
 ]
@@ -78,12 +96,17 @@ __all__ = [
     "CorrelatedKOpacityProvider",
     "CorrelatedKTable",
     "EvaluatedCorrelatedKOpacity",
+    "EvaluatedLineByLineMixture",
+    "EvaluatedLineByLineOpacity",
     "EvaluatedOpacity",
     "EvaluatedOpacitySampling",
     "EvaluatedOpacitySamplingMixture",
     "GridCoverage",
     "KtaHeader",
     "KtaTable",
+    "LineByLineCoverageReport",
+    "LineByLineOpacityProvider",
+    "LineByLineTable",
     "OpacityCoverageReport",
     "OpacityDatabase",
     "OpacityDataProduct",
@@ -95,6 +118,7 @@ __all__ = [
     "OpacitySamplingTable",
     "OpacityStorageFormat",
     "PreparedCorrelatedKOpacity",
+    "PreparedLineByLineOpacity",
     "PreparedOpacity",
     "PreparedOpacitySampling",
     "RobertOpacityArchive",

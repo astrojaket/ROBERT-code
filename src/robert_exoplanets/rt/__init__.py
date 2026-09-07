@@ -34,8 +34,10 @@ from .mie import (
 )
 from .extinction import (
     CiaTable,
+    HMinusContinuumConfig,
     LayerOpticalDepth,
     cia_optical_depth,
+    hminus_optical_depth,
     load_nemesispy_cia_table,
     rayleigh_scattering_optical_depth,
     read_cia_table,
@@ -111,6 +113,7 @@ __all__ = [
     "OpticalConstantsCatalog",
     "RefractiveIndexSpectrum",
     "CiaTable",
+    "HMinusContinuumConfig",
     "SingleScatteringSource",
     "ThermalEmissionIntegrationResult",
     "ThermalEmissionSpectrumIntegrationResult",
@@ -121,6 +124,7 @@ __all__ = [
     "assemble_gas_optical_depth",
     "assemble_opacity_sampling_gas_optical_depth",
     "cia_optical_depth",
+    "hminus_optical_depth",
     "disk_average_quadrature",
     "gauss_legendre_disk_geometry",
     "geometry_from_emission_angles",

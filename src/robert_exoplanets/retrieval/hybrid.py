@@ -61,7 +61,7 @@ def run_oe_then_nested_sampling(
     require_oe_convergence: bool = True,
     oe_kwargs: Mapping[str, object] | None = None,
     nested_kwargs: Mapping[str, object] | None = None,
-    nested_method: str = "ultranest",
+    nested_method: str = "multinest",
     seed: int | None = None,
 ) -> OENestedSamplingResult:
     """Use OE location and covariance to define bounded nested-sampling priors.
@@ -196,7 +196,7 @@ def run_nested_sampling_then_oe(
     root = Path(output_dir).expanduser()
     nested_result = run_retrieval(
         nested_problem,
-        method="ultranest",
+        method="multinest",
         output_dir=root / "nested_sampling",
         seed=seed,
         **_phase_kwargs(nested_kwargs, phase="nested sampling"),
@@ -365,7 +365,7 @@ def load_nested_sampler_result(output_dir: str | Path) -> NestedSamplerResult:
             weights = np.array(arrays["weights"], copy=True) if "weights" in arrays.files else None
     except (OSError, KeyError, ValueError, json.JSONDecodeError) as exc:
         raise RobertDataError(f"failed to load nested-sampling result from {root}") from exc
-    if summary.get("method") not in {"ultranest", "multinest", "nested_sampling"}:
+    if summary.get("method") not in {"multinest"}:
         raise RobertDataError(f"result under {root} is not a nested-sampling result")
     return NestedSamplerResult(
         method=str(summary["method"]),
@@ -418,7 +418,6 @@ def _phase_kwargs(settings: Mapping[str, object] | None, *, phase: str) -> dict[
 def _nested_method(method: str) -> str:
     normalized = str(method).strip().lower().replace("-", "_")
     aliases = {
-        "ultranest": "ultranest",
         "multinest": "multinest",
         "multi_nest": "multinest",
         "pymultinest": "multinest",
@@ -427,7 +426,7 @@ def _nested_method(method: str) -> str:
         return aliases[normalized]
     except KeyError as exc:
         raise RobertConfigError(
-            "nested_method must be 'ultranest' or 'multinest'"
+            "nested_method must be 'multinest' (PyMultiNest)"
         ) from exc
 
 

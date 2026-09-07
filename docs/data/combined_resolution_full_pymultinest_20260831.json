@@ -1,0 +1,885 @@
+{
+  "best_fit": {
+    "log10_co_vmr": -3.0357191085146056,
+    "log10_h2o_vmr": -3.321985935294613,
+    "radial_velocity_km_s": 4.983530178211224,
+    "temperature_K": 1497.6662749219379
+  },
+  "case_name": "combined-low-high-resolution-full-pymultinest",
+  "chi_square": 251.0127304194514,
+  "command": "examples/combined_resolution_full_pymultinest.py --run-pymultinest --run-native-stride-comparison --seed 24680 --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+  "cpu_guard_passed": true,
+  "fit_passed": true,
+  "inference_converged": true,
+  "memory_guard_passed": true,
+  "metadata": {
+    "dataset_names": "low_resolution,high_resolution",
+    "fit_gate": "Gaussian noise gate: reduced chi-square expected near noise_scale^2",
+    "likelihood": "Gaussian low resolution + projected high resolution",
+    "noise_scale": "1"
+  },
+  "n_active_points": 251,
+  "n_parameters": 4,
+  "native_stride_comparison": {
+    "candidate_stride": 2,
+    "elapsed_seconds": 133.9273002910195,
+    "gate": {
+      "nested_stride_2_comparison": false,
+      "retrieval_bias_vs_stride_1": true,
+      "spectral_accuracy": true,
+      "stride_2_chi_square": true,
+      "stride_2_oe_converged": true,
+      "stride_2_truth_recovery": true
+    },
+    "nested_posterior_comparison": {
+      "calls": {
+        "stride_1": [
+          2338,
+          2385
+        ],
+        "stride_2": [
+          2954,
+          2551
+        ]
+      },
+      "comparison": "paired same-seed stride-1 versus stride-2 four-parameter PyMultiNest",
+      "evidence_tolerance": 0.5,
+      "gate": {
+        "evidence_agreement_with_reported_errors": false,
+        "paired_seed_runs": true,
+        "passed": false,
+        "posterior_centres_and_intervals": true,
+        "stride_1_natural_convergence": true,
+        "stride_2_chi_square": true,
+        "stride_2_completed_runs": true,
+        "stride_2_natural_convergence": true
+      },
+      "limitation": "This comparison measures retrieval changes caused by native stride. It does not establish a general stride-2 accuracy bound for other opacity tables or atmospheric states.",
+      "paired_runs": [
+        {
+          "absolute_log_evidence_difference_stride_2_minus_stride_1": 5.364510096732687,
+          "evidence_difference_allowed": 0.5,
+          "evidence_gate_passed": false,
+          "log_evidence_stride_2_minus_stride_1": -5.364510096732687,
+          "posterior_gate_passed": true,
+          "posterior_interval_endpoint_shift_stride_2_minus_stride_1": {
+            "log10_co_vmr": [
+              0.0186394657697746,
+              0.02144691262037446
+            ],
+            "log10_h2o_vmr": [
+              0.012041565366121887,
+              0.018558884073085924
+            ],
+            "radial_velocity_km_s": [
+              -0.0031613018345044708,
+              -0.0030304749413270216
+            ],
+            "temperature_K": [
+              1.3813982100914473,
+              1.633002796755136
+            ]
+          },
+          "posterior_median_shift_stride_2_minus_stride_1": {
+            "log10_co_vmr": 0.015423897998329217,
+            "log10_h2o_vmr": 0.014651495928886593,
+            "radial_velocity_km_s": -0.00111005348453741,
+            "temperature_K": 1.539651415061826
+          },
+          "seed": 24680,
+          "stride_1": {
+            "elapsed_seconds": 93.89860737498384,
+            "likelihood_evaluations": 2338,
+            "log_evidence": -146.0998347489943,
+            "log_evidence_error": 0.0483162396286466,
+            "peak_rss_bytes": 693878784,
+            "posterior_intervals": {
+              "log10_co_vmr": [
+                -3.078881122588763,
+                -2.992186837884921
+              ],
+              "log10_h2o_vmr": [
+                -3.3516633236383395,
+                -3.292889353280012
+              ],
+              "radial_velocity_km_s": [
+                4.9623390963098295,
+                5.009556535904157
+              ],
+              "temperature_K": [
+                1494.7973059859567,
+                1500.502339028145
+              ]
+            },
+            "posterior_medians": {
+              "log10_co_vmr": -3.033892776406253,
+              "log10_h2o_vmr": -3.321510444373188,
+              "radial_velocity_km_s": 4.984037624917572,
+              "temperature_K": 1497.793939056453
+            }
+          },
+          "stride_2": {
+            "elapsed_seconds": 70.41359529201873,
+            "likelihood_evaluations": 2954,
+            "log_evidence": -151.464344845727,
+            "log_evidence_error": 0.04463923897192232,
+            "peak_rss_bytes": 883752960,
+            "posterior_intervals": {
+              "log10_co_vmr": [
+                -3.0602416568189885,
+                -2.9707399252645463
+              ],
+              "log10_h2o_vmr": [
+                -3.3396217582722176,
+                -3.274330469206926
+              ],
+              "radial_velocity_km_s": [
+                4.959177794475325,
+                5.00652606096283
+              ],
+              "temperature_K": [
+                1496.178704196048,
+                1502.1353418249
+              ]
+            },
+            "posterior_medians": {
+              "log10_co_vmr": -3.0184688784079237,
+              "log10_h2o_vmr": -3.3068589484443014,
+              "radial_velocity_km_s": 4.982927571433034,
+              "temperature_K": 1499.3335904715148
+            }
+          }
+        },
+        {
+          "absolute_log_evidence_difference_stride_2_minus_stride_1": 5.408633898061311,
+          "evidence_difference_allowed": 0.5,
+          "evidence_gate_passed": false,
+          "log_evidence_stride_2_minus_stride_1": -5.408633898061311,
+          "posterior_gate_passed": true,
+          "posterior_interval_endpoint_shift_stride_2_minus_stride_1": {
+            "log10_co_vmr": [
+              0.014744714238803525,
+              0.015147434839760887
+            ],
+            "log10_h2o_vmr": [
+              0.016640723699641313,
+              0.016842886243290334
+            ],
+            "radial_velocity_km_s": [
+              0.00036259481131306615,
+              -0.0026064115318575887
+            ],
+            "temperature_K": [
+              1.6666731223258466,
+              1.944613508323755
+            ]
+          },
+          "posterior_median_shift_stride_2_minus_stride_1": {
+            "log10_co_vmr": 0.02014491233052862,
+            "log10_h2o_vmr": 0.016007702970716853,
+            "radial_velocity_km_s": -0.002416607899888845,
+            "temperature_K": 1.5141089049775474
+          },
+          "seed": 24681,
+          "stride_1": {
+            "elapsed_seconds": 96.16427879198454,
+            "likelihood_evaluations": 2385,
+            "log_evidence": -146.08696410132436,
+            "log_evidence_error": 0.04423074085360392,
+            "peak_rss_bytes": 694009856,
+            "posterior_intervals": {
+              "log10_co_vmr": [
+                -3.077314206253555,
+                -2.9894897400005784
+              ],
+              "log10_h2o_vmr": [
+                -3.3521602553633723,
+                -3.2928625932330853
+              ],
+              "radial_velocity_km_s": [
+                4.959347269940824,
+                5.0064807291300575
+              ],
+              "temperature_K": [
+                1494.7496685493243,
+                1500.3068700021608
+              ]
+            },
+            "posterior_medians": {
+              "log10_co_vmr": -3.0367048866683355,
+              "log10_h2o_vmr": -3.323062702401446,
+              "radial_velocity_km_s": 4.9833030923417345,
+              "temperature_K": 1497.6826909590773
+            }
+          },
+          "stride_2": {
+            "elapsed_seconds": 60.96038258308545,
+            "likelihood_evaluations": 2551,
+            "log_evidence": -151.49559799938567,
+            "log_evidence_error": 0.0481592569297954,
+            "peak_rss_bytes": 883752960,
+            "posterior_intervals": {
+              "log10_co_vmr": [
+                -3.0625694920147515,
+                -2.9743423051608175
+              ],
+              "log10_h2o_vmr": [
+                -3.335519531663731,
+                -3.276019706989795
+              ],
+              "radial_velocity_km_s": [
+                4.959709864752137,
+                5.0038743175982
+              ],
+              "temperature_K": [
+                1496.4163416716501,
+                1502.2514835104846
+              ]
+            },
+            "posterior_medians": {
+              "log10_co_vmr": -3.016559974337807,
+              "log10_h2o_vmr": -3.3070549994307292,
+              "radial_velocity_km_s": 4.980886484441846,
+              "temperature_K": 1499.1967998640548
+            }
+          }
+        }
+      ],
+      "parameter_shift_tolerances": {
+        "log10_co_vmr": 0.25,
+        "log10_h2o_vmr": 0.25,
+        "radial_velocity_km_s": 1.0,
+        "temperature_K": 80.0
+      },
+      "peak_rss_bytes": {
+        "stride_1": [
+          693878784,
+          694009856
+        ],
+        "stride_2": [
+          883752960,
+          883752960
+        ]
+      },
+      "posterior_interval_statement": "central 90 percent weighted posterior interval",
+      "status": "fail",
+      "wall_time_seconds": {
+        "stride_1": [
+          93.89860737498384,
+          96.16427879198454
+        ],
+        "stride_2": [
+          70.41359529201873,
+          60.96038258308545
+        ]
+      }
+    },
+    "parameter_bias_stride_2_minus_stride_1": {
+      "log10_co_vmr": 0.019443687470866333,
+      "log10_h2o_vmr": 0.016535138615803024,
+      "radial_velocity_km_s": -0.0017037766019685208,
+      "temperature_K": 1.6831210353620918
+    },
+    "reference_stride": 1,
+    "spectral_limits": {
+      "max_absolute_relative_error_max": 0.01,
+      "rms_relative_error_max": 0.002
+    },
+    "spectral_metrics_at_injection": {
+      "max_absolute_relative_error": 0.004844931617561388,
+      "median_signed_relative_error": -0.00015602437955974935,
+      "rms_relative_error": 0.0012695671225799454
+    },
+    "status": "fail",
+    "stride_1_best_fit": {
+      "log10_co_vmr": -3.0357191085146056,
+      "log10_h2o_vmr": -3.321985935294613,
+      "radial_velocity_km_s": 4.983530178211224,
+      "temperature_K": 1497.6662749219379
+    },
+    "stride_2_absolute_error_vs_truth": {
+      "log10_co_vmr": 0.016275421043739247,
+      "log10_h2o_vmr": 0.00545079667881021,
+      "radial_velocity_km_s": 0.01817359839074495,
+      "temperature_K": 0.6506040427000244
+    },
+    "stride_2_best_fit": {
+      "log10_co_vmr": -3.0162754210437392,
+      "log10_h2o_vmr": -3.30545079667881,
+      "radial_velocity_km_s": 4.981826401609255,
+      "temperature_K": 1499.3493959573
+    },
+    "stride_2_fit_statistics": {
+      "chi_square": 261.7992713324978,
+      "chi_square_by_dataset": {
+        "high_resolution": 216.0409473799619,
+        "low_resolution": 45.75832395253591
+      },
+      "chi_square_passed": true,
+      "degrees_of_freedom": 247,
+      "effective_point_count": 253,
+      "effective_point_count_by_dataset": {
+        "high_resolution": 205,
+        "low_resolution": 48
+      },
+      "n_active_points": 253,
+      "raw_point_count": 253,
+      "reduced_chi_square": 1.0599160782692219,
+      "removed_basis_rank": 2,
+      "removed_basis_rank_by_dataset": {
+        "high_resolution": 2,
+        "low_resolution": 0
+      },
+      "retained_residual_rank": 251,
+      "retained_residual_rank_by_dataset": {
+        "high_resolution": 203,
+        "low_resolution": 48
+      }
+    },
+    "stride_2_nested": {
+      "elapsed_seconds": 131.37401404196862,
+      "full_four_parameter_nested_sampling": "run",
+      "gate": {
+        "best_fit_truth_recovery": true,
+        "chi_square": true,
+        "completed_runs": 2,
+        "evidence": {
+          "allowed_difference": 0.5,
+          "combined_reported_error": 0.06566563548784428,
+          "difference": 0.03125315365866754,
+          "passed": true
+        },
+        "evidence_agreement": true,
+        "max_iter_zero": true,
+        "natural_convergence": true,
+        "passed": true,
+        "required_completed_runs": 2,
+        "truth_inside_posterior_intervals": true
+      },
+      "limitation": "This full posterior test uses the synthetic shared-atmosphere case. It does not validate a real target or replace independent pRT oracle checks.",
+      "parameter_names": [
+        "temperature_K",
+        "log10_h2o_vmr",
+        "log10_co_vmr",
+        "radial_velocity_km_s"
+      ],
+      "posterior_interval_statement": "central 90 percent weighted posterior interval",
+      "runs": [
+        {
+          "best_fit": {
+            "log10_co_vmr": -3.0225095632543484,
+            "log10_h2o_vmr": -3.3112975276049577,
+            "radial_velocity_km_s": 4.986931252709766,
+            "temperature_K": 1498.6915486479697
+          },
+          "best_fit_absolute_errors": {
+            "log10_co_vmr": 0.022509563254348386,
+            "log10_h2o_vmr": 0.011297527604957835,
+            "radial_velocity_km_s": 0.013068747290233773,
+            "temperature_K": 1.3084513520302608
+          },
+          "best_fit_truth_recovery": true,
+          "converged": true,
+          "elapsed_seconds": 70.41359529201873,
+          "fit_statistics": {
+            "chi_square": 262.1145771408688,
+            "chi_square_by_dataset": {
+              "high_resolution": 216.05213126328735,
+              "low_resolution": 46.06244587758146
+            },
+            "chi_square_passed": true,
+            "degrees_of_freedom": 247,
+            "effective_point_count": 253,
+            "effective_point_count_by_dataset": {
+              "high_resolution": 205,
+              "low_resolution": 48
+            },
+            "n_active_points": 253,
+            "raw_point_count": 253,
+            "reduced_chi_square": 1.0611926200035173,
+            "removed_basis_rank": 2,
+            "removed_basis_rank_by_dataset": {
+              "high_resolution": 2,
+              "low_resolution": 0
+            },
+            "retained_residual_rank": 251,
+            "retained_residual_rank_by_dataset": {
+              "high_resolution": 203,
+              "low_resolution": 48
+            }
+          },
+          "likelihood_callback_evaluations": 2954,
+          "likelihood_evaluations": 2954,
+          "log_evidence": -151.464344845727,
+          "log_evidence_error": 0.04463923897192232,
+          "message": "converged",
+          "peak_rss_bytes": 883752960,
+          "posterior_interval_quantiles": [
+            0.05,
+            0.95
+          ],
+          "posterior_intervals": {
+            "log10_co_vmr": [
+              -3.0602416568189885,
+              -2.9707399252645463
+            ],
+            "log10_h2o_vmr": [
+              -3.3396217582722176,
+              -3.274330469206926
+            ],
+            "radial_velocity_km_s": [
+              4.959177794475325,
+              5.00652606096283
+            ],
+            "temperature_K": [
+              1496.178704196048,
+              1502.1353418249
+            ]
+          },
+          "posterior_medians": {
+            "log10_co_vmr": -3.0184688784079237,
+            "log10_h2o_vmr": -3.3068589484443014,
+            "radial_velocity_km_s": 4.982927571433034,
+            "temperature_K": 1499.3335904715148
+          },
+          "run_index": 1,
+          "seed": 24680,
+          "status": "completed",
+          "truth_inside_posterior_intervals": true
+        },
+        {
+          "best_fit": {
+            "log10_co_vmr": -3.015704820860654,
+            "log10_h2o_vmr": -3.307065756965316,
+            "radial_velocity_km_s": 4.980201330535241,
+            "temperature_K": 1499.560271584834
+          },
+          "best_fit_absolute_errors": {
+            "log10_co_vmr": 0.015704820860654056,
+            "log10_h2o_vmr": 0.0070657569653160834,
+            "radial_velocity_km_s": 0.019798669464758945,
+            "temperature_K": 0.4397284151659733
+          },
+          "best_fit_truth_recovery": true,
+          "converged": true,
+          "elapsed_seconds": 60.96038258308545,
+          "fit_statistics": {
+            "chi_square": 262.1441426153042,
+            "chi_square_by_dataset": {
+              "high_resolution": 215.9613042067471,
+              "low_resolution": 46.18283840855711
+            },
+            "chi_square_passed": true,
+            "degrees_of_freedom": 247,
+            "effective_point_count": 253,
+            "effective_point_count_by_dataset": {
+              "high_resolution": 205,
+              "low_resolution": 48
+            },
+            "n_active_points": 253,
+            "raw_point_count": 253,
+            "reduced_chi_square": 1.0613123182805837,
+            "removed_basis_rank": 2,
+            "removed_basis_rank_by_dataset": {
+              "high_resolution": 2,
+              "low_resolution": 0
+            },
+            "retained_residual_rank": 251,
+            "retained_residual_rank_by_dataset": {
+              "high_resolution": 203,
+              "low_resolution": 48
+            }
+          },
+          "likelihood_callback_evaluations": 2551,
+          "likelihood_evaluations": 2551,
+          "log_evidence": -151.49559799938567,
+          "log_evidence_error": 0.0481592569297954,
+          "message": "converged",
+          "peak_rss_bytes": 883752960,
+          "posterior_interval_quantiles": [
+            0.05,
+            0.95
+          ],
+          "posterior_intervals": {
+            "log10_co_vmr": [
+              -3.0625694920147515,
+              -2.9743423051608175
+            ],
+            "log10_h2o_vmr": [
+              -3.335519531663731,
+              -3.276019706989795
+            ],
+            "radial_velocity_km_s": [
+              4.959709864752137,
+              5.0038743175982
+            ],
+            "temperature_K": [
+              1496.4163416716501,
+              1502.2514835104846
+            ]
+          },
+          "posterior_medians": {
+            "log10_co_vmr": -3.016559974337807,
+            "log10_h2o_vmr": -3.3070549994307292,
+            "radial_velocity_km_s": 4.980886484441846,
+            "temperature_K": 1499.1967998640548
+          },
+          "run_index": 2,
+          "seed": 24681,
+          "status": "completed",
+          "truth_inside_posterior_intervals": true
+        }
+      ],
+      "scope": "stride-2 full four-parameter atmospheric posterior",
+      "settings": {
+        "evidence_tolerance": 0.5,
+        "max_iter": 0,
+        "mpi_nprocs": 1,
+        "n_live_points": 64,
+        "resume": false,
+        "sampling_efficiency": 0.8,
+        "seed_pair": [
+          24680,
+          24681
+        ],
+        "verbose": false
+      },
+      "status": "pass"
+    },
+    "stride_2_preparation": {
+      "high_resolution_native_points": 1260,
+      "high_resolution_observed_points": 205,
+      "low_resolution_points": 48,
+      "native_sampling_stride": 2,
+      "pressure_layers": 48
+    }
+  },
+  "native_stride_gate_passed": false,
+  "parameter_recoveries": [
+    {
+      "absolute_error": 2.333725078062116,
+      "absolute_tolerance": 80.0,
+      "estimate": 1497.6662749219379,
+      "name": "temperature_K",
+      "passed": true,
+      "posterior_standard_deviation": 1.774109418909896,
+      "standardized_error": 1.315434692577235,
+      "truth": 1500.0
+    },
+    {
+      "absolute_error": 0.021985935294613235,
+      "absolute_tolerance": 0.25,
+      "estimate": -3.321985935294613,
+      "name": "log10_h2o_vmr",
+      "passed": true,
+      "posterior_standard_deviation": 0.018550365282289337,
+      "standardized_error": 1.1852022836231668,
+      "truth": -3.3
+    },
+    {
+      "absolute_error": 0.03571910851460558,
+      "absolute_tolerance": 0.25,
+      "estimate": -3.0357191085146056,
+      "name": "log10_co_vmr",
+      "passed": true,
+      "posterior_standard_deviation": 0.026993686148616983,
+      "standardized_error": 1.3232393796812238,
+      "truth": -3.0
+    },
+    {
+      "absolute_error": 0.01646982178877643,
+      "absolute_tolerance": 1.0,
+      "estimate": 4.983530178211224,
+      "name": "radial_velocity_km_s",
+      "passed": true,
+      "posterior_standard_deviation": 0.014466727081515939,
+      "standardized_error": 1.1384621895452658,
+      "truth": 5.0
+    }
+  ],
+  "parameters_passed": true,
+  "passed": true,
+  "preparation": {
+    "high_resolution_native_points": 2520,
+    "high_resolution_observed_points": 205,
+    "low_resolution_points": 48,
+    "native_sampling_stride": 1,
+    "pressure_layers": 48
+  },
+  "production_stride_decision": {
+    "assessment_complete": true,
+    "candidate_stride": 2,
+    "candidate_stride_decision": "reject",
+    "decision": "reject",
+    "evidence_bias": true,
+    "failed_checks": [
+      "evidence_agreement_with_reported_errors",
+      "nested_stride_2_comparison"
+    ],
+    "production_stride": 1,
+    "reason": "stride-2 rejected because paired evidence agreement failed; stride-1 is the approved production stride",
+    "reference_stride": 1,
+    "reference_stride_decision": "approve",
+    "status": "rejected"
+  },
+  "pymultinest": {
+    "elapsed_seconds": 190.06291487510316,
+    "full_four_parameter_nested_sampling": "run",
+    "gate": {
+      "best_fit_truth_recovery": true,
+      "chi_square": true,
+      "completed_runs": 2,
+      "evidence": {
+        "allowed_difference": 0.5,
+        "combined_reported_error": 0.06550433152327766,
+        "difference": 0.01287064766995627,
+        "passed": true
+      },
+      "evidence_agreement": true,
+      "max_iter_zero": true,
+      "natural_convergence": true,
+      "passed": true,
+      "required_completed_runs": 2,
+      "truth_inside_posterior_intervals": true
+    },
+    "limitation": "This full posterior test uses the synthetic shared-atmosphere case. It does not validate a real target or replace independent pRT oracle checks.",
+    "parameter_names": [
+      "temperature_K",
+      "log10_h2o_vmr",
+      "log10_co_vmr",
+      "radial_velocity_km_s"
+    ],
+    "posterior_interval_statement": "central 90 percent weighted posterior interval",
+    "runs": [
+      {
+        "best_fit": {
+          "log10_co_vmr": -3.030677214892767,
+          "log10_h2o_vmr": -3.3192124338773166,
+          "radial_velocity_km_s": 4.982122704871401,
+          "temperature_K": 1497.7924146833404
+        },
+        "best_fit_absolute_errors": {
+          "log10_co_vmr": 0.03067721489276698,
+          "log10_h2o_vmr": 0.019212433877316748,
+          "radial_velocity_km_s": 0.017877295128599258,
+          "temperature_K": 2.2075853166595607
+        },
+        "best_fit_truth_recovery": true,
+        "converged": true,
+        "elapsed_seconds": 93.89860737498384,
+        "fit_statistics": {
+          "chi_square": 251.1017750590896,
+          "chi_square_by_dataset": {
+            "high_resolution": 204.53983585920088,
+            "low_resolution": 46.561939199888705
+          },
+          "chi_square_passed": true,
+          "degrees_of_freedom": 247,
+          "effective_point_count": 253,
+          "effective_point_count_by_dataset": {
+            "high_resolution": 205,
+            "low_resolution": 48
+          },
+          "n_active_points": 253,
+          "raw_point_count": 253,
+          "reduced_chi_square": 1.0166063767574478,
+          "removed_basis_rank": 2,
+          "removed_basis_rank_by_dataset": {
+            "high_resolution": 2,
+            "low_resolution": 0
+          },
+          "retained_residual_rank": 251,
+          "retained_residual_rank_by_dataset": {
+            "high_resolution": 203,
+            "low_resolution": 48
+          }
+        },
+        "likelihood_callback_evaluations": 2338,
+        "likelihood_evaluations": 2338,
+        "log_evidence": -146.0998347489943,
+        "log_evidence_error": 0.0483162396286466,
+        "message": "converged",
+        "peak_rss_bytes": 693878784,
+        "posterior_interval_quantiles": [
+          0.05,
+          0.95
+        ],
+        "posterior_intervals": {
+          "log10_co_vmr": [
+            -3.078881122588763,
+            -2.992186837884921
+          ],
+          "log10_h2o_vmr": [
+            -3.3516633236383395,
+            -3.292889353280012
+          ],
+          "radial_velocity_km_s": [
+            4.9623390963098295,
+            5.009556535904157
+          ],
+          "temperature_K": [
+            1494.7973059859567,
+            1500.502339028145
+          ]
+        },
+        "posterior_medians": {
+          "log10_co_vmr": -3.033892776406253,
+          "log10_h2o_vmr": -3.321510444373188,
+          "radial_velocity_km_s": 4.984037624917572,
+          "temperature_K": 1497.793939056453
+        },
+        "run_index": 1,
+        "seed": 24680,
+        "status": "completed",
+        "truth_inside_posterior_intervals": true
+      },
+      {
+        "best_fit": {
+          "log10_co_vmr": -3.0361867950600603,
+          "log10_h2o_vmr": -3.3245835634922547,
+          "radial_velocity_km_s": 4.985638967456765,
+          "temperature_K": 1497.4925274851698
+        },
+        "best_fit_absolute_errors": {
+          "log10_co_vmr": 0.036186795060060284,
+          "log10_h2o_vmr": 0.02458356349225488,
+          "radial_velocity_km_s": 0.014361032543234842,
+          "temperature_K": 2.5074725148301695
+        },
+        "best_fit_truth_recovery": true,
+        "converged": true,
+        "elapsed_seconds": 96.16427879198454,
+        "fit_statistics": {
+          "chi_square": 251.15769438429186,
+          "chi_square_by_dataset": {
+            "high_resolution": 204.41953615150962,
+            "low_resolution": 46.738158232782254
+          },
+          "chi_square_passed": true,
+          "degrees_of_freedom": 247,
+          "effective_point_count": 253,
+          "effective_point_count_by_dataset": {
+            "high_resolution": 205,
+            "low_resolution": 48
+          },
+          "n_active_points": 253,
+          "raw_point_count": 253,
+          "reduced_chi_square": 1.0168327707866067,
+          "removed_basis_rank": 2,
+          "removed_basis_rank_by_dataset": {
+            "high_resolution": 2,
+            "low_resolution": 0
+          },
+          "retained_residual_rank": 251,
+          "retained_residual_rank_by_dataset": {
+            "high_resolution": 203,
+            "low_resolution": 48
+          }
+        },
+        "likelihood_callback_evaluations": 2385,
+        "likelihood_evaluations": 2385,
+        "log_evidence": -146.08696410132436,
+        "log_evidence_error": 0.04423074085360392,
+        "message": "converged",
+        "peak_rss_bytes": 694009856,
+        "posterior_interval_quantiles": [
+          0.05,
+          0.95
+        ],
+        "posterior_intervals": {
+          "log10_co_vmr": [
+            -3.077314206253555,
+            -2.9894897400005784
+          ],
+          "log10_h2o_vmr": [
+            -3.3521602553633723,
+            -3.2928625932330853
+          ],
+          "radial_velocity_km_s": [
+            4.959347269940824,
+            5.0064807291300575
+          ],
+          "temperature_K": [
+            1494.7496685493243,
+            1500.3068700021608
+          ]
+        },
+        "posterior_medians": {
+          "log10_co_vmr": -3.0367048866683355,
+          "log10_h2o_vmr": -3.323062702401446,
+          "radial_velocity_km_s": 4.9833030923417345,
+          "temperature_K": 1497.6826909590773
+        },
+        "run_index": 2,
+        "seed": 24681,
+        "status": "completed",
+        "truth_inside_posterior_intervals": true
+      }
+    ],
+    "scope": "full four-parameter atmospheric posterior",
+    "settings": {
+      "evidence_tolerance": 0.5,
+      "max_iter": 0,
+      "mpi_nprocs": 1,
+      "n_live_points": 64,
+      "resume": false,
+      "sampling_efficiency": 0.8,
+      "seed_pair": [
+        24680,
+        24681
+      ],
+      "verbose": false
+    },
+    "status": "pass"
+  },
+  "recovery_component_passed": true,
+  "recovery_passed": true,
+  "reduced_chi_square": 1.016245872143528,
+  "reduced_chi_square_bounds": [
+    0.5,
+    1.5
+  ],
+  "resources": {
+    "cpu_rule": "all numerical thread variables are between 1 and 3; PyMultiNest MPI size is 1",
+    "max_memory_bytes": 1992294400,
+    "measured_peak_rss_bytes": 883752960,
+    "memory_rule": "measured_peak_rss < max_memory_bytes < 2 GiB",
+    "opacity_memory_limit_bytes": 943718400,
+    "thread_values": {
+      "MKL_NUM_THREADS": 3,
+      "NUMBA_NUM_THREADS": 3,
+      "NUMEXPR_NUM_THREADS": 3,
+      "OMP_NUM_THREADS": 3,
+      "OMP_THREAD_LIMIT": 3,
+      "OPENBLAS_NUM_THREADS": 3,
+      "VECLIB_MAXIMUM_THREADS": 3
+    }
+  },
+  "schema_version": "1.0",
+  "seed": 24680,
+  "status": "pass_native_stride_1_stride_2_rejected",
+  "table_inputs": {
+    "CO": {
+      "bytes": 4753927800,
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad"
+    },
+    "H2O": {
+      "bytes": 4681348920,
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73"
+    }
+  },
+  "timings_seconds": {
+    "model_and_truth": 5.966449709027074,
+    "optimal_estimation": 2.283940957975574,
+    "total_workflow": 335.87069100001827
+  },
+  "truth": {
+    "log10_co_vmr": -3.0,
+    "log10_h2o_vmr": -3.3,
+    "radial_velocity_km_s": 5.0,
+    "temperature_K": 1500.0
+  },
+  "workflow": "full four-parameter combined-resolution validation"
+}

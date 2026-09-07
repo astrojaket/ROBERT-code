@@ -70,6 +70,57 @@ def test_spectrum_only_solver_matches_diagnostic_solver() -> None:
     assert spectrum.metadata["diagnostics"] == "disabled"
 
 
+@pytest.mark.parametrize(
+    ("opacity_mode", "expected_source"),
+    [
+        ("correlated_k", "gas_correlated_k"),
+        ("opacity_sampling", "gas_opacity_sampling"),
+        ("line_by_line", "gas_line_by_line"),
+    ],
+)
+def test_solve_emission_preserves_gas_opacity_provenance(
+    opacity_mode: str,
+    expected_source: str,
+) -> None:
+    gas_tau = _gas_tau(
+        temperature=[900.0, 1300.0],
+        kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
+        opacity_metadata=(
+            {} if opacity_mode == "correlated_k" else {"opacity_mode": opacity_mode}
+        ),
+    )
+
+    result = solve_emission(gas_tau, bottom_boundary="none")
+
+    assert result.metadata["opacity_sources"] == expected_source
+
+
+def test_spectrum_only_no_scattering_does_not_allocate_scattering_work_arrays(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The extinction-only branch must not retain SH4 work arrays."""
+
+    pytest.importorskip("numba")
+    import robert_exoplanets.rt.emission as emission_module
+
+    gas_tau = _gas_tau(
+        temperature=[900.0, 1300.0],
+        kcoeff=np.array([[[[1.0e-23, 2.0e-23]], [[3.0e-23, 4.0e-23]]]]),
+    )
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("no-scattering spectrum path allocated zeros_like")
+
+    monkeypatch.setattr(emission_module.np, "zeros_like", forbidden)
+    result = solve_emission_spectrum(
+        gas_tau,
+        geometry=gauss_legendre_disk_geometry(2),
+        bottom_boundary="blackbody",
+        thermal_integration_backend="numba",
+    )
+    assert np.all(np.isfinite(result.values))
+
+
 def test_single_layer_without_bottom_matches_absorbing_slab_solution() -> None:
     pressure_grid = PressureGrid(
         edges=np.array([1.0e-5, 1.0e-3]),
@@ -346,6 +397,7 @@ def _gas_tau(
     *,
     temperature: list[float],
     kcoeff: np.ndarray,
+    opacity_metadata: dict[str, str] | None = None,
 ) -> GasOpticalDepth:
     pressure_grid = PressureGrid(
         edges=np.array([1.0e-5, 1.0e-3, 1.0e-1]),
@@ -359,7 +411,12 @@ def _gas_tau(
         mean_molecular_weight=2.3,
     )
     spectral_grid = SpectralGrid.from_array([2.0], unit="micron", role="opacity")
-    opacity = _evaluated_opacity(pressure_grid, spectral_grid, kcoeff)
+    opacity = _evaluated_opacity(
+        pressure_grid,
+        spectral_grid,
+        kcoeff,
+        metadata=opacity_metadata,
+    )
     return assemble_gas_optical_depth(atmosphere, opacity, gravity_m_s2=10.0)
 
 
@@ -369,6 +426,7 @@ def _evaluated_opacity(
     kcoeff: np.ndarray,
     *,
     unit: str = "cm^2/molecule",
+    metadata: dict[str, str] | None = None,
 ) -> EvaluatedCorrelatedKOpacity:
     prepared = PreparedCorrelatedKOpacity(
         provider_name="test-correlated-k",
@@ -378,6 +436,7 @@ def _evaluated_opacity(
         g_samples=np.array([0.25, 0.75]) if kcoeff.shape[-1] == 2 else np.array([0.5]),
         g_weights=np.array([0.4, 0.6]) if kcoeff.shape[-1] == 2 else np.array([1.0]),
         cache_key="test-cloud-free-cache-key",
+        metadata={} if metadata is None else metadata,
     )
     return EvaluatedCorrelatedKOpacity(
         prepared=prepared,

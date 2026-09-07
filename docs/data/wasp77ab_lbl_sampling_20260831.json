@@ -1,0 +1,675 @@
+{
+  "acceptance": {
+    "hrs_finest_passing_stride_selected": true,
+    "hrs_reference_and_candidates_complete": true,
+    "hrs_response_contract": true,
+    "lrs_finest_passing_stride_selected": true,
+    "lrs_reference_and_candidates_complete": true,
+    "opacity_estimates_below_1023_MiB": true,
+    "process_rss_below_1_9_GiB": true,
+    "thread_values_between_1_and_3": true
+  },
+  "atmosphere": {
+    "composition_convention": "volume_mixing_ratio",
+    "hminus_continuum": {
+      "config_species": [
+        "H-",
+        "H",
+        "e-"
+      ],
+      "electron_vmr": 0.001,
+      "hminus_vmr": 1e-06,
+      "hydrogen_vmr": 0.01,
+      "included_in_all_stride_evaluations": true,
+      "spectral_extrapolation": "raise",
+      "temperature_extrapolation": "raise"
+    },
+    "mass_fraction_parameters": false,
+    "mean_molecular_weight_amu": 2.303174509605827,
+    "n_layers": 80,
+    "pressure_centers_bar": [
+      1e-05,
+      100.0
+    ],
+    "temperature_profile": {
+      "bottom_K": 2900.0,
+      "form": "linear_in_log10_pressure",
+      "inverted": false,
+      "top_K": 2600.0
+    },
+    "vmr": {
+      "CO": 0.0001230268770812381,
+      "H": 0.01,
+      "H-": 1e-06,
+      "H2": 0.8404634027846691,
+      "H2O": 9.549925860214369e-05,
+      "He": 0.14831707107964753,
+      "e-": 0.001
+    }
+  },
+  "command": "conda run -n robert-exoplanets python examples/benchmark_wasp77ab_lbl_sampling.py",
+  "hrs": {
+    "candidate_strides": [
+      2,
+      4,
+      6,
+      8
+    ],
+    "doppler_stage": "not applied in sampling convergence; rest-grid comparison",
+    "gaussian_lsf_resolving_power": 45000.0,
+    "max_preparation_estimate_bytes": {
+      "1": 89852112,
+      "2": 44929152,
+      "4": 22464576,
+      "6": 14978448,
+      "8": 11232288
+    },
+    "metrics": {
+      "2": {
+        "gate_max_limit": 0.05,
+        "gate_pass": true,
+        "gate_rms_limit": 0.005,
+        "max_absolute_fractional": 0.00031853805002679536,
+        "n_orders": 19,
+        "n_points": 35112,
+        "p95_absolute_fractional": 8.682209605667122e-05,
+        "per_order": {
+          "0": {
+            "max_absolute_fractional": 0.00021503362718200414,
+            "rms_fractional": 5.40094498691825e-05
+          },
+          "1": {
+            "max_absolute_fractional": 0.00015538974283924034,
+            "rms_fractional": 4.095954827722738e-05
+          },
+          "10": {
+            "max_absolute_fractional": 9.550628770593761e-05,
+            "rms_fractional": 2.070864572670799e-05
+          },
+          "11": {
+            "max_absolute_fractional": 0.0001097586261771255,
+            "rms_fractional": 2.873954856325175e-05
+          },
+          "12": {
+            "max_absolute_fractional": 0.00014035483157859296,
+            "rms_fractional": 2.8928595388264567e-05
+          },
+          "13": {
+            "max_absolute_fractional": 0.00018539654656390958,
+            "rms_fractional": 3.480581346097519e-05
+          },
+          "14": {
+            "max_absolute_fractional": 0.00020595774167087022,
+            "rms_fractional": 4.495883632906459e-05
+          },
+          "15": {
+            "max_absolute_fractional": 0.00029746149191334226,
+            "rms_fractional": 6.334660358486872e-05
+          },
+          "16": {
+            "max_absolute_fractional": 0.00031853805002679536,
+            "rms_fractional": 7.281415377456238e-05
+          },
+          "17": {
+            "max_absolute_fractional": 0.00031326009984455894,
+            "rms_fractional": 6.614680129453272e-05
+          },
+          "18": {
+            "max_absolute_fractional": 0.00027980758921564153,
+            "rms_fractional": 5.161231568259269e-05
+          },
+          "2": {
+            "max_absolute_fractional": 0.00017938300227204884,
+            "rms_fractional": 3.712038227197914e-05
+          },
+          "3": {
+            "max_absolute_fractional": 0.0001578508128696754,
+            "rms_fractional": 3.597202913280266e-05
+          },
+          "4": {
+            "max_absolute_fractional": 0.0001566218973632072,
+            "rms_fractional": 3.226000651325168e-05
+          },
+          "5": {
+            "max_absolute_fractional": 0.00013466235106984747,
+            "rms_fractional": 2.1311003359694074e-05
+          },
+          "6": {
+            "max_absolute_fractional": 0.00013123166446482593,
+            "rms_fractional": 1.955310205016798e-05
+          },
+          "7": {
+            "max_absolute_fractional": 0.00010015932477647205,
+            "rms_fractional": 1.718362157941803e-05
+          },
+          "8": {
+            "max_absolute_fractional": 6.499190962183654e-05,
+            "rms_fractional": 1.650694800664876e-05
+          },
+          "9": {
+            "max_absolute_fractional": 8.059858795372854e-05,
+            "rms_fractional": 1.8470323057874164e-05
+          }
+        },
+        "rms_fractional": 4.086631167210462e-05
+      },
+      "4": {
+        "gate_max_limit": 0.05,
+        "gate_pass": true,
+        "gate_rms_limit": 0.005,
+        "max_absolute_fractional": 0.0008835027967086795,
+        "n_orders": 19,
+        "n_points": 35112,
+        "p95_absolute_fractional": 0.00032007667214997145,
+        "per_order": {
+          "0": {
+            "max_absolute_fractional": 0.0008835027967086795,
+            "rms_fractional": 0.000250013160256555
+          },
+          "1": {
+            "max_absolute_fractional": 0.0006764971101127504,
+            "rms_fractional": 0.00016638412045760334
+          },
+          "10": {
+            "max_absolute_fractional": 0.0003129084888839895,
+            "rms_fractional": 7.164854534535544e-05
+          },
+          "11": {
+            "max_absolute_fractional": 0.0004094133307923631,
+            "rms_fractional": 9.491562410305795e-05
+          },
+          "12": {
+            "max_absolute_fractional": 0.00045965194542674226,
+            "rms_fractional": 0.00011307608216008558
+          },
+          "13": {
+            "max_absolute_fractional": 0.0006733576335629099,
+            "rms_fractional": 0.00014012092076729952
+          },
+          "14": {
+            "max_absolute_fractional": 0.0006922495927839112,
+            "rms_fractional": 0.00016097368799548016
+          },
+          "15": {
+            "max_absolute_fractional": 0.000871517184125592,
+            "rms_fractional": 0.00018264534381205448
+          },
+          "16": {
+            "max_absolute_fractional": 0.0008591502974055754,
+            "rms_fractional": 0.00022558308974563495
+          },
+          "17": {
+            "max_absolute_fractional": 0.0007433622971109166,
+            "rms_fractional": 0.00019299942423704164
+          },
+          "18": {
+            "max_absolute_fractional": 0.0008370357174332099,
+            "rms_fractional": 0.00019136706137478678
+          },
+          "2": {
+            "max_absolute_fractional": 0.0006703085726946778,
+            "rms_fractional": 0.00015765610305899308
+          },
+          "3": {
+            "max_absolute_fractional": 0.0007346453883065873,
+            "rms_fractional": 0.0001525099510112954
+          },
+          "4": {
+            "max_absolute_fractional": 0.0007036462113381159,
+            "rms_fractional": 0.00015408397185245646
+          },
+          "5": {
+            "max_absolute_fractional": 0.00047759520813639433,
+            "rms_fractional": 7.380122211618465e-05
+          },
+          "6": {
+            "max_absolute_fractional": 0.0003648630145933751,
+            "rms_fractional": 5.786085830118481e-05
+          },
+          "7": {
+            "max_absolute_fractional": 0.0002396413035101741,
+            "rms_fractional": 4.8282769345542666e-05
+          },
+          "8": {
+            "max_absolute_fractional": 0.00019737821157828073,
+            "rms_fractional": 4.8080570472330535e-05
+          },
+          "9": {
+            "max_absolute_fractional": 0.00026533754334900905,
+            "rms_fractional": 5.793011388019514e-05
+          }
+        },
+        "rms_fractional": 0.00014679604458112428
+      },
+      "6": {
+        "gate_max_limit": 0.05,
+        "gate_pass": true,
+        "gate_rms_limit": 0.005,
+        "max_absolute_fractional": 0.0018399773763937421,
+        "n_orders": 19,
+        "n_points": 35112,
+        "p95_absolute_fractional": 0.0006906120325221197,
+        "per_order": {
+          "0": {
+            "max_absolute_fractional": 0.0018399773763937421,
+            "rms_fractional": 0.00044983308730017465
+          },
+          "1": {
+            "max_absolute_fractional": 0.0014245926858742486,
+            "rms_fractional": 0.0003703889975174158
+          },
+          "10": {
+            "max_absolute_fractional": 0.0007070387746985762,
+            "rms_fractional": 0.00016111872409319146
+          },
+          "11": {
+            "max_absolute_fractional": 0.000873407204237342,
+            "rms_fractional": 0.00021143976464076851
+          },
+          "12": {
+            "max_absolute_fractional": 0.0009900182487729836,
+            "rms_fractional": 0.00025193100468509806
+          },
+          "13": {
+            "max_absolute_fractional": 0.0014610342285423794,
+            "rms_fractional": 0.00031847031077801124
+          },
+          "14": {
+            "max_absolute_fractional": 0.0015307037980998306,
+            "rms_fractional": 0.0003707669885212203
+          },
+          "15": {
+            "max_absolute_fractional": 0.0016625268728680531,
+            "rms_fractional": 0.00040018962967689213
+          },
+          "16": {
+            "max_absolute_fractional": 0.0016936123294404304,
+            "rms_fractional": 0.0004462579130563289
+          },
+          "17": {
+            "max_absolute_fractional": 0.0016433701891473973,
+            "rms_fractional": 0.0004197462563916145
+          },
+          "18": {
+            "max_absolute_fractional": 0.001747449276728652,
+            "rms_fractional": 0.00042507199578714
+          },
+          "2": {
+            "max_absolute_fractional": 0.0013711738072381685,
+            "rms_fractional": 0.00036679430508253675
+          },
+          "3": {
+            "max_absolute_fractional": 0.0018375449696212964,
+            "rms_fractional": 0.00036679364047386554
+          },
+          "4": {
+            "max_absolute_fractional": 0.0015658899412591687,
+            "rms_fractional": 0.00032029705066417217
+          },
+          "5": {
+            "max_absolute_fractional": 0.0013716898625804053,
+            "rms_fractional": 0.0001613066378973354
+          },
+          "6": {
+            "max_absolute_fractional": 0.000777227471200792,
+            "rms_fractional": 0.00012303971096373024
+          },
+          "7": {
+            "max_absolute_fractional": 0.0005215116986145851,
+            "rms_fractional": 0.00010549833149153259
+          },
+          "8": {
+            "max_absolute_fractional": 0.00046141377592201493,
+            "rms_fractional": 0.00010660075952049058
+          },
+          "9": {
+            "max_absolute_fractional": 0.0005995614855638376,
+            "rms_fractional": 0.00012688833246931214
+          }
+        },
+        "rms_fractional": 0.0003145719110575635
+      },
+      "8": {
+        "gate_max_limit": 0.05,
+        "gate_pass": true,
+        "gate_rms_limit": 0.005,
+        "max_absolute_fractional": 0.003456188918756542,
+        "n_orders": 19,
+        "n_points": 35112,
+        "p95_absolute_fractional": 0.0012050542742137885,
+        "per_order": {
+          "0": {
+            "max_absolute_fractional": 0.0032859727695755403,
+            "rms_fractional": 0.0008199466283384029
+          },
+          "1": {
+            "max_absolute_fractional": 0.003456188918756542,
+            "rms_fractional": 0.0006530797488609072
+          },
+          "10": {
+            "max_absolute_fractional": 0.001153234261739744,
+            "rms_fractional": 0.00027572796235673415
+          },
+          "11": {
+            "max_absolute_fractional": 0.0016853109348879958,
+            "rms_fractional": 0.0003744093672040521
+          },
+          "12": {
+            "max_absolute_fractional": 0.0018435500513112046,
+            "rms_fractional": 0.0004419326667377694
+          },
+          "13": {
+            "max_absolute_fractional": 0.002504819637135114,
+            "rms_fractional": 0.0005627356557969972
+          },
+          "14": {
+            "max_absolute_fractional": 0.0022644679140102486,
+            "rms_fractional": 0.0006152470229825213
+          },
+          "15": {
+            "max_absolute_fractional": 0.0028194989549001903,
+            "rms_fractional": 0.0006701360562364313
+          },
+          "16": {
+            "max_absolute_fractional": 0.0031074403830204655,
+            "rms_fractional": 0.0007762166850189551
+          },
+          "17": {
+            "max_absolute_fractional": 0.0032115900140763376,
+            "rms_fractional": 0.0007497270774708118
+          },
+          "18": {
+            "max_absolute_fractional": 0.003048846387236015,
+            "rms_fractional": 0.0007442343718898321
+          },
+          "2": {
+            "max_absolute_fractional": 0.002953079982546125,
+            "rms_fractional": 0.0006531697148158875
+          },
+          "3": {
+            "max_absolute_fractional": 0.003405230897593592,
+            "rms_fractional": 0.0006829929413338451
+          },
+          "4": {
+            "max_absolute_fractional": 0.003273893901458269,
+            "rms_fractional": 0.0005475842453886162
+          },
+          "5": {
+            "max_absolute_fractional": 0.002327994235613806,
+            "rms_fractional": 0.00028725077742816586
+          },
+          "6": {
+            "max_absolute_fractional": 0.001457901522769145,
+            "rms_fractional": 0.00021308839465478954
+          },
+          "7": {
+            "max_absolute_fractional": 0.0008614493825001013,
+            "rms_fractional": 0.00018387126262915275
+          },
+          "8": {
+            "max_absolute_fractional": 0.000946222183131562,
+            "rms_fractional": 0.00018580396811736498
+          },
+          "9": {
+            "max_absolute_fractional": 0.0010580114542242391,
+            "rms_fractional": 0.0002231845670587141
+          }
+        },
+        "rms_fractional": 0.0005530837093564658
+      }
+    },
+    "n_orders": 19,
+    "native_evaluation": "one buffered order at a time",
+    "order_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "order_selection_range_micron": [
+      1.9,
+      2.45
+    ],
+    "pixel_grid": "real Smith order pixels with midpoint-inferred edges",
+    "pixels_per_order": 1848,
+    "reference_stride": 1,
+    "response_stages": [
+      "rotational-broadening",
+      "gaussian-high-resolution",
+      "pixel-bin-integration"
+    ],
+    "rotation_km_s": 4.2,
+    "scope": "real Smith 2020-12-14 IGRINS K-band orders",
+    "selected_finest_passing_stride": 2
+  },
+  "lrs": {
+    "bin_edges_micron": [
+      2.808,
+      5.168
+    ],
+    "broad_stride_1_attempted": false,
+    "candidate_strides": [
+      25,
+      50,
+      100,
+      250
+    ],
+    "detectors": [
+      "JWST/NIRSpec-G395H-NRS1",
+      "JWST/NIRSpec-G395H-NRS2"
+    ],
+    "max_preparation_estimate_bytes": {
+      "10": 383860656,
+      "100": 38390400,
+      "25": 153543024,
+      "250": 15356160,
+      "50": 76774608
+    },
+    "metrics": {
+      "100": {
+        "gate_max_limit_sigma": 1.0,
+        "gate_pass": true,
+        "gate_rms_limit_sigma": 0.25,
+        "max_absolute_sigma": 0.2570330977642441,
+        "n_detectors": 2,
+        "n_points": 150,
+        "p95_absolute_sigma": 0.14105285430653275,
+        "per_detector": {
+          "JWST/NIRSpec-G395H-NRS1": {
+            "max_absolute_sigma": 0.2570330977642441,
+            "n_points": 70,
+            "p95_absolute_sigma": 0.1379086810452966,
+            "rms_sigma": 0.08549424070730396
+          },
+          "JWST/NIRSpec-G395H-NRS2": {
+            "max_absolute_sigma": 0.2052188074399292,
+            "n_points": 80,
+            "p95_absolute_sigma": 0.14187213914882582,
+            "rms_sigma": 0.07427924145386906
+          }
+        },
+        "rms_sigma": 0.07970951513528207
+      },
+      "25": {
+        "gate_max_limit_sigma": 1.0,
+        "gate_pass": true,
+        "gate_rms_limit_sigma": 0.25,
+        "max_absolute_sigma": 0.1197048533229227,
+        "n_detectors": 2,
+        "n_points": 150,
+        "p95_absolute_sigma": 0.05822800973675846,
+        "per_detector": {
+          "JWST/NIRSpec-G395H-NRS1": {
+            "max_absolute_sigma": 0.1197048533229227,
+            "n_points": 70,
+            "p95_absolute_sigma": 0.07067962380947927,
+            "rms_sigma": 0.03692919424799075
+          },
+          "JWST/NIRSpec-G395H-NRS2": {
+            "max_absolute_sigma": 0.055618483403288725,
+            "n_points": 80,
+            "p95_absolute_sigma": 0.04432555943831506,
+            "rms_sigma": 0.02050975896052307
+          }
+        },
+        "rms_sigma": 0.029338892748467155
+      },
+      "250": {
+        "gate_max_limit_sigma": 1.0,
+        "gate_pass": true,
+        "gate_rms_limit_sigma": 0.25,
+        "max_absolute_sigma": 0.6385493289131611,
+        "n_detectors": 2,
+        "n_points": 150,
+        "p95_absolute_sigma": 0.3449058515249238,
+        "per_detector": {
+          "JWST/NIRSpec-G395H-NRS1": {
+            "max_absolute_sigma": 0.6385493289131611,
+            "n_points": 70,
+            "p95_absolute_sigma": 0.3556919772821694,
+            "rms_sigma": 0.18093450073768777
+          },
+          "JWST/NIRSpec-G395H-NRS2": {
+            "max_absolute_sigma": 0.43640324024254573,
+            "n_points": 80,
+            "p95_absolute_sigma": 0.24449244272673065,
+            "rms_sigma": 0.14014073873650143
+          }
+        },
+        "rms_sigma": 0.1604735633740073
+      },
+      "50": {
+        "gate_max_limit_sigma": 1.0,
+        "gate_pass": true,
+        "gate_rms_limit_sigma": 0.25,
+        "max_absolute_sigma": 0.13023695051600284,
+        "n_detectors": 2,
+        "n_points": 150,
+        "p95_absolute_sigma": 0.08867921227151157,
+        "per_detector": {
+          "JWST/NIRSpec-G395H-NRS1": {
+            "max_absolute_sigma": 0.13023695051600284,
+            "n_points": 70,
+            "p95_absolute_sigma": 0.098575693715781,
+            "rms_sigma": 0.04947423868101991
+          },
+          "JWST/NIRSpec-G395H-NRS2": {
+            "max_absolute_sigma": 0.10454649681687007,
+            "n_points": 80,
+            "p95_absolute_sigma": 0.08395390610497197,
+            "rms_sigma": 0.04536114064899271
+          }
+        },
+        "rms_sigma": 0.047325093202434915
+      }
+    },
+    "n_points": 150,
+    "published_uncertainty_definition": "loader symmetric mean of absolute asymmetric errors",
+    "reference_resolution_note": "stride 10 approximates R~100,000",
+    "reference_stride": 10,
+    "response": "exact piecewise-linear top-hat integration over published bin edges",
+    "scope": "August NRS1/NRS2 bins",
+    "selected_finest_passing_stride": 25
+  },
+  "notes": [
+    "The Smith cube flux values are not fitted; its 2020-12-14 order and pixel wavelength grids are used.",
+    "The HRS reference and candidates are evaluated one order at a time with no spectra retained in the report.",
+    "The LRS reference uses stride 10 as the R~100,000 carrier; broad stride 1 was not attempted.",
+    "All ROBERT composition inputs are VMRs. No ROBERT mass-fraction parameter is present."
+  ],
+  "paper": {
+    "august2023_doi": "10.3847/2041-8213/ace828",
+    "smith2024_arxiv": "2312.13069",
+    "smith2024_doi": "10.3847/1538-3881/ad17bf",
+    "zenodo_doi": "10.5281/zenodo.10382053"
+  },
+  "record_type": "wasp77ab_real_grid_lbl_sampling_convergence",
+  "resources": {
+    "max_threads": 3,
+    "measured_peak_rss_bytes": 1663959040,
+    "opacity_estimate_comparison": "strictly below",
+    "opacity_estimate_limit_bytes": 1072693248,
+    "process_rss_comparison": "strictly below",
+    "process_rss_limit_bytes": 2040109465,
+    "run_cpu_count": 1,
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 3,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    }
+  },
+  "schema_version": 1,
+  "source_inputs": {
+    "data": {
+      "august_nirspec_table": {
+        "bytes": 27329,
+        "data_producer": "August et al. 2023; Smith et al. 2024 comparison input",
+        "path": "data/jwst_emission_spectra/spectra/76/89/90/56/WASP_77_A_b_3.11569_5329_1.tbl",
+        "role": "August et al. 2023 NRS1/NRS2 bin edges and uncertainties",
+        "sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f"
+      },
+      "smith_20201214_info": {
+        "bytes": 7261,
+        "md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+        "path": "external_data/wasp77ab_smith2024/20201214_info.csv",
+        "role": "Smith 2020-12-14 frame metadata",
+        "sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e"
+      },
+      "smith_cube14v3": {
+        "bytes": 77591894,
+        "md5": "3fd41560b7dbcc60851ef3a0972c852f",
+        "path": "external_data/wasp77ab_smith2024/cube14v3.pic",
+        "role": "Smith 2024 IGRINS order and pixel grids",
+        "sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26"
+      }
+    },
+    "opacity_tables": {
+      "CO__HITEMP": {
+        "bytes": 4753927800,
+        "checksum_status": "pinned_external_manifest",
+        "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+        "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad"
+      },
+      "H2O__POKAZATEL": {
+        "bytes": 4681348920,
+        "checksum_status": "pinned_external_manifest",
+        "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+        "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73"
+      }
+    }
+  },
+  "status": "pass",
+  "target": {
+    "gravity_m_s2": 29.796051121185513,
+    "name": "WASP-77Ab",
+    "planet_radius_r_j": 1.21,
+    "smith_joint_anchor_log10_co_vmr": -3.91,
+    "smith_joint_anchor_log10_h2o_vmr": -4.02,
+    "star_radius_r_sun": 0.955
+  },
+  "timings_seconds": {
+    "hrs_seconds": 390.7259357080329,
+    "lrs_seconds": 3.10292762494646,
+    "source_load_seconds": 0.3329379999777302,
+    "total_seconds": 394.56524575001094
+  }
+}

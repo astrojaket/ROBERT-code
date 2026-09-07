@@ -10,13 +10,14 @@ from pathlib import Path
 import re
 import socket
 import time
-from typing import Any
+from typing import Any, Mapping, Protocol, cast
 
 import numpy as np
 
 from robert_exoplanets.core import RobertConfigError
 
-from ..problem import RetrievalProblem
+from ..manifest import normalize_multinest_resume
+from ..protocols import SamplerRetrievalProblem
 from ..status import append_retrieval_attempt_event, write_retrieval_status
 from .base import NestedSamplerResult, validate_mpi_world_size
 
@@ -28,15 +29,28 @@ from .base import NestedSamplerResult, validate_mpi_world_size
 MULTINEST_MAX_SEED = 30_080
 
 
+class _AnalyzerProtocol(Protocol):
+    """Small part of PyMultiNest's analyzer API used by ROBERT."""
+
+    def get_data(self) -> Any:
+        """Return posterior rows."""
+
+    def get_best_fit(self) -> Mapping[str, Any]:
+        """Return the native best-fit record."""
+
+    def get_stats(self) -> Mapping[str, Any]:
+        """Return global evidence statistics."""
+
+
 def run_multinest(
-    problem: RetrievalProblem,
+    problem: SamplerRetrievalProblem,
     *,
     output_dir: str | Path,
     n_live_points: int = 400,
     evidence_tolerance: float = 0.5,
     sampling_efficiency: float = 0.8,
     max_iter: int = 0,
-    resume: bool = True,
+    resume: bool | str = True,
     verbose: bool = True,
     mpi_nprocs: int | None = None,
     seed: int | None = None,
@@ -54,6 +68,7 @@ def run_multinest(
     """
 
     validate_mpi_world_size(mpi_nprocs)
+    resume_flag = normalize_multinest_resume(resume)
     live_points = _positive_integer(n_live_points, "n_live_points")
     update_interval = _positive_integer(n_iter_before_update, "n_iter_before_update")
     iteration_limit = int(max_iter)
@@ -73,7 +88,7 @@ def run_multinest(
         )
 
     try:
-        import pymultinest
+        import pymultinest  # type: ignore[import-untyped]
     except (ImportError, OSError, SystemExit) as exc:
         raise RobertConfigError(
             "PyMultiNest or its compiled MultiNest library is unavailable. "
@@ -107,7 +122,7 @@ def run_multinest(
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
         "slurm_array_task_id": os.environ.get("SLURM_ARRAY_TASK_ID"),
         "mpi_nprocs": mpi_nprocs,
-        "resume": bool(resume),
+        "resume": resume_flag,
         "n_live_points": live_points,
         "max_iter": iteration_limit,
         "evidence_tolerance": tolerance,
@@ -195,7 +210,7 @@ def run_multinest(
                 prior,
                 problem.ndim,
                 outputfiles_basename=basename,
-                resume=bool(resume),
+                resume=resume_flag,
                 verbose=bool(verbose),
                 n_live_points=live_points,
                 evidence_tolerance=tolerance,
@@ -228,7 +243,7 @@ def run_multinest(
                 mpi_nprocs=mpi_nprocs,
                 seed=seed,
                 effective_seed=effective_seed,
-                resume=bool(resume),
+                resume=resume_flag,
                 max_iter=iteration_limit,
                 invalid_loglike_floor=invalid_floor,
                 attempt_id=attempt_id,
@@ -271,7 +286,7 @@ def run_multinest(
 
 
 def _result_from_analyzer(
-    problem: RetrievalProblem,
+    problem: SamplerRetrievalProblem,
     analyzer: object,
     *,
     output_dir: Path,
@@ -287,7 +302,8 @@ def _result_from_analyzer(
     likelihood_evaluations: int,
     likelihood_callback_evaluations: int,
 ) -> NestedSamplerResult:
-    data = np.asarray(analyzer.get_data(), dtype=float)
+    typed_analyzer = cast(_AnalyzerProtocol, analyzer)
+    data = np.asarray(typed_analyzer.get_data(), dtype=np.float64)
     if data.ndim == 1:
         data = data[np.newaxis, :]
     if data.shape[1] != problem.ndim + 2:
@@ -296,11 +312,16 @@ def _result_from_analyzer(
             f"expected {problem.ndim + 2}, received {data.shape[1]}"
         )
     weights = data[:, 0]
-    log_likelihood = -0.5 * data[:, 1]
-    samples = data[:, 2:]
-    evidence, evidence_error = _global_evidence(analyzer, Path(f"{basename}stats.dat"))
-    best = analyzer.get_best_fit()
-    best_fit = problem.parameter_mapping(np.asarray(best["parameters"], dtype=float))
+    log_likelihood = np.asarray(-0.5 * data[:, 1], dtype=np.float64)
+    samples = np.asarray(data[:, 2:], dtype=np.float64)
+    evidence, evidence_error = _global_evidence(
+        typed_analyzer,
+        Path(f"{basename}stats.dat"),
+    )
+    best = typed_analyzer.get_best_fit()
+    best_fit = problem.parameter_mapping(
+        np.asarray(cast(Any, best["parameters"]), dtype=np.float64)
+    )
     converged = bool(samples.size) and max_iter == 0
     message = (
         "converged"
@@ -312,7 +333,7 @@ def _result_from_analyzer(
         parameter_names=problem.parameter_names,
         samples=samples,
         log_likelihood=log_likelihood,
-        weights=weights,
+        weights=np.asarray(weights, dtype=np.float64),
         log_evidence=evidence,
         log_evidence_error=evidence_error,
         best_fit_parameters=best_fit,
@@ -339,20 +360,23 @@ def _result_from_analyzer(
 
 
 def _positive_integer(value: object, name: str) -> int:
-    converted = int(value)
+    converted = int(cast(Any, value))
     if isinstance(value, bool) or converted < 1:
         raise RobertConfigError(f"{name} must be a positive integer")
     return converted
 
 
 def _positive_float(value: object, name: str) -> float:
-    converted = float(value)
+    converted = float(cast(Any, value))
     if not np.isfinite(converted) or converted <= 0.0:
         raise RobertConfigError(f"{name} must be finite and positive")
     return converted
 
 
-def _global_evidence(analyzer: object, stats_path: Path) -> tuple[float, float | None]:
+def _global_evidence(
+    analyzer: _AnalyzerProtocol,
+    stats_path: Path,
+) -> tuple[float, float | None]:
     """Read global evidence without parsing unrelated per-mode statistics.
 
     MultiNest 3.10 can write an underflowed Fortran value such as
@@ -402,7 +426,7 @@ def _fortran_float(value: object) -> float:
 def _finite_or_none(value: object) -> float | None:
     if value is None:
         return None
-    converted = float(value)
+    converted = float(cast(Any, value))
     return converted if np.isfinite(converted) else None
 
 

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "record_type": "wasp77ab_stsci_phoenix_subset_sources",
+  "status": "manifest_only_not_downloaded",
+  "target": "WASP-77Ab",
+  "source": {
+    "provider": "Space Telescope Science Institute",
+    "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+    "tree": "PYSYN_CDBS/grid/phoenix",
+    "purpose": "minimal official PHOENIX subset for the ROBERT stellar model"
+  },
+  "acquisition": {
+    "script": "examples/fetch_wasp77ab_phoenix_subset.py",
+    "command": "conda run -n robert-exoplanets python examples/fetch_wasp77ab_phoenix_subset.py --output-dir external_data/wasp77ab_phoenix_subset",
+    "output_directory": "external_data/wasp77ab_phoenix_subset",
+    "pysyn_cdbs_root": "external_data/wasp77ab_phoenix_subset",
+    "atomic_install": true,
+    "skip_valid": true,
+    "overwrite_invalid": false,
+    "stream_chunk_bytes": 1048576,
+    "reads_fits_content": false
+  },
+  "resource_policy": {
+    "max_threads": 6,
+    "observed_threads": 1,
+    "process_rss_limit_bytes": 2147483647,
+    "process_rss_limit_comparison": "strictly below 2 GiB",
+    "thread_variables": [
+      "OMP_NUM_THREADS",
+      "OPENBLAS_NUM_THREADS",
+      "MKL_NUM_THREADS",
+      "NUMEXPR_NUM_THREADS",
+      "VECLIB_MAXIMUM_THREADS",
+      "NUMBA_NUM_THREADS",
+      "OMP_THREAD_LIMIT"
+    ]
+  },
+  "files": [
+    {
+      "name": "catalog.fits",
+      "relative_path": "grid/phoenix/catalog.fits",
+      "role": "official STScI PHOENIX grid catalogue",
+      "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/catalog.fits",
+      "size_bytes": 1497600,
+      "sha256": "c5cb54e12ca20f8cba38624c460b743d0783ab92fcc0ad53b8288819d1d4d471",
+      "status": "not_downloaded",
+      "local_sha256": null
+    },
+    {
+      "name": "phoenixm00/phoenixm00_5600.fits",
+      "relative_path": "grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+      "role": "official STScI PHOENIX [M/H]=0.0, 5600 K spectrum",
+      "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+      "size_bytes": 9901440,
+      "sha256": "688a5acf69c9ec65a1b5398084d6c62e43ad63d2799588e5a005f715123686ca",
+      "status": "not_downloaded",
+      "local_sha256": null
+    },
+    {
+      "name": "phoenixm00/phoenixm00_5700.fits",
+      "relative_path": "grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+      "role": "official STScI PHOENIX [M/H]=0.0, 5700 K spectrum",
+      "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+      "size_bytes": 9901440,
+      "sha256": "373a945f3c16f36473fdca542d5a97c090a16871ad598f7b069fd15bb4bbe027",
+      "status": "not_downloaded",
+      "local_sha256": null
+    }
+  ]
+}

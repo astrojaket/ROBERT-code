@@ -1,0 +1,192 @@
+{
+  "best_fit": {
+    "log10_co_vmr": -3.0357191085146056,
+    "log10_h2o_vmr": -3.321985935294613,
+    "radial_velocity_km_s": 4.983530178211224,
+    "temperature_K": 1497.6662749219379
+  },
+  "case_name": "combined-low-high-resolution-emission-injection",
+  "chi_square": 251.01273041945137,
+  "command": "examples/combined_resolution_injection_recovery.py --max-memory-gib 1.9 --run-pymultinest --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+  "fit_passed": true,
+  "inference_converged": true,
+  "memory_guard_passed": true,
+  "metadata": {
+    "dataset_names": "low_resolution,high_resolution",
+    "fit_gate": "Gaussian noise gate: reduced chi-square expected near noise_scale^2",
+    "likelihood": "Gaussian low resolution + projected high resolution",
+    "noise_scale": "1"
+  },
+  "n_active_points": 253,
+  "n_parameters": 4,
+  "parameter_recoveries": [
+    {
+      "absolute_error": 2.333725078062116,
+      "absolute_tolerance": 80.0,
+      "estimate": 1497.6662749219379,
+      "name": "temperature_K",
+      "passed": true,
+      "posterior_standard_deviation": 1.774109418909896,
+      "standardized_error": 1.315434692577235,
+      "truth": 1500.0
+    },
+    {
+      "absolute_error": 0.021985935294613235,
+      "absolute_tolerance": 0.25,
+      "estimate": -3.321985935294613,
+      "name": "log10_h2o_vmr",
+      "passed": true,
+      "posterior_standard_deviation": 0.018550365282289337,
+      "standardized_error": 1.1852022836231668,
+      "truth": -3.3
+    },
+    {
+      "absolute_error": 0.03571910851460558,
+      "absolute_tolerance": 0.25,
+      "estimate": -3.0357191085146056,
+      "name": "log10_co_vmr",
+      "passed": true,
+      "posterior_standard_deviation": 0.026993686148616983,
+      "standardized_error": 1.3232393796812238,
+      "truth": -3.0
+    },
+    {
+      "absolute_error": 0.01646982178877643,
+      "absolute_tolerance": 1.0,
+      "estimate": 4.983530178211224,
+      "name": "radial_velocity_km_s",
+      "passed": true,
+      "posterior_standard_deviation": 0.014466727081515939,
+      "standardized_error": 1.1384621895452658,
+      "truth": 5.0
+    }
+  ],
+  "parameters_passed": true,
+  "passed": true,
+  "preparation": {
+    "high_resolution_native_points": 2520,
+    "high_resolution_observed_points": 205,
+    "low_resolution_points": 48,
+    "pressure_layers": 48
+  },
+  "pymultinest": {
+    "elapsed_seconds": 32.520812625065446,
+    "fixed_parameters": [
+      "temperature_K",
+      "log10_h2o_vmr",
+      "log10_co_vmr"
+    ],
+    "forward_cache": {
+      "atmosphere_evaluations_per_sampler_call": 0,
+      "cache_state": "one_shared_native_atmosphere_at_injected_parameters",
+      "cached_dataset_names": [
+        "high_resolution",
+        "low_resolution"
+      ],
+      "native_spectra_cached": true,
+      "runtime_response_only": true,
+      "single_truth_likelihood": -126.95656231939037,
+      "single_truth_likelihood_seconds": 0.02233354200143367
+    },
+    "full_four_parameter_nested_sampling": "not_run",
+    "gate": {
+      "converged": true,
+      "evidence_absolute_difference": 0.00986675167064277,
+      "evidence_absolute_difference_max": 0.5,
+      "evidence_agreement": true,
+      "radial_velocity_absolute_error_max_km_s": 1.0,
+      "required_completed_runs": 2,
+      "required_converged_each_run": true,
+      "truth_recovery": true
+    },
+    "gate_passed": true,
+    "limitation": "This resource-bounded PyMultiNest proof validates the combined likelihood and RV response. It does not demonstrate convergence or evidence accuracy for the full four-parameter atmospheric posterior.",
+    "runs": [
+      {
+        "absolute_truth_error_km_s": 0.013655946159488508,
+        "best_fit_radial_velocity_km_s": 4.9863440538405115,
+        "converged": true,
+        "elapsed_seconds": 17.104194166953675,
+        "likelihood_callback_evaluations": 681,
+        "likelihood_evaluations": 681,
+        "log_evidence": -133.00791950754464,
+        "log_evidence_error": 0.06073900823818373,
+        "message": "converged",
+        "run_index": 1,
+        "seed": 24680,
+        "status": "completed"
+      },
+      {
+        "absolute_truth_error_km_s": 0.013659141302380107,
+        "best_fit_radial_velocity_km_s": 4.98634085869762,
+        "converged": true,
+        "elapsed_seconds": 15.394249208038673,
+        "likelihood_callback_evaluations": 679,
+        "likelihood_evaluations": 679,
+        "log_evidence": -132.998052755874,
+        "log_evidence_error": 0.06501341903286248,
+        "message": "converged",
+        "run_index": 2,
+        "seed": 24681,
+        "status": "completed"
+      }
+    ],
+    "scope": "one-dimensional radial-velocity PyMultiNest slice",
+    "settings": {
+      "evidence_tolerance": 0.5,
+      "max_iter": 0,
+      "mpi_nprocs": 1,
+      "n_live_points": 64,
+      "resume": false,
+      "sampling_efficiency": 0.8,
+      "seed_pair": [
+        24680,
+        24681
+      ],
+      "verbose": false
+    },
+    "status": "pass"
+  },
+  "recovery_passed": true,
+  "reduced_chi_square": 1.0080832546965919,
+  "reduced_chi_square_bounds": [
+    0.5,
+    1.5
+  ],
+  "resources": {
+    "cached_velocity_responses": 2,
+    "cpu_thread_limit": 3,
+    "max_memory_bytes": 2040109465,
+    "measured_peak_rss_bytes": 801226752,
+    "opacity_limit_rule": "estimated_opacity_slice < 1 GiB",
+    "opacity_memory_limit_bytes": 943718400,
+    "process_limit_rule": "measured_peak_rss < max_memory_bytes < 2 GiB"
+  },
+  "sampling_gate_passed": true,
+  "schema_version": "1.0",
+  "seed": 24680,
+  "status": "pass",
+  "table_inputs": {
+    "CO": {
+      "bytes": 4753927800,
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad"
+    },
+    "H2O": {
+      "bytes": 4681348920,
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73"
+    }
+  },
+  "timings_seconds": {
+    "model_preparation_and_truth": 6.951730250031687,
+    "optimal_estimation": 2.6933190419804305,
+    "total_workflow": 46.22924274997786
+  },
+  "truth": {
+    "log10_co_vmr": -3.0,
+    "log10_h2o_vmr": -3.3,
+    "radial_velocity_km_s": 5.0,
+    "temperature_K": 1500.0
+  }
+}

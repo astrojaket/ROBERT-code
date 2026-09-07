@@ -1,4 +1,4 @@
-"""Plot the exploratory ROBERT WASP-69b cloud-free retrieval and paper comparison."""
+"""Plot an existing WASP-69b cloud-free product and compare published values."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 from pathlib import Path
-import re
 import tempfile
 
 os.environ.setdefault(
@@ -20,7 +19,10 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-import retrieve_wasp69b_cloud_free_native_modes as retrieval
+if __package__:
+    from . import retrieve_wasp69b_cloud_free_native_modes as retrieval
+else:
+    import retrieve_wasp69b_cloud_free_native_modes as retrieval
 
 
 OUTPUT = retrieval.OUTPUT
@@ -114,7 +116,7 @@ def _plot_spectrum(problem, products, summary, output: Path) -> None:
             observation.wavelength, residual, ".", color=color, markersize=3
         )
     spectrum_axis.set_ylabel("Eclipse depth (ppm)")
-    spectrum_axis.set_title("WASP-69b cloud-free one-region fit (exploratory early stop)")
+    spectrum_axis.set_title("WASP-69b cloud-free one-region fit")
     spectrum_axis.legend(fontsize=8, ncol=3)
     spectrum_axis.text(
         0.02,
@@ -148,8 +150,9 @@ def _plot_corner(samples: np.ndarray, weights: np.ndarray, output: Path) -> None
         plot_contours=False,
         color="#20639b",
     )
+    effective_sample_size = 1.0 / np.sum(weights**2)
     figure.suptitle(
-        "WASP-69b ROBERT posterior — exploratory; weighted ESS = 2.45",
+        f"WASP-69b ROBERT posterior — weighted ESS = {effective_sample_size:.3g}",
         y=1.01,
         fontsize=13,
     )
@@ -211,7 +214,10 @@ def _plot_composition_and_temperature(
     chemistry_axis.set_ylabel("Pressure (bar)")
     chemistry_axis.set_title("Equilibrium chemistry profiles")
     chemistry_axis.legend(fontsize=8, ncol=2)
-    figure.suptitle("Exploratory weighted profiles (ESS = 2.45)")
+    effective_sample_size = 1.0 / np.sum(weights**2)
+    figure.suptitle(
+        f"Weighted atmospheric profiles (ESS = {effective_sample_size:.3g})"
+    )
     figure.tight_layout()
     figure.savefig(output / "comparison_atmosphere_profiles.png", dpi=200)
     plt.close(figure)
@@ -261,45 +267,6 @@ def _plot_paper_parameters(
     plt.close(figure)
 
 
-def _plot_convergence(debug_path: Path, output: Path) -> None:
-    pattern = re.compile(
-        r"iteration=(?P<iteration>\d+), ncalls=(?P<ncall>\d+).*?"
-        r"logz=(?P<logz>[-+0-9.eE]+).*?Lmin=(?P<lmin>[-+0-9.eE]+), "
-        r"Lmax=(?P<lmax>[-+0-9.eE]+)"
-    )
-    records: dict[int, tuple[int, float, float, float]] = {}
-    for line in debug_path.read_text(encoding="utf-8").splitlines():
-        match = pattern.search(line)
-        if match is None:
-            continue
-        iteration = int(match["iteration"])
-        try:
-            record = (
-                int(match["ncall"]),
-                float(match["logz"]),
-                float(match["lmin"]),
-                float(match["lmax"]),
-            )
-        except ValueError:
-            continue
-        records.setdefault(iteration, record)
-    ordered = [records[key] for key in sorted(records)]
-    values = np.asarray(ordered, dtype=float)
-    tail = values[(values[:, 0] >= 10_000) & (values[:, 1] >= 1_800)]
-    figure, axis = plt.subplots(figsize=(10, 5))
-    axis.plot(tail[:, 0], tail[:, 1], label="accumulated logZ", linewidth=1.5)
-    axis.plot(tail[:, 0], tail[:, 2], label="minimum live logL", linewidth=1.2)
-    axis.plot(tail[:, 0], tail[:, 3], label="best live logL", linewidth=1.2)
-    axis.axvline(20049, color="0.3", linestyle="--", linewidth=0.8)
-    axis.set_xlabel("Likelihood evaluations")
-    axis.set_ylabel("Log value")
-    axis.set_title("UltraNest exploration history (high-likelihood tail)")
-    axis.legend(fontsize=8)
-    figure.tight_layout()
-    figure.savefig(output / "comparison_convergence.png", dpi=200)
-    plt.close(figure)
-
-
 def _write_comparison(
     summary: dict[str, object],
     weights: np.ndarray,
@@ -309,7 +276,7 @@ def _write_comparison(
     effective_sample_size = float(1.0 / np.sum(weights**2))
     comparison = {
         "schema_version": 1,
-        "run_classification": "exploratory_forced_early_stop",
+        "run_classification": "existing_retrieval_product",
         "posterior_effective_sample_size": effective_sample_size,
         "maximum_posterior_weight": float(np.max(weights)),
         "robert": {
@@ -332,8 +299,8 @@ def _write_comparison(
             "spectrum": "near-full published native spectrum; six overlap-average bins excluded",
             "temperature_profile": "ROBERT PG14 analytic versus published interpolated EGP RCE grid",
             "opacities_and_rt": "ROBERT ExoMol/petitRADTRANS correlated-k versus CHIMERA",
-            "evidence": "not comparable because likelihood/model definitions differ and ROBERT was force-stopped",
-            "posterior_warning": "ESS is too small for production credible intervals",
+            "evidence": "not comparable because likelihood and model definitions differ",
+            "posterior_warning": "check the effective sample size before scientific interpretation",
         },
     }
     (output / "published_comparison.json").write_text(
@@ -352,7 +319,6 @@ def main() -> None:
     _plot_corner(samples, weights, args.output)
     _plot_composition_and_temperature(problem, samples, weights, args.output)
     _plot_paper_parameters(samples, weights, summary, args.output)
-    _plot_convergence(args.output / "ultranest" / "debug.log", args.output)
     _write_comparison(summary, weights, args.output)
     print(f"Wrote WASP-69b comparison products to {args.output}")
 

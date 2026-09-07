@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -42,6 +44,35 @@ def test_assemble_gas_optical_depth_uses_hydrostatic_column_and_cm2_conversion()
     np.testing.assert_allclose(gas_tau.species_tau[0], expected_tau)
     np.testing.assert_allclose(gas_tau.total_tau, expected_tau)
     assert gas_tau.metadata["column_model"] == "hydrostatic_plane_parallel"
+
+
+def test_gas_optical_depth_copies_and_freezes_metadata() -> None:
+    pressure_grid = _pressure_grid()
+    spectral_grid = SpectralGrid.from_array([1000.0], unit="cm^-1", role="opacity")
+    atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=np.array([900.0, 1200.0]),
+        composition={"H2O": np.array([1.0e-3, 1.0e-3])},
+        mean_molecular_weight=2.3,
+    )
+    base = assemble_gas_optical_depth(
+        atmosphere,
+        _evaluated_opacity(
+            pressure_grid,
+            spectral_grid,
+            ("H2O",),
+            np.ones((1, 2, 1, 2)) * 1.0e-24,
+        ),
+        gravity_m_s2=10.0,
+    )
+    metadata = {"gas_combination": "sum_by_g", "marker": "before"}
+    gas_tau = replace(base, metadata=metadata)
+
+    metadata["marker"] = "after"
+
+    assert gas_tau.metadata["marker"] == "before"
+    with pytest.raises(TypeError):
+        gas_tau.metadata["marker"] = "changed"
 
 
 def test_assemble_gas_optical_depth_sums_multiple_species() -> None:

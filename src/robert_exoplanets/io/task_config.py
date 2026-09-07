@@ -68,6 +68,7 @@ class DatasetNuisanceConfig(ConfigModel):
 class ObservationsConfig(ConfigModel):
     loader: Literal[
         "robert_npz",
+        "august2023_wasp77ab",
         "bello_arufe2025_l9859b",
         "schlawin2024_wasp69b",
         "wiser2025_wasp80b",
@@ -458,7 +459,7 @@ class OpacityBinningConfig(ConfigModel):
 class OpacityConfig(ConfigModel):
     format: Literal["exomol_kta", "exomol_cross_section_hdf"]
     path: Path
-    resolution: str = Field(pattern=r"^R[1-9][0-9]*$")
+    resolution: str = Field(default="R1000", pattern=r"^R[1-9][0-9]*$")
     species: tuple[str, ...] = Field(min_length=1)
     cache_directory: Path
     binning: OpacityBinningConfig = OpacityBinningConfig()
@@ -527,21 +528,18 @@ class LikelihoodConfig(ConfigModel):
 
 class SamplerConfig(ConfigModel):
     engine: Literal[
-        "ultranest",
         "multinest",
         "optimal_estimation",
-        "optimal_estimation_to_ultranest",
         "optimal_estimation_to_multinest",
     ] = "multinest"
     live_points: PositiveInt = 400
-    max_calls: PositiveInt | None = None
     multinest_max_iterations: NonNegativeInt = 0
     dlogz: PositiveFloat = 0.5
     sampling_efficiency: float = Field(default=0.8, gt=0.0, le=1.0)
     importance_nested_sampling: bool = True
     multimodal: bool = True
     iterations_before_update: PositiveInt = 100
-    resume: Literal["resume", "resume-similar", "overwrite", "subfolder"] = "resume"
+    resume: Literal["resume", "overwrite"] = "resume"
     show_status: bool = True
     seed: int | None = Field(default=None, ge=0)
     invalid_loglike_floor: float = Field(default=-1.0e100, lt=0.0)
@@ -597,14 +595,14 @@ class LeaveOneOutConfig(ConfigModel):
 class PlottingConfig(ConfigModel):
     """Optional automatic and manual post-processing controls."""
 
-    enabled: bool = False
+    enabled: bool = True
     retrieval: bool = True
-    forward: bool = True
+    forward: bool = False
     style: str = Field(default="default", min_length=1)
     image_format: Literal["png", "pdf", "svg"] = "png"
     dpi: PositiveInt = 180
     max_posterior_samples: PositiveInt = 20_000
-    posterior_predictive_samples: PositiveInt = 200
+    posterior_predictive_samples: PositiveInt = 100
     posterior_predictive_seed: NonNegativeInt = 0
     corner_max_parameters: PositiveInt = 20
     dataset_colors: dict[str, str] = Field(default_factory=dict)
@@ -630,7 +628,7 @@ class RuntimeConfig(ConfigModel):
     scratch_directory: Path
 
 
-class HousekeepingConfig(ConfigModel):
+class TaskPathsConfig(ConfigModel):
     """Machine- and project-specific paths kept in one visible YAML block."""
 
     project_directory: Path | None = None
@@ -647,7 +645,7 @@ class TaskConfig(ConfigModel):
     """Complete schema-versioned retrieval/forward-model configuration."""
 
     schema_version: Literal[2]
-    paths: HousekeepingConfig | None = None
+    paths: TaskPathsConfig | None = None
     run: RunConfig
     bodies: BodiesConfig
     observations: ObservationsConfig
@@ -662,14 +660,9 @@ class TaskConfig(ConfigModel):
     outputs: OutputsConfig
     plotting: PlottingConfig = PlottingConfig()
     runtime: RuntimeConfig
-    # Legacy name retained so existing configurations continue to load. New
-    # YAML should use the top-level ``paths`` block.
-    housekeeping: HousekeepingConfig | None = None
 
     @model_validator(mode="after")
     def validate_cross_references(self) -> "TaskConfig":
-        if self.paths is not None and self.housekeeping is not None:
-            raise ValueError("configure paths or legacy housekeeping, not both")
         opacity = self.opacity.species
         if len(set(opacity)) != len(opacity):
             raise ValueError("opacity.species contains duplicates")
@@ -980,14 +973,6 @@ def load_task_config(path: str | Path) -> TaskConfig:
         ("paths", "output_directory"),
         ("paths", "scratch_directory"),
         ("paths", "optical_constants_directory"),
-        ("housekeeping", "project_directory"),
-        ("housekeeping", "observations_directory"),
-        ("housekeeping", "fastchem_directory"),
-        ("housekeeping", "k_table_directory"),
-        ("housekeeping", "opacity_cache_directory"),
-        ("housekeeping", "output_directory"),
-        ("housekeeping", "scratch_directory"),
-        ("housekeeping", "optical_constants_directory"),
         ("outputs", "directory"),
         ("runtime", "scratch_directory"),
     ):
@@ -1018,9 +1003,7 @@ def _expanded_path(value: object) -> Path:
 def _apply_configured_paths(raw: dict) -> None:
     """Fill component paths and local writable defaults from the top path block."""
 
-    if raw.get("paths") is not None and raw.get("housekeeping") is not None:
-        raise ValueError("configure paths or legacy housekeeping, not both")
-    path_config = raw.get("paths", raw.get("housekeeping", {}))
+    path_config = raw.get("paths", {})
     if path_config is None:
         path_config = {}
     if not isinstance(path_config, dict):
@@ -1036,8 +1019,6 @@ def _apply_configured_paths(raw: dict) -> None:
             path_config[key] = value
     if raw.get("paths") is not None:
         raw["paths"] = path_config
-    elif raw.get("housekeeping") is not None:
-        raw["housekeeping"] = path_config
     mappings = (
         (("observations", "path"), "observations_directory"),
         (("opacity", "path"), "k_table_directory"),

@@ -8,8 +8,15 @@ import pytest
 
 from robert_exoplanets import (
     CenteredLogRatioPrior,
+    CorrelatedGaussianLikelihood,
+    GaussianLikelihood,
     LogUniformPrior,
+    MixedMultiDatasetLikelihood,
+    MultiDatasetRetrievalProblem,
     Observation,
+    ObservationCollection,
+    ObservationDataset,
+    PolynomialContinuumLikelihood,
     RetrievalParameter,
     RetrievalParameterSet,
     RetrievalProblem,
@@ -21,13 +28,8 @@ from robert_exoplanets import (
     run_retrieval,
     save_observation_npz,
 )
-from robert_exoplanets.core import RobertDataError
-from robert_exoplanets.retrieval.manifest import build_run_manifest
-from robert_exoplanets.retrieval.results import build_retrieval_result
-from robert_exoplanets.retrieval.samplers.ultranest import (
-    _result_from_ultranest,
-    _validate_mpi_world_size,
-)
+from robert_exoplanets.core import RobertConfigError, RobertDataError
+
 
 
 def test_self_describing_npz_preserves_transit_depth_semantics(tmp_path) -> None:
@@ -198,6 +200,134 @@ def test_retrieval_problem_loglike_and_oe_recover_linear_model(tmp_path) -> None
     np.testing.assert_allclose(result.covariance, result.covariance.T, rtol=0.0, atol=0.0)
 
 
+def test_optimal_estimation_rejects_correlated_single_dataset_likelihood() -> None:
+    observation = _oe_observation([1.0, 2.0])
+    problem = _single_oe_problem(
+        observation,
+        CorrelatedGaussianLikelihood([[1.0, 0.2], [0.2, 1.0]]),
+    )
+
+    with pytest.raises(RobertConfigError, match="supported independent Gaussian"):
+        run_optimal_estimation(problem)
+
+
+def test_optimal_estimation_rejects_correlated_child_in_mixed_multi_dataset_problem() -> None:
+    problem = _mixed_oe_problem(
+        MixedMultiDatasetLikelihood(
+            {
+                "independent": GaussianLikelihood(
+                    offset_parameter=None,
+                    jitter_parameter=None,
+                ),
+                "second": CorrelatedGaussianLikelihood(
+                    [[1.0, 0.2], [0.2, 1.0]]
+                ),
+            }
+        )
+    )
+
+    with pytest.raises(RobertConfigError, match="supported independent Gaussian"):
+        run_optimal_estimation(problem)
+
+
+def test_optimal_estimation_rejects_profiled_likelihood() -> None:
+    observation = _oe_observation([1.0, 2.0, 3.0])
+    problem = _single_oe_problem(
+        observation,
+        PolynomialContinuumLikelihood(degree=0).prepare(observation),
+    )
+
+    with pytest.raises(RobertConfigError, match="supported independent Gaussian"):
+        run_optimal_estimation(problem)
+
+
+def test_optimal_estimation_accepts_mixed_all_gaussian_likelihood() -> None:
+    problem = _mixed_oe_problem(
+        MixedMultiDatasetLikelihood(
+            {
+                "independent": GaussianLikelihood(
+                    offset_parameter=None,
+                    jitter_parameter=None,
+                ),
+                "second": GaussianLikelihood(
+                    offset_parameter=None,
+                    jitter_parameter=None,
+                ),
+            }
+        ),
+        flux=1.25,
+    )
+
+    result = run_optimal_estimation(problem, max_iterations=6)
+
+    assert result.converged
+    assert result.best_fit_parameters["baseline"] == pytest.approx(1.25, abs=1.0e-3)
+
+
+def _oe_observation(wavelength: list[float], *, flux: float = 1.0) -> Observation:
+    return Observation.from_arrays(
+        wavelength=wavelength,
+        flux=np.full(len(wavelength), flux),
+        uncertainty=np.full(len(wavelength), 0.1),
+    )
+
+
+def _single_oe_problem(observation: Observation, likelihood: object) -> RetrievalProblem:
+    parameters = RetrievalParameterSet(
+        (RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),)
+    )
+    return RetrievalProblem(
+        name="oe-likelihood-contract-test",
+        observation=observation,
+        parameters=parameters,
+        forward_model=lambda p: _constant_spectrum(observation, p["baseline"]),
+        likelihood=likelihood,
+    )
+
+
+def _mixed_oe_problem(
+    likelihood: MixedMultiDatasetLikelihood,
+    *,
+    flux: float = 1.0,
+) -> MultiDatasetRetrievalProblem:
+    independent_observation = _oe_observation([1.0, 2.0], flux=flux)
+    second_observation = _oe_observation([3.0, 4.0], flux=flux)
+    observations = ObservationCollection(
+        (
+            ObservationDataset("independent", independent_observation),
+            ObservationDataset("second", second_observation),
+        )
+    )
+    parameters = RetrievalParameterSet(
+        (RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),)
+    )
+
+    def forward(parameter_values: dict[str, float]) -> dict[str, Spectrum]:
+        baseline = parameter_values["baseline"]
+        return {
+            "independent": _constant_spectrum(independent_observation, baseline),
+            "second": _constant_spectrum(second_observation, baseline),
+        }
+
+    return MultiDatasetRetrievalProblem(
+        name="mixed-oe-likelihood-contract-test",
+        observations=observations,
+        parameters=parameters,
+        forward_model=forward,
+        likelihood=likelihood,
+    )
+
+
+def _constant_spectrum(observation: Observation, value: float) -> Spectrum:
+    return Spectrum.from_arrays(
+        observation.wavelength,
+        np.full(observation.n_points, value),
+        unit=observation.flux_unit,
+        observable=observation.observable,
+        wavelength_unit=observation.wavelength_unit,
+    )
+
+
 def test_optimal_estimation_honors_observation_mask(tmp_path) -> None:
     observation = load_observation_npz_from_arrays()
     observation = type(observation).from_arrays(
@@ -260,7 +390,7 @@ def test_run_retrieval_writes_manifest_and_unified_result(tmp_path) -> None:
     assert summary["metadata"]["config_hash"] == manifest["config_hash"]
 
 
-def test_run_retrieval_dispatch_rejects_missing_ultranest_output_dir() -> None:
+def test_run_retrieval_dispatch_rejects_missing_multinest_output_dir() -> None:
     observation = load_observation_npz_from_arrays()
     parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
     problem = RetrievalProblem(
@@ -277,74 +407,10 @@ def test_run_retrieval_dispatch_rejects_missing_ultranest_output_dir() -> None:
     )
 
     with pytest.raises(ValueError, match="output_dir"):
-        run_retrieval(problem, method="ultranest")
-
-
-def test_ultranest_result_adapter_extracts_best_fit() -> None:
-    observation = load_observation_npz_from_arrays()
-    parameters = RetrievalParameterSet((RetrievalParameter("baseline", UniformPrior(0.0, 2.0)),))
-    problem = RetrievalProblem(
-        name="adapter-test",
-        observation=observation,
-        parameters=parameters,
-        forward_model=lambda p: Spectrum.from_arrays(
-            observation.wavelength,
-            np.full(observation.n_points, p["baseline"]),
-            unit=observation.flux_unit,
-            observable=observation.observable,
-            wavelength_unit=observation.wavelength_unit,
-        ),
-    )
-    raw_result = {
-        "weighted_samples": {
-            "points": np.array([[0.8], [1.0], [1.2]]),
-            "weights": np.array([0.2, 0.6, 0.2]),
-            "logl": np.array([-2.0, 0.0, -1.0]),
-        },
-        "logz": 10.0,
-        "logzerr": 0.1,
-        "ncall": 500,
-        "maximum_likelihood": {"point": np.array([1.0]), "logl": 0.0},
-    }
-
-    result = _result_from_ultranest(problem, raw_result, log_dir=tmp_path_like(), mpi_nprocs=3)
-
-    assert result.method == "ultranest"
-    assert result.log_evidence == pytest.approx(10.0)
-    assert result.best_fit_parameters == {"baseline": 1.0}
-    assert result.metadata["mpi_nprocs"] == "3"
-    assert result.metadata["ncall"] == "500"
-
-    manifest = build_run_manifest(
-        problem,
-        method="ultranest",
-        settings={"min_num_live_points": 40},
-        random_seed=42,
-    )
-    stable_result = build_retrieval_result(result, manifest=manifest, output_dir=tmp_path_like())
-
-    assert stable_result.metadata["mpi_nprocs"] == "3"
-    assert stable_result.metadata["ncall"] == "500"
-
-
-def test_ultranest_rejects_requested_mpi_size_that_is_not_present() -> None:
-    from robert_exoplanets.core import RobertConfigError
-
-    with pytest.raises(RobertConfigError, match="MPI communicator size mismatch"):
-        _validate_mpi_world_size(2)
-
-
-def test_ultranest_accepts_the_actual_single_process_communicator() -> None:
-    _validate_mpi_world_size(1)
+        run_retrieval(problem, method="multinest")
 
 
 def load_observation_npz_from_arrays():
     from robert_exoplanets.instruments import Observation
 
     return Observation.from_arrays(wavelength=[1.0, 2.0], flux=[1.0, 1.0], uncertainty=[0.1, 0.1])
-
-
-def tmp_path_like():
-    from pathlib import Path
-
-    return Path("/tmp/ultranest-test")

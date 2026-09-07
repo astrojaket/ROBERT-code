@@ -14,6 +14,10 @@ from robert_exoplanets.core._immutability import immutable_mapping
 
 from .manifest import RunManifest
 from .optimal_estimation import OptimalEstimationResult
+from .predictions import (
+    BestFitPredictionArtifact,
+    write_best_fit_prediction,
+)
 from .samplers import NestedSamplerResult
 
 RETRIEVAL_RESULT_SCHEMA_VERSION = "1.0"
@@ -54,12 +58,6 @@ class RetrievalResult:
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
 
     @property
-    def log_likelihood(self):
-        """Compatibility view of method-specific log-likelihood output."""
-
-        return self.inference_result.log_likelihood
-
-    @property
     def manifest_path(self) -> Path:
         return self.output_dir / "manifest.json"
 
@@ -79,8 +77,18 @@ class RetrievalResult:
             return self.inference_result.log_evidence_error
         return None
 
-    def to_mapping(self) -> dict[str, object]:
-        """Return the portable JSON summary for this result."""
+    def to_mapping(
+        self,
+        *,
+        prediction_artifact: BestFitPredictionArtifact | None = None,
+    ) -> dict[str, object]:
+        """Return the portable JSON summary for this result.
+
+        ``prediction_artifact`` is optional because a sampler result remains
+        valid when its forward output does not expose a safe one-dimensional
+        spectrum (for example, a prepared HRS cube).  The summary always
+        records whether the optional product was requested.
+        """
 
         result: dict[str, object] = {
             "schema_version": self.schema_version,
@@ -98,6 +106,11 @@ class RetrievalResult:
             "manifest": self.manifest_path.name,
             "arrays": RETRIEVAL_ARRAYS_FILENAME,
             "metadata": dict(self.metadata),
+            "best_fit_prediction": (
+                {"status": "not_requested"}
+                if prediction_artifact is None
+                else prediction_artifact.reference_mapping()
+            ),
         }
         if isinstance(self.inference_result, OptimalEstimationResult):
             result.update(
@@ -157,8 +170,17 @@ def build_retrieval_result(
     )
 
 
-def write_retrieval_result(result: RetrievalResult) -> tuple[Path, Path]:
-    """Write JSON summary and method-specific numerical arrays."""
+def write_retrieval_result(
+    result: RetrievalResult,
+    *,
+    prediction_artifact: BestFitPredictionArtifact | None = None,
+) -> tuple[Path, Path]:
+    """Write the result and an optional portable best-fit prediction.
+
+    The optional artifact is written before the result summary.  The summary
+    then points to the artifact's JSON/NPZ pair and records its available or
+    unavailable status.
+    """
 
     result.output_dir.mkdir(parents=True, exist_ok=True)
     result_path = result.result_path
@@ -178,8 +200,19 @@ def write_retrieval_result(result: RetrievalResult) -> tuple[Path, Path]:
             arrays["weights"] = result.inference_result.weights
     try:
         np.savez(arrays_path, **arrays)
+        if prediction_artifact is not None:
+            write_best_fit_prediction(
+                prediction_artifact,
+                result.output_dir,
+                overwrite=True,
+            )
         result_path.write_text(
-            json.dumps(result.to_mapping(), indent=2, sort_keys=True, allow_nan=False),
+            json.dumps(
+                result.to_mapping(prediction_artifact=prediction_artifact),
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            ),
             encoding="utf-8",
         )
     except OSError as exc:

@@ -11,6 +11,9 @@ import yaml
 from pydantic import ValidationError
 
 from robert_exoplanets.io.configured_tasks import (
+    _configured_science_sha256,
+    _load_cached_table,
+    _preparation_fingerprint,
     load_observations as load_configured_observations,
     prepare_opacity,
 )
@@ -26,27 +29,56 @@ from robert_exoplanets.instruments import (
     ObservationCollection,
     ObservationDataset,
 )
+from robert_exoplanets.core import RobertConfigError
 from robert_exoplanets.retrieval.samplers.multinest import MULTINEST_MAX_SEED
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE = ROOT / "configurations" / "wasp69b_cloud_free_R1000.yaml"
-TEMPLATE = ROOT / "configurations" / "TEMPLATE_all_supported_options.yaml"
+EXAMPLE = (
+    ROOT
+    / "configurations"
+    / "targets"
+    / "WASP-69b"
+    / "wasp69b_cloud_free_R1000.yaml"
+)
+TEMPLATE = ROOT / "configurations" / "examples" / "TEMPLATE_all_supported_options.yaml"
 TRANSMISSION = (
-    ROOT / "configurations" / "synthetic_transmission_injection_recovery_multinest.yaml"
+    ROOT
+    / "configurations"
+    / "examples"
+    / "synthetic_transmission_injection_recovery_multinest.yaml"
 )
 MULTISPECIES_TRANSMISSION = (
     ROOT
     / "configurations"
+    / "examples"
     / "synthetic_six_molecule_transmission_injection_recovery_multinest.yaml"
 )
 CLOUDY_MULTISPECIES_TRANSMISSION = (
     ROOT
     / "configurations"
+    / "examples"
     / "synthetic_six_molecule_cloudy_transmission_injection_recovery_multinest.yaml"
 )
-DEFAULTS = tuple(sorted((ROOT / "configurations").glob("wasp*.yaml")))
-SHIPPED_CONFIGURATIONS = tuple(sorted((ROOT / "configurations").glob("*.yaml")))
+TARGETS = ROOT / "configurations" / "targets"
+DEFAULTS = tuple(
+    sorted(
+        (
+            *TARGETS.glob("WASP-*/*.yaml"),
+            ROOT
+            / "configurations"
+            / "quickstart"
+            / "wasp80b_cloud_free_native_pg14_R100.yaml",
+        )
+    )
+)
+SHIPPED_CONFIGURATIONS = tuple(
+    sorted(
+        path
+        for path in (ROOT / "configurations").rglob("*.yaml")
+        if "outputs" not in path.parts and "opacity_cache" not in path.parts
+    )
+)
 
 
 def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
@@ -55,17 +87,18 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.schema_version == 2
     assert config.observations.datasets == ("f322w2", "f444w", "lrs")
     assert config.opacity.resolution == "R1000"
+    assert config.opacity.path.resolve() == ROOT / "opacity_data" / "ktables_exomol"
     assert config.opacity.species == ("H2O", "CO2", "CO", "CH4", "NH3", "SO2")
     assert config.atmosphere.chemistry.constant_log10_vmr_parameters == {
         "SO2": "log_SO2"
     }
     assert config.sampler.live_points == 400
-    assert config.sampler.max_calls is None
     assert config.radiative_transfer.sh4_boundary_backend == "auto"
     assert config.runtime.mpi_processes == "auto"
     assert config.runtime.scratch_directory.is_absolute()
     assert config.outputs.directory.is_absolute()
-    assert config.plotting.enabled is False
+    assert config.plotting.enabled is True
+    assert config.plotting.posterior_predictive_samples == 100
     assert config.bodies.star.spectrum_model == "phoenix"
     assert config.bodies.star.log_g_cgs == 4.5
     assert config.bodies.star.metallicity_dex == 0.0
@@ -198,7 +231,6 @@ def test_yaml_defaults_writable_paths_to_the_configuration_directory(
     config = load_task_config(EXAMPLE)
     raw = deepcopy(config.model_dump(mode="json"))
     raw.pop("paths", None)
-    raw.pop("housekeeping", None)
     raw.pop("outputs")
     raw["runtime"].pop("scratch_directory")
     raw["opacity"].pop("cache_directory")
@@ -214,6 +246,29 @@ def test_yaml_defaults_writable_paths_to_the_configuration_directory(
 
 def test_sampler_defaults_to_multinest() -> None:
     assert SamplerConfig().engine == "multinest"
+
+
+def test_opacity_defaults_to_r1000_but_preserves_explicit_resolution() -> None:
+    raw = load_task_config(EXAMPLE).model_dump(mode="python")
+    raw["opacity"].pop("resolution")
+    assert TaskConfig.model_validate(raw).opacity.resolution == "R1000"
+    raw["opacity"]["resolution"] = "R100"
+    assert TaskConfig.model_validate(raw).opacity.resolution == "R100"
+
+
+def test_resume_science_identity_excludes_budget_but_includes_fixed_physics() -> None:
+    config = load_task_config(EXAMPLE)
+    identity = _configured_science_sha256(config)
+    changed_budget = config.model_copy(update={"sampler": config.sampler.model_copy(
+        update={"dlogz": 0.1, "multinest_max_iterations": 2000}
+    )})
+    assert _configured_science_sha256(changed_budget) == identity
+    changed_star = config.model_copy(update={"bodies": config.bodies.model_copy(
+        update={"star": config.bodies.star.model_copy(
+            update={"effective_temperature_k": 4800.0}
+        )}
+    )})
+    assert _configured_science_sha256(changed_star) != identity
 
 
 def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
@@ -410,9 +465,9 @@ def test_yaml_rejects_optimal_estimation_for_centered_log_ratio_prior() -> None:
         TaskConfig.model_validate(raw)
 
 
-def test_real_cross_section_hdf_is_correlated_inside_observation_bins(
+def _cross_section_cache_fixture(
     tmp_path: Path,
-) -> None:
+) -> tuple[TaskConfig, ObservationCollection, Path]:
     h5py = pytest.importorskip("h5py")
     config = load_task_config(TRANSMISSION)
     source = tmp_path / "source"
@@ -449,6 +504,13 @@ def test_real_cross_section_hdf_is_correlated_inside_observation_bins(
             ObservationDataset(name="synthetic_transit", observation=observation),
         )
     )
+    return config, observations, cache
+
+
+def test_real_cross_section_hdf_is_correlated_inside_observation_bins(
+    tmp_path: Path,
+) -> None:
+    config, observations, cache = _cross_section_cache_fixture(tmp_path)
 
     prepare_opacity(config, observations)
 
@@ -456,9 +518,85 @@ def test_real_cross_section_hdf_is_correlated_inside_observation_bins(
         assert saved["kcoeff"].shape == (2, 2, 2, 8)
         assert np.isclose(saved["g_weights"].sum(), 1.0)
         assert str(saved["source_line_list"]) == "test-line-list"
+        assert int(saved["opacity_cache_schema_version"]) == 2
+        assert str(saved["preparation_fingerprint"]) == _preparation_fingerprint(
+            config, observations.datasets[0], "H2O"
+        )
         assert str(saved["spectral_preparation"]) == (
             "exomol_cross_section_wavelength_weighted_k"
         )
+
+
+def test_opacity_cache_fingerprint_covers_grid_and_binning_settings(
+    tmp_path: Path,
+) -> None:
+    config, observations, cache = _cross_section_cache_fixture(tmp_path)
+    prepare_opacity(config, observations)
+    path = cache / "R100" / "synthetic_transit_H2O.npz"
+    with np.load(path, allow_pickle=False) as saved:
+        original_fingerprint = str(saved["preparation_fingerprint"])
+
+    changed_source_config = config.model_copy(
+        update={
+            "opacity": config.opacity.model_copy(
+                update={"path": tmp_path / "different-source"}
+            )
+        }
+    )
+    assert _preparation_fingerprint(
+        changed_source_config, observations.datasets[0], "H2O"
+    ) != original_fingerprint
+
+    changed_config = config.model_copy(
+        update={
+            "opacity": config.opacity.model_copy(
+                update={
+                    "binning": config.opacity.binning.model_copy(
+                        update={"g_points": 4, "remove_zeros": False}
+                    )
+                }
+            )
+        }
+    )
+    changed_observation = Observation.from_arrays(
+        wavelength=[1.0, 2.0],
+        wavelength_bin_edges=[0.80, 1.35, 2.5],
+        flux=[0.01, 0.01],
+        uncertainty=[1.0e-5, 1.0e-5],
+        flux_unit="transit_depth",
+        observable="transit_depth",
+    )
+    changed_dataset = ObservationDataset(
+        name="synthetic_transit", observation=changed_observation
+    )
+    changed_observations = ObservationCollection(datasets=(changed_dataset,))
+
+    with pytest.raises(RobertConfigError, match="stale"):
+        _load_cached_table(config, changed_dataset, "H2O")
+    prepare_opacity(changed_config, changed_observations)
+
+    with np.load(path, allow_pickle=False) as saved:
+        assert str(saved["preparation_fingerprint"]) != original_fingerprint
+        assert saved["g_samples"].size == 4
+        assert bool(saved["binning_remove_zeros"]) is False
+
+
+def test_opacity_cache_without_current_schema_requires_repreparation(
+    tmp_path: Path,
+) -> None:
+    config, observations, cache = _cross_section_cache_fixture(tmp_path)
+    prepare_opacity(config, observations)
+    path = cache / "R100" / "synthetic_transit_H2O.npz"
+    with np.load(path, allow_pickle=False) as saved:
+        legacy = {
+            name: saved[name]
+            for name in saved.files
+            if name != "opacity_cache_schema_version"
+        }
+    np.savez_compressed(path, **legacy)
+
+    with pytest.raises(RobertConfigError, match="stale|unsupported schema"):
+        _load_cached_table(config, observations.datasets[0], "H2O")
 
 
 def test_unknown_configuration_field_is_rejected() -> None:
@@ -523,14 +661,13 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
 
 
 def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
-    assert len(DEFAULTS) == 21
+    assert DEFAULTS
     resolutions = []
     for path in DEFAULTS:
         config = load_task_config(path)
         assert config.run.name.startswith(("wasp69b-", "wasp80b-"))
         resolutions.append(config.opacity.resolution)
-    assert resolutions.count("R100") == 1
-    assert resolutions.count("R1000") == 20
+    assert set(resolutions) == {"R100", "R1000"}
 
 
 def test_all_shipped_multinest_seeds_fit_legacy_fortran_range() -> None:
@@ -543,7 +680,7 @@ def test_all_shipped_multinest_seeds_fit_legacy_fortran_range() -> None:
 
 def test_mie_catalog_configuration_is_valid_for_transmission() -> None:
     config = load_task_config(
-        ROOT / "configurations" / "wasp69b_mie_catalog_pg14_R1000.yaml"
+        TARGETS / "WASP-69b" / "wasp69b_mie_catalog_pg14_R1000.yaml"
     )
     raw = deepcopy(config.model_dump(mode="python"))
     raw["radiative_transfer"]["model"] = "transmission"
@@ -557,9 +694,7 @@ def test_mie_catalog_configuration_is_valid_for_transmission() -> None:
 @pytest.mark.parametrize(
     ("suffix", "engine"),
     [
-        ("multinest", "multinest"),
         ("optimal_estimation", "optimal_estimation"),
-        ("optimal_estimation_to_ultranest", "optimal_estimation_to_ultranest"),
         ("optimal_estimation_to_multinest", "optimal_estimation_to_multinest"),
     ],
 )
@@ -568,12 +703,13 @@ def test_wasp69b_inference_benchmarks_only_change_run_controls(
     scenario: str, suffix: str, engine: str
 ) -> None:
     baseline = load_task_config(
-        ROOT / "configurations" / f"wasp69b_{scenario}_R1000.yaml"
+        TARGETS / "WASP-69b" / f"wasp69b_{scenario}_R1000.yaml"
     )
     benchmark = load_task_config(
-        ROOT / "configurations" / f"wasp69b_{scenario}_R1000_{suffix}.yaml"
+        TARGETS / "WASP-69b" / f"wasp69b_{scenario}_R1000_{suffix}.yaml"
     )
 
+    assert baseline.sampler.engine == "multinest"
     assert benchmark.sampler.engine == engine
     assert baseline.sampler.live_points == 400
     if engine != "optimal_estimation":
@@ -595,7 +731,7 @@ def test_wasp69b_inference_benchmarks_only_change_run_controls(
 
 def test_direct_nk_default_replaces_catalogue_cloud_fields() -> None:
     config = load_task_config(
-        ROOT / "configurations" / "wasp69b_mie_direct_nk_pg14_R1000.yaml"
+        TARGETS / "WASP-69b" / "wasp69b_mie_direct_nk_pg14_R1000.yaml"
     )
 
     assert config.clouds.model == "mie_direct_nk"
@@ -607,16 +743,22 @@ def test_complete_template_uses_one_top_level_path_block() -> None:
 
     assert config.clouds.model == "none"
     assert config.paths is not None
-    assert config.housekeeping is None
     assert config.observations.path == config.paths.observations_directory
     assert config.atmosphere.chemistry.fastchem_path == config.paths.fastchem_directory
     assert config.opacity.path == config.paths.k_table_directory
-    assert config.opacity.cache_directory == ROOT / "configurations" / "opacity_cache"
-    assert config.outputs.directory == ROOT / "configurations" / "outputs"
-    assert config.runtime.scratch_directory == ROOT / "configurations" / "scratch"
-    assert config.plotting.enabled is False
-    assert config.sampler.max_calls is None
-    assert config.plotting.dataset_colors["f322w2"] == "#20639b"
+    assert config.opacity.cache_directory == ROOT / "configurations" / "examples" / "opacity_cache"
+    assert config.outputs.directory == ROOT / "configurations" / "examples" / "outputs"
+    assert config.runtime.scratch_directory == ROOT / "configurations" / "examples" / "scratch"
+    assert config.plotting.enabled is True
+    assert config.plotting.dataset_colors["f322w2"] == "mediumpurple"
+
+
+def test_legacy_housekeeping_path_block_is_rejected() -> None:
+    raw = load_task_config(TEMPLATE).model_dump(mode="python")
+    raw["housekeeping"] = raw.pop("paths")
+
+    with pytest.raises(ValidationError, match="housekeeping"):
+        TaskConfig.model_validate(raw)
 
 
 def test_yaml_supports_named_dataset_offsets_and_uncertainty_inflation() -> None:

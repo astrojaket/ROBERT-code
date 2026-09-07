@@ -10,11 +10,9 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
 from robert_exoplanets.core._immutability import immutable_mapping
-from robert_exoplanets.opacity import (
-    pressure_values_in_unit,
-    spectral_grid_values_in_unit,
-)
+from robert_exoplanets.opacity import pressure_values_in_unit
 
+from ._validation import _validate_contribution_grid_match
 from .optical_depth import GasOpticalDepth
 from .path_geometry import HydrostaticPathGeometry
 
@@ -233,50 +231,6 @@ def _validate_path_geometry_match(
         raise RobertValidationError(
             "path geometry pressure grid must match gas optical-depth pressure grid"
         )
-
-
-def _validate_contribution_grid_match(
-    gas_optical_depth: GasOpticalDepth,
-    contribution: object,
-) -> None:
-    if hasattr(contribution, "spectral_grid"):
-        contribution_wavelength = spectral_grid_values_in_unit(
-            getattr(contribution, "spectral_grid"),
-            "micron",
-        )
-        gas_wavelength = spectral_grid_values_in_unit(
-            gas_optical_depth.spectral_grid,
-            "micron",
-        )
-        if contribution_wavelength.shape != gas_wavelength.shape or not np.allclose(
-            contribution_wavelength,
-            gas_wavelength,
-            rtol=1.0e-12,
-            atol=0.0,
-        ):
-            raise RobertValidationError(
-                "additional optical-depth spectral grid must match gas grid"
-            )
-    if hasattr(contribution, "pressure_grid"):
-        contribution_pressure = pressure_values_in_unit(
-            getattr(contribution, "pressure_grid").centers,
-            getattr(contribution, "pressure_grid").unit,
-            "pa",
-        )
-        gas_pressure = pressure_values_in_unit(
-            gas_optical_depth.pressure_grid.centers,
-            gas_optical_depth.pressure_grid.unit,
-            "pa",
-        )
-        if contribution_pressure.shape != gas_pressure.shape or not np.allclose(
-            contribution_pressure,
-            gas_pressure,
-            rtol=1.0e-10,
-            atol=0.0,
-        ):
-            raise RobertValidationError(
-                "additional optical-depth pressure grid must match gas grid"
-            )
 
 
 def _full_shell_chord_lengths(

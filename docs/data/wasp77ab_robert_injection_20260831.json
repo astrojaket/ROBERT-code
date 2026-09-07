@@ -1,0 +1,366 @@
+{
+  "acceptance": {
+    "all_modes_finite": true,
+    "hminus_on_off_evaluated": true,
+    "posterior_recovery_claim": false,
+    "resource_gate": true,
+    "truth_preferred_to_null": true,
+    "truth_preferred_to_off_velocity": true
+  },
+  "checks": {
+    "hminus_off_model": "H-minus continuum disabled; same VMR parameters retained",
+    "hminus_on_model": "physical H-minus BF/FF from VMR composition",
+    "modes": [
+      "hrs_only",
+      "lrs_only",
+      "joint"
+    ],
+    "real_data_truth_recovery_claim": false
+  },
+  "claim": "deterministic operator-level injection/null discrimination for real WASP-77Ab HRS/LRS grids; not posterior recovery",
+  "composition_policy": {
+    "hminus_species": [
+      "H-",
+      "H",
+      "e-"
+    ],
+    "mass_fraction_parameters_in_robert": false,
+    "robert_convention": "volume_mixing_ratio",
+    "shared_atmosphere": true
+  },
+  "generative_model": {
+    "hrs_equation": "y_syn[o,t,p] = (1 + s_hrs * template_flux_ratio_scale * (Fp/Fs)[o,t,p]) * D[o,t,p] + sigma[o] * epsilon[o,t,p], where D is the prepared Smith low-rank data_scale, sigma[o] is the RMS of the prepared valid Smith data_residual in order o, epsilon is independent Normal(0,1), and s_hrs=10**log10_a_hrs=1 for the neutral injection truth",
+    "hrs_noise_calibration": {
+      "chunking": "one order at a time",
+      "distribution": "fixed-seed independent Gaussian detector noise",
+      "n_orders": 19,
+      "scale_definition": "per-order RMS of prepared Smith data_residual over valid pixels",
+      "seed": 20260832,
+      "sigma_by_order": [
+        32.690807297042085,
+        34.899573072529954,
+        35.70154854894155,
+        36.079505487114794,
+        36.144988012418466,
+        35.420918105622086,
+        36.43346255149866,
+        38.079700752244115,
+        38.9493663074706,
+        40.44942446954039,
+        40.77238672828949,
+        40.624030237718266,
+        40.20420542580484,
+        36.755718469221144,
+        35.75693347211196,
+        34.59499353852432,
+        27.371459668899337,
+        36.205727391969624,
+        27.52928157746451
+      ],
+      "sigma_sha256": "1cb926a6ccdfdf2a4326610442e485f2d430341ea5533df55f11cf193dd64e22",
+      "sigma_summary": {
+        "max": 40.77238672828949,
+        "mean": 36.03494900602243,
+        "min": 27.371459668899337,
+        "rms": 36.22162547136858
+      }
+    },
+    "hrs_noise_chunking": "one order at a time",
+    "hrs_noise_distribution": "independent Normal(0, sigma_order^2)",
+    "hrs_noise_scale_definition": "per-order RMS of prepared Smith data_residual over valid pixels",
+    "hrs_noise_seed": 20260832,
+    "lrs_equation": "y_syn[i] = y_model[i] + sigma[i] * epsilon[i], epsilon[i] ~ Normal(0,1), with fixed NumPy seed 20260831",
+    "lrs_noise_seed": 20260831,
+    "synthetic_spectra_written": false
+  },
+  "mode_results": {
+    "hrs_only": {
+      "gate_passed": true,
+      "hminus_loglike_on_minus_off": 0.0,
+      "hminus_off": {
+        "finite": true,
+        "null_loglike": -9807879.28895638,
+        "off_velocity_applicable": true,
+        "off_velocity_delta_km_s": 13.0,
+        "off_velocity_loglike": -9807830.176266208,
+        "truth_loglike": -9807787.636365842,
+        "truth_minus_null": 91.65259053744376,
+        "truth_minus_off_velocity": 42.5399003662169,
+        "truth_preferred_to_null": true,
+        "truth_preferred_to_off_velocity": true
+      },
+      "hminus_on": {
+        "finite": true,
+        "null_loglike": -9807879.28895638,
+        "off_velocity_applicable": true,
+        "off_velocity_delta_km_s": 13.0,
+        "off_velocity_loglike": -9807830.176266208,
+        "truth_loglike": -9807787.636365842,
+        "truth_minus_null": 91.65259053744376,
+        "truth_minus_off_velocity": 42.5399003662169,
+        "truth_preferred_to_null": true,
+        "truth_preferred_to_off_velocity": true
+      },
+      "hminus_on_off_finite": true
+    },
+    "joint": {
+      "gate_passed": true,
+      "hminus_loglike_on_minus_off": 0.0,
+      "hminus_off": {
+        "finite": true,
+        "null_loglike": -10069826.667813586,
+        "off_velocity_applicable": true,
+        "off_velocity_delta_km_s": 13.0,
+        "off_velocity_loglike": -9807917.72587697,
+        "truth_loglike": -9807875.185976604,
+        "truth_minus_null": 261951.48183698207,
+        "truth_minus_off_velocity": 42.5399003662169,
+        "truth_preferred_to_null": true,
+        "truth_preferred_to_off_velocity": true
+      },
+      "hminus_on": {
+        "finite": true,
+        "null_loglike": -10069826.667813586,
+        "off_velocity_applicable": true,
+        "off_velocity_delta_km_s": 13.0,
+        "off_velocity_loglike": -9807917.72587697,
+        "truth_loglike": -9807875.185976604,
+        "truth_minus_null": 261951.48183698207,
+        "truth_minus_off_velocity": 42.5399003662169,
+        "truth_preferred_to_null": true,
+        "truth_preferred_to_off_velocity": true
+      },
+      "hminus_on_off_finite": true
+    },
+    "lrs_only": {
+      "gate_passed": true,
+      "hminus_loglike_on_minus_off": -1.4210854715202004e-14,
+      "hminus_off": {
+        "finite": true,
+        "null_loglike": -261947.37885720682,
+        "off_velocity_applicable": false,
+        "off_velocity_delta_km_s": 0.0,
+        "off_velocity_loglike": -87.5496107635408,
+        "truth_loglike": -87.5496107635408,
+        "truth_minus_null": 261859.8292464433,
+        "truth_minus_off_velocity": 0.0,
+        "truth_preferred_to_null": true,
+        "truth_preferred_to_off_velocity": true
+      },
+      "hminus_on": {
+        "finite": true,
+        "null_loglike": -261947.37885720682,
+        "off_velocity_applicable": false,
+        "off_velocity_delta_km_s": 0.0,
+        "off_velocity_loglike": -87.54961076354081,
+        "truth_loglike": -87.54961076354081,
+        "truth_minus_null": 261859.8292464433,
+        "truth_minus_off_velocity": 0.0,
+        "truth_preferred_to_null": true,
+        "truth_preferred_to_off_velocity": true
+      },
+      "hminus_on_off_finite": true
+    }
+  },
+  "real_data_loaded": true,
+  "real_grids": {
+    "hrs": {
+      "fixed_velocity_sha256": "f26a3ac23dfc55ffb1f85463ee0b8242d7c8ba1247aeb768854f2a27d5f2c4cd",
+      "n_active_points": 2773848,
+      "n_frames": 79,
+      "n_orders": 19,
+      "n_pixels_per_order": 1848,
+      "order_wavelength_sha256": "2da798b1d1a4d68a1f92ab14a1b81787ae768a8edddd008efaa623e95e2217f0",
+      "phase_sha256": "16403fd0254ce204d0a1b90c0d1c64dd7db28c1cf0b8a139bda89ce49d5f8675",
+      "wavelength_max_micron": 2.449277000527045,
+      "wavelength_min_micron": 1.9479483279090593
+    },
+    "lrs": {
+      "nirspec_g395h_nrs1": {
+        "bin_edge_max_micron": 3.712,
+        "bin_edge_min_micron": 2.808,
+        "bin_edges_sha256": "8adc4168bb69ce326b9e75ca5b6ddfce08ee166747975fb19adbf5b4b01f1ef2",
+        "n_points": 70,
+        "wavelength_max_micron": 3.709,
+        "wavelength_min_micron": 2.811,
+        "wavelength_sha256": "7f6be24db2e702f6dac41212a160af2f515bfceab5bb8eab2c7cef264c8c1909"
+      },
+      "nirspec_g395h_nrs2": {
+        "bin_edge_max_micron": 5.167999999999999,
+        "bin_edge_min_micron": 3.831,
+        "bin_edges_sha256": "ec874c17b77798185b4fe4973867ba7bc4784602a44fe030a7385cf3f0d43d18",
+        "n_points": 80,
+        "wavelength_max_micron": 5.164,
+        "wavelength_min_micron": 3.835,
+        "wavelength_sha256": "459c67c31fc8ade1892a27640d109ca9cbc8b4841a536f05e72c25bc2b1d792b"
+      }
+    }
+  },
+  "record_type": "wasp77ab_robert_operator_injection_validation",
+  "resource_policy": {
+    "hard_process_memory_limit_bytes": 2147483648,
+    "max_threads": 6,
+    "mpi_processes": 1,
+    "process_memory_limit_bytes": 2040109465,
+    "thread_variables": [
+      "OMP_NUM_THREADS",
+      "OPENBLAS_NUM_THREADS",
+      "MKL_NUM_THREADS",
+      "NUMEXPR_NUM_THREADS",
+      "VECLIB_MAXIMUM_THREADS",
+      "NUMBA_NUM_THREADS",
+      "OMP_THREAD_LIMIT"
+    ]
+  },
+  "resources": {
+    "configured_process_rss_limit_bytes": 2040109465,
+    "gate_passed": true,
+    "mpi_pass": true,
+    "mpi_processes_configured": 1,
+    "mpi_world_size_observed": 1,
+    "peak_rss_bytes": 1754120192,
+    "process_rss_hard_limit_bytes": 2147483648,
+    "process_rss_pass": true,
+    "thread_limit": 6,
+    "thread_values": {
+      "MKL_NUM_THREADS": 6,
+      "NUMBA_NUM_THREADS": 6,
+      "NUMEXPR_NUM_THREADS": 6,
+      "OMP_NUM_THREADS": 6,
+      "OMP_THREAD_LIMIT": 6,
+      "OPENBLAS_NUM_THREADS": 6,
+      "VECLIB_MAXIMUM_THREADS": 6
+    },
+    "threads_pass": true
+  },
+  "sampler": {
+    "purpose": "none; deterministic truth/null/off-velocity checks only",
+    "used": false
+  },
+  "schema_version": "1.0",
+  "source_hashes": {
+    "august_nirspec_table": {
+      "detectors": [
+        "NRS1",
+        "NRS2"
+      ],
+      "expected_sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f",
+      "name": "WASP_77_A_b_3.11569_5329_1.tbl",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/data/jwst_emission_spectra/spectra/76/89/90/56/WASP_77_A_b_3.11569_5329_1.tbl",
+      "role": "August et al. 2023 NIRSpec G395H comparison table",
+      "sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f",
+      "size_bytes": 27329,
+      "verified": true
+    },
+    "cia": {
+      "name": "NEMESISPY CIA table",
+      "role": "H2-H2/H2-He collision-induced absorption",
+      "sha256": "5b519f02f98b205f20628ee5ec7f2829528d0bd356b449c4221ba8b2ef86ea0e",
+      "source_project": "NEMESISPY",
+      "verified": true
+    },
+    "co_lbl": {
+      "expected_sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad",
+      "name": "12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "role": "pRT CO HITEMP R=1e6 tabulated LBL cross sections",
+      "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad",
+      "size_bytes": 4753927800,
+      "verified": true
+    },
+    "h2o_lbl": {
+      "expected_sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73",
+      "name": "1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "role": "pRT H2O POKAZATEL R=1e6 tabulated LBL cross sections",
+      "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73",
+      "size_bytes": 4681348920,
+      "verified": true
+    },
+    "lbl_stride_report": {
+      "expected_sha256": null,
+      "name": "wasp77ab_lbl_sampling_20260831.json",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/docs/data/wasp77ab_lbl_sampling_20260831.json",
+      "role": "passing real-grid LBL stride-selection benchmark",
+      "sha256": "365b4cc05a9e84576f6d494d526bffc4856d0a314bc0ae902f0e8713b8864106",
+      "size_bytes": 22680,
+      "verified": true
+    },
+    "phoenix_catalog": {
+      "expected_sha256": "c5cb54e12ca20f8cba38624c460b743d0783ab92fcc0ad53b8288819d1d4d471",
+      "expected_size_bytes": 1497600,
+      "name": "catalog.fits",
+      "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+      "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/catalog.fits",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix/grid/phoenix/catalog.fits",
+      "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix",
+      "relative_path": "grid/phoenix/catalog.fits",
+      "role": "official STScI PHOENIX grid catalogue",
+      "sha256": "c5cb54e12ca20f8cba38624c460b743d0783ab92fcc0ad53b8288819d1d4d471",
+      "size_bytes": 1497600,
+      "verified": true
+    },
+    "phoenix_phoenixm00_5600": {
+      "expected_sha256": "688a5acf69c9ec65a1b5398084d6c62e43ad63d2799588e5a005f715123686ca",
+      "expected_size_bytes": 9901440,
+      "name": "phoenixm00/phoenixm00_5600.fits",
+      "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+      "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix/grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+      "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix",
+      "relative_path": "grid/phoenix/phoenixm00/phoenixm00_5600.fits",
+      "role": "official STScI PHOENIX [M/H]=0.0, 5600 K spectrum",
+      "sha256": "688a5acf69c9ec65a1b5398084d6c62e43ad63d2799588e5a005f715123686ca",
+      "size_bytes": 9901440,
+      "verified": true
+    },
+    "phoenix_phoenixm00_5700": {
+      "expected_sha256": "373a945f3c16f36473fdca542d5a97c090a16871ad598f7b069fd15bb4bbe027",
+      "expected_size_bytes": 9901440,
+      "name": "phoenixm00/phoenixm00_5700.fits",
+      "official_base_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/",
+      "official_url": "https://ssb.stsci.edu/cdbs/grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix/grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+      "pysyn_cdbs_root": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_phoenix",
+      "relative_path": "grid/phoenix/phoenixm00/phoenixm00_5700.fits",
+      "role": "official STScI PHOENIX [M/H]=0.0, 5700 K spectrum",
+      "sha256": "373a945f3c16f36473fdca542d5a97c090a16871ad598f7b069fd15bb4bbe027",
+      "size_bytes": 9901440,
+      "verified": true
+    },
+    "smith_cube14v3": {
+      "expected_md5": "3fd41560b7dbcc60851ef3a0972c852f",
+      "expected_sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+      "expected_size_bytes": 77591894,
+      "name": "cube14v3.pic",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/cube14v3.pic",
+      "role": "Smith et al. 2024 cleaned pre-eclipse IGRINS cube",
+      "sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+      "size_bytes": 77591894,
+      "verified": true
+    },
+    "smith_info14": {
+      "expected_md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+      "expected_sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+      "expected_size_bytes": 7261,
+      "name": "20201214_info.csv",
+      "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/20201214_info.csv",
+      "role": "Smith et al. 2024 frame phases and fixed RV terms",
+      "sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+      "size_bytes": 7261,
+      "verified": true
+    }
+  },
+  "status": "pass",
+  "truth_parameters": {
+    "Kp": 190.74,
+    "dVsys": -5.27,
+    "log10_CO_VMR": -3.91,
+    "log10_H2O_VMR": -4.02,
+    "log10_Hminus_VMR": -8.0,
+    "log10_a_hrs": 0.0,
+    "log10_electron_VMR": -3.0,
+    "lrs_scale": 1.0,
+    "temperature_K": 2700.0
+  }
+}

@@ -1,25 +1,26 @@
-"""Full-band one-region Mie-cloud retrieval for a configured target.
+"""Reusable one-region Mie-cloud builders and the current YAML entry point.
 
 Two optical-constant modes share the same cloud mass/particle physics:
 
 * ``catalog`` fixes n(lambda), k(lambda) to a selected laboratory material;
 * ``direct-nk`` retrieves nodal n(lambda) and log10(k(lambda)).
 
-The catalog run is the practical first inference and evidence baseline. The
-direct-nk run is higher-dimensional and should follow once that baseline and
-its prior sensitivity are understood.
+The catalog and direct-n/k scenarios are configured by
+``configurations/targets/WASP-69b/wasp69b_mie_catalog_pg14_R1000.yaml`` and
+``configurations/targets/WASP-69b/wasp69b_mie_direct_nk_pg14_R1000.yaml``. Use the strict YAML
+runner for retrieval execution; the builders in this module remain available
+to forward-model benchmarks.
 """
 
 from __future__ import annotations
 
-import argparse
 from dataclasses import dataclass, replace
-import json
 import os
 from pathlib import Path
+import runpy
+import sys
 import tempfile
-import time
-from typing import Mapping
+from typing import Mapping, Sequence
 
 os.environ.setdefault(
     "MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "robert-matplotlib")
@@ -50,24 +51,35 @@ from robert_exoplanets import (
     RetrievalParameterSet,
     UniformPrior,
     build_parameterized_emission_model,
-    run_ultranest,
 )
 from robert_exoplanets.core import Spectrum
 
-from retrieve_wasp69b_nircam_cloud_free import (
-    FASTCHEM,
-    DEFAULT_OPACITY_RESOLUTION,
-    OPACITY_RESOLUTIONS,
-    PLANET,
-    PLANET_GRAVITY_M_S2,
-    SPECIES,
-    STAR,
-    TARGET,
-    TARGET_SLUG,
-    _cia_tables,
-    _load_table,
-    prepare_opacity_cache,
-)
+if __package__:
+    from .retrieve_wasp69b_nircam_cloud_free import (
+        FASTCHEM,
+        DEFAULT_OPACITY_RESOLUTION,
+        PLANET,
+        PLANET_GRAVITY_M_S2,
+        SPECIES,
+        STAR,
+        TARGET,
+        TARGET_SLUG,
+        _cia_tables,
+        _load_table,
+    )
+else:
+    from retrieve_wasp69b_nircam_cloud_free import (
+        FASTCHEM,
+        DEFAULT_OPACITY_RESOLUTION,
+        PLANET,
+        PLANET_GRAVITY_M_S2,
+        SPECIES,
+        STAR,
+        TARGET,
+        TARGET_SLUG,
+        _cia_tables,
+        _load_table,
+    )
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = Path(
@@ -76,8 +88,8 @@ CATALOG = Path(
         ROOT / "data" / "optical_constants" / "exo_skryer",
     )
 ).expanduser()
-OUTPUT = Path(__file__).resolve().parent / "outputs" / f"{TARGET_SLUG}_mie_cloud"
 DIRECT_NK_NODES_MICRON = (2.4, 4.0, 5.5, 7.0, 9.0, 12.0)
+DEFAULT_CONFIG = ROOT / "configurations" / "targets/WASP-69b/wasp69b_mie_catalog_pg14_R1000.yaml"
 
 
 @dataclass(frozen=True)
@@ -286,103 +298,31 @@ def build_problem(
     )
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    configured_kta_path = os.environ.get("ROBERT_KTABLE_PATH")
-    parser.add_argument(
-        "--kta-path",
-        type=Path,
-        default=configured_kta_path,
-        required=configured_kta_path is None,
-        help="KTA root containing R1000/R15000, or the selected resolution directory",
-    )
-    parser.add_argument(
-        "--opacity-resolution",
-        choices=OPACITY_RESOLUTIONS,
-        default=os.environ.get(
-            "ROBERT_OPACITY_RESOLUTION", DEFAULT_OPACITY_RESOLUTION
-        ),
-    )
-    parser.add_argument(
-        "--cloud-mode", choices=("catalog", "direct-nk"), default="catalog"
-    )
-    parser.add_argument("--material", default="MgSiO3")
-    parser.add_argument("--particle-density-kg-m3", type=float, default=3200.0)
-    parser.add_argument("--prepare-only", action="store_true")
-    parser.add_argument("--smoke-only", action="store_true")
-    parser.add_argument("--output", type=Path, default=OUTPUT)
-    parser.add_argument("--live-points", type=int, default=200)
-    parser.add_argument("--max-ncalls", type=int, default=100000)
-    parser.add_argument("--mpi-processes", type=int, default=4)
-    args = parser.parse_args()
+def _run_current_configuration(
+    default_config: Path = DEFAULT_CONFIG,
+    argv: Sequence[str] | None = None,
+) -> None:
+    """Delegate execution to the repository's strict YAML retrieval runner."""
 
-    selected_observations = observations()
-    if args.prepare_only:
-        prepare_opacity_cache(
-            selected_observations,
-            kta_path=args.kta_path,
-            resolution=args.opacity_resolution,
-        )
-        return
-    problem = build_problem(
-        cloud_mode=args.cloud_mode,
-        material=args.material,
-        particle_density_kg_m3=args.particle_density_kg_m3,
-        opacity_resolution=args.opacity_resolution,
-    )
-    if args.smoke_only:
-        start = time.perf_counter()
-        midpoint = problem.parameters.midpoint_vector()
-        loglike = problem.log_likelihood_from_vector(midpoint)
-        elapsed = time.perf_counter() - start
-        report = {
-            "problem": problem.name,
-            "ndim": problem.ndim,
-            "n_points": problem.observations.n_points,
-            "finite_log_likelihood": bool(np.isfinite(loglike)),
-            "log_likelihood": float(loglike),
-            "elapsed_seconds": elapsed,
-            "parameters": problem.parameter_mapping(midpoint),
-        }
-        args.output.mkdir(parents=True, exist_ok=True)
-        path = args.output / f"smoke_{args.cloud_mode}_{args.material}.json"
-        path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-        print(json.dumps(report, indent=2))
-        return
-
-    result = run_ultranest(
-        problem,
-        output_dir=args.output / "ultranest",
-        min_num_live_points=args.live_points,
-        max_ncalls=args.max_ncalls,
-        dlogz=0.5,
-        resume="resume",
-        show_status=False,
-        mpi_nprocs=args.mpi_processes,
-        seed=20260712,
-    )
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if not any(
+        argument == "--config" or argument.startswith("--config=")
+        for argument in arguments
+    ):
+        arguments = ["--config", str(default_config), *arguments]
+    runner = ROOT / "run_retrieval.py"
+    previous_argv = sys.argv
+    sys.argv = [str(runner), *arguments]
     try:
-        from mpi4py import MPI
+        runpy.run_path(str(runner), run_name="__main__")
+    finally:
+        sys.argv = previous_argv
 
-        is_primary = MPI.COMM_WORLD.Get_rank() == 0
-    except ImportError:
-        is_primary = True
-    if is_primary:
-        args.output.mkdir(parents=True, exist_ok=True)
-        summary = {
-            "problem": problem.name,
-            "cloud_mode": args.cloud_mode,
-            "material": args.material,
-            "converged": result.converged,
-            "message": result.message,
-            "ncall": result.metadata.get("ncall"),
-            "log_evidence": result.log_evidence,
-            "log_evidence_error": result.log_evidence_error,
-            "best_fit": dict(result.best_fit_parameters),
-        }
-        (args.output / "summary.json").write_text(
-            json.dumps(summary, indent=2), encoding="utf-8"
-        )
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Run the selected current YAML retrieval workflow."""
+
+    _run_current_configuration(argv=argv)
 
 
 if __name__ == "__main__":

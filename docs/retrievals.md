@@ -1,12 +1,22 @@
 # Running retrievals
 
-ROBERT runs optimal estimation, UltraNest, MultiNest, and optimal-estimation
+ROBERT runs optimal estimation, PyMultiNest, and optimal-estimation
 to nested-sampling workflows from one schema-version-2 YAML file. The same
 configuration defines the observations, atmosphere, opacity, radiative
 transfer, likelihood, priors, inference settings, runtime, and plotting.
 
-MultiNest is the default nested sampler. UltraNest is an explicitly selected
-compatibility option.
+PyMultiNest is the supported nested sampler. Stale sampler APIs have been removed.
+
+Optimal estimation uses independent Gaussian errors. Covariance and profiled
+high-resolution likelihoods require their full scalar objective through nested
+sampling; their diagonal diagnostic uncertainties are not valid OE inputs.
+Specialized Python retrieval problems are not all supported by this YAML
+runner. See the [capability audit](review/53_repository_audit_2026-09-07.md).
+
+CLR composition priors support the joint unit-cube transform for direct nested
+sampling. Their scalar prior-density and posterior-density APIs are unsupported
+and raise an error. Optimal estimation cannot use CLR priors, through YAML or
+Python.
 
 This guide first creates and checks a run directory, then gives separate
 instructions for a local machine, a standard Slurm cluster, and the Oxford
@@ -42,7 +52,7 @@ different models being combined:
 ```bash
 python scripts/create_run_directory.py \
   --project-dir /path/to/robert-runs \
-  --config configurations/wasp69b_cloud_free_R1000.yaml \
+  --config configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml \
   --slurm-account my-account \
   --slurm-partition compute \
   --slurm-time 48:00:00 \
@@ -98,8 +108,7 @@ runtime:
   mpi_processes: auto
 ```
 
-For UltraNest, set `engine: ultranest`; `max_calls: null` runs until the
-configured convergence criterion is reached. For MultiNest,
+For MultiNest,
 `multinest_max_iterations: 0` means unlimited. ROBERT accepts any
 non-negative requested MultiNest seed and records both that seed and the
 effective seed passed to the legacy native generator.
@@ -263,9 +272,20 @@ environment. The generated script stops immediately if it is absent.
 ### Restarting a Slurm run
 
 Keep `sampler.resume: resume`, leave the completed checkpoint files in place,
-and submit the same run directory again. ROBERT writes a new retrieval-attempt
-event and status record. A changed configuration should use a new directory,
-even if the sampler would technically accept the old checkpoint.
+and submit the same run directory again. ROBERT preserves the original
+manifest and writes each attempt's normalized settings under `attempts/`.
+An omitted sampler setting and its explicit default have the same identity.
+
+You may change `multinest_max_iterations`, `dlogz`, `show_status`, and
+`iterations_before_update` between attempts. Keep the data, physical model,
+priors, seed, invalid-likelihood floor, live-point count, sampling efficiency,
+importance sampling, mode search, and MPI layout fixed. Changes to those
+settings require a new run directory.
+
+Standard YAML problems record a physical-configuration hash and observation
+array hashes. Custom Python forward models and prepared device inputs must
+declare their physical and external-input identities in problem metadata;
+ROBERT cannot infer the meaning of an arbitrary callable.
 
 ## 7. Run on Glamdring (Oxford Physics only)
 
@@ -370,6 +390,8 @@ ROBERT writes:
   restarts;
 - `result.json`: portable scalar result and metadata;
 - `result_arrays.npz`: samples, weights, likelihoods, or OE state/covariance;
+- `best_fit_prediction.json` and `.npz`: named best-fit spectra, observations,
+  and provenance, or an explicit unavailable status;
 - sampler-native checkpoint directories; and
 - source and resolved configuration snapshots.
 
@@ -380,8 +402,8 @@ robert-retrieval-status outputs/multinest
 python -m robert_exoplanets.retrieval.status outputs/multinest
 ```
 
-The exact path is the sampler phase directory, such as `outputs/ultranest`,
-`outputs/multinest`, or `outputs/optimal_estimation`.
+The path is the sampler phase directory, such as `outputs/multinest` or
+`outputs/optimal_estimation`.
 
 ## 9. Post-process completed inference
 

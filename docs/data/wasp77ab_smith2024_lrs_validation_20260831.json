@@ -1,0 +1,108 @@
+{
+  "abundance_state": "not evaluated; ROBERT remains VMR-only",
+  "binning": {
+    "detector_gap_integrated": false,
+    "detector_gap_micron": 0.119,
+    "method": "top-hat wavelength integral over each published bin"
+  },
+  "claim": "public-data and bin-integration reproduction; not a ROBERT atmosphere retrieval",
+  "data": {
+    "comparison_study": "Smith et al. 2024",
+    "count_interpretation": "the public 150-bin table reproduces the reported fit; N=160 is treated as a manuscript count discrepancy",
+    "detectors": [
+      "nirspec_g395h_nrs1",
+      "nirspec_g395h_nrs2"
+    ],
+    "producer": "August et al. 2023",
+    "published_count": 150,
+    "smith_predictive_text_count": 160,
+    "table_points": 150,
+    "table_sha256": "96159824870eb7c8132fd9c8bee30caf9ec95f05e128dbe2fea8627909a40d3f"
+  },
+  "metrics": {
+    "absolute_difference_from_smith": 0.025245496377597987,
+    "acceptance_tolerance": 0.05,
+    "chi_square_per_point_symmetric": 0.724754503622402,
+    "chi_square_split_error1_upper": 110.78422748967188,
+    "chi_square_split_error2_upper": 111.35940087766487,
+    "chi_square_symmetric": 108.71317554336031,
+    "detector_metrics": [
+      {
+        "chi_square_per_point_symmetric": 0.7425956352086774,
+        "chi_square_split_error1_upper": 51.525043532421556,
+        "chi_square_split_error2_upper": 52.56180178417877,
+        "chi_square_symmetric": 51.98169446460742,
+        "maximum_absolute_residual": 0.00015448567638433244,
+        "mean_residual": -6.7515687317522475e-06,
+        "n_points": 70,
+        "name": "nirspec_g395h_nrs1",
+        "rms_residual": 6.494998936731114e-05,
+        "wavelength_max_micron": 3.709,
+        "wavelength_min_micron": 2.811
+      },
+      {
+        "chi_square_per_point_symmetric": 0.7091435134844112,
+        "chi_square_split_error1_upper": 59.259183957250315,
+        "chi_square_split_error2_upper": 58.7975990934861,
+        "chi_square_symmetric": 56.73148107875289,
+        "maximum_absolute_residual": 0.0002124670959375418,
+        "mean_residual": 3.289330941357749e-05,
+        "n_points": 80,
+        "name": "nirspec_g395h_nrs2",
+        "rms_residual": 0.00010427916929251193,
+        "wavelength_max_micron": 5.164,
+        "wavelength_min_micron": 3.835
+      }
+    ],
+    "n_points": 150,
+    "smith_consistency_pass": true,
+    "smith_reported_best_chi_square_per_point": 0.75
+  },
+  "plot": {
+    "path": "/Users/jaketaylor/Developer/ROBERT-code/examples/outputs/wasp77ab_smith2024/nirspec_lrs_validation.png",
+    "sha256": "f42b7437bffd1c4b6a84d3f90b58ab8e524613e97b4c02c5a7d8997c825c85ef"
+  },
+  "resources": {
+    "elapsed_seconds": 1.624026415986009,
+    "peak_rss_bytes": 211304448,
+    "process_rss_limit_bytes": 1992294400,
+    "thread_limit": 3,
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    }
+  },
+  "sampler": "none",
+  "schema_version": "1.0",
+  "scope": "deterministic Smith et al. model versus August et al. NIRSpec data",
+  "status": "pass",
+  "template": {
+    "bytes": 72672825,
+    "columns": [
+      "wavelength_micron",
+      "planet_surface_flux",
+      "star_surface_flux"
+    ],
+    "eclipse_depth_formula": "(Rp/Rs)^2 * planet_surface_flux / star_surface_flux",
+    "md5": "93841125cab0a2c74ae4730ebf36b7dc",
+    "path": "/Users/jaketaylor/Developer/ROBERT-code/external_data/wasp77ab_smith2024/w77_pre_nirspec_best_fit_R500K_scaled.txt",
+    "radius_ratio_squared": 0.01695254415154625,
+    "sha256": "fe1fb7cd37b6dec52173a19ee1fd7ea1529c421946c76d728d0bdcf4285ad34d",
+    "shape": [
+      968971,
+      3
+    ]
+  },
+  "uncertainty_policy": {
+    "primary": "mean absolute asymmetric errors, matching ROBERT Gaussian input",
+    "sensitivity": [
+      "published error 1 used above the data and error 2 below",
+      "published error 2 used above the data and error 1 below"
+    ]
+  }
+}

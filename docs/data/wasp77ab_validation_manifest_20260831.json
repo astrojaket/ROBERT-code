@@ -1,0 +1,581 @@
+{
+  "command": "examples/finalize_wasp77ab_validation.py",
+  "comparison": "Smith et al. 2024 IGRINS HRS + August et al. 2023 NIRSpec LRS",
+  "composition": {
+    "hminus_bound_free_free_free_identifiability_notes": false,
+    "hminus_notes": {
+      "bound_free_present": false,
+      "free_free_present": false,
+      "identifiability_present": true
+    },
+    "hminus_notes_pending": true,
+    "mass_fraction_parameters_in_robert": false,
+    "robert_vmr_only": true
+  },
+  "environment": {
+    "python_executable": "/opt/miniconda3/envs/robert-exoplanets/bin/python",
+    "python_version": "3.12.13",
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    }
+  },
+  "git": {
+    "available": true,
+    "commit": "cede240e7df4a21e3572d2e3c112aaeadfb7261f",
+    "dirty": true,
+    "dirty_path_count": 282
+  },
+  "manifest_name": "wasp77ab_validation_manifest_20260831",
+  "pending": [
+    "robert_joint_sampler",
+    "hminus_notes"
+  ],
+  "plots": {
+    "fixed_template_sampler": [
+      {
+        "bytes": 77986,
+        "path": "examples/outputs/wasp77ab_smith2024/reference_lrs.png",
+        "sha256": "7fcfc8d46e55d0c3e6e495f8caea723b685b7b5a74de7422db69b8e774721778",
+        "status": "verified"
+      }
+    ],
+    "hrs": [
+      {
+        "bytes": 58523,
+        "path": "examples/outputs/wasp77ab_smith2024/igrins_hrs_validation.png",
+        "sha256": "c927f494d79ac3a4db9f94434af09fe2d1080d83d0985d4275a202cdf2f8cb54",
+        "status": "verified"
+      }
+    ],
+    "injection": [],
+    "lrs": [
+      {
+        "bytes": 122218,
+        "path": "examples/outputs/wasp77ab_smith2024/nirspec_lrs_validation.png",
+        "sha256": "f42b7437bffd1c4b6a84d3f90b58ab8e524613e97b4c02c5a7d8997c825c85ef",
+        "status": "verified"
+      }
+    ],
+    "source": [],
+    "stride": []
+  },
+  "provenance": {
+    "external_heavy_inputs_rehashed": false,
+    "lightweight_report_and_plot_hashes_verified": true,
+    "sampler_chain_files_read": false,
+    "source_manifest_primary_hashes_reused": true
+  },
+  "report_hashes": {
+    "fixed_template_sampler": "7bdbf6df636ca1bb4cd9e01a87cc5898558e79142c0204305aea9368fd36f1d9",
+    "hrs": "3bfe5ccd29ac572652a619b15acbfac7a39c7087311e4290c004da06348cac92",
+    "injection": "0e0efb30ba27b6a5fc0599ef6d5f8b839f13ae7693bd7a172a2a1436eed0afe9",
+    "lrs": "6d9cd93f3de1c753c80a3d9f251759a9302870e699d52039d08e0aa64efa9736",
+    "source": "23b41a9823d285877a11bd15ec44c9ea51400bec3c2728d20f2eb278a9ab2586",
+    "stride": "365b4cc05a9e84576f6d494d526bffc4856d0a314bc0ae902f0e8713b8864106"
+  },
+  "reports": {
+    "fixed_template_sampler": {
+      "bytes": 28982,
+      "command": null,
+      "path": "docs/data/wasp77ab_smith2024_reference_pymultinest.json",
+      "schema_version": "1.0",
+      "sha256": "7bdbf6df636ca1bb4cd9e01a87cc5898558e79142c0204305aea9368fd36f1d9",
+      "status": "pass"
+    },
+    "hrs": {
+      "bytes": 16328,
+      "command": null,
+      "path": "docs/data/wasp77ab_smith2024_hrs_validation_20260831.json",
+      "schema_version": 1,
+      "sha256": "3bfe5ccd29ac572652a619b15acbfac7a39c7087311e4290c004da06348cac92",
+      "status": "pass"
+    },
+    "injection": {
+      "bytes": 15080,
+      "command": null,
+      "path": "docs/data/wasp77ab_robert_injection_20260831.json",
+      "schema_version": "1.0",
+      "sha256": "0e0efb30ba27b6a5fc0599ef6d5f8b839f13ae7693bd7a172a2a1436eed0afe9",
+      "status": "pass"
+    },
+    "lrs": {
+      "bytes": 4014,
+      "command": null,
+      "path": "docs/data/wasp77ab_smith2024_lrs_validation_20260831.json",
+      "schema_version": "1.0",
+      "sha256": "6d9cd93f3de1c753c80a3d9f251759a9302870e699d52039d08e0aa64efa9736",
+      "status": "pass"
+    },
+    "robert_joint_sampler": {
+      "path": "docs/data/wasp77ab_robert_joint_20260831.json",
+      "status": "pending_missing_report"
+    },
+    "source": {
+      "bytes": 8063,
+      "command": null,
+      "path": "docs/data/wasp77ab_smith2024_sources.json",
+      "schema_version": 1,
+      "sha256": "23b41a9823d285877a11bd15ec44c9ea51400bec3c2728d20f2eb278a9ab2586",
+      "status": "pass_primary_files_present"
+    },
+    "stride": {
+      "bytes": 22680,
+      "command": "conda run -n robert-exoplanets python examples/benchmark_wasp77ab_lbl_sampling.py",
+      "path": "docs/data/wasp77ab_lbl_sampling_20260831.json",
+      "schema_version": 1,
+      "sha256": "365b4cc05a9e84576f6d494d526bffc4856d0a314bc0ae902f0e8713b8864106",
+      "status": "pass"
+    }
+  },
+  "resources": {
+    "legacy_report_max_threads": 3,
+    "max_threads": 6,
+    "mpi_processes_required_for_samplers": 1,
+    "opacity_estimate_limit_bytes": 1072693248,
+    "reports": {
+      "hrs": {
+        "configured_memory_bytes": {
+          "$.resources.process_memory_limit_bytes": 1992294400
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 630226944
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 1,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      },
+      "injection": {
+        "configured_memory_bytes": {
+          "$.resource_policy.process_memory_limit_bytes": 2040109465,
+          "$.resources.configured_process_rss_limit_bytes": 2040109465,
+          "$.resources.process_rss_hard_limit_bytes": 2147483648
+        },
+        "configured_process_memory_limit_bytes": 2040109465,
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "$.resource_policy.mpi_processes": 1,
+          "$.resources.mpi_world_size_observed": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 1754120192
+        },
+        "strict_process_memory_under_2_gib": true,
+        "strict_process_memory_under_configured_limit": true,
+        "thread_limit": 6,
+        "thread_values": {
+          "MKL_NUM_THREADS": 6,
+          "NUMBA_NUM_THREADS": 6,
+          "NUMEXPR_NUM_THREADS": 6,
+          "OMP_NUM_THREADS": 6,
+          "OMP_THREAD_LIMIT": 6,
+          "OPENBLAS_NUM_THREADS": 6,
+          "VECLIB_MAXIMUM_THREADS": 6
+        },
+        "threads_at_most_6": true
+      },
+      "lrs": {
+        "configured_memory_bytes": {
+          "$.resources.process_rss_limit_bytes": 1992294400
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 211304448
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 1,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      },
+      "stride": {
+        "configured_memory_bytes": {
+          "$.resources.process_rss_limit_bytes": 2040109465
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.measured_peak_rss_bytes": 1663959040
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      }
+    },
+    "strict_process_memory_limit_bytes": 2147483648,
+    "thread_variables": [
+      "OMP_NUM_THREADS",
+      "OPENBLAS_NUM_THREADS",
+      "MKL_NUM_THREADS",
+      "NUMEXPR_NUM_THREADS",
+      "VECLIB_MAXIMUM_THREADS",
+      "NUMBA_NUM_THREADS",
+      "OMP_THREAD_LIMIT"
+    ]
+  },
+  "sampler_policy": {
+    "backend": "MultiNest",
+    "legacy_reference_max_threads": 3,
+    "max_iter": 0,
+    "max_threads": 6,
+    "mpi_processes": 1,
+    "sampler": "PyMultiNest",
+    "two_seed_requirement": true,
+    "ultranest_allowed": false
+  },
+  "samplers": {
+    "fixed_template_sampler": {
+      "backend": "PyMultiNest/MultiNest",
+      "complete": true,
+      "groups": [
+        {
+          "evidence_comparison": {
+            "combined_error": 0.22753519192787927,
+            "delta_log_evidence": 0.3614405244588852,
+            "finite_evidence": true,
+            "finite_reported_errors": true,
+            "gate_passed": true,
+            "repeatability_limit": 0.5,
+            "seed_pair": [
+              24680,
+              24681
+            ],
+            "within_combined_error": false
+          },
+          "name": "hrs_only",
+          "run_count": 2
+        },
+        {
+          "evidence_comparison": {
+            "combined_error": 0.07405638396036493,
+            "delta_log_evidence": 0.28602783381938934,
+            "finite_evidence": true,
+            "finite_reported_errors": true,
+            "gate_passed": true,
+            "repeatability_limit": 0.5,
+            "seed_pair": [
+              24680,
+              24681
+            ],
+            "within_combined_error": false
+          },
+          "name": "joint",
+          "run_count": 2
+        },
+        {
+          "evidence_comparison": {
+            "combined_error": 0.09902806041310898,
+            "delta_log_evidence": 0.06953350590468688,
+            "finite_evidence": true,
+            "finite_reported_errors": true,
+            "gate_passed": true,
+            "repeatability_limit": 0.5,
+            "seed_pair": [
+              24680,
+              24681
+            ],
+            "within_combined_error": true
+          },
+          "name": "lrs_only",
+          "run_count": 2
+        }
+      ],
+      "max_iter": 0,
+      "max_threads": 3,
+      "mpi_processes": {
+        "$.resources.mpi_world_size_observed": 1,
+        "$.sampler_policy.mpi_processes": 1
+      },
+      "resources": {
+        "configured_memory_bytes": {
+          "$.resources.configured_process_rss_limit_bytes": 2040109465,
+          "$.resources.process_rss_hard_limit_bytes": 2147483648
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "$.resources.mpi_world_size_observed": 1,
+          "$.sampler_policy.mpi_processes": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 1261125632,
+          "$.runs.hrs_only.runs[0].peak_rss_bytes": 1261125632,
+          "$.runs.hrs_only.runs[1].peak_rss_bytes": 1261125632,
+          "$.runs.joint.runs[0].peak_rss_bytes": 1261125632,
+          "$.runs.joint.runs[1].peak_rss_bytes": 1261125632,
+          "$.runs.lrs_only.runs[0].peak_rss_bytes": 1261125632,
+          "$.runs.lrs_only.runs[1].peak_rss_bytes": 1261125632
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 1,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      },
+      "seeds": [
+        24680,
+        24681
+      ],
+      "status": "pass",
+      "thread_values": {
+        "MKL_NUM_THREADS": 1,
+        "NUMBA_NUM_THREADS": 1,
+        "NUMEXPR_NUM_THREADS": 1,
+        "OMP_NUM_THREADS": 1,
+        "OMP_THREAD_LIMIT": 1,
+        "OPENBLAS_NUM_THREADS": 1,
+        "VECLIB_MAXIMUM_THREADS": 1
+      }
+    },
+    "robert_joint_sampler": {
+      "complete": false,
+      "status": "pending_missing_report"
+    }
+  },
+  "schema_version": 1,
+  "status": "pending_samplers_or_notes",
+  "target": "WASP-77Ab",
+  "validation": {
+    "hrs": {
+      "gates": {
+        "cpu_threads_at_most_3": true,
+        "finite_diagnostics": true,
+        "full_template_present": true,
+        "memory_strictly_below_2_gib": true
+      },
+      "resources": {
+        "configured_memory_bytes": {
+          "$.resources.process_memory_limit_bytes": 1992294400
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 630226944
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 1,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      },
+      "response": {
+        "pixel_mapping_after_lsf": true,
+        "rotation_then_gaussian": true,
+        "stage_order": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ]
+      },
+      "status": "pass"
+    },
+    "injection": {
+      "hrs_noise_scales": {
+        "all_positive_finite": true,
+        "order_count": 19,
+        "seed": 20260832,
+        "sha256": "1cb926a6ccdfdf2a4326610442e485f2d430341ea5533df55f11cf193dd64e22",
+        "summary_verified": true
+      },
+      "modes": {
+        "hrs_only": "finite truth/null/off-velocity and H-minus on/off",
+        "joint": "finite truth/null/off-velocity and H-minus on/off",
+        "lrs_only": "finite truth/null and H-minus on/off"
+      },
+      "posterior_recovery_claim": false,
+      "real_data_loaded": true,
+      "record_type": "wasp77ab_robert_operator_injection_validation",
+      "resources": {
+        "configured_memory_bytes": {
+          "$.resource_policy.process_memory_limit_bytes": 2040109465,
+          "$.resources.configured_process_rss_limit_bytes": 2040109465,
+          "$.resources.process_rss_hard_limit_bytes": 2147483648
+        },
+        "configured_process_memory_limit_bytes": 2040109465,
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "$.resource_policy.mpi_processes": 1,
+          "$.resources.mpi_world_size_observed": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 1754120192
+        },
+        "strict_process_memory_under_2_gib": true,
+        "strict_process_memory_under_configured_limit": true,
+        "thread_limit": 6,
+        "thread_values": {
+          "MKL_NUM_THREADS": 6,
+          "NUMBA_NUM_THREADS": 6,
+          "NUMEXPR_NUM_THREADS": 6,
+          "OMP_NUM_THREADS": 6,
+          "OMP_THREAD_LIMIT": 6,
+          "OPENBLAS_NUM_THREADS": 6,
+          "VECLIB_MAXIMUM_THREADS": 6
+        },
+        "threads_at_most_6": true
+      },
+      "sampler_used": false,
+      "source_hashes": {
+        "verified_records": 10
+      },
+      "status": "pass",
+      "truth_parameters": {
+        "all_finite": true,
+        "count": 9
+      }
+    },
+    "lrs": {
+      "gates": {
+        "smith_consistency_pass": true
+      },
+      "resources": {
+        "configured_memory_bytes": {
+          "$.resources.process_rss_limit_bytes": 1992294400
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.peak_rss_bytes": 211304448
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 1,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      },
+      "status": "pass"
+    },
+    "source": {
+      "external_file_bytes_not_rehashed": true,
+      "primary_file_count": 7,
+      "primary_files_verified_from_manifest": true,
+      "resources": {
+        "configured_memory_bytes": {
+          "$.resource_policy.process_rss_limit_bytes": 2147483647
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {},
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 3,
+          "NUMBA_NUM_THREADS": 3,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 3,
+          "OMP_THREAD_LIMIT": 3,
+          "OPENBLAS_NUM_THREADS": 3,
+          "VECLIB_MAXIMUM_THREADS": 3
+        },
+        "threads_at_most_3": true
+      },
+      "status": "pass_primary_files_present"
+    },
+    "stride": {
+      "gates": {
+        "hrs_finest_passing_stride_selected": true,
+        "hrs_reference_and_candidates_complete": true,
+        "hrs_response_contract": true,
+        "lrs_finest_passing_stride_selected": true,
+        "lrs_reference_and_candidates_complete": true,
+        "opacity_estimates_below_1023_MiB": true,
+        "process_rss_below_1_9_GiB": true,
+        "thread_values_between_1_and_3": true
+      },
+      "opacity_limit_below_1_gib": true,
+      "resources": {
+        "configured_memory_bytes": {
+          "$.resources.process_rss_limit_bytes": 2040109465
+        },
+        "mpi_processes_are_valid": true,
+        "mpi_values": {
+          "default": 1
+        },
+        "observed_peak_rss_bytes": {
+          "$.resources.measured_peak_rss_bytes": 1663959040
+        },
+        "strict_process_memory_under_2_gib": true,
+        "thread_limit": 3,
+        "thread_values": {
+          "MKL_NUM_THREADS": 1,
+          "NUMBA_NUM_THREADS": 1,
+          "NUMEXPR_NUM_THREADS": 3,
+          "OMP_NUM_THREADS": 1,
+          "OMP_THREAD_LIMIT": 1,
+          "OPENBLAS_NUM_THREADS": 1,
+          "VECLIB_MAXIMUM_THREADS": 1
+        },
+        "threads_at_most_3": true
+      },
+      "selected_strides": {
+        "hrs": 2,
+        "lrs": 25
+      },
+      "status": "pass"
+    }
+  }
+}

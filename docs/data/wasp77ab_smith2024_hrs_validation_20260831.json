@@ -1,0 +1,480 @@
+{
+  "acceptance": {
+    "cpu_threads_at_most_3": true,
+    "finite_diagnostics": true,
+    "full_template_present": true,
+    "memory_strictly_below_2_gib": true
+  },
+  "claim": "Independent ROBERT evaluation of public Smith data and method; not a sampler or full literature reproduction.",
+  "inputs": [
+    {
+      "md5": "3fd41560b7dbcc60851ef3a0972c852f",
+      "name": "cube14v3.pic",
+      "path": "external_data/wasp77ab_smith2024/cube14v3.pic",
+      "role": "Smith pre-eclipse IGRINS cube",
+      "sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+      "size_bytes": 77591894
+    },
+    {
+      "md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+      "name": "20201214_info.csv",
+      "path": "external_data/wasp77ab_smith2024/20201214_info.csv",
+      "role": "Smith pre-eclipse frame metadata",
+      "sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+      "size_bytes": 7261
+    },
+    {
+      "md5": "dbaa138b7768b727c87ff8f83fcc563f",
+      "name": "w77_1DRC_FULL.txt",
+      "path": "external_data/wasp77ab_smith2024/w77_1DRC_FULL.txt",
+      "role": "Smith full atmospheric template",
+      "sha256": "8f3fcdf119b42e1c1db5b5aba61c8266bad65cf3c279aa237e55346ed9be7a14",
+      "size_bytes": 13899150
+    },
+    {
+      "md5": "6cf0ec37cbed5db5b18e6d434838fa40",
+      "name": "w77_1DRC_H2O_ONLY.txt",
+      "path": "external_data/wasp77ab_smith2024/w77_1DRC_H2O_ONLY.txt",
+      "role": "Smith H2O-only atmospheric template",
+      "sha256": "f68acda835e0af3e1747504d1e6243560610e5b98ad675917233859a17ace330",
+      "size_bytes": 13899150
+    },
+    {
+      "md5": "d4f0c6dfd4bb50a7ca9ca73ea3318eb3",
+      "name": "w77_1DRC_CO_ONLY.txt",
+      "path": "external_data/wasp77ab_smith2024/w77_1DRC_CO_ONLY.txt",
+      "role": "Smith CO-only atmospheric template",
+      "sha256": "b8c9fc1496b25d9b4030ac3fafac3623ac1a5e945cf0b2f3161e96d3e8e3c016",
+      "size_bytes": 13899150
+    }
+  ],
+  "method": {
+    "abundance_convention": "ROBERT volume mixing ratios only",
+    "data_model_memory_path": "one order at a time for scalar diagnostics",
+    "doppler_mode": "smith_nonrelativistic",
+    "evaluation_parameter_source": "Smith et al. 2024 Table 3 pre-eclipse medians; Kp=192+dKp",
+    "evaluation_parameters": {
+      "Kp": 190.74,
+      "dVsys": -5.27,
+      "dphi": 0.0,
+      "log10_a": 0.15
+    },
+    "flux_ratio_scale": 0.01695254415154625,
+    "gaussian_kernel_support_sigma": 4.0,
+    "gaussian_lsf_resolving_power": 45000.0,
+    "n_components": 4,
+    "pixel_integration": false,
+    "pixel_mapping": "likelihood interpolation onto real cube pixels",
+    "positive_velocity": "redshift",
+    "response_chain": [
+      "rotational-broadening",
+      "gaussian-high-resolution"
+    ],
+    "response_stage_order": "Gray rotation -> Gaussian LSF -> PCA likelihood interpolation",
+    "response_template_resolving_power": 250000.0,
+    "rotation_vsini_km_s": 4.2,
+    "sampler": "none",
+    "scale_parameter": "log10_a",
+    "sigma_clip": 3.0,
+    "surface_flux_ratio_geometry": "(Rp/Rs)^2"
+  },
+  "observation": {
+    "active_samples": 6423648,
+    "clipped_samples": 40527,
+    "fixed_velocity_max_km_s": 23.849236772935928,
+    "fixed_velocity_min_km_s": 23.348872081644107,
+    "metadata": {
+      "abundance_convention": "ROBERT volume mixing ratios only",
+      "cube_filename": "cube14v3.pic",
+      "cube_md5": "3fd41560b7dbcc60851ef3a0972c852f",
+      "cube_sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+      "cube_shape": "(44, 79, 1848)",
+      "cube_size_bytes": "77591894",
+      "data_role": "Smith 2024 IGRINS pre-eclipse HRS input",
+      "info_filename": "20201214_info.csv",
+      "info_md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+      "info_sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+      "info_size_bytes": "7261",
+      "paper_arxiv": "2312.13069",
+      "paper_doi": "10.3847/1538-3881/ad17bf",
+      "source": "Smith et al. 2024 supplementary data",
+      "velocity_column": "RV [km/s]",
+      "velocity_sign_convention": "positive velocity is redshift",
+      "zenodo_doi": "10.5281/zenodo.10382053",
+      "zenodo_record": "https://zenodo.org/records/10382053"
+    },
+    "n_frames": 79,
+    "n_orders": 44,
+    "n_pixels": 1848,
+    "phase_max": 0.4706719304854232,
+    "phase_min": 0.32587816142677184,
+    "retained_samples_after_pca": 6423648,
+    "shape": [
+      44,
+      79,
+      1848
+    ]
+  },
+  "optional_templates_missing": [],
+  "paper": {
+    "arxiv": "2312.13069",
+    "ccf_snr_anchors": {
+      "co_only": 3.6,
+      "full": 9.4,
+      "h2o_only": 9.2
+    },
+    "ccf_snr_note": "The paper's 9.4/9.2/3.6 pre-eclipse CCF SNR values use its full 2-D map median/3-sigma normalization. The local scan reports raw summed CCF values and does not claim to reproduce those SNRs.",
+    "doi": "10.3847/1538-3881/ad17bf",
+    "url": "https://arxiv.org/abs/2312.13069"
+  },
+  "plot": {
+    "path": "examples/outputs/wasp77ab_smith2024/igrins_hrs_validation.png",
+    "sha256": "c927f494d79ac3a4db9f94434af09fe2d1080d83d0985d4275a202cdf2f8cb54"
+  },
+  "resources": {
+    "elapsed_seconds": 118.55153537506703,
+    "peak_rss_bytes": 630226944,
+    "process_memory_limit_bytes": 1992294400,
+    "ru_maxrss": 630226944,
+    "ru_maxrss_units": "bytes on macOS; KiB on other platforms",
+    "strict_below_2_gib": true,
+    "thread_limit": 3,
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    }
+  },
+  "response": {
+    "coverage_source": "per-template response metadata",
+    "gaussian_kernel_support_sigma": 4.0,
+    "gaussian_lsf_resolving_power": 45000.0,
+    "operator_family": "ROBERT sparse spectral response operators",
+    "pixel_integration": false,
+    "post_response_mapping": "Smith likelihood interpolation onto real cube pixels",
+    "rotation_vsini_km_s": 4.2,
+    "stage_order": [
+      "rotational-broadening",
+      "gaussian-high-resolution"
+    ],
+    "template_resolving_power": 250000.0
+  },
+  "schema_version": 1,
+  "scope": "deterministic Smith et al. 2024 pre-eclipse IGRINS HRS diagnostic",
+  "status": "pass",
+  "templates": [
+    {
+      "ccf_finite_values": 3476,
+      "ccf_max": 0.1363433098879577,
+      "ccf_mean": 0.007496481651415778,
+      "ccf_min": -0.1122502854475435,
+      "ccf_sum": 26.057770220321245,
+      "doppler_mode": "smith_nonrelativistic",
+      "flux_ratio_scale": 0.01695254415154625,
+      "loglike": -23375305.186341006,
+      "n_components": 4,
+      "name": "full",
+      "paper_ccf_snr_anchor": 9.4,
+      "paper_ccf_snr_note": "Paper value uses the full 2-D CCF-map median/3-sigma normalization; this local diagnostic is a raw summed CCF and does not reproduce it.",
+      "parameter_source": "Smith et al. 2024 Table 3 pre-eclipse medians",
+      "parameters": {
+        "Kp": 190.74,
+        "dVsys": -5.27,
+        "dphi": 0.0,
+        "log10_a": 0.15
+      },
+      "response": {
+        "applied_operator_names": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ],
+        "crop": {
+          "edge_padding_points": 8,
+          "raw_orientation": "ascending",
+          "source_bounds_actual_micron": [
+            1.451870348853811,
+            2.4492358992846053
+          ],
+          "source_bounds_requested_micron": [
+            1.451917120881073,
+            2.449155671542693
+          ],
+          "source_points": 130732
+        },
+        "doppler_stage": "Smith likelihood interpolation after fixed response",
+        "gaussian_kernel_support_sigma": 4.0,
+        "gaussian_lsf_resolving_power": 45000.0,
+        "pixel_integration": false,
+        "post_response_mapping": "Smith likelihood linear interpolation onto real cube pixels",
+        "processed_bounds_micron": [
+          1.4519487664258472,
+          2.4491036197324565
+        ],
+        "processed_points": 130704,
+        "query_bounds_micron": [
+          1.4520164880366861,
+          2.4489880697503623
+        ],
+        "raw_template_resolution": "R=250000",
+        "rotation_kernel": "Gray linear-limb-darkened rotational broadening",
+        "rotation_limb_darkening": 0.6,
+        "rotation_vsini_km_s": 4.2,
+        "stage_order": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ],
+        "velocity_coverage": {
+          "anchor_parameters": {
+            "Kp": 190.74,
+            "dVsys": -5.27,
+            "dphi": 0.0,
+            "log10_a": 0.15
+          },
+          "anchor_velocity_bounds_km_s": [
+            53.529017940321424,
+            187.5490756237242
+          ],
+          "dVsys_prior_bounds_km_s": [
+            -20.0,
+            20.0
+          ],
+          "dphi_fixed": 0.0,
+          "kp_prior_bounds_km_s": [
+            172.0,
+            212.0
+          ],
+          "prior_velocity_bounds_km_s": [
+            35.36523950330347,
+            231.70833077369076
+          ]
+        }
+      },
+      "template": {
+        "md5": "dbaa138b7768b727c87ff8f83fcc563f",
+        "name": "w77_1DRC_FULL.txt",
+        "path": "external_data/wasp77ab_smith2024/w77_1DRC_FULL.txt",
+        "role": "Smith full atmospheric template",
+        "sha256": "8f3fcdf119b42e1c1db5b5aba61c8266bad65cf3c279aa237e55346ed9be7a14",
+        "size_bytes": 13899150
+      }
+    },
+    {
+      "ccf_finite_values": 3476,
+      "ccf_max": 0.10530510058191034,
+      "ccf_mean": 0.006406900745194223,
+      "ccf_min": -0.11225245186653718,
+      "ccf_sum": 22.27038699029512,
+      "doppler_mode": "smith_nonrelativistic",
+      "flux_ratio_scale": 0.01695254415154625,
+      "loglike": -23375411.214066107,
+      "n_components": 4,
+      "name": "h2o_only",
+      "paper_ccf_snr_anchor": 9.2,
+      "paper_ccf_snr_note": "Paper value uses the full 2-D CCF-map median/3-sigma normalization; this local diagnostic is a raw summed CCF and does not reproduce it.",
+      "parameter_source": "Smith et al. 2024 Table 3 pre-eclipse medians",
+      "parameters": {
+        "Kp": 190.74,
+        "dVsys": -5.27,
+        "dphi": 0.0,
+        "log10_a": 0.15
+      },
+      "response": {
+        "applied_operator_names": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ],
+        "crop": {
+          "edge_padding_points": 8,
+          "raw_orientation": "ascending",
+          "source_bounds_actual_micron": [
+            1.451870348853811,
+            2.4492358992846053
+          ],
+          "source_bounds_requested_micron": [
+            1.451917120881073,
+            2.449155671542693
+          ],
+          "source_points": 130732
+        },
+        "doppler_stage": "Smith likelihood interpolation after fixed response",
+        "gaussian_kernel_support_sigma": 4.0,
+        "gaussian_lsf_resolving_power": 45000.0,
+        "pixel_integration": false,
+        "post_response_mapping": "Smith likelihood linear interpolation onto real cube pixels",
+        "processed_bounds_micron": [
+          1.4519487664258472,
+          2.4491036197324565
+        ],
+        "processed_points": 130704,
+        "query_bounds_micron": [
+          1.4520164880366861,
+          2.4489880697503623
+        ],
+        "raw_template_resolution": "R=250000",
+        "rotation_kernel": "Gray linear-limb-darkened rotational broadening",
+        "rotation_limb_darkening": 0.6,
+        "rotation_vsini_km_s": 4.2,
+        "stage_order": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ],
+        "velocity_coverage": {
+          "anchor_parameters": {
+            "Kp": 190.74,
+            "dVsys": -5.27,
+            "dphi": 0.0,
+            "log10_a": 0.15
+          },
+          "anchor_velocity_bounds_km_s": [
+            53.529017940321424,
+            187.5490756237242
+          ],
+          "dVsys_prior_bounds_km_s": [
+            -20.0,
+            20.0
+          ],
+          "dphi_fixed": 0.0,
+          "kp_prior_bounds_km_s": [
+            172.0,
+            212.0
+          ],
+          "prior_velocity_bounds_km_s": [
+            35.36523950330347,
+            231.70833077369076
+          ]
+        }
+      },
+      "template": {
+        "md5": "6cf0ec37cbed5db5b18e6d434838fa40",
+        "name": "w77_1DRC_H2O_ONLY.txt",
+        "path": "external_data/wasp77ab_smith2024/w77_1DRC_H2O_ONLY.txt",
+        "role": "Smith H2O-only atmospheric template",
+        "sha256": "f68acda835e0af3e1747504d1e6243560610e5b98ad675917233859a17ace330",
+        "size_bytes": 13899150
+      }
+    },
+    {
+      "ccf_finite_values": 3476,
+      "ccf_max": 0.10673087098345233,
+      "ccf_mean": 0.0013536456145487178,
+      "ccf_min": -0.11226648435661157,
+      "ccf_sum": 4.705272156171343,
+      "doppler_mode": "smith_nonrelativistic",
+      "flux_ratio_scale": 0.01695254415154625,
+      "loglike": -23375600.671311215,
+      "n_components": 4,
+      "name": "co_only",
+      "paper_ccf_snr_anchor": 3.6,
+      "paper_ccf_snr_note": "Paper value uses the full 2-D CCF-map median/3-sigma normalization; this local diagnostic is a raw summed CCF and does not reproduce it.",
+      "parameter_source": "Smith et al. 2024 Table 3 pre-eclipse medians",
+      "parameters": {
+        "Kp": 190.74,
+        "dVsys": -5.27,
+        "dphi": 0.0,
+        "log10_a": 0.15
+      },
+      "response": {
+        "applied_operator_names": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ],
+        "crop": {
+          "edge_padding_points": 8,
+          "raw_orientation": "ascending",
+          "source_bounds_actual_micron": [
+            1.451870348853811,
+            2.4492358992846053
+          ],
+          "source_bounds_requested_micron": [
+            1.451917120881073,
+            2.449155671542693
+          ],
+          "source_points": 130732
+        },
+        "doppler_stage": "Smith likelihood interpolation after fixed response",
+        "gaussian_kernel_support_sigma": 4.0,
+        "gaussian_lsf_resolving_power": 45000.0,
+        "pixel_integration": false,
+        "post_response_mapping": "Smith likelihood linear interpolation onto real cube pixels",
+        "processed_bounds_micron": [
+          1.4519487664258472,
+          2.4491036197324565
+        ],
+        "processed_points": 130704,
+        "query_bounds_micron": [
+          1.4520164880366861,
+          2.4489880697503623
+        ],
+        "raw_template_resolution": "R=250000",
+        "rotation_kernel": "Gray linear-limb-darkened rotational broadening",
+        "rotation_limb_darkening": 0.6,
+        "rotation_vsini_km_s": 4.2,
+        "stage_order": [
+          "rotational-broadening",
+          "gaussian-high-resolution"
+        ],
+        "velocity_coverage": {
+          "anchor_parameters": {
+            "Kp": 190.74,
+            "dVsys": -5.27,
+            "dphi": 0.0,
+            "log10_a": 0.15
+          },
+          "anchor_velocity_bounds_km_s": [
+            53.529017940321424,
+            187.5490756237242
+          ],
+          "dVsys_prior_bounds_km_s": [
+            -20.0,
+            20.0
+          ],
+          "dphi_fixed": 0.0,
+          "kp_prior_bounds_km_s": [
+            172.0,
+            212.0
+          ],
+          "prior_velocity_bounds_km_s": [
+            35.36523950330347,
+            231.70833077369076
+          ]
+        }
+      },
+      "template": {
+        "md5": "d4f0c6dfd4bb50a7ca9ca73ea3318eb3",
+        "name": "w77_1DRC_CO_ONLY.txt",
+        "path": "external_data/wasp77ab_smith2024/w77_1DRC_CO_ONLY.txt",
+        "role": "Smith CO-only atmospheric template",
+        "sha256": "b8c9fc1496b25d9b4030ac3fafac3623ac1a5e945cf0b2f3161e96d3e8e3c016",
+        "size_bytes": 13899150
+      }
+    }
+  ],
+  "velocity_scan": {
+    "Kp_km_s": [
+      190.74
+    ],
+    "dVsys_km_s": [
+      -7.27,
+      -5.27,
+      -3.27
+    ],
+    "method": "three-point local dVsys scan at fixed Kp",
+    "normalization": "raw sum of per-order/per-frame normalized CCF values",
+    "paper_snr_reproduction": false,
+    "raw_summed_ccf": [
+      [
+        23.366489393753263,
+        26.05777022032124,
+        25.08252873734422
+      ]
+    ]
+  },
+  "zenodo": {
+    "files_verified_before_load": true,
+    "url": "https://zenodo.org/records/10382053"
+  }
+}

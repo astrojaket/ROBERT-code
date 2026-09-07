@@ -25,8 +25,8 @@ from robert_exoplanets.opacity import (
 from robert_exoplanets.rt import (
     CiaTable,
     DiscGeometry,
+    HMinusContinuumConfig,
     RefractiveIndexSpectrum,
-    cia_optical_depth,
     gauss_legendre_disk_geometry,
     grey_cloud_from_mass_extinction,
     lognormal_mie_optics,
@@ -43,6 +43,7 @@ from robert_exoplanets.stellar import prepare_stellar_spectrum
 
 from ._atmospheric import (
     evaluate_additional_optical_depths,
+    evaluate_combined_additional_optical_depth,
     evaluate_gas_optical_depth,
 )
 from .clouds import ParameterizedCloudModel, pressure_slab_layer_fractions
@@ -184,6 +185,8 @@ class ParameterizedEmissionModelConfig:
     stellar_spectrum_model: str = "phoenix"
     compute_diagnostics: bool = False
     metadata: Mapping[str, str] = field(default_factory=dict)
+    hminus_continuum: HMinusContinuumConfig | None = None
+    aggregate_additional_optical_depths: bool = False
 
     def __post_init__(self) -> None:
         species = tuple(str(item).strip() for item in self.opacity_species)
@@ -212,6 +215,17 @@ class ParameterizedEmissionModelConfig:
             )
         if not isinstance(self.compute_diagnostics, bool):
             raise RobertValidationError("compute_diagnostics must be a boolean")
+        if not isinstance(self.aggregate_additional_optical_depths, bool):
+            raise RobertValidationError(
+                "aggregate_additional_optical_depths must be a boolean"
+            )
+        if self.hminus_continuum is not None and not isinstance(
+            self.hminus_continuum,
+            HMinusContinuumConfig,
+        ):
+            raise RobertValidationError(
+                "hminus_continuum must be an HMinusContinuumConfig or None"
+            )
         stellar_model = self.stellar_spectrum_model.strip().lower()
         if stellar_model not in {"phoenix", "blackbody"}:
             raise RobertValidationError(
@@ -693,9 +707,24 @@ class ParameterizedEmissionForwardModel:
                 "cia_normal_hydrogen": str(
                     bool(self.config.cia_normal_hydrogen)
                 ).lower(),
+                "include_hminus_continuum": str(
+                    self.config.hminus_continuum is not None
+                ).lower(),
+                "hminus_continuum_species": ""
+                if self.config.hminus_continuum is None
+                else ",".join(self.config.hminus_continuum.species),
+                "hminus_temperature_extrapolation": ""
+                if self.config.hminus_continuum is None
+                else self.config.hminus_continuum.temperature_extrapolation,
+                "hminus_spectral_extrapolation": ""
+                if self.config.hminus_continuum is None
+                else self.config.hminus_continuum.spectral_extrapolation,
                 "thermal_integration_backend": self.config.thermal_integration_backend,
                 "sh4_boundary_backend": self.config.sh4_boundary_backend,
                 "compute_diagnostics": str(self.config.compute_diagnostics).lower(),
+                "aggregate_additional_optical_depths": str(
+                    bool(self.config.aggregate_additional_optical_depths)
+                ).lower(),
                 "geometry": self.geometry.name,
                 "geometry_points": str(self.geometry.n_points),
                 "radius_scale_parameter": self.config.radius_scale_parameter or "",
@@ -793,16 +822,35 @@ class ParameterizedEmissionForwardModel:
             gas_combination=self.config.gas_combination,
             retain_species_tau=self.config.compute_diagnostics,
         )
-        additional_optical_depths = evaluate_additional_optical_depths(
-            gas_optical_depth,
-            cia_tables=self.cia_tables,
-            include_rayleigh=self.config.include_rayleigh,
-            cia_normal_hydrogen=self.config.cia_normal_hydrogen,
-            cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
-            cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
-            cloud_model=self.cloud_model,
-            parameters=parameter_values,
-        )
+        if (
+            self.config.aggregate_additional_optical_depths
+            and not self.config.compute_diagnostics
+            and self.cloud_model is None
+        ):
+            combined_additional = evaluate_combined_additional_optical_depth(
+                gas_optical_depth,
+                cia_tables=self.cia_tables,
+                include_rayleigh=self.config.include_rayleigh,
+                cia_normal_hydrogen=self.config.cia_normal_hydrogen,
+                cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
+                cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+                hminus_continuum=self.config.hminus_continuum,
+            )
+            additional_optical_depths = (
+                () if combined_additional is None else (combined_additional,)
+            )
+        else:
+            additional_optical_depths = evaluate_additional_optical_depths(
+                gas_optical_depth,
+                cia_tables=self.cia_tables,
+                include_rayleigh=self.config.include_rayleigh,
+                cia_normal_hydrogen=self.config.cia_normal_hydrogen,
+                cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
+                cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+                hminus_continuum=self.config.hminus_continuum,
+                cloud_model=self.cloud_model,
+                parameters=parameter_values,
+            )
         multiple_scattering_backend = (
             "none"
             if self.cloud_model is None
@@ -950,21 +998,17 @@ class ParameterizedGreyCloudEmissionForwardModel(ParameterizedEmissionForwardMod
             gas_combination=self.config.gas_combination,
             retain_species_tau=self.config.compute_diagnostics,
         )
-        additional_optical_depths = []
-        for table in self.cia_tables:
-            additional_optical_depths.append(
-                cia_optical_depth(
-                    gas_optical_depth,
-                    table,
-                    normal_hydrogen=self.config.cia_normal_hydrogen,
-                    temperature_extrapolation=self.config.cia_temperature_extrapolation,
-                    spectral_extrapolation=self.config.cia_spectral_extrapolation,
-                )
+        additional_optical_depths = list(
+            evaluate_additional_optical_depths(
+                gas_optical_depth,
+                cia_tables=self.cia_tables,
+                include_rayleigh=self.config.include_rayleigh,
+                cia_normal_hydrogen=self.config.cia_normal_hydrogen,
+                cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
+                cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+                hminus_continuum=self.config.hminus_continuum,
             )
-        if self.config.include_rayleigh:
-            additional_optical_depths.append(
-                rayleigh_scattering_optical_depth(gas_optical_depth)
-            )
+        )
         cloud_opacity = float(
             np.power(10.0, parameter_values[self.cloud.log10_mass_extinction_parameter])
         )
@@ -1295,20 +1339,17 @@ class ParameterizedRefractiveIndexCloudEmissionForwardModel(
             gas_combination=self.config.gas_combination,
             retain_species_tau=self.config.compute_diagnostics,
         )
-        additional_optical_depths = [
-            cia_optical_depth(
+        additional_optical_depths = list(
+            evaluate_additional_optical_depths(
                 gas_optical_depth,
-                table,
-                normal_hydrogen=self.config.cia_normal_hydrogen,
-                temperature_extrapolation=self.config.cia_temperature_extrapolation,
-                spectral_extrapolation=self.config.cia_spectral_extrapolation,
+                cia_tables=self.cia_tables,
+                include_rayleigh=self.config.include_rayleigh,
+                cia_normal_hydrogen=self.config.cia_normal_hydrogen,
+                cia_temperature_extrapolation=self.config.cia_temperature_extrapolation,
+                cia_spectral_extrapolation=self.config.cia_spectral_extrapolation,
+                hminus_continuum=self.config.hminus_continuum,
             )
-            for table in self.cia_tables
-        ]
-        if self.config.include_rayleigh:
-            additional_optical_depths.append(
-                rayleigh_scattering_optical_depth(gas_optical_depth)
-            )
+        )
 
         index = self.cloud.fixed_refractive_index
         if index is None:

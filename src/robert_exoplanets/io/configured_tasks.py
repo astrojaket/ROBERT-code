@@ -77,7 +77,11 @@ from .task_config import (
 )
 from .l9859b import load_bello_arufe2025_l9859b
 from .wasp69b import load_schlawin2024_wasp69b
+from .wasp77ab import load_august2023_wasp77ab
 from .wasp80b import load_wiser2025_wasp80b
+
+
+_OPACITY_CACHE_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -175,6 +179,7 @@ def load_observations(config: TaskConfig) -> ObservationCollection:
             metadata={"source_path": str(config.observations.path)},
         )
     loaders = {
+        "august2023_wasp77ab": load_august2023_wasp77ab,
         "bello_arufe2025_l9859b": load_bello_arufe2025_l9859b,
         "schlawin2024_wasp69b": load_schlawin2024_wasp69b,
         "wiser2025_wasp80b": load_wiser2025_wasp80b,
@@ -215,6 +220,110 @@ def cache_directory(config: TaskConfig) -> Path:
     return config.opacity.cache_directory / config.opacity.resolution
 
 
+def _preparation_fingerprint(
+    config: TaskConfig,
+    dataset: ObservationDataset,
+    species: str,
+) -> str:
+    """Return the identity of one prepared table's scientific inputs."""
+
+    grid = dataset.observation.spectral_grid
+    binning = config.opacity.binning
+    metadata = {
+        "cache_schema_version": _OPACITY_CACHE_SCHEMA_VERSION,
+        "dataset": dataset.name,
+        "species": species,
+        "configured_species": list(config.opacity.species),
+        "format": config.opacity.format,
+        "source_path": str(config.opacity.path.expanduser().resolve()),
+        "resolution": config.opacity.resolution,
+        "binning": {
+            "num": binning.num,
+            "use_rebin": binning.use_rebin,
+            "remove_zeros": binning.remove_zeros,
+            "g_points": binning.g_points,
+        },
+        "spectral_grid": {
+            "unit": grid.unit,
+            "role": grid.role,
+            "has_bin_edges": grid.bin_edges is not None,
+        },
+    }
+    digest = sha256(
+        dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+    for name, values in (
+        ("values", grid.values),
+        ("bin_edges", grid.bin_edges),
+    ):
+        digest.update(name.encode("ascii"))
+        if values is None:
+            digest.update(b"none")
+            continue
+        canonical = np.ascontiguousarray(values, dtype="<f8")
+        digest.update(str(canonical.shape).encode("ascii"))
+        digest.update(canonical.tobytes(order="C"))
+    return digest.hexdigest()
+
+
+def _saved_text(saved: np.lib.npyio.NpzFile, name: str) -> str:
+    value = np.asarray(saved[name])
+    if value.size != 1:
+        raise ValueError(f"cache field {name!r} must contain one value")
+    item = value.reshape(-1)[0]
+    if isinstance(item, bytes):
+        return item.decode("utf-8")
+    return str(item)
+
+
+def _saved_integer(saved: np.lib.npyio.NpzFile, name: str) -> int:
+    value = np.asarray(saved[name])
+    if value.size != 1:
+        raise ValueError(f"cache field {name!r} must contain one value")
+    return int(value.reshape(-1)[0])
+
+
+def _cache_matches(
+    saved: np.lib.npyio.NpzFile,
+    *,
+    fingerprint: str,
+    source_sha256: str,
+    species: str,
+    resolution: str,
+    spectral_preparation: str,
+) -> bool:
+    required = {
+        "opacity_cache_schema_version",
+        "preparation_fingerprint",
+        "species",
+        "source_sha256",
+        "opacity_resolution",
+        "spectral_preparation",
+    }
+    if not required.issubset(saved.files):
+        return False
+    try:
+        return (
+            _saved_integer(saved, "opacity_cache_schema_version")
+            == _OPACITY_CACHE_SCHEMA_VERSION
+            and _saved_text(saved, "preparation_fingerprint") == fingerprint
+            and _saved_text(saved, "species") == species
+            and _saved_text(saved, "source_sha256") == source_sha256
+            and _saved_text(saved, "opacity_resolution") == resolution
+            and _saved_text(saved, "spectral_preparation")
+            == spectral_preparation
+        )
+    except (TypeError, ValueError, UnicodeDecodeError):
+        return False
+
+
+def _cache_error(path: Path) -> RobertConfigError:
+    return RobertConfigError(
+        f"prepared opacity cache is stale or uses an unsupported schema: {path}\n"
+        "Run `python run_retrieval.py --config CONFIG --prepare-opacity` again."
+    )
+
+
 def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> None:
     """Prepare selected molecular opacity on each observed spectral grid."""
 
@@ -239,15 +348,16 @@ def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> 
         source_sha = str(table.metadata["checksum_sha256"])
         for dataset in observations.datasets:
             target = cache / f"{dataset.name}_{species}.npz"
+            fingerprint = _preparation_fingerprint(config, dataset, species)
             if target.exists():
                 with np.load(target, allow_pickle=False) as saved:
-                    current = {"opacity_resolution", "binning_num"}.issubset(
-                        saved.files
-                    ) and (
-                        str(saved["source_sha256"]) == source_sha
-                        and str(saved["opacity_resolution"])
-                        == config.opacity.resolution
-                        and int(saved["binning_num"]) == binning.num
+                    current = _cache_matches(
+                        saved,
+                        fingerprint=fingerprint,
+                        source_sha256=source_sha,
+                        species=species,
+                        resolution=config.opacity.resolution,
+                        spectral_preparation="exo_k_bin_down_cp",
                     )
                 if current:
                     continue
@@ -272,6 +382,13 @@ def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> 
                 source_sha256=source_sha,
                 opacity_resolution=config.opacity.resolution,
                 binning_num=binning.num,
+                binning_use_rebin=binning.use_rebin,
+                binning_remove_zeros=binning.remove_zeros,
+                binning_g_points=binning.g_points,
+                opacity_format=config.opacity.format,
+                configured_species=",".join(config.opacity.species),
+                opacity_cache_schema_version=_OPACITY_CACHE_SCHEMA_VERSION,
+                preparation_fingerprint=fingerprint,
                 spectral_preparation="exo_k_bin_down_cp",
             )
 
@@ -299,20 +416,25 @@ def _prepare_exomol_cross_section_opacity(
         source_sha = _file_sha256(source)
         for dataset in observations.datasets:
             target = cache / f"{dataset.name}_{species}.npz"
-            wavelength = np.asarray(
-                dataset.observation.spectral_grid.values,
-                dtype=float,
-            )
+            fingerprint = _preparation_fingerprint(config, dataset, species)
             if target.exists():
                 with np.load(target, allow_pickle=False) as saved:
-                    current = (
-                        "source_sha256" in saved.files
-                        and str(saved["source_sha256"]) == source_sha
-                        and str(saved.get("spectral_preparation", ""))
-                        == "exomol_cross_section_wavelength_weighted_k"
-                        and saved["g_samples"].size == config.opacity.binning.g_points
-                        and np.allclose(saved["wavelength_micron"], wavelength)
+                    current = _cache_matches(
+                        saved,
+                        fingerprint=fingerprint,
+                        source_sha256=source_sha,
+                        species=species,
+                        resolution=config.opacity.resolution,
+                        spectral_preparation=(
+                            "exomol_cross_section_wavelength_weighted_k"
+                        ),
                     )
+                    if current:
+                        current = (
+                            "g_samples" in saved.files
+                            and saved["g_samples"].size
+                            == config.opacity.binning.g_points
+                        )
                 if current:
                     continue
             table = CorrelatedKTable.from_exomol_cross_section_hdf(
@@ -340,6 +462,12 @@ def _prepare_exomol_cross_section_opacity(
                 opacity_resolution=config.opacity.resolution,
                 binning_num=config.opacity.binning.num,
                 g_points=config.opacity.binning.g_points,
+                binning_use_rebin=config.opacity.binning.use_rebin,
+                binning_remove_zeros=config.opacity.binning.remove_zeros,
+                opacity_format=config.opacity.format,
+                configured_species=",".join(config.opacity.species),
+                opacity_cache_schema_version=_OPACITY_CACHE_SCHEMA_VERSION,
+                preparation_fingerprint=fingerprint,
                 spectral_preparation="exomol_cross_section_wavelength_weighted_k",
             )
 
@@ -353,29 +481,62 @@ def _file_sha256(path: Path) -> str:
 
 
 def _load_cached_table(
-    config: TaskConfig, dataset: str, species: str
+    config: TaskConfig, dataset: ObservationDataset, species: str
 ) -> CorrelatedKTable:
-    path = cache_directory(config) / f"{dataset}_{species}.npz"
+    path = cache_directory(config) / f"{dataset.name}_{species}.npz"
     if not path.is_file():
         raise FileNotFoundError(
             f"prepared opacity cache is missing: {path}\n"
             "Run `python run_retrieval.py --config CONFIG --prepare-opacity` first."
         )
     with np.load(path, allow_pickle=False) as saved:
-        opacity_resolution = (
-            str(saved["opacity_resolution"])
-            if "opacity_resolution" in saved.files
-            else config.opacity.resolution
-        )
-        spectral_preparation = (
-            str(saved["spectral_preparation"])
-            if "spectral_preparation" in saved.files
-            else "legacy_prepared_cache"
-        )
-        source_doi = str(saved["source_doi"]) if "source_doi" in saved.files else ""
-        source_line_list = (
-            str(saved["source_line_list"]) if "source_line_list" in saved.files else ""
-        )
+        required = {
+            "source_path",
+            "source_sha256",
+            "unit",
+            "pressure_bar",
+            "temperature_K",
+            "wavenumber_cm_inverse",
+            "wavelength_micron",
+            "g_samples",
+            "g_weights",
+            "kcoeff",
+            "opacity_resolution",
+            "spectral_preparation",
+            "opacity_cache_schema_version",
+            "preparation_fingerprint",
+        }
+        if not required.issubset(saved.files):
+            raise _cache_error(path)
+        try:
+            source_sha256 = _saved_text(saved, "source_sha256")
+            opacity_resolution = _saved_text(saved, "opacity_resolution")
+            spectral_preparation = _saved_text(saved, "spectral_preparation")
+            expected_preparation = (
+                "exomol_cross_section_wavelength_weighted_k"
+                if config.opacity.format == "exomol_cross_section_hdf"
+                else "exo_k_bin_down_cp"
+            )
+            current = _cache_matches(
+                saved,
+                fingerprint=_preparation_fingerprint(config, dataset, species),
+                source_sha256=source_sha256,
+                species=species,
+                resolution=config.opacity.resolution,
+                spectral_preparation=expected_preparation,
+            )
+            if not source_sha256 or not current:
+                raise _cache_error(path)
+            source_doi = (
+                _saved_text(saved, "source_doi") if "source_doi" in saved.files else ""
+            )
+            source_line_list = (
+                _saved_text(saved, "source_line_list")
+                if "source_line_list" in saved.files
+                else ""
+            )
+        except (TypeError, ValueError, UnicodeDecodeError) as exc:
+            raise _cache_error(path) from exc
         return CorrelatedKTable(
             species=species,
             pressure_bar=saved["pressure_bar"],
@@ -385,14 +546,20 @@ def _load_cached_table(
             g_samples=saved["g_samples"],
             g_weights=saved["g_weights"],
             kcoeff=saved["kcoeff"],
-            unit=str(saved["unit"]),
+            unit=_saved_text(saved, "unit"),
             metadata={
-                "source_path": str(saved["source_path"]),
-                "checksum_sha256": str(saved["source_sha256"]),
+                "source_path": _saved_text(saved, "source_path"),
+                "checksum_sha256": source_sha256,
                 "opacity_resolution": opacity_resolution,
                 "spectral_preparation": spectral_preparation,
                 "source_doi": source_doi,
                 "source_line_list": source_line_list,
+                "opacity_cache_schema_version": str(
+                    _saved_integer(saved, "opacity_cache_schema_version")
+                ),
+                "preparation_fingerprint": _saved_text(
+                    saved, "preparation_fingerprint"
+                ),
             },
         )
 
@@ -605,7 +772,7 @@ def _opacity_providers(
     providers = {}
     for dataset in observations.datasets:
         tables = {
-            species: _load_cached_table(config, dataset.name, species)
+            species: _load_cached_table(config, dataset, species)
             for species in config.opacity.species
         }
         reference = next(iter(tables.values()))
@@ -785,6 +952,7 @@ def build_problem(
         ),
         invalid_loglike=-1.0e100,
         metadata={
+            "configured_science_sha256": _configured_science_sha256(config),
             "configuration_schema_version": str(config.schema_version),
             "opacity_resolution": config.opacity.resolution,
             "cloud_model": ",".join(
@@ -796,6 +964,20 @@ def build_problem(
         },
         opacity_identifiers=opacity_ids,
     )
+
+
+def _configured_science_sha256(config: TaskConfig) -> str:
+    """Identify the configured physics independently of run budgets and plots."""
+
+    fields = (
+        "bodies", "atmosphere", "clouds", "disk_emission", "opacity",
+        "radiative_transfer", "likelihood", "observations", "parameters",
+    )
+    values = config.model_dump(mode="json", include=set(fields))
+    values["opacity"].pop("cache_directory", None)
+    return sha256(
+        dumps(values, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 def build_native_emission_model(
@@ -974,7 +1156,7 @@ def run_retrieval_task(config: TaskConfig, source: Path):
             output_dir=config.outputs.directory / "optimal_estimation",
             **_optimal_estimation_kwargs(config, problem),
         )
-    elif engine in {"ultranest", "multinest"}:
+    elif engine == "multinest":
         result = run_retrieval(
             problem,
             method=engine,
@@ -983,7 +1165,7 @@ def run_retrieval_task(config: TaskConfig, source: Path):
             **_nested_sampler_kwargs(config, engine),
         )
     else:
-        nested_method = "multinest" if engine.endswith("multinest") else "ultranest"
+        nested_method = "multinest"
         result = run_oe_then_nested_sampling(
             problem,
             output_dir=config.outputs.directory,
@@ -1078,15 +1260,9 @@ def _nested_sampler_kwargs(config: TaskConfig, method: str) -> dict[str, object]
         "mpi_nprocs": mpi_processes(config),
         "invalid_loglike_floor": sampler.invalid_loglike_floor,
     }
-    if method == "ultranest":
-        return {
-            **common,
-            "min_num_live_points": sampler.live_points,
-            "max_ncalls": sampler.max_calls,
-            "dlogz": sampler.dlogz,
-            "resume": sampler.resume,
-            "show_status": sampler.show_status,
-        }
+    if method != "multinest":
+        raise RobertConfigError("nested sampling requires MultiNest through PyMultiNest")
+
     return {
         **common,
         "n_live_points": sampler.live_points,
@@ -1114,11 +1290,7 @@ def _sampler_description(config: TaskConfig) -> str:
                 f"{sampler.oe_temperature_correlation_length_dex:g} dex"
             )
         return description
-    limits = (
-        f"max_calls={sampler.max_calls}"
-        if "ultranest" in sampler.engine
-        else f"max_iterations={sampler.multinest_max_iterations or 'unlimited'}"
-    )
+    limits = f"max_iterations={sampler.multinest_max_iterations or 'unlimited'}"
     return f"Inference: {sampler.engine}, live_points={sampler.live_points}, {limits}"
 
 
@@ -1153,10 +1325,10 @@ def _preflight_retrieval_manifests(
             settings={"method": "optimal_estimation", **oe_kwargs},
             random_seed=None,
         )
-    if engine in {"ultranest", "multinest"} or engine.startswith(
+    if engine == "multinest" or engine.startswith(
         "optimal_estimation_to_"
     ):
-        nested_method = "multinest" if engine.endswith("multinest") else "ultranest"
+        nested_method = "multinest"
         nested_kwargs = _nested_sampler_kwargs(config, nested_method)
         build_run_manifest(
             problem,
@@ -1232,10 +1404,6 @@ def _postprocess_retrieval_outputs(
         if parameter.label is not None
     }
     parameter_labels.update(config.plotting.parameter_labels)
-    native_spectrum_model = build_native_emission_model(
-        config,
-        problem.observations,
-    )
     for result_dir in discover_retrieval_result_directories(config.outputs.directory):
         postprocess_retrieval_output(
             problem,
@@ -1250,7 +1418,6 @@ def _postprocess_retrieval_outputs(
             posterior_predictive_samples=(config.plotting.posterior_predictive_samples),
             posterior_predictive_seed=config.plotting.posterior_predictive_seed,
             corner_max_parameters=config.plotting.corner_max_parameters,
-            native_spectrum_model=native_spectrum_model,
             leave_one_out=config.plotting.leave_one_out.enabled,
             loo_max_posterior_draws=(config.plotting.leave_one_out.max_posterior_draws),
             loo_seed=config.plotting.leave_one_out.seed,

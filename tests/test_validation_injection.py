@@ -142,3 +142,25 @@ def test_evaluate_injection_recovery_requires_inference_convergence() -> None:
     assert report.fit_passed
     assert not report.inference_converged
     assert not report.passed
+
+
+def test_evaluate_injection_recovery_accepts_exact_fit_statistic_and_effective_count() -> None:
+    spectrum = _model_spectrum()
+    observation = inject_spectrum(spectrum, 0.1, seed=11, noise_scale=0.0)
+
+    report = evaluate_injection_recovery(
+        case_name="profiled-statistic",
+        truth={"offset": 1.0},
+        estimates={"offset": 1.0},
+        absolute_tolerances={"offset": 0.1},
+        observation=observation,
+        best_fit_spectrum=spectrum,
+        seed=11,
+        chi_square_override=4.0,
+        effective_n_active_points=3,
+        reduced_chi_square_bounds=(0.0, 10.0),
+    )
+
+    assert report.chi_square == pytest.approx(4.0)
+    assert report.n_active_points == 3
+    assert report.reduced_chi_square == pytest.approx(2.0)

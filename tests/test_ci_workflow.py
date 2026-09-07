@@ -8,6 +8,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+PYPROJECT = ROOT / "pyproject.toml"
 
 
 def test_ci_example_smoke_checks_reference_maintained_files() -> None:
@@ -26,7 +27,7 @@ def test_ci_validates_the_generalized_yaml_workflow() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "python run_retrieval.py" in text
-    assert "configurations/wasp69b_cloud_free_R1000.yaml" in text
+    assert "configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml" in text
     assert "--validate-only" in text
 
 
@@ -35,3 +36,23 @@ def test_ci_quality_job_exercises_optional_diagnostics() -> None:
 
     quality_job = text.split("  test:", maxsplit=1)[0]
     assert "[dev,perf,opacity,diagnostics]" in quality_job
+
+
+def test_ci_uses_current_node24_actions() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    checkout_versions = re.findall(r"uses:\s*actions/checkout@([^\s]+)", text)
+    setup_python_versions = re.findall(r"uses:\s*actions/setup-python@([^\s]+)", text)
+
+    assert checkout_versions
+    assert setup_python_versions
+    assert all(version == "v7" for version in checkout_versions)
+    assert all(version == "v7" for version in setup_python_versions)
+
+
+def test_ci_lint_policy_is_reproducible() -> None:
+    text = PYPROJECT.read_text(encoding="utf-8")
+
+    assert text.count('"ruff==0.15.22"') == 2
+    assert '[tool.ruff]\ntarget-version = "py310"' in text
+    assert '[tool.ruff.lint]\nselect = ["E4", "E7", "E9", "F"]' in text

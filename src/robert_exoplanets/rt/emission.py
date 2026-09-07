@@ -15,12 +15,15 @@ from robert_exoplanets.opacity import (
     spectral_grid_values_in_unit,
 )
 
+from . import _planck
 from .geometry import (
     DiscGeometry,
     gauss_legendre_disk_geometry,
     geometry_from_emission_angles,
     normal_emission_geometry,
 )
+from ._planck import _planck_radiance_wavelength
+from ._validation import _validate_contribution_grid_match
 from .optical_depth import GasOpticalDepth
 from .path_geometry import HydrostaticPathGeometry
 from .scattering import SingleScatteringSource
@@ -32,10 +35,10 @@ from .thermal_integration import (
 )
 from .toon import solve_thermal_two_stream
 
-PLANCK_CONSTANT_J_S = 6.62607015e-34
-SPEED_OF_LIGHT_M_S = 299_792_458.0
-BOLTZMANN_CONSTANT_J_K = 1.380649e-23
-MICRON_TO_METER = 1.0e-6
+PLANCK_CONSTANT_J_S = _planck.PLANCK_CONSTANT_J_S
+SPEED_OF_LIGHT_M_S = _planck.SPEED_OF_LIGHT_M_S
+BOLTZMANN_CONSTANT_J_K = _planck.BOLTZMANN_CONSTANT_J_K
+MICRON_TO_METER = _planck.MICRON_TO_METER
 
 
 @dataclass(frozen=True)
@@ -807,9 +810,6 @@ def solve_emission_spectrum(
         total_tau, opacity_sources = _total_extinction_only(
             gas_optical_depth, additional_optical_depths
         )
-        scattering_tau = np.zeros_like(total_tau)
-        transport_scattering_tau = np.zeros_like(total_tau)
-        scattering_phase_moments = np.zeros((5,) + total_tau.shape)
     path_factors = _emission_path_factors(
         mu,
         gas_optical_depth.atmosphere.n_layers,
@@ -1041,31 +1041,6 @@ def _layer_planck_source(
     return source
 
 
-def _planck_radiance_wavelength(
-    wavelength_micron: ArrayLike,
-    temperature_k: float,
-) -> NDArray[np.float64]:
-    wavelength = _positive_wavelength_micron(wavelength_micron)
-    temperature = _positive_float(temperature_k, "temperature_k")
-    wavelength_m = wavelength * MICRON_TO_METER
-    exponent = (
-        PLANCK_CONSTANT_J_S
-        * SPEED_OF_LIGHT_M_S
-        / (wavelength_m * BOLTZMANN_CONSTANT_J_K * temperature)
-    )
-    with np.errstate(over="ignore", invalid="ignore"):
-        radiance = (
-            2.0
-            * PLANCK_CONSTANT_J_S
-            * SPEED_OF_LIGHT_M_S**2
-            / (np.power(wavelength_m, 5) * np.expm1(exponent))
-        )
-    if not np.all(np.isfinite(radiance)) or np.any(radiance < 0.0):
-        raise RobertValidationError("Planck source calculation produced invalid values")
-    radiance.setflags(write=False)
-    return radiance
-
-
 def _stellar_radiance_for_eclipse(
     output_grid: SpectralGrid,
     wavelength_micron: NDArray[np.float64],
@@ -1152,7 +1127,10 @@ def _total_optical_depth(
     scattering_tau = np.zeros_like(total_tau)
     transport_scattering_tau = np.zeros_like(total_tau)
     phase_moment_numerator = np.zeros((5,) + total_tau.shape)
-    sources = ["gas_correlated_k"]
+    opacity_mode = str(
+        gas_optical_depth.metadata.get("opacity_mode", "correlated_k")
+    ).strip() or "correlated_k"
+    sources = [f"gas_{opacity_mode}"]
     scattering_sources = []
     has_scattering_extinction = False
     if additional_optical_depths is not None:
@@ -1364,49 +1342,6 @@ def _looks_like_cloud_optical_properties(contribution: object) -> bool:
             "asymmetry_factor",
         )
     )
-
-
-def _validate_contribution_grid_match(
-    gas_optical_depth: GasOpticalDepth,
-    contribution: object,
-) -> None:
-    if hasattr(contribution, "spectral_grid"):
-        contribution_wavelength = spectral_grid_values_in_unit(
-            getattr(contribution, "spectral_grid"),
-            "micron",
-        )
-        gas_wavelength = spectral_grid_values_in_unit(
-            gas_optical_depth.spectral_grid, "micron"
-        )
-        if contribution_wavelength.shape != gas_wavelength.shape or not np.allclose(
-            contribution_wavelength,
-            gas_wavelength,
-            rtol=1.0e-12,
-            atol=0.0,
-        ):
-            raise RobertValidationError(
-                "additional optical-depth spectral grid must match gas grid"
-            )
-    if hasattr(contribution, "pressure_grid"):
-        contribution_pressure = pressure_values_in_unit(
-            getattr(contribution, "pressure_grid").centers,
-            getattr(contribution, "pressure_grid").unit,
-            "pa",
-        )
-        gas_pressure = pressure_values_in_unit(
-            gas_optical_depth.pressure_grid.centers,
-            gas_optical_depth.pressure_grid.unit,
-            "pa",
-        )
-        if contribution_pressure.shape != gas_pressure.shape or not np.allclose(
-            contribution_pressure,
-            gas_pressure,
-            rtol=1.0e-10,
-            atol=0.0,
-        ):
-            raise RobertValidationError(
-                "additional optical-depth pressure grid must match gas grid"
-            )
 
 
 def _layer_spectral_tau_for_g(

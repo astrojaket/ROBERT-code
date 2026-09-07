@@ -361,7 +361,7 @@ Belongs here:
 
 - Sampler adapter protocols.
 - Built-in adapters such as `dynesty`.
-- Optional adapters for UltraNest, PyMultiNest, Nautilus, BlackJAX, NumPyro, or
+- Optional adapters for PyMultiNest, Nautilus, BlackJAX, NumPyro, or
   JAXNS.
 
 Does not belong here:
@@ -1336,7 +1336,8 @@ with migration notes.
 
 ### v0.1: Skeleton
 
-Status: current repository stage.
+Status: historical v0.1 milestone. README.md documents the current production
+status.
 
 Includes:
 

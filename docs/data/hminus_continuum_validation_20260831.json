@@ -1,0 +1,1957 @@
+{
+  "acceptance_gates": {
+    "component_coefficients": "pRT/Gray component vectors are checked by the native ROBERT/pRT comparison; John (1988) is diagnostic only",
+    "gaussian_R100000_max_absolute_relative_error_max": 0.05,
+    "gaussian_R100000_rms_relative_error_max": 0.01,
+    "integrated_flux_relative_error_abs_max": 0.01,
+    "native_max_absolute_relative_error_max": 0.05,
+    "native_rms_relative_error_max": 0.01
+  },
+  "angular_quadrature": {
+    "emission_mu": [
+      0.1127016653792583,
+      0.5,
+      0.8872983346207417
+    ],
+    "final_disk_weights": [
+      0.06261203632181017,
+      0.4444444444444444,
+      0.4929435192337454
+    ],
+    "final_weight_sum": 1.0,
+    "name": "petitRADTRANS-3-point-thermal-disc",
+    "pRT_integral_weights": [
+      0.2777777777777778,
+      0.4444444444444444,
+      0.2777777777777778
+    ],
+    "quadrature": "petitRADTRANS_gauss_legendre_projected_disc",
+    "raw_gauss_weights_passed": false,
+    "robert_receives": "final_disk_weights",
+    "weight_formula": "2 * emission_mu * pRT_integral_weight"
+  },
+  "command": "conda run -n robert-exoplanets python examples/benchmark_hminus_continuum.py --max-memory-gib 1.8 --run-pymultinest --pymultinest-live-points 64 --pymultinest-max-iter 0 --pymultinest-evidence-tolerance 0.5 --pymultinest-sampling-efficiency 0.8",
+  "cross_reference": {
+    "path": "docs/data/lbl_kband_science_grid_20260830.json",
+    "role": "existing CO/H2O LBL science-grid validation; not rerun here",
+    "sha256": "f62f51904507c0bd479e8516a81ac33be01c06481de8c6e5ff495d80cd6f6537"
+  },
+  "elapsed_seconds": 29.4810158329783,
+  "frequency_bin_edges": {
+    "saved_in_oracle_npz": true,
+    "unit": "Hz",
+    "used_by_robert_for_bound_free_bin_average": true,
+    "wavelength_edge_unit": "micron"
+  },
+  "hrs_native_and_gaussian_R100000": {
+    "effective_resolving_power": 1000000,
+    "elapsed_seconds": 3.756032875040546,
+    "gaussian_lsf_resolving_power": 100000.0,
+    "measured_peak_rss_bytes": 497319936,
+    "metrics": {
+      "T2500_g10_bound_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.3481466571162457e-07,
+          "max_absolute_relative_error": 2.349317347327684e-07,
+          "median_signed_relative_error": 2.3481457867013944e-07,
+          "p95_absolute_relative_error": 2.3492001179903355e-07,
+          "rms_relative_error": 2.3481461532140608e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.3481461508545465e-07,
+          "max_absolute_relative_error": 2.3493360856718937e-07,
+          "median_signed_relative_error": 2.348145268227242e-07,
+          "p95_absolute_relative_error": 2.3492169315408873e-07,
+          "rms_relative_error": 2.3481456377897947e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_free_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.004825850632102391,
+          "max_absolute_relative_error": 0.004829841136792634,
+          "median_signed_relative_error": 0.004825847897039659,
+          "p95_absolute_relative_error": 0.0048294415692781145,
+          "rms_relative_error": 0.004825849362030433
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.004825848911695685,
+          "max_absolute_relative_error": 0.004829905009010593,
+          "median_signed_relative_error": 0.004825846109838938,
+          "p95_absolute_relative_error": 0.004829498867431337,
+          "rms_relative_error": 0.004825847610735357
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_gray_cloud": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": -1.2311691279243142e-05,
+          "max_absolute_relative_error": 1.2331250255348536e-05,
+          "median_signed_relative_error": -1.2311675619658402e-05,
+          "p95_absolute_relative_error": 1.2329290746238009e-05,
+          "rms_relative_error": 1.2311688479019405e-05
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": -1.2311682905719046e-05,
+          "max_absolute_relative_error": 1.2331563506773335e-05,
+          "median_signed_relative_error": -1.2311666862385717e-05,
+          "p95_absolute_relative_error": 1.2329571728669775e-05,
+          "rms_relative_error": 1.2311680037325677e-05
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_off": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.3481466571162457e-07,
+          "max_absolute_relative_error": 2.349317347327684e-07,
+          "median_signed_relative_error": 2.3481457867013944e-07,
+          "p95_absolute_relative_error": 2.3492001179903355e-07,
+          "rms_relative_error": 2.3481461532140608e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.3481461508545465e-07,
+          "max_absolute_relative_error": 2.3493360856718937e-07,
+          "median_signed_relative_error": 2.348145268227242e-07,
+          "p95_absolute_relative_error": 2.3492169315408873e-07,
+          "rms_relative_error": 2.3481456377897947e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_total": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.004825850632102391,
+          "max_absolute_relative_error": 0.004829841136792634,
+          "median_signed_relative_error": 0.00482584789703977,
+          "p95_absolute_relative_error": 0.004829441569278193,
+          "rms_relative_error": 0.004825849362030482
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.004825848911695685,
+          "max_absolute_relative_error": 0.004829905009010593,
+          "median_signed_relative_error": 0.004825846109839049,
+          "p95_absolute_relative_error": 0.004829498867431448,
+          "rms_relative_error": 0.004825847610735414
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_bound_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.3481466571162457e-07,
+          "max_absolute_relative_error": 2.349317347327684e-07,
+          "median_signed_relative_error": 2.3481457867013944e-07,
+          "p95_absolute_relative_error": 2.3492001179903355e-07,
+          "rms_relative_error": 2.3481461532140608e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.3481461508545465e-07,
+          "max_absolute_relative_error": 2.3493360856718937e-07,
+          "median_signed_relative_error": 2.348145268227242e-07,
+          "p95_absolute_relative_error": 2.3492169315408873e-07,
+          "rms_relative_error": 2.3481456377897947e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_free_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.004821119353101588,
+          "max_absolute_relative_error": 0.004825037587387282,
+          "median_signed_relative_error": 0.004821116811259851,
+          "p95_absolute_relative_error": 0.004824645309432452,
+          "rms_relative_error": 0.0048211180965385195
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.004821117660216645,
+          "max_absolute_relative_error": 0.004825100293548212,
+          "median_signed_relative_error": 0.004821115056314551,
+          "p95_absolute_relative_error": 0.004824701562804901,
+          "rms_relative_error": 0.004821116373091734
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_gray_cloud": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": -7.259112633550835e-06,
+          "max_absolute_relative_error": 7.274209986252167e-06,
+          "median_signed_relative_error": -7.259099639556066e-06,
+          "p95_absolute_relative_error": 7.272697194760091e-06,
+          "rms_relative_error": 7.259111474596637e-06
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": -7.259106192147868e-06,
+          "max_absolute_relative_error": 7.274451827909978e-06,
+          "median_signed_relative_error": -7.259092879907669e-06,
+          "p95_absolute_relative_error": 7.272914118006124e-06,
+          "rms_relative_error": 7.2591050056843306e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_off": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.3481466571162457e-07,
+          "max_absolute_relative_error": 2.349317347327684e-07,
+          "median_signed_relative_error": 2.3481457867013944e-07,
+          "p95_absolute_relative_error": 2.3492001179903355e-07,
+          "rms_relative_error": 2.3481461532140608e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.3481461508545465e-07,
+          "max_absolute_relative_error": 2.3493360856718937e-07,
+          "median_signed_relative_error": 2.348145268227242e-07,
+          "p95_absolute_relative_error": 2.3492169315408873e-07,
+          "rms_relative_error": 2.3481456377897947e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_total": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.0048211193718745715,
+          "max_absolute_relative_error": 0.004825037606408289,
+          "median_signed_relative_error": 0.004821116830032057,
+          "p95_absolute_relative_error": 0.004824645328428479,
+          "rms_relative_error": 0.004821118115311253
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.004821117678989406,
+          "max_absolute_relative_error": 0.004825100312573438,
+          "median_signed_relative_error": 0.004821115075086757,
+          "p95_absolute_relative_error": 0.004824701581804425,
+          "rms_relative_error": 0.004821116391864345
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_bound_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.1803226024630362e-07,
+          "max_absolute_relative_error": 2.181263827338853e-07,
+          "median_signed_relative_error": 2.1803218053229045e-07,
+          "p95_absolute_relative_error": 2.1811695674056609e-07,
+          "rms_relative_error": 2.1803220891360952e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.1803222005623013e-07,
+          "max_absolute_relative_error": 2.1812788997266352e-07,
+          "median_signed_relative_error": 2.1803213889892703e-07,
+          "p95_absolute_relative_error": 2.1811830847040525e-07,
+          "rms_relative_error": 2.1803216744954238e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_free_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.00023883385103973254,
+          "max_absolute_relative_error": 0.00023900626652939572,
+          "median_signed_relative_error": 0.0002388337152210429,
+          "p95_absolute_relative_error": 0.00023898900131649192,
+          "rms_relative_error": 0.00023883377383565908
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.00023883377712796694,
+          "max_absolute_relative_error": 0.00023900902642259858,
+          "median_signed_relative_error": 0.000238833637992375,
+          "p95_absolute_relative_error": 0.000238991477160444,
+          "rms_relative_error": 0.00023883369804294057
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_gray_cloud": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": -7.327226906328477e-06,
+          "max_absolute_relative_error": 7.336761747467335e-06,
+          "median_signed_relative_error": -7.327218169150829e-06,
+          "p95_absolute_relative_error": 7.335806452835048e-06,
+          "rms_relative_error": 7.327223752323576e-06
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": -7.327222850350701e-06,
+          "max_absolute_relative_error": 7.33691446141993e-06,
+          "median_signed_relative_error": -7.327213898844498e-06,
+          "p95_absolute_relative_error": 7.3359434378805766e-06,
+          "rms_relative_error": 7.32721961945725e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_off": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.1803226024630362e-07,
+          "max_absolute_relative_error": 2.181263827338853e-07,
+          "median_signed_relative_error": 2.1803218053229045e-07,
+          "p95_absolute_relative_error": 2.1811695674056609e-07,
+          "rms_relative_error": 2.1803220891360952e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.1803222005623013e-07,
+          "max_absolute_relative_error": 2.1812788997266352e-07,
+          "median_signed_relative_error": 2.1803213889892703e-07,
+          "p95_absolute_relative_error": 2.1811830847040525e-07,
+          "rms_relative_error": 2.1803216744954238e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_total": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.0002388338527863354,
+          "max_absolute_relative_error": 0.00023900626827821903,
+          "median_signed_relative_error": 0.00023883371696797884,
+          "p95_absolute_relative_error": 0.00023898900306421612,
+          "rms_relative_error": 0.00023883377558237112
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.00023883377887479185,
+          "max_absolute_relative_error": 0.00023900902817075576,
+          "median_signed_relative_error": 0.00023883363973886684,
+          "p95_absolute_relative_error": 0.00023899147890849015,
+          "rms_relative_error": 0.00023883369978966354
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_bound_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.1803226024630362e-07,
+          "max_absolute_relative_error": 2.181263827338853e-07,
+          "median_signed_relative_error": 2.1803218053229045e-07,
+          "p95_absolute_relative_error": 2.1811695674056609e-07,
+          "rms_relative_error": 2.1803220891360952e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.1803222005623013e-07,
+          "max_absolute_relative_error": 2.1812788997266352e-07,
+          "median_signed_relative_error": 2.1803213889892703e-07,
+          "p95_absolute_relative_error": 2.1811830847040525e-07,
+          "rms_relative_error": 2.1803216744954238e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_free_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.000235514988296881,
+          "max_absolute_relative_error": 0.0002356843189936786,
+          "median_signed_relative_error": 0.00023551485401196448,
+          "p95_absolute_relative_error": 0.00023566736258162635,
+          "rms_relative_error": 0.0002355149115404956
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.00023551491572937344,
+          "max_absolute_relative_error": 0.00023568702952414533,
+          "median_signed_relative_error": 0.00023551477816463606,
+          "p95_absolute_relative_error": 0.00023566979414318956,
+          "rms_relative_error": 0.00023551483710253137
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_gray_cloud": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": -3.7886877970461086e-06,
+          "max_absolute_relative_error": 3.7954883098656467e-06,
+          "median_signed_relative_error": -3.7886811241061302e-06,
+          "p95_absolute_relative_error": 3.7948068239923583e-06,
+          "rms_relative_error": 3.7886860408825465e-06
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": -3.7886849151291813e-06,
+          "max_absolute_relative_error": 3.795597255273897e-06,
+          "median_signed_relative_error": -3.7886780783202845e-06,
+          "p95_absolute_relative_error": 3.794904544579536e-06,
+          "rms_relative_error": 3.7886831163327395e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_off": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.1803226024630362e-07,
+          "max_absolute_relative_error": 2.181263827338853e-07,
+          "median_signed_relative_error": 2.1803218053229045e-07,
+          "p95_absolute_relative_error": 2.1811695674056609e-07,
+          "rms_relative_error": 2.1803220891360952e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.1803222005623013e-07,
+          "max_absolute_relative_error": 2.1812788997266352e-07,
+          "median_signed_relative_error": 2.1803213889892703e-07,
+          "p95_absolute_relative_error": 2.1811830847040525e-07,
+          "rms_relative_error": 2.1803216744954238e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_total": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.0002355149900028497,
+          "max_absolute_relative_error": 0.0002356843207012016,
+          "median_signed_relative_error": 0.00023551485571771114,
+          "p95_absolute_relative_error": 0.00023566736428856094,
+          "rms_relative_error": 0.0002355149132462082
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.0002355149174351201,
+          "max_absolute_relative_error": 0.00023568703123166834,
+          "median_signed_relative_error": 0.0002355147798702717,
+          "p95_absolute_relative_error": 0.00023566979585021297,
+          "rms_relative_error": 0.00023551483880824802
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_bound_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.0632499331263432e-07,
+          "max_absolute_relative_error": 2.064031019433088e-07,
+          "median_signed_relative_error": 2.0632492170324923e-07,
+          "p95_absolute_relative_error": 2.0639527926746836e-07,
+          "rms_relative_error": 2.0632494445305698e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.0632496022798819e-07,
+          "max_absolute_relative_error": 2.0640435316465755e-07,
+          "median_signed_relative_error": 2.0632488695326856e-07,
+          "p95_absolute_relative_error": 2.0639640063713216e-07,
+          "rms_relative_error": 2.063249099952187e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_free_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.00018283212114300618,
+          "max_absolute_relative_error": 0.00018295329128092952,
+          "median_signed_relative_error": 0.0001828320144957596,
+          "p95_absolute_relative_error": 0.0001829411563946115,
+          "rms_relative_error": 0.00018283205493941883
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.00018283206946856367,
+          "max_absolute_relative_error": 0.00018295523107858536,
+          "median_signed_relative_error": 0.00018283196021617876,
+          "p95_absolute_relative_error": 0.0001829428965437474,
+          "rms_relative_error": 0.00018283200165054435
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_gray_cloud": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": -4.995027595544599e-06,
+          "max_absolute_relative_error": 5.000446884229071e-06,
+          "median_signed_relative_error": -4.995022252984871e-06,
+          "p95_absolute_relative_error": 4.999903923297299e-06,
+          "rms_relative_error": 4.995025100546726e-06
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": -4.995025298826228e-06,
+          "max_absolute_relative_error": 5.000533681798203e-06,
+          "median_signed_relative_error": -4.995019824871605e-06,
+          "p95_absolute_relative_error": 4.999981781605989e-06,
+          "rms_relative_error": 4.9950227432262896e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_off": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.0632499331263432e-07,
+          "max_absolute_relative_error": 2.064031019433088e-07,
+          "median_signed_relative_error": 2.0632492170324923e-07,
+          "p95_absolute_relative_error": 2.0639527926746836e-07,
+          "rms_relative_error": 2.0632494445305698e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.0632496022798819e-07,
+          "max_absolute_relative_error": 2.0640435316465755e-07,
+          "median_signed_relative_error": 2.0632488695326856e-07,
+          "p95_absolute_relative_error": 2.0639640063713216e-07,
+          "rms_relative_error": 2.063249099952187e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_total": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.0001828321222432372,
+          "max_absolute_relative_error": 0.00018295329238182667,
+          "median_signed_relative_error": 0.0001828320155954355,
+          "p95_absolute_relative_error": 0.00018294115749550866,
+          "rms_relative_error": 0.00018283205603931277
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.0001828320705683506,
+          "max_absolute_relative_error": 0.00018295523217926046,
+          "median_signed_relative_error": 0.00018283196131585466,
+          "p95_absolute_relative_error": 0.00018294289764464455,
+          "rms_relative_error": 0.0001828320027504315
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_bound_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.0632499331263432e-07,
+          "max_absolute_relative_error": 2.064031019433088e-07,
+          "median_signed_relative_error": 2.0632492170324923e-07,
+          "p95_absolute_relative_error": 2.0639527926746836e-07,
+          "rms_relative_error": 2.0632494445305698e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.0632496022798819e-07,
+          "max_absolute_relative_error": 2.0640435316465755e-07,
+          "median_signed_relative_error": 2.0632488695326856e-07,
+          "p95_absolute_relative_error": 2.0639640063713216e-07,
+          "rms_relative_error": 2.063249099952187e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_free_free": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.00018073832845799664,
+          "max_absolute_relative_error": 0.0001808576237647408,
+          "median_signed_relative_error": 0.0001807382230311072,
+          "p95_absolute_relative_error": 0.00018084567659168994,
+          "rms_relative_error": 0.00018073826280740814
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.00018073827759335082,
+          "max_absolute_relative_error": 0.00018085953355595485,
+          "median_signed_relative_error": 0.00018073816959129907,
+          "p95_absolute_relative_error": 0.00018084738982221404,
+          "rms_relative_error": 0.00018073821034183963
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_gray_cloud": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": -2.31681193052502e-06,
+          "max_absolute_relative_error": 2.3203722867570775e-06,
+          "median_signed_relative_error": -2.316808179525509e-06,
+          "p95_absolute_relative_error": 2.320015491069638e-06,
+          "rms_relative_error": 2.316810536205717e-06
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": -2.3168104278381563e-06,
+          "max_absolute_relative_error": 2.320429324909057e-06,
+          "median_signed_relative_error": -2.316806584579112e-06,
+          "p95_absolute_relative_error": 2.3200666537104286e-06,
+          "rms_relative_error": 2.3168089995585468e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_off": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 2.0632499331263432e-07,
+          "max_absolute_relative_error": 2.064031019433088e-07,
+          "median_signed_relative_error": 2.0632492170324923e-07,
+          "p95_absolute_relative_error": 2.0639527926746836e-07,
+          "rms_relative_error": 2.0632494445305698e-07
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 2.0632496022798819e-07,
+          "max_absolute_relative_error": 2.0640435316465755e-07,
+          "median_signed_relative_error": 2.0632488695326856e-07,
+          "p95_absolute_relative_error": 2.0639640063713216e-07,
+          "rms_relative_error": 2.063249099952187e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_total": {
+        "gaussian_R100000": {
+          "integrated_flux_relative_error": 0.00018073832953624525,
+          "max_absolute_relative_error": 0.00018085762484387757,
+          "median_signed_relative_error": 0.00018073822410924478,
+          "p95_absolute_relative_error": 0.00018084567767038263,
+          "rms_relative_error": 0.00018073826388552718
+        },
+        "gaussian_R100000_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "gaussian_R100000_gate_passed": true,
+        "native": {
+          "integrated_flux_relative_error": 0.00018073827867137737,
+          "max_absolute_relative_error": 0.0001808595346348696,
+          "median_signed_relative_error": 0.00018073817066932563,
+          "p95_absolute_relative_error": 0.00018084739090157287,
+          "rms_relative_error": 0.00018073821141997428
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      }
+    },
+    "n_wavelength": 2166,
+    "prepared_metadata": {
+      "estimated_memory_bytes": "6757920",
+      "interpolation": "log_pressure_temperature_log_xsec_clip",
+      "native_sampling_accuracy": "requires_convergence_validation",
+      "native_sampling_convergence_validation": "required",
+      "native_sampling_stride": "1",
+      "native_sampling_validation": "required",
+      "opacity_mode": "line_by_line",
+      "physical_sample_axis": "singleton",
+      "sample_count": "2166",
+      "source_read": "exact_narrow_window",
+      "spectral_coordinate": "physical_wavelength",
+      "storage_strategy": "hdf5_hyperslab",
+      "wavelength_window_micron": "2.298799629992875:2.3037819225772518"
+    },
+    "provider_preparation_memory_bytes": 6757920,
+    "resolution_name": "hrs_native",
+    "robert_flux_not_saved": true,
+    "status": "pass",
+    "wavelength_bounds_micron": [
+      2.2988,
+      2.30378
+    ]
+  },
+  "lrs": {
+    "effective_resolving_power": 1000,
+    "elapsed_seconds": 0.7079927909653634,
+    "gaussian_lsf_resolving_power": null,
+    "measured_peak_rss_bytes": 440074240,
+    "metrics": {
+      "T2500_g10_bound_free": {
+        "native": {
+          "integrated_flux_relative_error": -0.0004932902702784459,
+          "max_absolute_relative_error": 0.004632217880091272,
+          "median_signed_relative_error": 1.8935346990378576e-07,
+          "p95_absolute_relative_error": 0.004268441696482106,
+          "rms_relative_error": 0.0018752981408905816
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_free_free": {
+        "native": {
+          "integrated_flux_relative_error": 0.006652182699691922,
+          "max_absolute_relative_error": 0.012029951863799404,
+          "median_signed_relative_error": 0.005314822821611664,
+          "p95_absolute_relative_error": 0.01124047167689911,
+          "rms_relative_error": 0.006645823150509269
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_gray_cloud": {
+        "native": {
+          "integrated_flux_relative_error": -2.554003513188796e-05,
+          "max_absolute_relative_error": 8.849629151463922e-05,
+          "median_signed_relative_error": -1.4849548417184e-05,
+          "p95_absolute_relative_error": 7.308801049116797e-05,
+          "rms_relative_error": 3.251376500381615e-05
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_off": {
+        "native": {
+          "integrated_flux_relative_error": 2.975692978690603e-07,
+          "max_absolute_relative_error": 4.7012072590391085e-07,
+          "median_signed_relative_error": 2.4916781271588917e-07,
+          "p95_absolute_relative_error": 4.362804463475811e-07,
+          "rms_relative_error": 2.856472072648187e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g10_total": {
+        "native": {
+          "integrated_flux_relative_error": 0.0029042545604618386,
+          "max_absolute_relative_error": 0.006444916599495976,
+          "median_signed_relative_error": 0.003272345033943025,
+          "p95_absolute_relative_error": 0.005935315933669582,
+          "rms_relative_error": 0.003932914133680735
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_bound_free": {
+        "native": {
+          "integrated_flux_relative_error": -0.00025144140705624096,
+          "max_absolute_relative_error": 0.0022170089965988238,
+          "median_signed_relative_error": 1.895090641079733e-07,
+          "p95_absolute_relative_error": 0.0020520669427935233,
+          "rms_relative_error": 0.0008931226577679241
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_free_free": {
+        "native": {
+          "integrated_flux_relative_error": 0.005887531057681139,
+          "max_absolute_relative_error": 0.007541232462245917,
+          "median_signed_relative_error": 0.005292570718844702,
+          "p95_absolute_relative_error": 0.007529768316793828,
+          "rms_relative_error": 0.005616979425208214
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_gray_cloud": {
+        "native": {
+          "integrated_flux_relative_error": -1.8948633074722387e-05,
+          "max_absolute_relative_error": 7.35831453196889e-05,
+          "median_signed_relative_error": -9.247550114888092e-06,
+          "p95_absolute_relative_error": 5.973807038962552e-05,
+          "rms_relative_error": 2.5474315220589428e-05
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_off": {
+        "native": {
+          "integrated_flux_relative_error": 2.975692978690603e-07,
+          "max_absolute_relative_error": 4.7012072590391085e-07,
+          "median_signed_relative_error": 2.4916781271588917e-07,
+          "p95_absolute_relative_error": 4.362804463475811e-07,
+          "rms_relative_error": 2.856472072648187e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T2500_g30_total": {
+        "native": {
+          "integrated_flux_relative_error": 0.0030633918092377588,
+          "max_absolute_relative_error": 0.0062567858515767405,
+          "median_signed_relative_error": 0.0032723450332594606,
+          "p95_absolute_relative_error": 0.00585014197184186,
+          "rms_relative_error": 0.003549519017400117
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_bound_free": {
+        "native": {
+          "integrated_flux_relative_error": -0.0006153772536546809,
+          "max_absolute_relative_error": 0.003105393043593252,
+          "median_signed_relative_error": 1.814311421100001e-07,
+          "p95_absolute_relative_error": 0.002853571993624165,
+          "rms_relative_error": 0.0012542598243416745
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_free_free": {
+        "native": {
+          "integrated_flux_relative_error": 0.000339771151903534,
+          "max_absolute_relative_error": 0.0005672814651054292,
+          "median_signed_relative_error": 0.00025989330846765135,
+          "p95_absolute_relative_error": 0.0005221206258258615,
+          "rms_relative_error": 0.00031560208576704234
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_gray_cloud": {
+        "native": {
+          "integrated_flux_relative_error": -1.5897794685137967e-05,
+          "max_absolute_relative_error": 4.3071255387827634e-05,
+          "median_signed_relative_error": -8.554925471082608e-06,
+          "p95_absolute_relative_error": 3.585327568658702e-05,
+          "rms_relative_error": 1.645439638779259e-05
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_off": {
+        "native": {
+          "integrated_flux_relative_error": 2.8146857222743904e-07,
+          "max_absolute_relative_error": 4.1109828163854445e-07,
+          "median_signed_relative_error": 2.2957957923619432e-07,
+          "p95_absolute_relative_error": 3.8287118918622905e-07,
+          "rms_relative_error": 2.585214862947715e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g10_total": {
+        "native": {
+          "integrated_flux_relative_error": -0.000580347856270258,
+          "max_absolute_relative_error": 0.0031176466837009587,
+          "median_signed_relative_error": 0.00017080741502562002,
+          "p95_absolute_relative_error": 0.002864766443808758,
+          "rms_relative_error": 0.0012709968839638899
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_bound_free": {
+        "native": {
+          "integrated_flux_relative_error": -0.0003086579211416529,
+          "max_absolute_relative_error": 0.001518250263510823,
+          "median_signed_relative_error": 1.815990331444084e-07,
+          "p95_absolute_relative_error": 0.0013999455743852194,
+          "rms_relative_error": 0.000608585699791781
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_free_free": {
+        "native": {
+          "integrated_flux_relative_error": 0.00033578660622723966,
+          "max_absolute_relative_error": 0.0005587516877090248,
+          "median_signed_relative_error": 0.00025619991739267434,
+          "p95_absolute_relative_error": 0.0005142309485871243,
+          "rms_relative_error": 0.000310985156757594
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_gray_cloud": {
+        "native": {
+          "integrated_flux_relative_error": -1.0904912833398228e-05,
+          "max_absolute_relative_error": 3.3867812033627764e-05,
+          "median_signed_relative_error": -4.680873078588554e-06,
+          "p95_absolute_relative_error": 2.7494881194906057e-05,
+          "rms_relative_error": 1.1839246877922198e-05
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_off": {
+        "native": {
+          "integrated_flux_relative_error": 2.8146857222743904e-07,
+          "max_absolute_relative_error": 4.1109828163854445e-07,
+          "median_signed_relative_error": 2.2957957923619432e-07,
+          "p95_absolute_relative_error": 3.8287118918622905e-07,
+          "rms_relative_error": 2.585214862947715e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3000_g30_total": {
+        "native": {
+          "integrated_flux_relative_error": -0.00022332399005653425,
+          "max_absolute_relative_error": 0.0015254185354869332,
+          "median_signed_relative_error": 0.0001687193146350241,
+          "p95_absolute_relative_error": 0.0014065313218798335,
+          "rms_relative_error": 0.000634646820516399
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_bound_free": {
+        "native": {
+          "integrated_flux_relative_error": -0.0006249444946799798,
+          "max_absolute_relative_error": 0.002217509914285154,
+          "median_signed_relative_error": 1.7586534928337727e-07,
+          "p95_absolute_relative_error": 0.002036233409703136,
+          "rms_relative_error": 0.0008969181027527013
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_free_free": {
+        "native": {
+          "integrated_flux_relative_error": 0.00026870411058910193,
+          "max_absolute_relative_error": 0.0004217820054102095,
+          "median_signed_relative_error": 0.0001976556989397027,
+          "p95_absolute_relative_error": 0.00038791473042486534,
+          "rms_relative_error": 0.00023745209962220247
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_gray_cloud": {
+        "native": {
+          "integrated_flux_relative_error": -1.062606748725159e-05,
+          "max_absolute_relative_error": 2.4229484033910786e-05,
+          "median_signed_relative_error": -5.687259770903452e-06,
+          "p95_absolute_relative_error": 2.037865426398055e-05,
+          "rms_relative_error": 9.725322510737647e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_off": {
+        "native": {
+          "integrated_flux_relative_error": 2.6695300170409553e-07,
+          "max_absolute_relative_error": 3.685322476076891e-07,
+          "median_signed_relative_error": 2.1590734744503237e-07,
+          "p95_absolute_relative_error": 3.4450034871458255e-07,
+          "rms_relative_error": 2.394557453849298e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g10_total": {
+        "native": {
+          "integrated_flux_relative_error": -0.0006029383142660549,
+          "max_absolute_relative_error": 0.002226077247691638,
+          "median_signed_relative_error": 0.0001351298813480062,
+          "p95_absolute_relative_error": 0.0020440648805358005,
+          "rms_relative_error": 0.00091016304877515
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_bound_free": {
+        "native": {
+          "integrated_flux_relative_error": -0.00031189793133612476,
+          "max_absolute_relative_error": 0.001098502302974591,
+          "median_signed_relative_error": 1.7604101254509175e-07,
+          "p95_absolute_relative_error": 0.0010114310204934695,
+          "rms_relative_error": 0.0004401589146235885
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_free_free": {
+        "native": {
+          "integrated_flux_relative_error": 0.00026588107624858637,
+          "max_absolute_relative_error": 0.0004162900759216992,
+          "median_signed_relative_error": 0.0001953332264572616,
+          "p95_absolute_relative_error": 0.00038286457605903875,
+          "rms_relative_error": 0.00023452503928471946
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_gray_cloud": {
+        "native": {
+          "integrated_flux_relative_error": -6.705447793242669e-06,
+          "max_absolute_relative_error": 1.7771012377654216e-05,
+          "median_signed_relative_error": -2.7812384620906627e-06,
+          "p95_absolute_relative_error": 1.4472261542630702e-05,
+          "rms_relative_error": 6.3391812361648524e-06
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_off": {
+        "native": {
+          "integrated_flux_relative_error": 2.6695300170409553e-07,
+          "max_absolute_relative_error": 3.685322476076891e-07,
+          "median_signed_relative_error": 2.1590734744503237e-07,
+          "p95_absolute_relative_error": 3.4450034871458255e-07,
+          "rms_relative_error": 2.394557453849298e-07
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      },
+      "T3500_g30_total": {
+        "native": {
+          "integrated_flux_relative_error": -0.0002577594466414146,
+          "max_absolute_relative_error": 0.0011036097761059072,
+          "median_signed_relative_error": 0.00013377568049710575,
+          "p95_absolute_relative_error": 0.0010161191974254746,
+          "rms_relative_error": 0.00046127901772719074
+        },
+        "native_gate_limits": {
+          "integrated_flux_relative_error_abs_max": 0.01,
+          "max_absolute_relative_error_max": 0.05,
+          "rms_relative_error_max": 0.01
+        },
+        "native_gate_passed": true
+      }
+    },
+    "n_wavelength": 1874,
+    "prepared_metadata": {
+      "estimated_memory_bytes": "5846880",
+      "interpolation": "log_pressure_temperature_log_xsec_clip",
+      "native_sampling_accuracy": "requires_convergence_validation",
+      "native_sampling_convergence_validation": "required",
+      "native_sampling_stride": "1",
+      "native_sampling_validation": "required",
+      "opacity_mode": "line_by_line",
+      "physical_sample_axis": "singleton",
+      "sample_count": "1874",
+      "source_read": "exact_narrow_window",
+      "spectral_coordinate": "physical_wavelength",
+      "storage_strategy": "hdf5_hyperslab",
+      "wavelength_window_micron": "0.79947908011141533:5.2028423741501157"
+    },
+    "provider_preparation_memory_bytes": 5846880,
+    "resolution_name": "lrs",
+    "robert_flux_not_saved": true,
+    "status": "pass",
+    "wavelength_bounds_micron": [
+      0.8,
+      5.2
+    ]
+  },
+  "oracle": {
+    "elapsed_seconds": 3.8670013750670478,
+    "hrs_native_archive_path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_hrs_native.npz",
+    "hrs_native_archive_sha256": "19fd260b09d5090b65daa346d16b443d20f98d61526a1ad5687e017cd732d29d",
+    "hrs_native_n_wavelength": 2166,
+    "lrs_archive_path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_lrs.npz",
+    "lrs_archive_sha256": "2053ec1d41c3afad230424e58efbd2e59e765db7d9ea3d86e47746db63e4b00c",
+    "lrs_n_wavelength": 1874,
+    "measured_peak_rss_bytes": 415186944,
+    "opacity_memory_ceiling_bytes": 1063004405,
+    "oracle_json_path": "examples/outputs/hminus_continuum/petitradtrans3_hminus_oracle.json",
+    "oracle_json_sha256": "573b0ad8b4adbff71d9df4038acd66092f4884e761a4396d686e6a5b44c5c291",
+    "process_memory_ceiling_bytes": 1986422374
+  },
+  "petitradtrans_version": "3.3.3",
+  "plot": "examples/outputs/hminus_continuum/hminus_validation.png",
+  "poseidon_john_1988_diagnostic": {
+    "bound_free_formula": "sigma_bf=1e-18*lambda_um^3*(1/lambda_um-1/1.6421)^1.5*sum_n C_n*(1/lambda_um-1/1.6421)^((n-1)/2), at or below 1.6421 um",
+    "bound_free_records": [
+      {
+        "john_cm2_per_hminus": 3.972119909553534e-17,
+        "relative_difference": -0.0008223421215026602,
+        "robert_gray_cm2_per_hminus": 3.975389039410001e-17,
+        "wavelength_micron": 0.9
+      },
+      {
+        "john_cm2_per_hminus": 3.787327299836915e-17,
+        "relative_difference": -0.00047768133476728354,
+        "robert_gray_cm2_per_hminus": 3.789137299999996e-17,
+        "wavelength_micron": 1.0
+      },
+      {
+        "john_cm2_per_hminus": 2.232691565301836e-17,
+        "relative_difference": 0.003300692458534816,
+        "robert_gray_cm2_per_hminus": 2.22532213709001e-17,
+        "wavelength_micron": 1.3
+      },
+      {
+        "john_cm2_per_hminus": 1.304907615256055e-18,
+        "relative_difference": 0.001311704856412207,
+        "robert_gray_cm2_per_hminus": 1.3031959615999544e-18,
+        "wavelength_micron": 1.6
+      },
+      {
+        "john_cm2_per_hminus": 5.593475605371679e-21,
+        "relative_difference": 1.0,
+        "robert_gray_cm2_per_hminus": 0.0,
+        "wavelength_micron": 1.641
+      },
+      {
+        "john_cm2_per_hminus": 0.0,
+        "relative_difference": 0.0,
+        "robert_gray_cm2_per_hminus": 0.0,
+        "wavelength_micron": 1.7
+      },
+      {
+        "john_cm2_per_hminus": 0.0,
+        "relative_difference": 0.0,
+        "robert_gray_cm2_per_hminus": 0.0,
+        "wavelength_micron": 2.3
+      },
+      {
+        "john_cm2_per_hminus": 0.0,
+        "relative_difference": 0.0,
+        "robert_gray_cm2_per_hminus": 0.0,
+        "wavelength_micron": 3.0
+      },
+      {
+        "john_cm2_per_hminus": 0.0,
+        "relative_difference": 0.0,
+        "robert_gray_cm2_per_hminus": 0.0,
+        "wavelength_micron": 5.0
+      }
+    ],
+    "bound_free_threshold_micron": 1.6421,
+    "bound_free_unit": "cm^2 per H- particle",
+    "database_downloaded": false,
+    "electron_partial_pressure_reference": {
+      "electron_vmr": 0.001,
+      "pressure_bar": 1.0,
+      "pressure_dyn_cm2": 1000.0
+    },
+    "expected_physical_differences": "John uses the 1.6421 um BF threshold and point values. ROBERT uses the pRT Gray threshold and pRT-compatible bin averages when frequency-bin edges are available. The selected long-wave FF polynomial is an independent fit, so small coefficient differences are expected. No full FF upper validity range is claimed here.",
+    "free_free_branch": "long-wave John polynomial only",
+    "free_free_formula": "k_ff=1e-29*sum_n theta^((n+1)/2)*(lambda_um^2*A_n+B_n+C_n/lambda_um+D_n/lambda_um^2+E_n/lambda_um^3+F_n/lambda_um^4); sigma_ff=p_e*k_ff",
+    "free_free_lower_cutoff_micron": 0.3645,
+    "free_free_records": [
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 1.0420168047883764e-23,
+        "relative_difference": -0.0003418421931588293,
+        "robert_gray_cm2_per_h": 1.0423731319058769e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 0.9
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 1.2550394215143509e-23,
+        "relative_difference": -0.002212853227732839,
+        "robert_gray_cm2_per_h": 1.2578227987544907e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 1.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.0237242849835274e-23,
+        "relative_difference": -0.002257587786314234,
+        "robert_gray_cm2_per_h": 2.0283033578711975e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 1.3
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.9895608591308296e-23,
+        "relative_difference": 0.00021421580369919318,
+        "robert_gray_cm2_per_h": 2.988920447948683e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 1.6
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 3.136938535164113e-23,
+        "relative_difference": 0.0005474188006607944,
+        "robert_gray_cm2_per_h": 3.135221316033447e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 1.641
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 3.3555154412221624e-23,
+        "relative_difference": 0.0010040068837697817,
+        "robert_gray_cm2_per_h": 3.3521464806205796e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 1.7
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 6.014050972594988e-23,
+        "relative_difference": 0.0036167087301340875,
+        "robert_gray_cm2_per_h": 5.992299901938932e-23,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 2.3
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 1.011924070088511e-22,
+        "relative_difference": 0.0028679541814621355,
+        "robert_gray_cm2_per_h": 1.0090219182203785e-22,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 3.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.780904239942739e-22,
+        "relative_difference": -0.004700338101600362,
+        "robert_gray_cm2_per_h": 2.7940371592596947e-22,
+        "temperature_K": 2500.0,
+        "wavelength_micron": 5.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 8.86690234161651e-24,
+        "relative_difference": -0.006587231286289233,
+        "robert_gray_cm2_per_h": 8.925697978593066e-24,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 0.9
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 1.0726057564381241e-23,
+        "relative_difference": -0.007595139836863049,
+        "robert_gray_cm2_per_h": 1.0808146951857967e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 1.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 1.7450564217091735e-23,
+        "relative_difference": -0.005892764465055753,
+        "robert_gray_cm2_per_h": 1.7554005838918696e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 1.3
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.5897584407162105e-23,
+        "relative_difference": -0.0028734200383111735,
+        "robert_gray_cm2_per_h": 2.597221348583159e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 1.6
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.718558835717627e-23,
+        "relative_difference": -0.0025150710342292187,
+        "robert_gray_cm2_per_h": 2.72541344412725e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 1.641
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.9095385450720336e-23,
+        "relative_difference": -0.002033409783891282,
+        "robert_gray_cm2_per_h": 2.915466883958486e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 1.7
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 5.229088241979883e-23,
+        "relative_difference": 0.0006511275041829535,
+        "robert_gray_cm2_per_h": 5.22568343880373e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 2.3
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 8.804287185536212e-23,
+        "relative_difference": 0.00040199443969445454,
+        "robert_gray_cm2_per_h": 8.800747911042154e-23,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 3.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.4187152108914117e-22,
+        "relative_difference": -0.004366512972652057,
+        "robert_gray_cm2_per_h": 2.4293228807650326e-22,
+        "temperature_K": 3000.0,
+        "wavelength_micron": 5.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 7.750098810880317e-24,
+        "relative_difference": -0.006848708921132727,
+        "robert_gray_cm2_per_h": 7.80354300547838e-24,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 0.9
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 9.40280337100798e-24,
+        "relative_difference": -0.007417507840795107,
+        "robert_gray_cm2_per_h": 9.47306994157602e-24,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 1.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 1.5379135604500186e-23,
+        "relative_difference": -0.0055219238446913505,
+        "robert_gray_cm2_per_h": 1.5464529559019067e-23,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 1.3
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.2877826844919902e-23,
+        "relative_difference": -0.00298058090964958,
+        "robert_gray_cm2_per_h": 2.2946219909932067e-23,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 1.6
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.4020536666605386e-23,
+        "relative_difference": -0.002695271447806494,
+        "robert_gray_cm2_per_h": 2.4085453501736086e-23,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 1.641
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.5714626352988087e-23,
+        "relative_difference": -0.00231625422803652,
+        "robert_gray_cm2_per_h": 2.5774326245128158e-23,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 1.7
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 4.627310408354663e-23,
+        "relative_difference": -0.0003021417345309639,
+        "robert_gray_cm2_per_h": 4.628708934500772e-23,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 2.3
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 7.793163752413872e-23,
+        "relative_difference": -0.000475142799468959,
+        "robert_gray_cm2_per_h": 7.79686837828222e-23,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 3.0
+      },
+      {
+        "electron_partial_pressure_dyn_cm2": 1000.0,
+        "john_cm2_per_h": 2.140592208612805e-22,
+        "relative_difference": -0.003466670094457837,
+        "robert_gray_cm2_per_h": 2.1480387503102423e-22,
+        "temperature_K": 3500.0,
+        "wavelength_micron": 5.0
+      }
+    ],
+    "free_free_selected_long_wave_micron": [
+      0.3645,
+      5.0
+    ],
+    "free_free_unit": "cm^4 dyne^-1 before p_e; cm^2 per H particle after p_e",
+    "free_free_upper_validity_micron": null,
+    "free_free_upper_validity_sourced": false,
+    "implementation": "John (1988) selected long-wave implementation",
+    "john_source_ads_url": "https://ui.adsabs.harvard.edu/abs/1988A%26A...193..189J/abstract",
+    "john_source_bibcode": "1988A&A...193..189J",
+    "john_source_doi": null,
+    "maximum_absolute_relative_difference": {
+      "bound_free": 1.0,
+      "free_free": 0.007595139836863049
+    },
+    "official_poseidon_absorption_url": "https://github.com/MartianColonist/POSEIDON/blob/main/POSEIDON/absorption.py",
+    "required_gate": false,
+    "source": "John (1988), Continuous absorption by the negative hydrogen ion reconsidered",
+    "source_url": "https://github.com/MartianColonist/POSEIDON/blob/main/POSEIDON/absorption.py",
+    "status": "diagnostic_only"
+  },
+  "pymultinest": {
+    "elapsed_seconds": 22.68266337492969,
+    "evidence_difference": 0.08140618224479113,
+    "evidence_difference_allowed": 0.5,
+    "fixed_gravity_m_s2": 10.0,
+    "fixed_temperature_K": 3000.0,
+    "full_atmospheric_nested_sampling": "not_run",
+    "gate": {
+      "chi_square": true,
+      "completed_runs": true,
+      "evidence_agreement": true,
+      "memory": true,
+      "natural_convergence": true,
+      "passed": true,
+      "truth_recovery": true
+    },
+    "provider_preparation_memory_bytes": 5846880,
+    "runs": [
+      {
+        "absolute_truth_error_dex": 0.0009459131702982404,
+        "best_fit_log10_hminus_vmr": -6.000945913170298,
+        "chi_square": 1851.3953958658858,
+        "converged": true,
+        "elapsed_seconds": 11.086805250030011,
+        "likelihood_evaluations": 648,
+        "log_evidence": -932.2414963702071,
+        "log_evidence_error": 0.07011774583268873,
+        "message": "converged",
+        "noise_seed": 20260831,
+        "posterior_interval_05_95": [
+          -6.005363482028445,
+          -5.997122692585694
+        ],
+        "reduced_chi_square": 0.9884652407185722,
+        "run_index": 1,
+        "sampler_seed": 24680,
+        "seed": 24680,
+        "status": "completed",
+        "truth_inside_posterior_interval": true
+      },
+      {
+        "absolute_truth_error_dex": 0.0009517894652617542,
+        "best_fit_log10_hminus_vmr": -6.000951789465262,
+        "chi_square": 1851.395356404608,
+        "converged": true,
+        "elapsed_seconds": 11.377645749947987,
+        "likelihood_evaluations": 699,
+        "log_evidence": -932.1600901879623,
+        "log_evidence_error": 0.05781766336069295,
+        "message": "converged",
+        "noise_seed": 20260831,
+        "posterior_interval_05_95": [
+          -6.004894716174694,
+          -5.996631956639877
+        ],
+        "reduced_chi_square": 0.9884652196500844,
+        "run_index": 2,
+        "sampler_seed": 24681,
+        "seed": 24681,
+        "status": "completed",
+        "truth_inside_posterior_interval": true
+      }
+    ],
+    "scope": "two-seed one-dimensional LRS log10(H-) VMR injection recovery",
+    "settings": {
+      "evidence_tolerance": 0.5,
+      "max_iter": 0,
+      "mpi_nprocs": 1,
+      "n_live_points": 64,
+      "noise_seed": 20260831,
+      "resume": false,
+      "sampler_seed_pair": [
+        24680,
+        24681
+      ],
+      "sampling_efficiency": 0.8,
+      "seed_pair": [
+        24680,
+        24681
+      ],
+      "verbose": false
+    },
+    "status": "pass",
+    "truth_log10_hminus_vmr": -6.0,
+    "uncertainty_fraction": 0.01
+  },
+  "resource_policy": {
+    "measured_peak_rss_bytes": 562872320,
+    "memory_gate": "RSS < configured ceiling < 1.9 GiB",
+    "opacity_memory_ceiling_bytes": 1072693248,
+    "process_memory_ceiling_bytes": 1932735283,
+    "processes": 1,
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    }
+  },
+  "schema_version": 1,
+  "scientific_state": {
+    "electron_vmr": 0.001,
+    "gravities_m_s2": [
+      10.0,
+      30.0
+    ],
+    "hminus_vmr": 1e-06,
+    "hydrogen_vmr": 0.01,
+    "mean_molecular_weight_amu_by_mode": {
+      "bound_free": 2.3138869866602803,
+      "free_free": 2.29851547727991,
+      "gray_cloud": 2.29851416394019,
+      "off": 2.29851416394019,
+      "total": 2.29851416394019
+    },
+    "mmw_formula": "MMW=sum_i(VMR_i*m_i)",
+    "modes": [
+      "off",
+      "bound_free",
+      "free_free",
+      "total",
+      "gray_cloud"
+    ],
+    "molar_masses_amu": {
+      "CO": 28.0,
+      "H": 1.00794,
+      "H-": 1.0005485799096197,
+      "H2": 2.01588,
+      "He": 4.002602,
+      "e-": 0.0005485799096195737
+    },
+    "pressure_centers_bar": [
+      1e-05,
+      1.2263306841775618e-05,
+      1.5038869469554101e-05,
+      1.844262708585533e-05,
+      2.2616759492228645e-05,
+      2.7735626141984122e-05,
+      3.401304938279253e-05,
+      4.171124612056516e-05,
+      5.115178099293145e-05,
+      6.272899858196244e-05,
+      7.692649574879147e-05,
+      9.433732216299774e-05,
+      0.00011568875283162821,
+      0.00014187266741165963,
+      0.0001739828052930364,
+      0.0002133604526501411,
+      0.0002616504698748821,
+      0.00032086999973704504,
+      0.0003934927263095849,
+      0.0004825522042741279,
+      0.0005917685748188825,
+      0.0007257039612324216,
+      0.0008899530352885224,
+      0.0010913767146512737,
+      0.0013383887531737565,
+      0.0016413071953751282,
+      0.0020127853758499384,
+      0.0024683404670686484,
+      0.0030270016537634614,
+      0.0037121050090663608,
+      0.00455226827550731,
+      0.005582586268862695,
+      0.006846096838574658,
+      0.008395578619995112,
+      0.010295755673125127,
+      0.012626001098748564,
+      0.015483652565854992,
+      0.018988078244652633,
+      0.023285662984981966,
+      0.02855592301990109,
+      0.03501900461431713,
+      0.04294487988789272,
+      0.05266462393484275,
+      0.06458424430196978,
+      0.07920164050192549,
+      0.09712740198471168,
+      0.1191103133283008,
+      0.1460686320364989,
+      0.17912844546220022,
+      0.2196707090793235,
+      0.26938893095901695,
+      0.33035991201283393,
+      0.4051304969235378,
+      0.49682395947343877,
+      0.6092704661368674,
+      0.7471670675868082,
+      0.9162739011886731,
+      1.1236548001387516,
+      1.3779723598335567,
+      1.6898497868124587,
+      2.0723146452190293,
+      2.541343036702639,
+      3.11652694492943,
+      3.8218926206331227,
+      4.686904192314192,
+      5.7476944248353465,
+      7.048574036451903,
+      8.643882620598262,
+      10.600258488068825,
+      12.999422244132449,
+      15.941590374559995,
+      19.549661430912597,
+      23.974349678010785,
+      29.400480643347077,
+      36.05471154250506,
+      44.21499907374487,
+      54.22221006501592,
+      66.49435996665045,
+      81.5440739518517,
+      100.0
+    ],
+    "representation": "VMR in ROBERT model/config/retrieval/report truth",
+    "temperature_profile": "T(K)=T_reference+100*log10(P_bar)",
+    "temperature_references_K": [
+      2500.0,
+      3000.0,
+      3500.0
+    ]
+  },
+  "source_table": {
+    "mass_fraction_conversion": "private pRT boundary only",
+    "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+    "role": "zero-abundance CO spectral-grid carrier",
+    "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad"
+  },
+  "status": "pass",
+  "workflow": "external petitRADTRANS 3.3.3 versus ROBERT H-minus thermal emission"
+}

@@ -18,17 +18,18 @@ from robert_exoplanets.bodies import Planet, Star
 from robert_exoplanets.core import (
     PressureGrid,
     RobertConfigError,
-    RobertValidationError,
     SpectralGrid,
 )
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import (
     CorrelatedKOpacityProvider,
+    LineByLineOpacityProvider,
     OpacityProvider,
     OpacitySamplingProvider,
 )
 from robert_exoplanets.rt import CiaTable, DiscGeometry
 
+from ._construction import prepare_opacity_inputs, pressure_grid_from_opacity
 from .emission import (
     EmissionForwardModel,
     EmissionModelConfig,
@@ -186,6 +187,112 @@ class ExoMolOpacitySamplingSource:
 
 
 @dataclass(frozen=True)
+class LineByLineOpacitySource:
+    """Typed source configuration for native line-by-line opacity.
+
+    The source keeps the physical wavelength samples.  ``wavelength_bounds``
+    is an explicit safety window for normal forward-model preparation.  The
+    optional ``native_sampling_stride`` retains every ``stride``-th native
+    sample.  This is a speed option only.  It is marked as requiring a later
+    convergence test at the final observation resolution.
+    """
+
+    species: tuple[str, ...]
+    paths: Mapping[str, str | Path]
+    name: str = "line-by-line-native"
+    interpolation: str = "log_pressure_temperature_log_xsec"
+    checksum: bool = True
+    cross_section_floor: float = 1.0e-300
+    max_memory_bytes: int | None = 1 * 1024**3
+    wavelength_bounds_micron: tuple[float, float] | None = None
+    native_sampling_stride: int = 1
+    max_cached_slices: int = 2
+
+    def __post_init__(self) -> None:
+        species = tuple(str(item).strip() for item in self.species)
+        paths = {
+            str(key).strip(): Path(value).expanduser()
+            for key, value in self.paths.items()
+        }
+        if not species or any(not item for item in species):
+            raise RobertConfigError("line-by-line species must contain non-empty names")
+        if len(set(species)) != len(species):
+            raise RobertConfigError("line-by-line species must not contain duplicates")
+        if set(paths) != set(species):
+            raise RobertConfigError(
+                "line-by-line opacity path keys must match configured species"
+            )
+        if any(not key for key in paths):
+            raise RobertConfigError("line-by-line opacity path names must not be empty")
+        if not str(self.name).strip():
+            raise RobertConfigError("line-by-line opacity source name must not be empty")
+        if self.interpolation not in {
+            "log_pressure_temperature_log_xsec",
+            "log_pressure_temperature_log_xsec_clip",
+        }:
+            raise RobertConfigError(
+                "line-by-line interpolation must be log-pressure/temperature/log-xsec"
+            )
+        floor = float(self.cross_section_floor)
+        if not np.isfinite(floor) or floor <= 0.0:
+            raise RobertConfigError(
+                "line-by-line cross_section_floor must be finite and positive"
+            )
+        if self.max_memory_bytes is not None:
+            if isinstance(self.max_memory_bytes, bool) or not isinstance(
+                self.max_memory_bytes, (int, np.integer)
+            ) or int(self.max_memory_bytes) < 1:
+                raise RobertConfigError(
+                    "line-by-line max_memory_bytes must be a positive integer or None"
+                )
+            max_memory_bytes = int(self.max_memory_bytes)
+        else:
+            max_memory_bytes = None
+        if isinstance(self.native_sampling_stride, bool) or not isinstance(
+            self.native_sampling_stride, (int, np.integer)
+        ) or int(self.native_sampling_stride) < 1:
+            raise RobertConfigError(
+                "line-by-line native_sampling_stride must be a positive integer"
+            )
+        stride = int(self.native_sampling_stride)
+        if isinstance(self.max_cached_slices, bool) or not isinstance(
+            self.max_cached_slices, (int, np.integer)
+        ) or int(self.max_cached_slices) < 0:
+            raise RobertConfigError(
+                "line-by-line max_cached_slices must be a non-negative integer"
+            )
+        bounds = _validate_line_by_line_window(self.wavelength_bounds_micron)
+        object.__setattr__(self, "species", species)
+        object.__setattr__(self, "paths", immutable_mapping(paths))
+        object.__setattr__(self, "name", str(self.name).strip())
+        object.__setattr__(self, "cross_section_floor", floor)
+        object.__setattr__(self, "max_memory_bytes", max_memory_bytes)
+        object.__setattr__(self, "wavelength_bounds_micron", bounds)
+        object.__setattr__(self, "native_sampling_stride", stride)
+        object.__setattr__(self, "max_cached_slices", int(self.max_cached_slices))
+
+    def load(self) -> LineByLineOpacityProvider:
+        """Load the configured HDF5 or NPZ line-by-line provider."""
+
+        return LineByLineOpacityProvider.from_paths(
+            self.paths,
+            name=self.name,
+            interpolation=self.interpolation,
+            checksum=self.checksum,
+            cross_section_floor=self.cross_section_floor,
+            max_memory_bytes=self.max_memory_bytes,
+            wavelength_bounds_micron=self.wavelength_bounds_micron,
+            native_sampling_stride=self.native_sampling_stride,
+            max_cached_slices=self.max_cached_slices,
+        )
+
+    def native_spectral_grid(self) -> SpectralGrid:
+        """Return the configured exact native wavelength grid."""
+
+        return self.load().native_spectral_grid()
+
+
+@dataclass(frozen=True)
 class ExoKTableBinning:
     """Configuration for exo_k correlated-k binning and recompression."""
 
@@ -237,7 +344,12 @@ class EmissionFactoryConfig:
     planet: Planet
     star: Star
     temperature_profile: TemperatureProfile
-    opacity_source: ExoKOpacitySource | ExoMolOpacitySamplingSource | OpacityProvider
+    opacity_source: (
+        ExoKOpacitySource
+        | ExoMolOpacitySamplingSource
+        | LineByLineOpacitySource
+        | OpacityProvider
+    )
     model: EmissionModelConfig
     pressure_grid: PressureGrid | None = None
     temperature_parameters: Mapping[str, float] = field(default_factory=dict)
@@ -298,7 +410,12 @@ class ParameterizedEmissionFactoryConfig:
     star: Star
     temperature_profile: TemperatureProfile
     chemistry_model: ChemistryModel
-    opacity_source: ExoKOpacitySource | ExoMolOpacitySamplingSource | OpacityProvider
+    opacity_source: (
+        ExoKOpacitySource
+        | ExoMolOpacitySamplingSource
+        | LineByLineOpacitySource
+        | OpacityProvider
+    )
     model: ParameterizedEmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     pressure_grid: PressureGrid | None = None
@@ -354,7 +471,12 @@ class ParameterizedTransmissionFactoryConfig:
     star: Star
     temperature_profile: TemperatureProfile
     chemistry_model: ChemistryModel
-    opacity_source: ExoKOpacitySource | ExoMolOpacitySamplingSource | OpacityProvider
+    opacity_source: (
+        ExoKOpacitySource
+        | ExoMolOpacitySamplingSource
+        | LineByLineOpacitySource
+        | OpacityProvider
+    )
     model: ParameterizedTransmissionModelConfig
     cia_table: CiaTable | tuple[CiaTable, ...] | None = None
     pressure_grid: PressureGrid | None = None
@@ -404,23 +526,42 @@ class ParameterizedTransmissionFactoryConfig:
         object.__setattr__(self, "mean_molecular_weight", mmw)
 
 
-def _prepare_provider(
-    provider: OpacityProvider,
-    binning: ExoKTableBinning | None,
-    spectral_grid: SpectralGrid,
-) -> OpacityProvider:
-    if isinstance(provider, OpacitySamplingProvider):
-        # The requested grid is already an exact selection of physical ExoMol
-        # samples. Exo-k binning/recompression applies only to correlated-k.
-        return provider
-    return provider if binning is None else binning.apply(provider, spectral_grid)
+def _validate_line_by_line_window(
+    value: tuple[float, float] | None,
+) -> tuple[float, float] | None:
+    if value is None:
+        return None
+    try:
+        lower, upper = (float(item) for item in value)
+    except (TypeError, ValueError) as exc:
+        raise RobertConfigError(
+            "line-by-line wavelength_bounds_micron must contain two finite, "
+            "positive, increasing values"
+        ) from exc
+    if (
+        not np.isfinite(lower)
+        or not np.isfinite(upper)
+        or lower <= 0.0
+        or lower >= upper
+    ):
+        raise RobertConfigError(
+            "line-by-line wavelength_bounds_micron must contain two finite, "
+            "positive, increasing values"
+        )
+    return (lower, upper)
 
 
 def _uses_exok_binning(config: object) -> bool:
     source = getattr(config, "opacity_source")
     binning = getattr(config, "opacity_binning")
     return binning is not None and not isinstance(
-        source, (ExoMolOpacitySamplingSource, OpacitySamplingProvider)
+        source,
+        (
+            ExoMolOpacitySamplingSource,
+            LineByLineOpacitySource,
+            OpacitySamplingProvider,
+            LineByLineOpacityProvider,
+        ),
     )
 
 
@@ -433,16 +574,15 @@ def build_emission_model(
 
     if not isinstance(config, EmissionFactoryConfig):
         raise RobertConfigError("config must be a EmissionFactoryConfig")
-    native_provider = (
-        config.opacity_source.load()
-        if isinstance(config.opacity_source, (ExoKOpacitySource, ExoMolOpacitySamplingSource))
-        else config.opacity_source
-    )
-    pressure_grid = config.pressure_grid or pressure_grid_from_opacity(
-        native_provider,
+    prepared = prepare_opacity_inputs(
+        config.opacity_source,
+        spectral_grid=spectral_grid,
+        pressure_grid=config.pressure_grid,
         species=config.model.opacity_species[0],
+        opacity_binning=config.opacity_binning,
     )
-    provider = _prepare_provider(native_provider, config.opacity_binning, spectral_grid)
+    pressure_grid = prepared.pressure_grid
+    provider = prepared.provider
     base_temperature = config.temperature_profile.evaluate(
         config.temperature_parameters,
         pressure_grid,
@@ -466,6 +606,23 @@ def build_emission_model(
     )
 
 
+def _build_atmosphere_builder(
+    config: ParameterizedEmissionFactoryConfig
+    | ParameterizedTransmissionFactoryConfig,
+    pressure_grid: PressureGrid,
+) -> AtmosphereBuilder:
+    """Assemble the shared runtime atmosphere builder for a prepared grid."""
+
+    return AtmosphereBuilder(
+        pressure_grid=pressure_grid,
+        temperature_profile=config.temperature_profile,
+        chemistry_model=config.chemistry_model,
+        mean_molecular_weight=config.mean_molecular_weight,
+        mean_molecular_weight_model=config.mean_molecular_weight_model,
+        opacity_free_species=config.opacity_free_species,
+    )
+
+
 def build_parameterized_emission_model(
     config: ParameterizedEmissionFactoryConfig,
     *,
@@ -477,24 +634,16 @@ def build_parameterized_emission_model(
         raise RobertConfigError(
             "config must be a ParameterizedEmissionFactoryConfig"
         )
-    native_provider = (
-        config.opacity_source.load()
-        if isinstance(config.opacity_source, (ExoKOpacitySource, ExoMolOpacitySamplingSource))
-        else config.opacity_source
-    )
-    pressure_grid = config.pressure_grid or pressure_grid_from_opacity(
-        native_provider,
+    prepared = prepare_opacity_inputs(
+        config.opacity_source,
+        spectral_grid=spectral_grid,
+        pressure_grid=config.pressure_grid,
         species=config.model.opacity_species[0],
+        opacity_binning=config.opacity_binning,
     )
-    provider = _prepare_provider(native_provider, config.opacity_binning, spectral_grid)
-    atmosphere_builder = AtmosphereBuilder(
-        pressure_grid=pressure_grid,
-        temperature_profile=config.temperature_profile,
-        chemistry_model=config.chemistry_model,
-        mean_molecular_weight=config.mean_molecular_weight,
-        mean_molecular_weight_model=config.mean_molecular_weight_model,
-        opacity_free_species=config.opacity_free_species,
-    )
+    pressure_grid = prepared.pressure_grid
+    provider = prepared.provider
+    atmosphere_builder = _build_atmosphere_builder(config, pressure_grid)
     model_config = replace(
         config.model,
         metadata={
@@ -526,31 +675,16 @@ def build_parameterized_transmission_model(
         raise RobertConfigError(
             "config must be a ParameterizedTransmissionFactoryConfig"
         )
-    native_provider = (
-        config.opacity_source.load()
-        if isinstance(
-            config.opacity_source,
-            (ExoKOpacitySource, ExoMolOpacitySamplingSource),
-        )
-        else config.opacity_source
-    )
-    pressure_grid = config.pressure_grid or pressure_grid_from_opacity(
-        native_provider,
+    prepared = prepare_opacity_inputs(
+        config.opacity_source,
+        spectral_grid=spectral_grid,
+        pressure_grid=config.pressure_grid,
         species=config.model.opacity_species[0],
+        opacity_binning=config.opacity_binning,
     )
-    provider = _prepare_provider(
-        native_provider,
-        config.opacity_binning,
-        spectral_grid,
-    )
-    atmosphere_builder = AtmosphereBuilder(
-        pressure_grid=pressure_grid,
-        temperature_profile=config.temperature_profile,
-        chemistry_model=config.chemistry_model,
-        mean_molecular_weight=config.mean_molecular_weight,
-        mean_molecular_weight_model=config.mean_molecular_weight_model,
-        opacity_free_species=config.opacity_free_species,
-    )
+    pressure_grid = prepared.pressure_grid
+    provider = prepared.provider
+    atmosphere_builder = _build_atmosphere_builder(config, pressure_grid)
     model_config = replace(
         config.model,
         metadata={
@@ -698,6 +832,29 @@ def _factory_manifest_metadata(config: EmissionFactoryConfig) -> dict[str, str]:
         metadata["factory_opacity_paths"] = ",".join(
             f"{species}:{path}" for species, path in config.opacity_source.paths.items()
         )
+    elif isinstance(config.opacity_source, LineByLineOpacitySource):
+        metadata["factory_opacity_source_type"] = "line_by_line"
+        metadata["factory_opacity_paths"] = ",".join(
+            f"{species}:{path}" for species, path in config.opacity_source.paths.items()
+        )
+        metadata["factory_opacity_wavelength_window_micron"] = (
+            ""
+            if config.opacity_source.wavelength_bounds_micron is None
+            else ":".join(
+                f"{value:.17g}"
+                for value in config.opacity_source.wavelength_bounds_micron
+            )
+        )
+        metadata["factory_opacity_native_sampling_stride"] = str(
+            config.opacity_source.native_sampling_stride
+        )
+        metadata["factory_opacity_native_sampling_accuracy"] = (
+            "requires_convergence_validation"
+        )
+        metadata["factory_opacity_native_sampling_validation"] = "required"
+        metadata["factory_opacity_max_cached_slices"] = str(
+            config.opacity_source.max_cached_slices
+        )
     else:
         metadata["factory_opacity_source_type"] = "provider"
         metadata["factory_opacity_provider"] = config.opacity_source.name
@@ -760,6 +917,29 @@ def _parameterized_factory_manifest_metadata(
         metadata["factory_opacity_paths"] = ",".join(
             f"{species}:{path}" for species, path in config.opacity_source.paths.items()
         )
+    elif isinstance(config.opacity_source, LineByLineOpacitySource):
+        metadata["factory_opacity_source_type"] = "line_by_line"
+        metadata["factory_opacity_paths"] = ",".join(
+            f"{species}:{path}" for species, path in config.opacity_source.paths.items()
+        )
+        metadata["factory_opacity_wavelength_window_micron"] = (
+            ""
+            if config.opacity_source.wavelength_bounds_micron is None
+            else ":".join(
+                f"{value:.17g}"
+                for value in config.opacity_source.wavelength_bounds_micron
+            )
+        )
+        metadata["factory_opacity_native_sampling_stride"] = str(
+            config.opacity_source.native_sampling_stride
+        )
+        metadata["factory_opacity_native_sampling_accuracy"] = (
+            "requires_convergence_validation"
+        )
+        metadata["factory_opacity_native_sampling_validation"] = "required"
+        metadata["factory_opacity_max_cached_slices"] = str(
+            config.opacity_source.max_cached_slices
+        )
     else:
         metadata["factory_opacity_source_type"] = "provider"
         metadata["factory_opacity_provider"] = config.opacity_source.name
@@ -770,51 +950,11 @@ def _parameterized_factory_manifest_metadata(
     return metadata
 
 
-def pressure_grid_from_opacity(
-    provider: OpacityProvider,
-    *,
-    species: str | None = None,
-    name: str | None = None,
-) -> PressureGrid:
-    """Construct layer edges around one opacity table's pressure centers."""
-
-    selected_species = provider.species[0] if species is None else str(species)
-    try:
-        table = provider.tables[selected_species]
-    except KeyError as exc:
-        raise RobertConfigError(
-            f"cannot derive pressure grid: opacity species {selected_species!r} is unavailable"
-        ) from exc
-    centers = np.asarray(table.pressure_bar, dtype=float)
-    if centers.size < 2:
-        raise RobertValidationError(
-            "at least two opacity pressure points are required to infer layer edges; "
-            "provide pressure_grid explicitly"
-        )
-    if np.any(centers <= 0.0) or not (
-        np.all(np.diff(centers) > 0.0) or np.all(np.diff(centers) < 0.0)
-    ):
-        raise RobertValidationError(
-            "opacity pressure centers must be positive and monotonic"
-        )
-    log_centers = np.log(centers)
-    inner_edges = 0.5 * (log_centers[:-1] + log_centers[1:])
-    first_edge = log_centers[0] - (inner_edges[0] - log_centers[0])
-    last_edge = log_centers[-1] + (log_centers[-1] - inner_edges[-1])
-    edges = np.exp(np.concatenate(([first_edge], inner_edges, [last_edge])))
-    return PressureGrid(
-        edges=edges,
-        centers=centers,
-        unit="bar",
-        name=name or f"{selected_species} opacity pressure grid",
-        metadata={"source": "correlated-k opacity", "species": selected_species},
-    )
-
-
 __all__ = [
     "EmissionFactoryConfig",
     "ExoKOpacitySource",
     "ExoKTableBinning",
+    "LineByLineOpacitySource",
     "ParameterizedEmissionFactoryConfig",
     "build_emission_model",
     "build_multi_dataset_emission_model",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -11,6 +12,7 @@ import robert_exoplanets.rt.extinction as extinction_module
 from robert_exoplanets import (
     AtmosphereState,
     CiaTable,
+    HMinusContinuumConfig,
     EvaluatedCorrelatedKOpacity,
     LayerOpticalDepth,
     PreparedCorrelatedKOpacity,
@@ -18,6 +20,7 @@ from robert_exoplanets import (
     SpectralGrid,
     assemble_gas_optical_depth,
     cia_optical_depth,
+    hminus_optical_depth,
     rayleigh_scattering_optical_depth,
     read_cia_table,
     load_nemesispy_cia_table,
@@ -151,6 +154,135 @@ def test_cia_optical_depth_uses_h2_h2_and_h2_he_pairs() -> None:
     assert np.all(cia.tau > 0.0)
     assert "H2-H2_normal" in cia.metadata["active_pairs"]
     assert "H2-He_normal" in cia.metadata["active_pairs"]
+
+
+def test_hminus_uses_explicit_vmr_profiles_and_gray_petit_radtrans_fits() -> None:
+    spectral_grid = SpectralGrid(
+        values=np.array([1.0, 2.0, 5.0]),
+        bin_edges=np.array([0.5, 1.5, 2.5, 5.5]),
+        unit="micron",
+        role="observed",
+    )
+    gas_tau = _gas_tau(spectral_grid)
+    hot_atmosphere = replace(
+        gas_tau.atmosphere,
+        temperature=np.array([3000.0, 3500.0]),
+        composition={
+            **dict(gas_tau.atmosphere.composition),
+            "H-": np.array([1.0e-8, 2.0e-8]),
+            "H": np.array([0.1, 0.2]),
+            "e-": np.array([1.0e-4, 2.0e-4]),
+        },
+    )
+    hot_gas_tau = replace(gas_tau, atmosphere=hot_atmosphere)
+
+    continuum = hminus_optical_depth(hot_gas_tau, HMinusContinuumConfig())
+
+    assert continuum.kind == "absorption_continuum"
+    assert continuum.metadata["composition_source"] == "explicit_atmosphere_vmr"
+    assert continuum.metadata["equilibrium_closure"] == "none"
+    assert continuum.metadata["bound_free_sampling"] == "gray_polynomial_bin_average"
+    assert np.all(continuum.tau[:, 0] > 0.0)
+    # The bound-free threshold is at 1.64 micron; the 2 and 5 micron bins
+    # still receive the free-free contribution at these temperatures.
+    assert np.all(continuum.tau[:, 1:] > 0.0)
+
+
+def test_hminus_point_grid_and_validity_policy() -> None:
+    spectral_grid = SpectralGrid.from_array(
+        [1.0, 1.1, 2.0],
+        unit="micron",
+        role="opacity",
+    )
+    gas_tau = _gas_tau(spectral_grid)
+    atmosphere = replace(
+        gas_tau.atmosphere,
+        temperature=np.array([1000.0, 3000.0]),
+        composition={
+            **dict(gas_tau.atmosphere.composition),
+            "H-": np.full(2, 1.0e-8),
+            "H": np.full(2, 0.1),
+            "e-": np.full(2, 1.0e-4),
+        },
+    )
+    gas_tau = replace(gas_tau, atmosphere=atmosphere)
+
+    point = hminus_optical_depth(gas_tau)
+    assert point.metadata["bound_free_sampling"] == (
+        "point_evaluation_without_bin_edges"
+    )
+    assert np.all(point.tau[1] > 0.0)
+    np.testing.assert_allclose(point.tau[0, 2], 0.0)
+    with pytest.raises(RobertCoverageError, match="below the H-minus"):
+        hminus_optical_depth(
+            gas_tau,
+            HMinusContinuumConfig(temperature_extrapolation="raise"),
+        )
+
+
+def test_hminus_requires_all_three_explicit_composition_species() -> None:
+    gas_tau = _gas_tau(SpectralGrid.from_array([2.0], unit="micron", role="opacity"))
+    with pytest.raises(RobertValidationError, match="explicit composition species: H-"):
+        hminus_optical_depth(gas_tau)
+
+
+def test_hminus_gray_vectors_match_petit_radtrans_and_are_orientation_safe() -> None:
+    edges = np.array([5000.0, 10000.0, 15000.0, 16400.0, 18000.0])
+    expected_bin_average = np.array(
+        [
+            3.7205790419642858e-21,
+            2.4638879836309590e-21,
+            3.1077940783142445e-22,
+            0.0,
+        ]
+    )
+    np.testing.assert_allclose(
+        extinction_module._hminus_bound_free_bin_cross_section(edges),
+        expected_bin_average,
+        rtol=0.0,
+        atol=0.0,
+    )
+    np.testing.assert_allclose(
+        extinction_module._hminus_bound_free_bin_cross_section(edges[::-1]),
+        expected_bin_average[::-1],
+        rtol=0.0,
+        atol=0.0,
+    )
+    expected_point = np.array(
+        [
+            2.9256126812499993e-21,
+            3.7891372999999952e-21,
+            7.4202473125000664e-22,
+            0.0,
+            0.0,
+        ]
+    )
+    np.testing.assert_allclose(
+        extinction_module._hminus_bound_free_point_cross_section(edges),
+        expected_point,
+        # Polynomial evaluation can differ by a few ulps across NumPy builds.
+        rtol=5.0e-15,
+        atol=0.0,
+    )
+    expected_free_free = np.array(
+        [
+            1.3608759083941226e-24,
+            1.3342657412068660e-23,
+            2.9989990963044322e-22,
+            1.5292327531369018e-21,
+            0.0,
+        ]
+    )
+    np.testing.assert_allclose(
+        extinction_module._hminus_free_free_cross_section(
+            np.array([2600.0, 10000.0, 50000.0, 113900.0, 120000.0]),
+            3000.0,
+            1234.5,
+        ),
+        expected_free_free,
+        rtol=0.0,
+        atol=0.0,
+    )
 
 
 def test_petitradtrans_cia_hdf_loader_and_log_interpolation(tmp_path) -> None:

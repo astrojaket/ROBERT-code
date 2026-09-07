@@ -219,7 +219,7 @@ def test_smoke_preflight_checks_both_hybrid_manifests(monkeypatch) -> None:
     config = load_task_config(
         ROOT
         / "configurations"
-        / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml"
+        / "targets/WASP-69b/wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml"
     )
     calls = []
 

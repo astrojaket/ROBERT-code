@@ -1,0 +1,378 @@
+{
+  "acceptance": {
+    "all_narrow_cases_R100000": true,
+    "bounded_prepared_slice_cache": true,
+    "cpu_threads_at_most_3": true,
+    "fused_low_memory_path": true,
+    "memory_below_2_GiB": true,
+    "pressure_80_vs_160_R100000": true,
+    "stride_2_R100000": true,
+    "wide_band_R100000": true
+  },
+  "cases": {
+    "background_only": {
+      "integrated_flux_relative_error": 0.011374144899295002,
+      "max_absolute_relative_error": 0.011384966326887236,
+      "median_signed_relative_error": 0.011374137039833254,
+      "p95_absolute_relative_error": 0.011383882763798769,
+      "rms_relative_error": 0.011374141142439217
+    },
+    "baseline": {
+      "integrated_flux_relative_error": -0.0007418993356956838,
+      "max_absolute_relative_error": 0.02105293556896015,
+      "median_signed_relative_error": -0.000812470862610104,
+      "p95_absolute_relative_error": 0.0059601017348534175,
+      "rms_relative_error": 0.0032589606737409398
+    },
+    "co_only": {
+      "integrated_flux_relative_error": -0.0002567000846602774,
+      "max_absolute_relative_error": 0.02161800275450676,
+      "median_signed_relative_error": -0.0005198418282744699,
+      "p95_absolute_relative_error": 0.0017472161801667628,
+      "rms_relative_error": 0.0019429121059277735
+    },
+    "h2o_only": {
+      "integrated_flux_relative_error": -0.003587292973114109,
+      "max_absolute_relative_error": 0.012437981251690378,
+      "median_signed_relative_error": -0.004648761651638134,
+      "p95_absolute_relative_error": 0.007581244728844544,
+      "rms_relative_error": 0.005150686159065388
+    },
+    "high_gravity": {
+      "integrated_flux_relative_error": -0.000950380700670328,
+      "max_absolute_relative_error": 0.015335320921571638,
+      "median_signed_relative_error": -0.0010372468723922612,
+      "p95_absolute_relative_error": 0.005818436683781836,
+      "rms_relative_error": 0.0029248194835579315
+    },
+    "inversion": {
+      "integrated_flux_relative_error": -0.0011727226224433895,
+      "max_absolute_relative_error": 0.041307158572360114,
+      "median_signed_relative_error": -6.011870622940618e-05,
+      "p95_absolute_relative_error": 0.00810256145599062,
+      "rms_relative_error": 0.005064206079029941
+    },
+    "isothermal": {
+      "integrated_flux_relative_error": 3.65497596410691e-07,
+      "max_absolute_relative_error": 3.6578202156078987e-07,
+      "median_signed_relative_error": 3.654975243572167e-07,
+      "p95_absolute_relative_error": 3.6575355683021726e-07,
+      "rms_relative_error": 3.654976182418014e-07
+    },
+    "low_abundance": {
+      "integrated_flux_relative_error": -0.001589421066460428,
+      "max_absolute_relative_error": 0.012352848459089127,
+      "median_signed_relative_error": -0.0018805958162878555,
+      "p95_absolute_relative_error": 0.004831378074902387,
+      "rms_relative_error": 0.002909990059302919
+    }
+  },
+  "command": "conda run -n robert-exoplanets python examples/benchmark_lbl_kband_science_grid.py",
+  "comparison": "ROBERT_full_table_LBL_science_grid_vs_petitRADTRANS3",
+  "isolated_species_line_imprints": {
+    "co_only_rms_fraction_of_background": 0.5114486769006698,
+    "combined_rms_fraction_of_background": 0.5533418506743614,
+    "h2o_only_rms_fraction_of_background": 0.49481157495398875
+  },
+  "native_sampling_stride_convergence": {
+    "accuracy_statement": "validated only after Gaussian R=100000 response",
+    "metrics": {
+      "2": {
+        "integrated_flux_relative_error": 3.2376733900330024e-05,
+        "max_absolute_relative_error": 0.008004973005951266,
+        "median_signed_relative_error": -4.077439536376293e-05,
+        "p95_absolute_relative_error": 0.003489855847819522,
+        "rms_relative_error": 0.001529525843996748
+      },
+      "4": {
+        "integrated_flux_relative_error": 5.674215336037847e-06,
+        "max_absolute_relative_error": 0.04115292165877138,
+        "median_signed_relative_error": -0.0003031119095388002,
+        "p95_absolute_relative_error": 0.009969085115238646,
+        "rms_relative_error": 0.006046182733829695
+      },
+      "8": {
+        "integrated_flux_relative_error": 0.00021225546049219446,
+        "max_absolute_relative_error": 0.12064349393786955,
+        "median_signed_relative_error": -0.0010575705630235799,
+        "p95_absolute_relative_error": 0.04753420245521619,
+        "rms_relative_error": 0.021562869509032283
+      }
+    },
+    "reference_stride": 1,
+    "resources": {
+      "1": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.048199875047430396,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "2": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.029679166967980564,
+        "end_to_end_estimate_bytes": 291776272,
+        "n_layers": 80,
+        "n_wavelength": 1083,
+        "native_sampling_stride": "2",
+        "preparation_estimate_bytes": 6705936,
+        "species_tau_diagnostics": "disabled"
+      },
+      "4": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.020126958028413355,
+        "end_to_end_estimate_bytes": 280116640,
+        "n_layers": 80,
+        "n_wavelength": 542,
+        "native_sampling_stride": "4",
+        "preparation_estimate_bytes": 3356064,
+        "species_tau_diagnostics": "disabled"
+      },
+      "8": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.013580915983766317,
+        "end_to_end_estimate_bytes": 274276048,
+        "n_layers": 80,
+        "n_wavelength": 271,
+        "native_sampling_stride": "8",
+        "preparation_estimate_bytes": 1678032,
+        "species_tau_diagnostics": "disabled"
+      }
+    }
+  },
+  "oracle_contract": {
+    "clear_atmosphere": true,
+    "included_continua": [],
+    "line_by_line_opacity_sampling": 1,
+    "line_opacity_mode": "lbl",
+    "native_resolving_power": 1000000,
+    "petitradtrans_version": "3.3.3"
+  },
+  "oracle_inputs": {
+    "background_only": {
+      "bytes": 29696,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_background_only.npz",
+      "sha256": "9f3fdffb9f42575733a7634e45affe580205bd1de780358f81bc03657ad99e52"
+    },
+    "baseline": {
+      "bytes": 32952,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_baseline.npz",
+      "sha256": "db1d4aa21d474e7057038c9743af3c6e7e938ffdd12e0504bb158f62068eb8e7"
+    },
+    "co_only": {
+      "bytes": 32779,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_co_only.npz",
+      "sha256": "b6ec68ed1d137b315ebb9b078559dbc65ccb6db93b05a502020622a0e591701a"
+    },
+    "h2o_only": {
+      "bytes": 32945,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_h2o_only.npz",
+      "sha256": "f768e0a330b94f8cbf330212418817f1c578e309893370c181141f3238966c92"
+    },
+    "high_gravity": {
+      "bytes": 32948,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_high_gravity.npz",
+      "sha256": "b57c4f15260f6a1b5fc50510347cad249124c15a91067a569d932a22526c4e0e"
+    },
+    "inversion": {
+      "bytes": 33065,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_inversion.npz",
+      "sha256": "67054d92ca030d69c5fc79402aa97748a20ff9c1097ead3f47bb87337dd87f65"
+    },
+    "isothermal": {
+      "bytes": 27348,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_isothermal.npz",
+      "sha256": "dca2e11ca9f886e345b33542a37ad928a0849582959da2b3825a09da0d69bae3"
+    },
+    "low_abundance": {
+      "bytes": 32864,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_grid_low_abundance.npz",
+      "sha256": "7c34a9dc80858e5d02c1b65b1c4973c075569f6096d249f56d2d60236668a978"
+    },
+    "medium_160": {
+      "bytes": 179186,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_medium_reference_160.npz",
+      "sha256": "bee38b3c03805863992b68c596b55b858527eb05d0a1caf4f28298b236e53191"
+    },
+    "medium_80": {
+      "bytes": 178338,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_medium_reference_80.npz",
+      "sha256": "2f82d18c324b979f43971d4a4628f0323cc8a824eaa5cd521c5694ad39971674"
+    },
+    "wide": {
+      "bytes": 350637,
+      "path": "examples/outputs/lbl_kband/petitradtrans3_lbl_kband_wide_reference.npz",
+      "sha256": "dcf0df3cf29de2623728467d6d4813c0df6371b845579a6e645b1030c0752b98"
+    }
+  },
+  "prepared_slice_cache": {
+    "cached_slice_bytes": 13411872,
+    "cached_slice_count": 1,
+    "cold_prepare_seconds": 0.01491550006903708,
+    "same_prepared_object": true,
+    "warm_prepare_seconds": 0.004662000108510256
+  },
+  "pressure_convergence": {
+    "layers": [
+      80,
+      160
+    ],
+    "metrics": {
+      "integrated_flux_relative_error": 0.00011198357846819995,
+      "max_absolute_relative_error": 0.000256204652581582,
+      "median_signed_relative_error": 0.00010840143361989796,
+      "p95_absolute_relative_error": 0.00016469001122643157,
+      "rms_relative_error": 0.00011837921358210201
+    },
+    "wavelength_micron": [
+      2.29,
+      2.32
+    ]
+  },
+  "resources": {
+    "case_resources": {
+      "background_only": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.03373104194179177,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "baseline": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.05990770796779543,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "co_only": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.03650616609957069,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "h2o_only": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.03666500002145767,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "high_gravity": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.036217667046003044,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "inversion": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.036011084099300206,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "isothermal": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.036020042025484145,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      },
+      "low_abundance": {
+        "assembly_backend": "fused_lbl_direct_sum",
+        "duration_seconds": 0.0359579169889912,
+        "end_to_end_estimate_bytes": 315117088,
+        "n_layers": 80,
+        "n_wavelength": 2166,
+        "native_sampling_stride": "1",
+        "preparation_estimate_bytes": 13411872,
+        "species_tau_diagnostics": "disabled"
+      }
+    },
+    "cpu_thread_limit": 3,
+    "measured_peak_rss_bytes": 928579584,
+    "memory_limit_bytes": 2040109465,
+    "opacity_memory_limit_bytes": 1072693248,
+    "thread_values": {
+      "MKL_NUM_THREADS": 3,
+      "NUMBA_NUM_THREADS": 3,
+      "NUMEXPR_NUM_THREADS": 3,
+      "OMP_NUM_THREADS": 3,
+      "OMP_THREAD_LIMIT": 3,
+      "OPENBLAS_NUM_THREADS": 3,
+      "VECLIB_MAXIMUM_THREADS": 3
+    }
+  },
+  "schema_version": 1,
+  "status": "pass",
+  "table_inputs": {
+    "CO": {
+      "bytes": 4753927800,
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "5f77209da3ea67d5a697b06379b1de2b8fe106adf7ea0abfb451c675084087ad"
+    },
+    "H2O": {
+      "bytes": 4681348920,
+      "path": "external_data/petitRADTRANS/input_data/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5",
+      "sha256": "9a79513fb92dfa369f85abb273257ae2b2100a4a386169b9bfff8a5b74249b73"
+    }
+  },
+  "thread_values": {
+    "MKL_NUM_THREADS": 3,
+    "NUMBA_NUM_THREADS": 3,
+    "NUMEXPR_NUM_THREADS": 3,
+    "OMP_NUM_THREADS": 3,
+    "OMP_THREAD_LIMIT": 3,
+    "OPENBLAS_NUM_THREADS": 3,
+    "VECLIB_MAXIMUM_THREADS": 3
+  },
+  "wide_band": {
+    "metrics": {
+      "integrated_flux_relative_error": 0.00025730515351995997,
+      "max_absolute_relative_error": 0.04680092368079691,
+      "median_signed_relative_error": -0.00029444348566776135,
+      "p95_absolute_relative_error": 0.00867133615887845,
+      "rms_relative_error": 0.005540958600586927
+    },
+    "resources": {
+      "assembly_backend": "fused_lbl_direct_sum",
+      "duration_seconds": 0.6437755000079051,
+      "end_to_end_estimate_bytes": 825899488,
+      "n_layers": 80,
+      "n_wavelength": 25866,
+      "native_sampling_stride": "1",
+      "preparation_estimate_bytes": 160162272,
+      "species_tau_diagnostics": "disabled"
+    },
+    "wavelength_micron": [
+      2.29,
+      2.35
+    ]
+  }
+}

@@ -89,6 +89,41 @@ def _factory_config() -> EmissionFactoryConfig:
     )
 
 
+class _TrackingOpacitySource:
+    """Small source double used to exercise factory preparation once."""
+
+    species = ("H2O",)
+    name = "tracking-opacity-source"
+
+    def __init__(self, provider: CorrelatedKOpacityProvider) -> None:
+        self.provider = provider
+        self.load_calls = 0
+
+    def load(self) -> CorrelatedKOpacityProvider:
+        self.load_calls += 1
+        return self.provider
+
+
+def test_factory_prepares_a_loaded_source_before_model_assembly() -> None:
+    source = _TrackingOpacitySource(_provider())
+    config = replace(_factory_config(), opacity_source=source)
+
+    model = build_emission_model(config, spectral_grid=_spectral_grid())
+    baseline = build_emission_model(
+        _factory_config(),
+        spectral_grid=_spectral_grid(),
+    )
+
+    assert source.load_calls == 1
+    assert model.opacity_provider is source.provider
+    np.testing.assert_array_equal(
+        model({"log_h2o": -3.0, "temperature_offset": 0.0, "radius_scale": 1.0}).values,
+        baseline(
+            {"log_h2o": -3.0, "temperature_offset": 0.0, "radius_scale": 1.0}
+        ).values,
+    )
+
+
 def test_factory_builds_evaluable_model_from_python_objects() -> None:
     model = build_emission_model(_factory_config(), spectral_grid=_spectral_grid())
 

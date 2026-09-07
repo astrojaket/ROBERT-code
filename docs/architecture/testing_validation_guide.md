@@ -2,6 +2,13 @@
 
 ROBERT must be tested as both software and science.
 
+This guide defines target tiers. Current CI runs the portable suite with
+optional-dependency skips; it does not implement every scheduled or release
+gate below. The marker names in section 9 are proposed, not configured.
+On systems where JAX also has an accelerator plug-in, select
+`JAX_PLATFORMS=cpu` for portable reference checks. Run opt-in hardware checks
+separately; a CPU pass is not hardware validation.
+
 ## 1. Test Tiers
 
 | Tier | Purpose | Runs in normal PR CI | Data allowed |
@@ -31,6 +38,11 @@ Rules:
 - No large data.
 - No external opacity databases.
 - No slow samplers.
+
+Keep tests that protect distinct behavior, numerical limits, or failure paths.
+Do not keep repeated source-string checks when a behavioral test covers the
+same contract. File length or runtime alone is not a reason to delete a
+scientific regression. Prefer small deterministic inputs to weaker assertions.
 
 ## 3. Integration Tests
 

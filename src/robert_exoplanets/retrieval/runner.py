@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 import time
-from typing import IO
+from typing import IO, Any, cast
 
 from robert_exoplanets.core import RobertConfigError, RobertDataError
 
@@ -16,47 +16,49 @@ from .manifest import (
     RUN_MANIFEST_FILENAME,
     RunManifest,
     build_run_manifest,
+    normalize_retrieval_method,
+    normalize_multinest_resume,
     read_run_manifest,
+    validate_resume_compatibility,
     write_run_manifest,
 )
-from .multi_dataset import MultiDatasetRetrievalProblem
 from .optimal_estimation import run_optimal_estimation
-from .problem import RetrievalProblem
-from .results import RetrievalResult, build_retrieval_result, write_retrieval_result
-from .samplers import run_multinest, run_ultranest
+from .protocols import OptimalEstimationProblem, SamplerRetrievalProblem
+from .predictions import capture_best_fit_prediction
+from .results import (
+    InferenceResult,
+    RetrievalResult,
+    build_retrieval_result,
+    write_retrieval_result,
+)
+from .samplers import run_multinest
 
 
 def run_retrieval(
-    problem: RetrievalProblem | MultiDatasetRetrievalProblem,
+    problem: SamplerRetrievalProblem,
     *,
-    method: str = "optimal_estimation",
+    method: str = "multinest",
     output_dir: str | Path | None = None,
     seed: int | None = None,
     **kwargs: object,
 ) -> RetrievalResult:
     """Run and serialize a retrieval with a manifest written before inference."""
 
-    normalized = method.strip().lower().replace("-", "_")
-    if normalized in {"optimal_estimation", "oe"}:
-        normalized = "optimal_estimation"
-    elif normalized in {"ultranest", "nested", "nested_sampling"}:
-        normalized = "ultranest"
-    elif normalized in {"multinest", "multi_nest", "pymultinest"}:
-        normalized = "multinest"
-    else:
+    normalized = normalize_retrieval_method(method)
+    if normalized not in {"optimal_estimation", "multinest"}:
         raise ValueError(f"unsupported retrieval method: {method}")
     if output_dir is None:
         raise ValueError("output_dir is required for reproducible retrieval runs")
 
     output_path = Path(output_dir).expanduser()
     settings = {"method": normalized, **kwargs}
-    if normalized in {"ultranest", "multinest"}:
+    if normalized == "multinest":
         settings["seed"] = seed
     current_manifest = build_run_manifest(
         problem,
         method=normalized,
         settings=settings,
-        random_seed=seed if normalized in {"ultranest", "multinest"} else None,
+        random_seed=seed if normalized == "multinest" else None,
     )
     rank, communicator = _mpi_context()
     lock: IO[str] | None = None
@@ -79,8 +81,8 @@ def run_retrieval(
                 manifest = _prepare_manifest(
                     current_manifest,
                     output_path,
-                    resume=kwargs.get("resume", "overwrite"),
-                    is_nested=normalized in {"ultranest", "multinest"},
+                    resume=kwargs.get("resume", True),
+                    is_nested=normalized == "multinest",
                 )
             except (RobertConfigError, RobertDataError, OSError) as exc:
                 manifest_error = str(exc)
@@ -92,15 +94,23 @@ def run_retrieval(
             communicator.Barrier()
 
         inference_started = time.monotonic()
+        inference_result: InferenceResult
         if normalized == "optimal_estimation":
-            inference_result = run_optimal_estimation(problem, **kwargs)
-        elif normalized == "ultranest":
-            inference_result = run_ultranest(
-                problem, output_dir=output_path, seed=seed, **kwargs
+            if not callable(getattr(problem, "gaussian_inputs_from_vector", None)):
+                raise RobertConfigError(
+                    "optimal estimation requires a problem implementing the "
+                    "explicit gaussian_inputs_from_vector capability"
+                )
+            inference_result = run_optimal_estimation(
+                cast(OptimalEstimationProblem, problem),
+                **cast(Any, kwargs),
             )
         else:
             inference_result = run_multinest(
-                problem, output_dir=output_path, seed=seed, **kwargs
+                problem,
+                output_dir=output_path,
+                seed=seed,
+                **cast(Any, kwargs),
             )
         inference_elapsed = max(time.monotonic() - inference_started, 0.0)
         result = build_retrieval_result(
@@ -113,10 +123,26 @@ def run_retrieval(
                 "inference_elapsed_seconds": f"{inference_elapsed:.6f}",
             },
         )
+        write_error: str | None = None
         if rank == 0:
-            write_retrieval_result(result)
+            try:
+                artifact = capture_best_fit_prediction(
+                    problem,
+                    result.best_fit_parameters,
+                    provenance={
+                        "config_hash": manifest.config_hash,
+                        "method": normalized,
+                        "robert_version": manifest.robert_version,
+                    },
+                )
+                write_retrieval_result(result, prediction_artifact=artifact)
+            except Exception as exc:
+                # Every rank must leave finalization together on a write failure.
+                write_error = f"failed to write retrieval products: {type(exc).__name__}: {exc}"
         if communicator is not None:
-            communicator.Barrier()
+            write_error = communicator.bcast(write_error, root=0)
+        if write_error is not None:
+            raise RobertDataError(write_error)
         return result
     finally:
         if rank == 0 and lock is not None:
@@ -133,13 +159,12 @@ def _prepare_manifest(
     """Preserve the original manifest and journal subsequent attempts."""
 
     manifest_path = output_path / RUN_MANIFEST_FILENAME
-    resume_existing = is_nested and (
-        resume is True
-        or str(resume).strip().lower() in {"resume", "resume-similar", "true"}
-    )
+    resume_existing = False
+    if is_nested:
+        resume_existing = normalize_multinest_resume(resume)
     if resume_existing and manifest_path.exists():
         original = read_run_manifest(manifest_path)
-        _validate_resume_compatibility(original, current)
+        validate_resume_compatibility(original, current)
         active = original
     else:
         write_run_manifest(current, output_path)
@@ -148,32 +173,6 @@ def _prepare_manifest(
         current, output_path, original_config_hash=active.config_hash
     )
     return active
-
-
-def _validate_resume_compatibility(original: RunManifest, current: RunManifest) -> None:
-    fields = (
-        "problem_name",
-        "method",
-        "parameter_names",
-        "parameter_priors",
-        "likelihood",
-        "problem_metadata",
-        "opacity_identifiers",
-        "random_seed",
-    )
-    changed = [
-        name for name in fields if getattr(original, name) != getattr(current, name)
-    ]
-    original_floor = original.settings.get("invalid_loglike_floor")
-    current_floor = current.settings.get("invalid_loglike_floor")
-    if original_floor != current_floor:
-        changed.append("invalid_loglike_floor")
-    if changed:
-        raise RobertConfigError(
-            "cannot resume because the scientific run definition changed: "
-            + ", ".join(changed)
-            + ". Use a new output directory or resume='overwrite'."
-        )
 
 
 def _write_attempt_manifest(

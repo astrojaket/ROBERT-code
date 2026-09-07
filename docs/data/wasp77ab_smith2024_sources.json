@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "record_type": "smith2024_wasp77ab_external_data_sources",
+  "status": "pass_primary_files_present",
+  "paper": {
+    "authors": "Smith et al. 2024",
+    "arxiv": "2312.13069",
+    "doi": "10.3847/1538-3881/ad17bf"
+  },
+  "zenodo": {
+    "record_url": "https://zenodo.org/records/10382053",
+    "doi": "10.5281/zenodo.10382053",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "files_api_url": "https://zenodo.org/api/records/10382053/files"
+  },
+  "acquisition": {
+    "script": "examples/fetch_wasp77ab_smith2024_data.py",
+    "command": "conda run -n robert-exoplanets python examples/fetch_wasp77ab_smith2024_data.py --output-dir external_data/wasp77ab_smith2024",
+    "output_directory": "external_data/wasp77ab_smith2024",
+    "include_sensitivity_nights": false,
+    "atomic_install": true,
+    "skip_valid": true,
+    "overwrite_invalid": false,
+    "stream_chunk_bytes": 1048576,
+    "deserializes_archives": false
+  },
+  "resource_policy": {
+    "max_threads": 3,
+    "observed_threads": 1,
+    "process_rss_limit_bytes": 2147483647,
+    "process_rss_limit_comparison": "strictly below 2 GiB",
+    "thread_variables": [
+      "OMP_NUM_THREADS",
+      "OPENBLAS_NUM_THREADS",
+      "MKL_NUM_THREADS",
+      "NUMEXPR_NUM_THREADS",
+      "VECLIB_MAXIMUM_THREADS",
+      "NUMBA_NUM_THREADS",
+      "OMP_THREAD_LIMIT"
+    ]
+  },
+  "files": [
+    {
+      "name": "cube14v3.pic",
+      "role": "primary pre-eclipse IGRINS reduced cube",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/cube14v3.pic/content",
+      "size_bytes": 77591894,
+      "md5": "3fd41560b7dbcc60851ef3a0972c852f",
+      "sha256_expected": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26",
+      "local_path": "external_data/wasp77ab_smith2024/cube14v3.pic",
+      "status": "present_verified",
+      "sha256": "999623a7ba4460aa72ba9bbe284de92e7b5a811ebe09e51d70667084ae592b26"
+    },
+    {
+      "name": "20201214_info.csv",
+      "role": "primary pre-eclipse observing-condition metadata",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/20201214_info.csv/content",
+      "size_bytes": 7261,
+      "md5": "7c861b1baf8ae87801f95d7af8b2e9c6",
+      "sha256_expected": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e",
+      "local_path": "external_data/wasp77ab_smith2024/20201214_info.csv",
+      "status": "present_verified",
+      "sha256": "68f5a80f930e5f1f99cd1861678754f824bf665972d675f617a7d66c4fdad11e"
+    },
+    {
+      "name": "w77_1DRC_FULL.txt",
+      "role": "full one-dimensional retrieval template",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/w77_1DRC_FULL.txt/content",
+      "size_bytes": 13899150,
+      "md5": "dbaa138b7768b727c87ff8f83fcc563f",
+      "sha256_expected": "8f3fcdf119b42e1c1db5b5aba61c8266bad65cf3c279aa237e55346ed9be7a14",
+      "local_path": "external_data/wasp77ab_smith2024/w77_1DRC_FULL.txt",
+      "status": "present_verified",
+      "sha256": "8f3fcdf119b42e1c1db5b5aba61c8266bad65cf3c279aa237e55346ed9be7a14"
+    },
+    {
+      "name": "w77_1DRC_H2O_ONLY.txt",
+      "role": "H2O-only one-dimensional retrieval template",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/w77_1DRC_H2O_ONLY.txt/content",
+      "size_bytes": 13899150,
+      "md5": "6cf0ec37cbed5db5b18e6d434838fa40",
+      "sha256_expected": "f68acda835e0af3e1747504d1e6243560610e5b98ad675917233859a17ace330",
+      "local_path": "external_data/wasp77ab_smith2024/w77_1DRC_H2O_ONLY.txt",
+      "status": "present_verified",
+      "sha256": "f68acda835e0af3e1747504d1e6243560610e5b98ad675917233859a17ace330"
+    },
+    {
+      "name": "w77_1DRC_CO_ONLY.txt",
+      "role": "CO-only one-dimensional retrieval template",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/w77_1DRC_CO_ONLY.txt/content",
+      "size_bytes": 13899150,
+      "md5": "d4f0c6dfd4bb50a7ca9ca73ea3318eb3",
+      "sha256_expected": "b8c9fc1496b25d9b4030ac3fafac3623ac1a5e945cf0b2f3161e96d3e8e3c016",
+      "local_path": "external_data/wasp77ab_smith2024/w77_1DRC_CO_ONLY.txt",
+      "status": "present_verified",
+      "sha256": "b8c9fc1496b25d9b4030ac3fafac3623ac1a5e945cf0b2f3161e96d3e8e3c016"
+    },
+    {
+      "name": "w77_pre_nirspec_best_fit_R500K_scaled.txt",
+      "role": "pre-eclipse best-fit R=500,000 template scaled for NIRSpec",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/w77_pre_nirspec_best_fit_R500K_scaled.txt/content",
+      "size_bytes": 72672825,
+      "md5": "93841125cab0a2c74ae4730ebf36b7dc",
+      "sha256_expected": "fe1fb7cd37b6dec52173a19ee1fd7ea1529c421946c76d728d0bdcf4285ad34d",
+      "local_path": "external_data/wasp77ab_smith2024/w77_pre_nirspec_best_fit_R500K_scaled.txt",
+      "status": "present_verified",
+      "sha256": "fe1fb7cd37b6dec52173a19ee1fd7ea1529c421946c76d728d0bdcf4285ad34d"
+    },
+    {
+      "name": "NIRSpec_posterior_draws_median_spectrum.txt",
+      "role": "NIRSpec posterior-median spectrum",
+      "optional": false,
+      "content_url": "https://zenodo.org/api/records/10382053/files/NIRSpec_posterior_draws_median_spectrum.txt/content",
+      "size_bytes": 526832,
+      "md5": "e82b61acf01b56c5bc0ea79186680b09",
+      "sha256_expected": "45858658108e62333226e16e13809f304666672803ffcdf089dabe3514b01e5a",
+      "local_path": "external_data/wasp77ab_smith2024/NIRSpec_posterior_draws_median_spectrum.txt",
+      "status": "present_verified",
+      "sha256": "45858658108e62333226e16e13809f304666672803ffcdf089dabe3514b01e5a"
+    },
+    {
+      "name": "cube06v3.pic",
+      "role": "post-eclipse 2020-12-06 IGRINS sensitivity cube",
+      "optional": true,
+      "content_url": "https://zenodo.org/api/records/10382053/files/cube06v3.pic/content",
+      "size_bytes": 55221925,
+      "md5": "fa338b902cfa5127fa4707187c2d00f0",
+      "sha256_expected": null,
+      "local_path": "external_data/wasp77ab_smith2024/cube06v3.pic",
+      "status": "not_requested",
+      "sha256": null
+    },
+    {
+      "name": "20201206_info.csv",
+      "role": "post-eclipse 2020-12-06 observing-condition metadata",
+      "optional": true,
+      "content_url": "https://zenodo.org/api/records/10382053/files/20201206_info.csv/content",
+      "size_bytes": 5109,
+      "md5": "ec2f3cbc0f0d1dc7a4cec599224cd186",
+      "sha256_expected": null,
+      "local_path": "external_data/wasp77ab_smith2024/20201206_info.csv",
+      "status": "not_requested",
+      "sha256": null
+    },
+    {
+      "name": "cube21v3.pic",
+      "role": "post-eclipse 2020-12-21 IGRINS sensitivity cube",
+      "optional": true,
+      "content_url": "https://zenodo.org/api/records/10382053/files/cube21v3.pic/content",
+      "size_bytes": 50346161,
+      "md5": "53f3c67601475f0f5ffc8d1b9277c304",
+      "sha256_expected": null,
+      "local_path": "external_data/wasp77ab_smith2024/cube21v3.pic",
+      "status": "not_requested",
+      "sha256": null
+    },
+    {
+      "name": "20201221_info.csv",
+      "role": "post-eclipse 2020-12-21 observing-condition metadata",
+      "optional": true,
+      "content_url": "https://zenodo.org/api/records/10382053/files/20201221_info.csv/content",
+      "size_bytes": 4529,
+      "md5": "6bba581a3eaaa5bdd90286264ad202e0",
+      "sha256_expected": null,
+      "local_path": "external_data/wasp77ab_smith2024/20201221_info.csv",
+      "status": "not_requested",
+      "sha256": null
+    }
+  ],
+  "notes": [
+    "Primary local files were verified against official Zenodo size and MD5 values and their SHA-256 values were computed with the acquisition script.",
+    "Sensitivity-night files are listed with official metadata but are not required for the primary pre-eclipse workflow; acquire them with --include-sensitivity-nights.",
+    "The .pic files remain opaque external inputs. No pickle deserialization is performed by the acquisition script."
+  ]
+}

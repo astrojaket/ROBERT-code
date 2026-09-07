@@ -203,9 +203,20 @@ def evaluate_injection_recovery(
     posterior_covariance: ArrayLike | None = None,
     inference_converged: bool = True,
     reduced_chi_square_bounds: tuple[float, float] = (0.5, 1.5),
+    chi_square_override: float | None = None,
+    effective_n_active_points: int | None = None,
     metadata: Mapping[str, str] | None = None,
 ) -> InjectionRecoveryReport:
-    """Evaluate explicit parameter and fit-quality recovery criteria."""
+    """Evaluate explicit parameter and fit-quality recovery criteria.
+
+    ``chi_square_override`` is useful when the likelihood has an exact
+    covariance-aware or profiled residual statistic that cannot be recovered
+    from the independent ``Observation.uncertainty`` vector.  When supplied,
+    ``effective_n_active_points`` can report the number of residual points
+    after fixed projection or profiled nuisance directions have been removed.
+    Both arguments are optional so existing independent-Gaussian callers keep
+    their original behaviour.
+    """
 
     names = tuple(truth) if parameter_order is None else tuple(str(name) for name in parameter_order)
     if not names or len(set(names)) != len(names):
@@ -261,9 +272,49 @@ def evaluate_injection_recovery(
             )
         )
 
-    model, data, uncertainty = GaussianLikelihood().effective_inputs(best_fit_spectrum, observation)
-    chi_square = float(np.sum(np.square((data - model) / uncertainty)))
+    model, data, uncertainty = GaussianLikelihood().effective_inputs(
+        best_fit_spectrum,
+        observation,
+    )
+    if chi_square_override is None:
+        chi_square = float(np.sum(np.square((data - model) / uncertainty)))
+    else:
+        if isinstance(chi_square_override, (bool, np.bool_)):
+            raise RobertValidationError(
+                "chi_square_override must be finite and non-negative"
+            )
+        try:
+            chi_square = float(chi_square_override)
+        except (TypeError, ValueError) as error:
+            raise RobertValidationError(
+                "chi_square_override must be finite and non-negative"
+            ) from error
+        if not np.isfinite(chi_square) or chi_square < 0.0:
+            raise RobertValidationError(
+                "chi_square_override must be finite and non-negative"
+            )
+
     n_active = int(data.size)
+    if effective_n_active_points is not None:
+        if isinstance(effective_n_active_points, (bool, np.bool_)):
+            raise RobertValidationError(
+                "effective_n_active_points must be a positive integer"
+            )
+        try:
+            normalized_n_active = int(effective_n_active_points)
+        except (TypeError, ValueError) as error:
+            raise RobertValidationError(
+                "effective_n_active_points must be a positive integer"
+            ) from error
+        if normalized_n_active != effective_n_active_points or normalized_n_active < 1:
+            raise RobertValidationError(
+                "effective_n_active_points must be a positive integer"
+            )
+        if normalized_n_active > n_active:
+            raise RobertValidationError(
+                "effective_n_active_points cannot exceed active data points"
+            )
+        n_active = normalized_n_active
     degrees_of_freedom = n_active - len(names)
     if degrees_of_freedom <= 0:
         raise RobertValidationError("injection recovery requires positive residual degrees of freedom")

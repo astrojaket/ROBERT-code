@@ -30,6 +30,7 @@ from robert_exoplanets.core import (
 )
 from robert_exoplanets.core._immutability import immutable_mapping
 
+from ._interpolation import _brackets
 from .inspectors import file_sha256
 from .metadata import pressure_values_in_unit, spectral_grid_values_in_unit
 
@@ -745,21 +746,6 @@ else:
 
     def _mixture_cross_section_kernel(*args):
         raise RobertValidationError("compiled opacity sampling requires numba")
-
-
-def _brackets(
-    values: NDArray[np.float64], grid: NDArray[np.float64]
-) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.float64]]:
-    upper = np.searchsorted(grid, values, side="right")
-    upper = np.clip(upper, 1, grid.size - 1).astype(np.int64)
-    lower = upper - 1
-    weight = (values - grid[lower]) / (grid[upper] - grid[lower])
-    exact_low = values == grid[0]
-    exact_high = values == grid[-1]
-    lower[exact_low] = upper[exact_low] = 0
-    lower[exact_high] = upper[exact_high] = grid.size - 1
-    weight[exact_low | exact_high] = 0.0
-    return lower, upper, weight
 
 
 def _exact_spectral_indices(

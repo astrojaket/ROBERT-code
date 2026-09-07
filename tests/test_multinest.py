@@ -120,6 +120,15 @@ def test_multinest_rejects_negative_seed(tmp_path) -> None:
         )
 
 
+def test_multinest_rejects_unsupported_resume_mode(tmp_path) -> None:
+    with pytest.raises(RobertConfigError, match="resume must be"):
+        run_multinest(
+            _problem(),
+            output_dir=tmp_path,
+            resume="resume-similar",
+        )
+
+
 def test_multinest_maps_requested_seed_into_native_randomns_range() -> None:
     assert _effective_multinest_seed(None) == -1
     assert _effective_multinest_seed(0) == 0

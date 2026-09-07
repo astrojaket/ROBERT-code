@@ -10,7 +10,7 @@ from robert_exoplanets.io.task_config import configured_regions, load_task_confi
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MATRIX = ROOT / "configurations" / "retrievals"
+MATRIX = ROOT / "configurations" / "targets"
 MODELS = {
     "clear": ("one_region", 7, "none"),
     "one-region": ("one_region", 11, "mie_catalog"),
@@ -37,7 +37,7 @@ def test_wasp_retrieval_matrix_is_queue_ready(
     model_expectation: tuple[str, int, str],
 ) -> None:
     config = load_task_config(
-        MATRIX / planet / model_name / "configuration.yaml"
+        MATRIX / planet / "retrievals" / model_name / "configuration.yaml"
     )
     disk_model, base_parameter_count, cloud_model = model_expectation
 
@@ -46,7 +46,6 @@ def test_wasp_retrieval_matrix_is_queue_ready(
     assert config.disk_emission.model == disk_model
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 1000
-    assert config.sampler.max_calls is None
     assert config.runtime.mpi_processes == 128
     assert config.opacity.resolution == "R1000"
     assert len(config.parameters) == base_parameter_count + parameter_offset
@@ -61,7 +60,7 @@ def test_two_region_matrix_uses_independent_temperature_and_cloud_parameters(
     planet: str,
 ) -> None:
     config = load_task_config(
-        MATRIX / planet / "two-region" / "configuration.yaml"
+        MATRIX / planet / "retrievals" / "two-region" / "configuration.yaml"
     )
     hot, cold = configured_regions(config)
 
@@ -73,3 +72,24 @@ def test_two_region_matrix_uses_independent_temperature_and_cloud_parameters(
         cold.clouds.log10_mass_fraction_parameter
         == "cold_log_cloud_mass_fraction"
     )
+
+
+@pytest.mark.parametrize(
+    ("planet", "observation_directory"),
+    [
+        ("WASP-69b", "wasp69b_schlawin2024"),
+        ("WASP-80b", "wasp80b_wiser2025"),
+    ],
+)
+def test_matrix_paths_resolve_from_each_nested_configuration(
+    planet: str, observation_directory: str
+) -> None:
+    config = load_task_config(
+        MATRIX / planet / "retrievals" / "clear" / "configuration.yaml"
+    )
+
+    assert config.observations.path.resolve() == ROOT / "data" / observation_directory
+    assert config.atmosphere.chemistry.fastchem_path.resolve() == (
+        ROOT / "data" / "chemistry" / "fastchem"
+    )
+    assert config.opacity.path.resolve() == ROOT / "opacity_data" / "ktables_exomol"

@@ -28,20 +28,20 @@ from run_oe_from_nested import (
 
 ROOT = Path(__file__).resolve().parents[1]
 NESTED_CONFIG = (
-    ROOT / "configurations" / "wasp69b_mie_catalog_pg14_R1000_multinest.yaml"
+    ROOT / "configurations" / "targets/WASP-69b/wasp69b_mie_catalog_pg14_R1000.yaml"
 )
 OE_CONFIG = (
     ROOT
     / "configurations"
-    / "wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation.yaml"
+    / "targets/WASP-69b/wasp69b_mie_catalog_layer_by_layer_R1000_optimal_estimation.yaml"
 )
 PG14_NESTED_CONFIG = (
-    ROOT / "configurations" / "wasp69b_cloud_free_native_pg14_R1000_multinest.yaml"
+    ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_native_pg14_R1000.yaml"
 )
 PG14_OE_CONFIG = (
     ROOT
     / "configurations"
-    / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml"
+    / "targets/WASP-69b/wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml"
 )
 
 

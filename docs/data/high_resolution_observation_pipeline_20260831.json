@@ -1,0 +1,339 @@
+{
+  "benchmark": "high-resolution multi-order observation/covariance contract",
+  "command": "examples/benchmark_high_resolution_observation_pipeline.py",
+  "covariance_assumption": {
+    "cross_order_covariance_included": false,
+    "orders_are_independent": true,
+    "per_order_likelihoods": true,
+    "statement": "The total chi-square is the sum of separate order chi-squares. No covariance block connects the two orders."
+  },
+  "elapsed_seconds": 0.47212316596414894,
+  "gates": {
+    "correlated_chi_square_numpy": true,
+    "covariance_FCFT": true,
+    "doppler_sign_and_order_recorded": true,
+    "independent_order_covariance_assumption_recorded": true,
+    "resources": true,
+    "response_filter_contract": true,
+    "retained_ranks_recorded": true,
+    "two_named_distinct_orders": true
+  },
+  "input_checksum_sha256": "9aee38fdc2ed4204c6837c894b8ce8a5647cdecc3f38b94277c0d8058554fd0f",
+  "not_cross_order_covariance": true,
+  "not_real_target_science_validation": true,
+  "opacity_data_used": false,
+  "order_gates": {
+    "order_blue": {
+      "correlated_chi_square": true,
+      "covariance_FCFT": true,
+      "output_mask_valid": true,
+      "response_filter_contract": true,
+      "retained_rank_matches_numpy": true
+    },
+    "order_red": {
+      "correlated_chi_square": true,
+      "covariance_FCFT": true,
+      "output_mask_valid": true,
+      "response_filter_contract": true,
+      "retained_rank_matches_numpy": true
+    }
+  },
+  "orders": {
+    "order_blue": {
+      "checksum_inputs": {
+        "effective_filter_matrix_sha256": "9821aabbf7499e32d9ad0837a4d9da64d46e4312cb121fb6dbbbdecaff0a9360",
+        "effective_mask_sha256": "dd5d1c5acc61bd90b0bb357b00e0754a4419b86f5e5955f8ce905f66681a2005",
+        "filter_matrix_sha256": "9821aabbf7499e32d9ad0837a4d9da64d46e4312cb121fb6dbbbdecaff0a9360",
+        "filter_output_wavelengths_sha256": "2643b2709761944db7ea318eaa82eeda254ec6b50cc0ae64b161fcb110c801bc",
+        "filtered_covariance_sha256": "221de013bdfbbbf334bb5440c83ccd41e838b60e85e0a0d5bb9ac3656f709f6a",
+        "input_covariance_sha256": "8a3236f6031338d55d0ad2b5e961652e83f220d5fe14d1c4798ae1f0a0340144",
+        "native_grid_sha256": "8d5a324d45eed46b26fac04316636905b35622091dc2028f9c4d3e7b64eec439",
+        "observation_mask_sha256": "993afcfaf2411a8a71d8c87506a987edc0d2d202c15720d0a297048a55afd97d",
+        "observation_wavelengths_sha256": "76214def1c00b453b44d07bbecb74b3b25c96a9856311dee76d00074aafa3dd0",
+        "order_mask_sha256": "eb1a440502dee5674d0939226123c224da24167cf4a08ffccf747404b089feef",
+        "pixel_edges_sha256": "0237e238251c3e2fe3c88461a378e0a2f7a5ad17ba662d0cd4628fc809aa8fda",
+        "raw_residual_sha256": "94a7eeaf7104182c28dd1c0390848ccc1d518068be45d5c19154ee36910786bb",
+        "trial_native_spectrum_sha256": "714fb9c78f2c2c710e76ff0766d1203fbbaf4a216a4e7833830ab6a102f7ea2c",
+        "truth_native_spectrum_sha256": "a5aaa8bfc4a48b286c2433bb25502e2b17ec05350d69deaa35d35f4adfea703b"
+      },
+      "chi_square": {
+        "absolute_difference": 0.0,
+        "method": "np.linalg.solve for DenseCovariance",
+        "numpy_independent": 0.1131850010889407,
+        "passed": true,
+        "robert": 0.1131850010889407
+      },
+      "covariance": {
+        "filtered_shape": [
+          4,
+          4
+        ],
+        "independent_numpy_rank": 4,
+        "input_shape": [
+          6,
+          6
+        ],
+        "operator": "DenseCovariance",
+        "propagation_formula": "C_filtered = F C_input F.T",
+        "propagation_passed": true,
+        "retained_rank": 4
+      },
+      "effective_mask": [
+        true,
+        false,
+        false,
+        true,
+        true,
+        true
+      ],
+      "filter": {
+        "effective_matrix_rank": 4,
+        "name": "order_blue-fixed-linear-filter",
+        "same_fixed_operator_for_data_and_model": true,
+        "shape": [
+          4,
+          6
+        ]
+      },
+      "lsf": {
+        "kernel_support_sigma": 4.0,
+        "resolving_power": 80000.0,
+        "response_stage": "Gaussian LSF after Doppler and before pixel integration"
+      },
+      "n_input_pixels": 6,
+      "n_output_pixels": 4,
+      "observation_mask": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        true
+      ],
+      "operator_contract": {
+        "filtered_observation_matches_filtered_data": true,
+        "output_mask_all_valid": true,
+        "response_order_passed": true,
+        "same_filter_operator_data_model": true,
+        "same_response_operator_reused": true
+      },
+      "order_mask": [
+        true,
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "order_number": 1,
+      "pixel_edges": [
+        1.49973,
+        1.4999,
+        1.50008,
+        1.50027,
+        1.5005,
+        1.50075,
+        1.50104
+      ],
+      "required_response_order": [
+        "relativistic-doppler",
+        "gaussian-high-resolution",
+        "pixel-bin-integration"
+      ],
+      "response_order": [
+        "relativistic-doppler",
+        "gaussian-high-resolution",
+        "pixel-bin-integration"
+      ],
+      "velocity": {
+        "barycentric_velocity_km_s": 12.0,
+        "doppler_factor": 1.0000383606067158,
+        "fixed_velocity_km_s": 9.0,
+        "formula": "D=sqrt((1+beta)/(1-beta)); lambda_observed=D*lambda_rest",
+        "observed_doppler_velocity_km_s": 11.5,
+        "runtime_radial_velocity_km_s": 2.5,
+        "sign_convention": "positive velocity shifts model wavelengths longer; fixed terms and runtime term add before one relativistic Doppler stage",
+        "systemic_velocity_km_s": -3.0,
+        "total_velocity_km_s": 11.5
+      },
+      "wavelength_unit": "micron",
+      "wavelengths": [
+        1.49982,
+        1.49998,
+        1.50017,
+        1.50038,
+        1.50062,
+        1.50089
+      ]
+    },
+    "order_red": {
+      "checksum_inputs": {
+        "effective_filter_matrix_sha256": "c43e2877c1a35bbd5f0650a2c7eb8c6aea71686bd98f4cdaa1b77f7fc74c2593",
+        "effective_mask_sha256": "182eda342330b621e1c86af8630952afa19b8253c837509fed4019dd24d7d190",
+        "filter_matrix_sha256": "c43e2877c1a35bbd5f0650a2c7eb8c6aea71686bd98f4cdaa1b77f7fc74c2593",
+        "filter_output_wavelengths_sha256": "096119f324563ad01f456cabf06cde5378a8061a515203aa8d61df6cb7fd9408",
+        "filtered_covariance_sha256": "083ad908b62933af82a87900698a0a2e78e6d80cd0b03c013576b59c13828886",
+        "input_covariance_sha256": "313a2f31f34f3593a34b4a23ff9f00146926f52604e2aef4ba60d113cdfcc886",
+        "native_grid_sha256": "19cea5028ce4db5ec14f4f31f71cbf28dc587e1a2ccdbc64671f97cf12b04a24",
+        "observation_mask_sha256": "d20904096cd673ae7dfb98df570cdff827839fe75b319a0a932c2c2cdaff480e",
+        "observation_wavelengths_sha256": "97b74a5fa8c641842db7d1b520bb65717b84ac4e4e49c109abfcf2a56ca4c776",
+        "order_mask_sha256": "85fd04644204cc625b1c7944c579d3dadfa4a280e8657eac57bc7476aa682e86",
+        "pixel_edges_sha256": "3a16c0977c0715d904b821d8d0f06eb9f6a931bdcd3b615f79e0220d792bf438",
+        "raw_residual_sha256": "e89eca7c48bcf1af15dd67806ea22788f031f7e2d1df0669509c68dfa521990d",
+        "trial_native_spectrum_sha256": "108da42d3d006d75d427485c88551780714e82f8049a1fbf9a9501fcbd6fbc3f",
+        "truth_native_spectrum_sha256": "cc74c3eeec7357133e3e71432100dfd6371100c3c05514ea4d4a7b2ac4a03a90"
+      },
+      "chi_square": {
+        "absolute_difference": 5.551115123125783e-17,
+        "method": "np.linalg.pinv(rcond=1e-12) for PositiveSemidefiniteCovariance",
+        "numpy_independent": 0.07123283691586696,
+        "passed": true,
+        "robert": 0.07123283691586701
+      },
+      "covariance": {
+        "filtered_shape": [
+          6,
+          6
+        ],
+        "independent_numpy_rank": 5,
+        "input_shape": [
+          7,
+          7
+        ],
+        "operator": "PositiveSemidefiniteCovariance",
+        "propagation_formula": "C_filtered = F C_input F.T",
+        "propagation_passed": true,
+        "retained_rank": 5
+      },
+      "effective_mask": [
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "filter": {
+        "effective_matrix_rank": 5,
+        "name": "order_red-fixed-linear-filter",
+        "same_fixed_operator_for_data_and_model": true,
+        "shape": [
+          6,
+          7
+        ]
+      },
+      "lsf": {
+        "kernel_support_sigma": 4.0,
+        "resolving_power": 120000.0,
+        "response_stage": "Gaussian LSF after Doppler and before pixel integration"
+      },
+      "n_input_pixels": 7,
+      "n_output_pixels": 6,
+      "observation_mask": [
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "operator_contract": {
+        "filtered_observation_matches_filtered_data": true,
+        "output_mask_all_valid": true,
+        "response_order_passed": true,
+        "same_filter_operator_data_model": true,
+        "same_response_operator_reused": true
+      },
+      "order_mask": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "order_number": 2,
+      "pixel_edges": [
+        1.79956,
+        1.79982,
+        1.80004,
+        1.80029,
+        1.80057,
+        1.80085,
+        1.8012,
+        1.80155
+      ],
+      "required_response_order": [
+        "relativistic-doppler",
+        "gaussian-high-resolution",
+        "pixel-bin-integration"
+      ],
+      "response_order": [
+        "relativistic-doppler",
+        "gaussian-high-resolution",
+        "pixel-bin-integration"
+      ],
+      "velocity": {
+        "barycentric_velocity_km_s": -7.0,
+        "doppler_factor": 0.9999983321809148,
+        "fixed_velocity_km_s": -3.0,
+        "formula": "D=sqrt((1+beta)/(1-beta)); lambda_observed=D*lambda_rest",
+        "observed_doppler_velocity_km_s": -0.5,
+        "runtime_radial_velocity_km_s": 2.5,
+        "sign_convention": "positive velocity shifts model wavelengths longer; fixed terms and runtime term add before one relativistic Doppler stage",
+        "systemic_velocity_km_s": 4.0,
+        "total_velocity_km_s": -0.5
+      },
+      "wavelength_unit": "micron",
+      "wavelengths": [
+        1.7997,
+        1.79992,
+        1.80015,
+        1.80041,
+        1.8007,
+        1.80102,
+        1.80137
+      ]
+    }
+  },
+  "passed": true,
+  "resource": {
+    "cpu_guard_passed": true,
+    "peak_rss_bytes": 119734272,
+    "rss_guard_passed": true,
+    "rss_limit_bytes": 1992294400,
+    "rule": "one process, numerical thread variables <= 3, RSS < 2 GiB",
+    "thread_values": {
+      "MKL_NUM_THREADS": 1,
+      "NUMBA_NUM_THREADS": 1,
+      "NUMEXPR_NUM_THREADS": 1,
+      "OMP_NUM_THREADS": 1,
+      "OMP_THREAD_LIMIT": 1,
+      "OPENBLAS_NUM_THREADS": 1,
+      "VECLIB_MAXIMUM_THREADS": 1
+    }
+  },
+  "response_and_filter_contract": {
+    "data_model_statement": "The prepared response maps native truth and trial models to the detector grid. The same prepared fixed filter then maps detector data and every response-mapped trial model.",
+    "fixed_filter_prepared_once_per_order": true,
+    "response_order": [
+      "Doppler",
+      "Gaussian LSF",
+      "pixel integration",
+      "fixed linear data/model filter"
+    ]
+  },
+  "runtime_radial_velocity_km_s": 2.5,
+  "sampler_used": false,
+  "schema_version": "1.0",
+  "scope": "synthetic operator contract",
+  "software": {
+    "numpy": "2.2.6",
+    "robert_exoplanets": "0.3.0"
+  },
+  "status": "pass",
+  "total_chi_square": 0.1844178380048077
+}

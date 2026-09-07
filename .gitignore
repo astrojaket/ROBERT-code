@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*.nbc
+*.nbi
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -28,6 +30,8 @@ env/
 outputs/
 ROBERT_output/
 retrieval_runs/
+scratch/
+opacity_cache/
 
 # Heavy scientific inputs and generated results live outside Git. See
 # docs/data_policy.md for the archive and path conventions. Lightweight,

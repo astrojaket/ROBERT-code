@@ -4,8 +4,20 @@ ROBERT's command-line interface uses a strict schema-version-2 YAML file.
 Unknown keys, inconsistent parameter references, invalid physical ranges, and
 unsupported model combinations are errors.
 
-Start with the [complete annotated template](../configurations/TEMPLATE_all_supported_options.yaml)
-or copy a shorter YAML from `configurations/`.
+Start with the [complete annotated template](../configurations/examples/TEMPLATE_all_supported_options.yaml)
+or copy a maintained YAML from `configurations/quickstart/`,
+`configurations/examples/`, or `configurations/targets/`.
+
+The quickstart directory contains the bundled R=100 forward and validation
+cases. The examples directory contains reusable synthetic and PICASO cases.
+The targets directory contains the canonical WASP-69b and WASP-80b workflows,
+including their matched retrieval matrices.
+
+This schema covers a subset of the Python API. `opacity.format` accepts
+`exomol_kta` and `exomol_cross_section_hdf`; `likelihood.model` accepts
+`gaussian`. Line-by-line providers, correlated likelihoods, time-resolved
+high-resolution data, and device-compiled retrieval problems require Python
+construction or their dedicated scripts. Do not add these as YAML keys.
 
 ## Paths
 
@@ -17,13 +29,15 @@ paths:
   project_directory: .
   observations_directory: ./data/observations
   fastchem_directory: ./data/fastchem
-  # k_table_directory: ./opacity_data/ktables_exomol
+  k_table_directory: ./opacity_data/ktables_exomol
   optical_constants_directory: ./data/optical_constants
 ```
 
 Relative paths resolve from the YAML file. ROBERT expands `${VARIABLE}` and
 rejects undefined variables. Writable directories default to `outputs/`,
 `opacity_cache/`, and `scratch/` beneath `project_directory`.
+Use the top-level `paths` block for all machine-specific locations. The old
+`housekeeping` alias is not supported; move those entries under `paths`.
 Omit `k_table_directory` when using the bundled R=100 tables. R=1000 tables
 are external and use the directory layout described below.
 
@@ -156,6 +170,19 @@ available. Set it to `scipy` to force the scientific reference implementation.
 
 ### Molecular opacity locations
 
+R=1000 is the default resolution for JWST work. The target configurations and
+template select the repository's `opacity_data/ktables_exomol/` directory.
+The local 16-table collection was copied from
+`Dropbox/NemesisPy-Docker/ktables_exomol/` and verified by SHA-256. Its
+`local_copy_manifest.json` records file identities. The directory is ignored
+by Git. Direct `SPECIES_R1000.kta` files and a nested `R1000/` directory are
+both accepted by the table reader.
+
+For combined instruments, keep a separate observation grid and bin edges for
+each dataset. ROBERT prepares the same molecular input tables on each grid;
+it does not force all instruments onto one observed resolution. Input opacity
+resolution must still be adequate for the finest data being modelled.
+
 ROBERT distributes R=100 correlated-k tables for H2O, CO, CO2, CH4, NH3, and
 HCN. They cover 0.3–15 microns on the complete 22-pressure,
 27-temperature ExoMolOP grid with eight g-points. No opacity path is needed:
@@ -250,7 +277,7 @@ plotting:
   forward: true
   image_format: png
   dpi: 180
-  posterior_predictive_samples: 200
+  posterior_predictive_samples: 100
   posterior_predictive_seed: 0
 
 runtime:
@@ -258,8 +285,7 @@ runtime:
 ```
 
 MultiNest is the default inference engine. Available engines are
-`optimal_estimation`, `multinest`, `ultranest`,
-`optimal_estimation_to_ultranest`, and `optimal_estimation_to_multinest`.
+`optimal_estimation`, `multinest`, and `optimal_estimation_to_multinest`.
 With `mpi_processes: auto`, ROBERT uses the launched MPI or Slurm world and
 otherwise runs on one process.
 

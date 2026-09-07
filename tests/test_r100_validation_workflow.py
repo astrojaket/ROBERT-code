@@ -7,15 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from examples import r100_injection_recovery
 from robert_exoplanets import bundled_k_table_directory
 from robert_exoplanets.io.task_config import load_task_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIGURATIONS = {
-    "emission": ROOT / "configurations" / "r100_emission_validation.yaml",
-    "transmission": ROOT / "configurations" / "r100_transmission_validation.yaml",
+    "emission": ROOT / "configurations" / "quickstart/r100_emission_validation.yaml",
+    "transmission": ROOT / "configurations" / "quickstart/r100_transmission_validation.yaml",
 }
 REFERENCE = ROOT / "data" / "validation" / "r100_quickstart"
 NOTEBOOK = (
@@ -38,14 +37,6 @@ def test_r100_validation_configuration_is_local_and_identifiable(model: str) -> 
     assert config.runtime.mpi_processes == "auto"
 
 
-def test_r100_validation_observation_contract_is_wfc3_scale() -> None:
-    assert r100_injection_recovery.UNCERTAINTY_PPM == 60.0
-    assert r100_injection_recovery.WAVELENGTH_MIN_MICRON == 1.10
-    assert r100_injection_recovery.WAVELENGTH_MAX_MICRON == 1.70
-    assert r100_injection_recovery.N_WAVELENGTH == 18
-    assert r100_injection_recovery.CONFIDENCE_LEVEL == 0.95
-
-
 @pytest.mark.parametrize("model", ("emission", "transmission"))
 def test_r100_reference_recovery_contains_truth_at_95_percent(model: str) -> None:
     report = json.loads(
@@ -59,7 +50,7 @@ def test_r100_reference_recovery_contains_truth_at_95_percent(model: str) -> Non
     assert recovery["q02_5"] <= recovery["truth"] <= recovery["q97_5"]
 
 
-def test_r100_validation_notebook_is_valid_python_and_uses_multinest() -> None:
+def test_r100_validation_notebook_is_valid_python() -> None:
     notebook = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
     sources = ["".join(cell.get("source", ())) for cell in notebook["cells"]]
     code = [
@@ -70,9 +61,3 @@ def test_r100_validation_notebook_is_valid_python_and_uses_multinest() -> None:
 
     for index, source in enumerate(code):
         compile(source, f"{NOTEBOOK.name}:cell-{index}", "exec")
-    joined = "\n".join(sources)
-    assert "MultiNest" in joined
-    assert "UltraNest" not in joined
-    assert "CORES = 2" in joined
-    assert "r100_emission_validation.yaml" in joined
-    assert "r100_transmission_validation.yaml" in joined

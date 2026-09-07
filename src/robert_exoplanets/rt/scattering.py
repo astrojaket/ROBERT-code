@@ -12,12 +12,14 @@ from robert_exoplanets.core import RobertValidationError, SpectralGrid
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import spectral_grid_values_in_unit
 
+from . import _planck
 from .geometry import DiscGeometry
+from ._planck import _planck_radiance_wavelength
 
-PLANCK_CONSTANT_J_S = 6.62607015e-34
-SPEED_OF_LIGHT_M_S = 299_792_458.0
-BOLTZMANN_CONSTANT_J_K = 1.380649e-23
-MICRON_TO_METER = 1.0e-6
+PLANCK_CONSTANT_J_S = _planck.PLANCK_CONSTANT_J_S
+SPEED_OF_LIGHT_M_S = _planck.SPEED_OF_LIGHT_M_S
+BOLTZMANN_CONSTANT_J_K = _planck.BOLTZMANN_CONSTANT_J_K
+MICRON_TO_METER = _planck.MICRON_TO_METER
 
 
 @dataclass(frozen=True)
@@ -149,29 +151,6 @@ def isotropic_phase_function(scattering_angle_deg: ArrayLike) -> NDArray[np.floa
     phase = np.ones_like(angle)
     phase.setflags(write=False)
     return phase
-
-
-def _planck_radiance_wavelength(
-    wavelength_micron: ArrayLike,
-    temperature_k: float,
-) -> NDArray[np.float64]:
-    wavelength = _positive_wavelength_micron(wavelength_micron)
-    temperature = _positive_float(temperature_k, "temperature_k")
-    wavelength_m = wavelength * MICRON_TO_METER
-    exponent = PLANCK_CONSTANT_J_S * SPEED_OF_LIGHT_M_S / (
-        wavelength_m * BOLTZMANN_CONSTANT_J_K * temperature
-    )
-    with np.errstate(over="ignore", invalid="ignore"):
-        radiance = (
-            2.0
-            * PLANCK_CONSTANT_J_S
-            * SPEED_OF_LIGHT_M_S**2
-            / (np.power(wavelength_m, 5) * np.expm1(exponent))
-        )
-    if not np.all(np.isfinite(radiance)) or np.any(radiance < 0.0):
-        raise RobertValidationError("Planck source calculation produced invalid values")
-    radiance.setflags(write=False)
-    return radiance
 
 
 def _positive_float(value: float, name: str) -> float:

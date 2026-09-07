@@ -69,7 +69,7 @@ def _oe_result() -> OptimalEstimationResult:
 def _nested_result(*, converged: bool = True) -> NestedSamplerResult:
     samples = np.array([[1.0, 0.1], [1.2, 0.2], [1.4, 0.3]])
     return NestedSamplerResult(
-        method="ultranest",
+        method="multinest",
         parameter_names=("baseline", "slope"),
         samples=samples,
         log_likelihood=np.array([-2.0, -0.5, -1.0]),
@@ -125,11 +125,11 @@ def test_oe_then_nested_sampling_runs_both_stages(monkeypatch, tmp_path) -> None
         _problem(),
         output_dir=tmp_path,
         prior_sigma=2.0,
-        nested_kwargs={"min_num_live_points": 20},
+        nested_kwargs={"n_live_points": 20},
         seed=3,
     )
 
-    assert [call[1] for call in calls] == ["optimal_estimation", "ultranest"]
+    assert [call[1] for call in calls] == ["optimal_estimation", "multinest"]
     assert result.refined_problem.parameters.bounds[0] == pytest.approx((1.0, 1.4))
     assert (tmp_path / "hybrid_handoff.json").is_file()
 
@@ -163,7 +163,7 @@ def test_nested_then_oe_uses_best_fit_as_prior_state(monkeypatch, tmp_path) -> N
 
     def fake_run(problem, *, method, output_dir, **kwargs):
         calls.append((method, kwargs))
-        if method == "ultranest":
+        if method == "multinest":
             return _nested_result()
         return SimpleNamespace(converged=True, best_fit_parameters={})
 

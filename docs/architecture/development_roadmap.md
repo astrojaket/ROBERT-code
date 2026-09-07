@@ -1,276 +1,81 @@
-# Development Roadmap
-
-This roadmap stages ROBERT from architecture skeleton to stable scientific
-release.
-
-## Status rebaseline (2026-07-21)
-
-The version sections below preserve the original architectural sequence; they
-are not a literal description of the current implementation. Development has
-advanced substantially beyond the published `0.3.0` version number:
-
-- the v0.4-v0.7 RT, instrument, retrieval, and validation foundations exist,
-  using UltraNest and MultiNest rather than the originally proposed dynesty;
-- much of the v0.9 performance work exists through Numba, optional JAX,
-  caching, fused random-overlap kernels, and maintained benchmarks;
-- substantial transmission, shared aerosol, PHOENIX, multi-dataset, and
-  post-processing work was delivered ahead of the original sequence;
-- the v0.8 plugin registry and entry-point discovery remain unimplemented;
-- the v0.10 release-quality validation matrix, covariance likelihood,
-  independent science-opacity cloudy validation, and API-freeze work remain
-  incomplete.
-
-Current priorities and acceptance criteria are tracked in the
-[2026-07-21 repository audit](../review/47_repository_audit_2026-07-21.md#prioritized-next-step-plan).
-The next release-planning pass should replace the historical version mapping
-with outcome-based milestones and assign a version consistent with the actual
-public API and validation maturity.
-
-## v0.1 - Architecture and Infrastructure
-
-Objectives:
-
-- Establish repository skeleton.
-- Produce RFC-0001 and companion architecture documents.
-- Keep current example and tests running.
-- Set distribution name to `robert-exoplanets`.
-
-Deliverables:
-
-- RFC-0001 document suite.
-- Minimal package skeleton.
-- Stub end-to-end example.
-- Initial pytest suite.
-
-Success criteria:
-
-- `pytest` passes.
-- Architecture docs are complete enough for review.
-- No major physics implementation has started.
-
-## v0.2 - Core Data Model
-
-Objectives:
-
-- Implement core immutable domain objects.
-- Resolve final import namespace.
-- Introduce config schema foundation.
-
-Deliverables:
-
-- `PressureGrid`, `SpectralGrid`, `Spectrum`.
-- `Planet`, `Star`, `Observation`.
-- Core exceptions and logging helpers.
-- Initial YAML/Pydantic config schema.
-
-Success criteria:
-
-- Domain objects validate units, shapes, and invariants.
-- Config can instantiate basic objects.
-- Existing skeleton tests migrate to the new namespace.
-
-## v0.3 - Forward-Model Foundation
-
-Objectives:
-
-- Build a non-retrieval forward-model pipeline.
-- Add modular atmosphere, chemistry, opacity, and RT-facing components.
-- Establish local benchmark and plotting workflows.
-
-Deliverables:
-
-- `AtmosphereState`.
-- Temperature profiles: isothermal, tabulated, spline, Madhusudhan & Seager
-  2009, and Parmentier & Guillot 2014 style.
-- Free/background chemistry, mean-molecular-weight models, and optional
-  FastChem equilibrium adapter.
-- `.kta` import, ROBERT archive helpers, opacity coverage metadata, and
-  correlated-k evaluation.
-- Gas optical-depth assembly, random-overlap mixing, CIA/Rayleigh optical-depth
-  terms, and tau/contribution plotting diagnostics.
-- NumPy cloud-free thermal-emission reference solver with disc geometries and a
-  first-order single-scattering source diagnostic.
-
-Success criteria:
-
-- A tiny clear-atmosphere forward model runs from config.
-- Output includes native and observed-grid spectra.
-- Tests cover public pipeline pieces.
-- Local HAT-P-32b benchmark scripts run and write plots/JSON summaries.
-
-## v0.4 - Benchmark RT Parity
-
-Objectives:
-
-- Close the remaining known gap between ROBERT and the local HAT-P-32b
-  emission benchmark before retrieval integration.
-
-Deliverables:
-
-- Benchmark matrix for geometry/scattering/CIA/Rayleigh choices.
-- Hydrostatic height/path geometry and reference-radius-pressure handling.
-- Clear convention for layer boundaries, pressure orientation, and radius
-  reference pressure.
-- Cloud/aerosol optical-property containers for absorption, scattering,
-  single-scattering albedo, and phase/asymmetry inputs.
-- Decision note for the default fast opacity archive format.
-
-Success criteria:
-
-- The validation report documents agreement/tolerances and residual causes.
-- Benchmark scripts can be rerun by a new user with local external inputs.
-- RT-facing public APIs do not need breaking changes before sampler work.
-
-## v0.5 - Instrument Support
-
-Objectives:
-
-- Support JWST-style observation handling and model-to-data transforms.
-
-Deliverables:
-
-- `InstrumentResponse`.
-- Binning/convolution support.
-- Multi-segment observations.
-- Offset and jitter group metadata.
-
-Success criteria:
-
-- Synthetic JWST-like data can be loaded, modeled, and compared.
-- Instrument response tests pass for known binning cases.
-
-## v0.6 - Retrieval Engine
-
-Objectives:
-
-- Implement sampler-independent retrieval problem.
-- Add first nested sampler adapter.
-
-Deliverables:
-
-- `Parameter`, `Prior`, `ParameterSpace`.
-- `RetrievalProblem`.
-- Gaussian likelihood.
-- dynesty adapter.
-- `RetrievalResult`.
-- Run manifest writer.
-
-Success criteria:
-
-- Tiny end-to-end retrieval smoke test passes.
-- Manifest records config hash, seed, versions, and opacity identifiers.
-
-## v0.7 - JWST Validation
-
-Objectives:
-
-- Establish initial scientific trust for JWST emission retrievals.
-
-Deliverables:
-
-- Clear 1D emission validation case.
-- Cloud-free JWST binned example.
-- External or published benchmark comparison where practical.
-- Documentation tutorial.
-
-Success criteria:
-
-- Validation report documents agreement/tolerances.
-- Tutorial can be run by a new user with small fixtures.
-
-## v0.8 - Plugin Ecosystem
-
-Objectives:
-
-- Stabilize extension points.
-
-Deliverables:
-
-- Plugin registry.
-- Entry-point discovery.
-- Plugin metadata validation.
-- Developer plugin guide.
-- Example toy plugin.
-
-Success criteria:
-
-- A third-party-style plugin can register without modifying core code.
-- Plugin compatibility errors are clear.
-
-## v0.9 - Performance Optimization
-
-Objectives:
-
-- Optimize measured bottlenecks without changing public APIs.
-
-Deliverables:
-
-- Benchmark suite.
-- Numba backend for one validated hot kernel if justified.
-- Opacity/instrument response caching.
-- Memory-use documentation.
-
-Success criteria:
-
-- Benchmarks quantify performance.
-- Accelerated backend matches NumPy reference tests.
-
-## v0.10 - Scientific Validation
-
-Objectives:
-
-- Prepare API and science release candidate.
-
-Deliverables:
-
-- Expanded validation matrix.
-- Multi-instrument JWST emission case.
-- Cloudy atmosphere case.
-- Optional covariance likelihood if ready.
-- API freeze proposal.
-
-Success criteria:
-
-- No known architecture blockers for v1.0.
-- Validation docs are release-quality.
-
-## v1.0 - Stable Scientific Release
-
-Objectives:
-
-- Provide a stable, documented JWST 1D emission retrieval platform.
-
-Deliverables:
-
-- Stable public API.
-- Stable config schema v1.
-- Stable result schema v1.
-- Validated 1D emission retrieval pipeline.
-- Plugin discovery.
-- Complete docs and tutorials.
-- CI/release workflow.
-
-Success criteria:
-
-- Independent developers can contribute compatible components.
-- Users can run documented JWST emission retrieval examples.
-- Scientific validation is documented and reproducible.
-
-## Post-v1.0 Candidates
-
-The original candidates were:
-
-- Transmission retrievals.
-- Patchy/column atmospheres.
-- Phase curves.
-- Reflection spectroscopy.
-- Multiple chemistry backends.
-- JAX/GPU backend.
-- Additional sampler adapters.
-
-These should not destabilize the v1.0 emission architecture.
-
-Transmission and an optional JAX backend have since been implemented ahead of
-this sequence. Patchy/two-region emission and multiple chemistry backends also
-exist in limited forms. Phase curves, reflection spectroscopy, a general plugin
-system, and broader sampler support remain future work.
+# Development roadmap
+
+Status: 2026-09-07. ROBERT is production-ready for its documented and
+benchmarked emission, transmission, and retrieval regimes. This roadmap records
+extensions, including high-resolution and accelerator work with separate
+validation requirements.
+See the [repository audit](../review/53_repository_audit_2026-09-07.md) for evidence
+and limitations.
+
+## Current position
+
+ROBERT has typed scientific objects, strict schema-v2 YAML, emission and
+transmission models, free and equilibrium chemistry, cloud models, instrument
+binning, Gaussian likelihoods, optimal estimation, PyMultiNest, and
+portable run products. NumPy, Numba, and optional JAX paths exist.
+
+Python APIs also provide line-by-line opacity, high-resolution responses,
+filtered observations, covariance likelihoods, and mixed-resolution retrieval
+problems. These are not all available through the standard YAML runners.
+The WASP-77Ab shared-VMR real-data sampler runs remain deferred to a cluster;
+operator checks and fixed-template recovery do not establish their completion.
+
+The package version is `0.3.0`. It does not indicate which scientific regimes
+are validated. The old version-by-feature sequence in RFC-0001 is historical;
+use the outcome gates below for new work.
+
+## 1. Establish one supported workflow contract
+
+- State which features work through YAML, Python, and target-specific scripts.
+- Keep one config-to-problem construction path for shared behavior.
+- Test each supported path from input validation to serialized results.
+- Define stable and experimental APIs before choosing the next release version.
+
+Done when a new user can run a bundled forward model and small retrieval from
+the documented commands, with input identity and limitations in the outputs.
+
+## 2. Reduce coupling at extension points
+
+- PyMultiNest is the sole nested sampler; Optimal Estimation remains a separate
+  capability for independent Gaussian errors. Extend OE for detailed sounding
+  only with a stated observation model and numerical validation case.
+- Keep atmosphere, opacity, RT, response, likelihood, and sampling separate.
+- Split large modules by independent responsibility when a change needs it.
+- Use the same sampler-facing contract for CPU and accelerator problems.
+- Keep target acquisition and observing-program assumptions at the I/O edge.
+- Add one tested third-party extension only when a concrete consumer needs it.
+
+Done when a new response or backend does not require copied workflow logic.
+A registry for every component family is not a prerequisite.
+
+## 3. Make quality gates match supported paths
+
+- Add incremental static type checks for the stable domain and problem APIs.
+- Separate portable tests from native sampler, accelerator, and external-data checks.
+- Check public commands and documentation links in CI.
+- Run hardware parity and resource checks on the hardware being supported.
+
+Done when skipped optional checks are visible and release evidence identifies
+which backends and platforms were exercised. Keep analytic limits, numerical
+regressions, and serialization tests. Remove tests that only repeat source text
+or duplicate the same behavior.
+
+## 4. Complete the scientific release matrix
+
+- Record independent cloudy calculations with science molecular opacity.
+- Test posterior calibration with repeated seeds and evidence stability.
+- Complete the deferred shared-VMR HRS/LRS real-data runs.
+- State covariance independence, filtering rank, opacity provenance, and
+  numerical-resolution assumptions for each case.
+
+Done when each claimed regime has reproducible inputs, tolerances, results,
+and a recorded review. An implementation or a passing unit test is not a
+scientific validation result.
+
+## Later work
+
+Prioritize new physics by a stated observing need and a validation case.
+Candidates include transmission scattering return, refraction, stellar
+heterogeneity, calibrated JWST products, disequilibrium chemistry, phase
+curves, and reflected light. Do not expand these areas before the existing
+workflow and validation contracts are clear.

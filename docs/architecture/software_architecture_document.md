@@ -4,6 +4,12 @@ This document defines ROBERT's software structure: package hierarchy, public API
 ownership, implementation boundaries, allowed dependencies, and forbidden
 dependencies.
 
+The hierarchy below is a target design. The implementation keeps chemistry
+under `atmosphere`, inference adapters under `retrieval`, and plotting under
+`diagnostics` and `postprocessing`. General plugin discovery is not implemented.
+Do not create empty packages only to match this diagram. See the
+[current roadmap](development_roadmap.md) for acceptance gates.
+
 ## 1. Architecture Style
 
 ROBERT uses a layered, protocol-oriented architecture.
