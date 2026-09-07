@@ -5,6 +5,10 @@ framework. It combines typed planet, star, atmosphere, opacity, observation,
 instrument, forward-model, likelihood, and inference components behind a
 strict YAML workflow.
 
+ROBERT is production-ready for its documented and benchmarked emission,
+transmission, and retrieval regimes. The documentation states the validation
+boundaries and unsupported scope for each workflow.
+
 ROBERT supports thermal-emission and transmission spectra, correlated-k and
 opacity-sampling inputs, equilibrium and free chemistry, cloud-free and cloudy
 atmospheres, one- and two-region emission, instrument binning, Gaussian
