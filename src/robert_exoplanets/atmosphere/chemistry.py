@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from functools import cached_property
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
+import re
 from typing import Mapping, Protocol
 
 import numpy as np
@@ -148,6 +149,398 @@ def _pressure_values_pa(pressure_grid: PressureGrid) -> NDArray[np.float64]:
         raise RobertValidationError(f"unsupported pressure unit for FastChem chemistry: {pressure_grid.unit}")
     pressure.setflags(write=False)
     return pressure
+
+
+def _pressure_values_bar(pressure_grid: PressureGrid) -> NDArray[np.float64]:
+    """Return immutable layer-center pressures converted explicitly to bar."""
+
+    pressure = np.array(_pressure_values_pa(pressure_grid) / 1.0e5, copy=True)
+    pressure.setflags(write=False)
+    return pressure
+
+
+_PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_MOLECULAR_FORMULA_PATTERN = re.compile(r"(?:[A-Z][a-z]?\d*)+")
+_MOLECULAR_TOKEN_PATTERN = re.compile(r"([A-Z][a-z]?)(\d*)")
+
+
+def _validate_parameter_name(parameter_name: str, *, context: str) -> str:
+    name = str(parameter_name).strip()
+    if not _PARAMETER_NAME_PATTERN.fullmatch(name):
+        raise RobertValidationError(
+            f"{context} must be a non-empty identifier containing only letters, "
+            "digits, and underscores"
+        )
+    return name
+
+
+@dataclass(frozen=True)
+class QuenchGroup:
+    """Species sharing one retrieved pressure-quench parameter.
+
+    ``pressure_parameter`` represents ``log10(P_q / bar)``. A one-species
+    group is molecular quenching; a multi-species group is coupled quenching.
+    """
+
+    pressure_parameter: str
+    species: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        parameter = _validate_parameter_name(
+            self.pressure_parameter,
+            context="quench pressure parameter name",
+        )
+        species = tuple(_validate_species_name(item) for item in self.species)
+        if not species:
+            raise RobertValidationError(
+                "quench groups must contain at least one species"
+            )
+        if len(set(species)) != len(species):
+            raise RobertValidationError(
+                "species within a quench group must be unique"
+            )
+        object.__setattr__(self, "pressure_parameter", parameter)
+        object.__setattr__(self, "species", species)
+
+    @classmethod
+    def molecular(
+        cls,
+        species: str,
+        pressure_parameter: str | None = None,
+    ) -> "QuenchGroup":
+        """Build a one-species molecular-quenching group."""
+
+        label = _validate_species_name(species)
+        return cls(
+            pressure_parameter=(
+                pressure_parameter
+                if pressure_parameter is not None
+                else f"log_Pq_{label}"
+            ),
+            species=(label,),
+        )
+
+
+@dataclass(frozen=True)
+class QuenchDiagnostics:
+    """Composition closure diagnostics before and after pressure quenching."""
+
+    base_vmr_sum: NDArray[np.float64]
+    quenched_vmr_sum: NDArray[np.float64]
+    vmr_sum_drift: NDArray[np.float64]
+    elemental_budget_drift: Mapping[str, NDArray[np.float64]] | None
+    unparsed_species: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        arrays = {}
+        for name in ("base_vmr_sum", "quenched_vmr_sum", "vmr_sum_drift"):
+            value = np.array(getattr(self, name), dtype=float, copy=True)
+            value.setflags(write=False)
+            arrays[name] = value
+        elemental = None
+        if self.elemental_budget_drift is not None:
+            values: dict[str, NDArray[np.float64]] = {}
+            for element, profile in self.elemental_budget_drift.items():
+                value = np.array(profile, dtype=float, copy=True)
+                value.setflags(write=False)
+                values[str(element)] = value
+            elemental = immutable_mapping(values)
+        for name, value in arrays.items():
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "elemental_budget_drift", elemental)
+        object.__setattr__(
+            self,
+            "unparsed_species",
+            tuple(str(item) for item in self.unparsed_species),
+        )
+
+
+@dataclass(frozen=True)
+class PressureQuenchChemistry:
+    """Generic pressure-quench decorator around a base chemistry model.
+
+    The transform follows Taylor et al. (2026), arXiv:2607.06491: below the
+    quench level (higher pressure) the base profile is retained, while at and
+    above it (lower pressure) the profile is frozen to ``X_eq(P_q)``.
+
+    The paper does not specify an off-grid sampling convention. ROBERT assumes
+    linear VMR interpolation in ``log10(P / bar)`` between layer centers. The
+    inclusive layer-center domain is enforced; extrapolation is forbidden.
+    Quenched profiles are not renormalized.
+    """
+
+    base_model: ChemistryModel
+    groups: tuple[QuenchGroup, ...]
+    name: str = "pressure-quench"
+    preset: str = "custom"
+    convention: str = field(init=False)
+    metadata: Mapping[str, str] = field(init=False)
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise RobertValidationError("chemistry name must not be empty")
+        if not str(self.preset).strip():
+            raise RobertValidationError("quench preset name must not be empty")
+        groups = tuple(self.groups)
+        if not groups:
+            raise RobertValidationError(
+                "pressure-quench chemistry requires at least one quench group"
+            )
+        if any(not isinstance(group, QuenchGroup) for group in groups):
+            raise RobertValidationError(
+                "pressure-quench groups must be QuenchGroup instances"
+            )
+
+        parameters = tuple(group.pressure_parameter for group in groups)
+        if len(set(parameters)) != len(parameters):
+            raise RobertValidationError(
+                "quench pressure parameter names must be unique"
+            )
+        selected_species = tuple(
+            species for group in groups for species in group.species
+        )
+        if len(set(selected_species)) != len(selected_species):
+            raise RobertValidationError(
+                "a species may belong to only one quench group"
+            )
+        missing = tuple(
+            species
+            for species in selected_species
+            if species not in self.base_model.species
+        )
+        if missing:
+            raise RobertValidationError(
+                "quench species missing from base chemistry: " + ", ".join(missing)
+            )
+
+        base_parameters = tuple(self.base_model.required_parameters())
+        collisions = sorted(set(base_parameters).intersection(parameters))
+        if collisions:
+            raise RobertValidationError(
+                "quench pressure parameters collide with base chemistry parameters: "
+                + ", ".join(collisions)
+            )
+        if len(set(base_parameters)) != len(base_parameters):
+            raise RobertValidationError(
+                "base chemistry required parameters must be unique"
+            )
+
+        convention = str(self.base_model.convention)
+        if convention != "volume_mixing_ratio":
+            raise RobertValidationError(
+                "pressure-quench chemistry currently requires volume_mixing_ratio"
+            )
+        base_metadata = dict(getattr(self.base_model, "metadata", {}))
+        group_record = ";".join(
+            f"{group.pressure_parameter}:{'|'.join(group.species)}"
+            for group in groups
+        )
+        base_metadata.update(
+            {
+                "quench_scheme": "pressure_quench",
+                "quench_preset": str(self.preset),
+                "quench_groups": group_record,
+                "quench_pressure_semantics": "log10(P_q/bar)",
+                "quench_pressure_domain": "inclusive_layer_centers",
+                "quench_interpolation": "linear_vmr_in_log10_pressure",
+                "quench_profile_rule": "base_for_P_gt_Pq;freeze_to_Xeq_Pq_for_P_le_Pq",
+                "quench_closure_policy": "no_renormalization",
+                "quench_elemental_grouping": (
+                    "grouped_molecular_profiles_not_elemental_conservation"
+                ),
+                "quench_reference": "Taylor_et_al_2026_arXiv_2607.06491",
+                "quench_code_convention": "ROBERT_assumption_not_NemesisPy_parity",
+                "quench_validation_level": (
+                    "unit_tested_not_cross_framework_or_science_demonstrated"
+                ),
+            }
+        )
+        object.__setattr__(self, "groups", groups)
+        object.__setattr__(self, "preset", str(self.preset))
+        object.__setattr__(self, "convention", convention)
+        object.__setattr__(self, "metadata", immutable_mapping(base_metadata))
+
+    @property
+    def species(self) -> tuple[str, ...]:
+        """Species produced by the decorated base model."""
+
+        return self.base_model.species
+
+    def required_parameters(self) -> tuple[str, ...]:
+        """Return base parameters followed by quench parameters in group order."""
+
+        return (
+            *self.base_model.required_parameters(),
+            *(group.pressure_parameter for group in self.groups),
+        )
+
+    @classmethod
+    def molecular(
+        cls,
+        base_model: ChemistryModel,
+        species_parameters: Mapping[str, str],
+    ) -> "PressureQuenchChemistry":
+        """Decorate arbitrary base species with independent quench pressures."""
+
+        return cls(
+            base_model=base_model,
+            groups=tuple(
+                QuenchGroup.molecular(species, parameter)
+                for species, parameter in species_parameters.items()
+            ),
+        )
+
+    @classmethod
+    def taylor_2026_hot_jupiter_element_grouped(
+        cls,
+        base_model: ChemistryModel,
+    ) -> "PressureQuenchChemistry":
+        """Build the paper-exact species grouping (which deliberately omits N2)."""
+
+        return cls(
+            base_model=base_model,
+            groups=(
+                QuenchGroup(
+                    pressure_parameter="log_Pq_C",
+                    species=("H2O", "CO", "CO2", "CH4"),
+                ),
+                QuenchGroup(
+                    pressure_parameter="log_Pq_N",
+                    species=("NH3",),
+                ),
+            ),
+            preset="taylor_2026_hot_jupiter_element_grouped",
+        )
+
+    def evaluate(
+        self,
+        parameters: Mapping[str, float],
+        pressure_grid: PressureGrid,
+        temperature: NDArray[np.float64],
+    ) -> dict[str, NDArray[np.float64]]:
+        """Evaluate and pressure-quench the base composition."""
+
+        composition, _ = self.evaluate_with_diagnostics(
+            parameters,
+            pressure_grid,
+            temperature,
+        )
+        return composition
+
+    def evaluate_with_diagnostics(
+        self,
+        parameters: Mapping[str, float],
+        pressure_grid: PressureGrid,
+        temperature: NDArray[np.float64],
+    ) -> tuple[dict[str, NDArray[np.float64]], QuenchDiagnostics]:
+        """Evaluate profiles and report VMR-sum and feasible elemental drift."""
+
+        _validate_temperature_layers(temperature, pressure_grid)
+        base = self.base_model.evaluate(parameters, pressure_grid, temperature)
+        if tuple(base) != self.base_model.species:
+            raise RobertValidationError(
+                "base chemistry output species do not match its declared species"
+            )
+        profiles = {
+            species: _readonly_layer_array(
+                values,
+                f"{species} base chemistry VMR",
+                pressure_grid.n_layers,
+            )
+            for species, values in base.items()
+        }
+        pressure_bar = _pressure_values_bar(pressure_grid)
+        log_pressure_bar = np.log10(pressure_bar)
+        domain_min = float(np.min(log_pressure_bar))
+        domain_max = float(np.max(log_pressure_bar))
+        order = np.argsort(log_pressure_bar)
+
+        for group in self.groups:
+            log_quench_pressure = _parameter_value(
+                parameters,
+                group.pressure_parameter,
+                context="pressure-quench chemistry",
+            )
+            if not domain_min <= log_quench_pressure <= domain_max:
+                raise RobertValidationError(
+                    f"quench pressure {group.pressure_parameter}={log_quench_pressure:.17g} "
+                    "lies outside the inclusive pressure-grid layer-center domain "
+                    f"[{domain_min:.17g}, {domain_max:.17g}] log10(bar)"
+                )
+            quench_pressure_bar = 10.0**log_quench_pressure
+            freeze_mask = pressure_bar <= quench_pressure_bar
+            for species in group.species:
+                equilibrium = np.asarray(profiles[species], dtype=float)
+                quench_vmr = float(
+                    np.interp(
+                        log_quench_pressure,
+                        log_pressure_bar[order],
+                        equilibrium[order],
+                    )
+                )
+                transformed = np.array(equilibrium, dtype=float, copy=True)
+                transformed[freeze_mask] = quench_vmr
+                transformed.setflags(write=False)
+                profiles[species] = transformed
+
+        diagnostics = _quench_diagnostics(base, profiles, pressure_grid.n_layers)
+        return profiles, diagnostics
+
+
+def _quench_diagnostics(
+    base: Mapping[str, NDArray[np.float64]],
+    quenched: Mapping[str, NDArray[np.float64]],
+    n_layers: int,
+) -> QuenchDiagnostics:
+    base_sum = np.zeros(n_layers, dtype=float)
+    quenched_sum = np.zeros(n_layers, dtype=float)
+    for species in base:
+        base_sum += np.asarray(base[species], dtype=float)
+        quenched_sum += np.asarray(quenched[species], dtype=float)
+
+    formulae: dict[str, Mapping[str, int]] = {}
+    unparsed: list[str] = []
+    for species in base:
+        formula = _molecular_formula(species)
+        if formula is None:
+            unparsed.append(species)
+        else:
+            formulae[species] = formula
+
+    elemental_drift: dict[str, NDArray[np.float64]] | None = None
+    if not unparsed:
+        elemental_drift = {}
+        elements = sorted(
+            {element for formula in formulae.values() for element in formula}
+        )
+        for element in elements:
+            drift = np.zeros(n_layers, dtype=float)
+            for species, formula in formulae.items():
+                coefficient = formula.get(element, 0)
+                if coefficient:
+                    drift += coefficient * (
+                        np.asarray(quenched[species], dtype=float)
+                        - np.asarray(base[species], dtype=float)
+                    )
+            drift.setflags(write=False)
+            elemental_drift[element] = drift
+
+    return QuenchDiagnostics(
+        base_vmr_sum=base_sum,
+        quenched_vmr_sum=quenched_sum,
+        vmr_sum_drift=quenched_sum - base_sum,
+        elemental_budget_drift=elemental_drift,
+        unparsed_species=tuple(unparsed),
+    )
+
+
+def _molecular_formula(species: str) -> Mapping[str, int] | None:
+    if not _MOLECULAR_FORMULA_PATTERN.fullmatch(species):
+        return None
+    counts: dict[str, int] = {}
+    for element, count in _MOLECULAR_TOKEN_PATTERN.findall(species):
+        counts[element] = counts.get(element, 0) + (int(count) if count else 1)
+    return counts or None
 
 
 @dataclass(frozen=True)

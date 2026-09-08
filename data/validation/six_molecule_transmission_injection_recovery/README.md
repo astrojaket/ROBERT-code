@@ -28,15 +28,15 @@ Reproduce with:
 ```bash
 conda run -n robert-exoplanets python \
   examples/synthetic_six_molecule_transmission_injection_recovery.py \
-  --config configurations/examples/synthetic_six_molecule_transmission_injection_recovery_multinest.yaml
+  --config tests/fixtures/configurations/six_gas_transmission.yaml
 
 conda run -n robert-exoplanets mpirun -np 2 python \
   run_retrieval.py \
-  --config configurations/examples/synthetic_six_molecule_transmission_injection_recovery_multinest.yaml
+  --config tests/fixtures/configurations/six_gas_transmission.yaml
 
 conda run -n robert-exoplanets python \
   examples/synthetic_six_molecule_transmission_injection_recovery.py \
-  --config configurations/examples/synthetic_six_molecule_transmission_injection_recovery_multinest.yaml \
+  --config tests/fixtures/configurations/six_gas_transmission.yaml \
   --evaluate-result \
   --validation-dir data/validation/six_molecule_transmission_injection_recovery
 ```

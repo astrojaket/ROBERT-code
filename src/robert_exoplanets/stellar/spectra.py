@@ -42,7 +42,7 @@ class StellarSpectrumModel(Protocol):
 
 @dataclass(frozen=True)
 class BlackbodyStellarSpectrumModel:
-    """Planck stellar surface radiance at the star's effective temperature."""
+    """Controlled Planck approximation, not a stellar-validation standard."""
 
     name: str = "blackbody"
 
@@ -61,6 +61,7 @@ class BlackbodyStellarSpectrumModel:
             observable="stellar_spectral_radiance",
             metadata={
                 "stellar_model": self.name,
+                "stellar_model_scope": "controlled_approximation_not_validation_standard",
                 "effective_temperature_k": f"{temperature:.17g}",
                 "surface_flux_convention": "pi_times_radiance",
             },

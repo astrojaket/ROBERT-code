@@ -5,6 +5,10 @@ clean path to transmission and multidimensional extensions. It should optimize
 for scientific correctness, simplicity, modularity, reproducibility,
 maintainability, and then performance.
 
+The current retrieval policy uses PyMultiNest as the sole nested sampler and
+retains Optimal Estimation as a separate route for supported independent
+Gaussian problems. Other sampler adapters require a separate validation case.
+
 ## Adopt Directly
 
 | Idea | Source frameworks | Recommendation | Justification |
@@ -13,7 +17,7 @@ maintainability, and then performance.
 | Contribution diagnostics | NEMESIS, TauREx, pRT, PICASO | Return gas, CIA, Rayleigh, cloud, and total contribution diagnostics | Diagnostics are essential for scientific review and regression tests. |
 | Component registry | TauREx, Exo_Skryer | Use simple registries for temperature, chemistry, cloud, opacity, RT, likelihood, sampler | Enables extension without raw string switches scattered through physics code. |
 | RT engine boundary | petitRADTRANS | Build `RadiativeTransferBackend` with stable inputs and outputs | Keeps physics kernels reusable outside retrieval. |
-| Sampler adapters | TauREx, pRT, Exo_Skryer | Wrap dynesty first; add other samplers behind the same interface | Retrieval logic should not know sampler-specific APIs. |
+| Sampler adapters | TauREx, pRT, Exo_Skryer | Use PyMultiNest for nested sampling and retain Optimal Estimation as a separate Gaussian route | Retrieval logic should not know sampler-specific APIs. |
 | Run manifest | NEMESIS examples, pRT data handling, PICASO data versioning | Save config hash, code version, opacity checksums, random seed, sampler settings | Reproducibility must be built in from the first real retrieval. |
 
 ## Modify Before Adopting
@@ -24,7 +28,7 @@ maintainability, and then performance.
 | JAX backend | Treat as future backend | Exo_Skryer shows value, but JAX changes array semantics, caching, and install complexity. |
 | Multiple chemistry backends | Start with free chemistry and one equilibrium adapter later | Multiple chemistry engines introduce validation and dependency burden. |
 | Multidimensional atmospheres | Design data structures to allow columns, but implement 1D first | POSEIDON/PICASO show value; early implementation would distract from robust JWST emission. |
-| Broad sampler support | Start with dynesty, then UltraNest or PyMultiNest if needed | Exo_Skryer breadth is attractive but can outpace tests. |
+| Additional sampler support | Defer other nested samplers; use PyMultiNest only for nested sampling and retain Optimal Estimation separately | Extra adapters add validation and deployment burden before a clear need. |
 
 ## Avoid Entirely
 
@@ -78,7 +82,8 @@ src/robert_exoplanets/
     transforms.py
     samplers/
       base.py
-      dynesty.py
+      multinest.py
+    optimal_estimation.py
   io/
     config.py
     manifests.py
@@ -129,7 +134,8 @@ The first substantial ROBERT release should include:
 - Gray cloud deck or opacity slab.
 - JWST-style observation object with binning, mask, offset, and jitter.
 - Gaussian independent-error likelihood.
-- dynesty sampler adapter.
+- PyMultiNest nested-sampling adapter.
+- Separate optimal-estimation route for independent Gaussian errors.
 - Run manifest and posterior output.
 - Reference tests for a cloud-free atmosphere and a cloudy atmosphere.
 
@@ -160,7 +166,7 @@ and a Python API:
 
 ```python
 problem = RetrievalProblem.from_config("config.yaml")
-result = DynestySampler().run(problem)
+result = run_multinest(problem, output_dir="run")
 ```
 
 The CLI should be a wrapper around the same typed objects used by the Python API.

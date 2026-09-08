@@ -13,6 +13,10 @@ Companion documents:
 - [Performance Strategy](performance_strategy.md)
 - [Development Roadmap](development_roadmap.md)
 
+User-facing status:
+
+- [Supported Methods and Validation Status](../supported_methods.md)
+
 Expanded reference:
 
 - [ROBERT Software Architecture Specification v1.0](robert_software_architecture_specification_v1_0.md)

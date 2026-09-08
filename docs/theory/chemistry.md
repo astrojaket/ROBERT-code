@@ -38,6 +38,73 @@ and elemental-abundance source are recorded in model provenance. FastChem
 remains an optional dependency, each MPI process owns its own solver instance,
 and the bundled upstream files retain their GPL-3.0 license.
 
+## Pressure-quench chemistry
+
+`PressureQuenchChemistry` is an immutable decorator around a base
+`ChemistryModel`. It implements the parameterised transport-quench model in
+[Taylor et al. (2026)](https://arxiv.org/abs/2607.06491): for each configured
+group and quench pressure `P_q`, the base profile is retained at `P > P_q` and
+is fixed to `X_eq(P_q)` at `P <= P_q`. The decorator does not contain FastChem
+logic and radiative transfer sees only the resulting `AtmosphereState`.
+
+Every group explicitly names one pressure parameter and one or more species:
+
+- a one-species group is molecular quenching;
+- a multi-species group applies one shared pressure to coupled/grouped
+  molecular profiles; and
+- a species may occur in only one group.
+
+The Python API is species-agnostic. The selected names must be produced by the
+base chemistry model, and the suitability of a molecule and prior depends on
+the temperature regime and chemical pathways. CH4 and NH3 are examples from
+the paper, not a whitelist. Strict YAML support initially decorates
+`FastChemEquilibriumChemistry`; applying this transform to ROBERT's
+constant-with-altitude free chemistry would be a numerical no-op and is not a
+configured or validated science mode.
+
+Pressure parameters always mean `log10(P_q / bar)`. Their priors are supplied
+by the user. A uniform prior on this logarithmic parameter is not a
+`log_uniform` prior on an already logarithmic value. ROBERT converts the
+`PressureGrid` unit to bar explicitly and supports either grid orientation.
+The allowed domain is the inclusive minimum-to-maximum range of layer-center
+pressures. Values outside it raise an error; no extrapolation is performed.
+
+Taylor et al. define the piecewise profile but do not state how an off-grid
+`P_q` is sampled, and no authoritative NemesisPy oracle was available for this
+implementation. ROBERT therefore makes an explicit assumption: interpolate
+VMR linearly as a function of `log10(P / bar)` between layer centers. This
+preserves non-negative and zero abundances without inventing a floor. It is a
+ROBERT convention, not a claim of exact NemesisPy parity, and is recorded in
+model and retrieval-manifest metadata.
+
+Quenched profiles are never renormalized because that would change the
+published parameterisation. `evaluate_with_diagnostics()` reports immutable
+base and quenched per-layer VMR sums, their drift, and elemental-count drift
+when every species label is a parseable molecular formula. If any label cannot
+be parsed, elemental drift is omitted rather than guessed. The normal
+`AtmosphereBuilder` path computes mean molecular weight after quenching.
+
+The Taylor et al. hot-Jupiter grouped preset is:
+
+- carbon: H2O, CO, CO2, and CH4 using `log_Pq_C`; and
+- nitrogen: NH3 using `log_Pq_N`.
+
+This is "elemental" only in the paper's sense of element-grouped molecular
+profiles. It is not an elemental-conservation solver. N2 motivated the nitrogen
+chemistry but was absent from the paper's opacity/species set, so the preset
+does not silently add it. A custom Python group may include N2 when the base
+model produces it.
+
+Only the pressure-quench transform is implemented here. The H2S deep-abundance,
+break-pressure, and power-law photochemical-depletion profile in Taylor et al.
+is a separate parameterisation and is intentionally out of scope.
+
+Unit and integration tests establish the validation level `tested`. No frozen
+NemesisPy profile comparison is currently available, so the implementation is
+not `cross-framework validated`; no retrieval reproduction has been run, so it
+is not `science demonstrated`. The reproducible oracle exchange contract is
+documented in [Pressure-quench validation](../validation/pressure_quench.md).
+
 ## Free Chemistry
 
 `FreeChemistry` is the first retrieval-facing chemistry model in ROBERT. It is
@@ -170,9 +237,8 @@ FastChem workflow, where a selected set of returned species is used directly.
 
 The current chemistry layer intentionally does not implement:
 
-- Quench chemistry.
-- Photochemical profile overlays.
-- Disequilibrium chemistry beyond tabulated or externally evaluated inputs.
+- photochemical profile overlays, including the H2S break-pressure model; or
+- kinetics-derived quench pressures or eddy-diffusion retrievals.
 
 Those should be added as separate adapters or post-processing components, not
 as hidden branches inside the free-chemistry model.

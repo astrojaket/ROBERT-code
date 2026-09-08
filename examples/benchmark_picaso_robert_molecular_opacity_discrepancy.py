@@ -64,7 +64,7 @@ except ModuleNotFoundError:
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = Path(__file__).with_name("run_picaso_jwst_transmission_injection.py")
-DEFAULT_CONFIG = ROOT / "configurations" / "examples/picaso_jwst_transmission_retrieval_multinest.yaml"
+DEFAULT_CONFIG = ROOT / "configurations" / "../tests/fixtures/configurations/picaso_transmission.yaml"
 DEFAULT_OUTPUT = ROOT / "examples" / "outputs" / "picaso_jwst_molecular_opacity_discrepancy"
 BARSTOW_2020_DOI = "10.1093/mnras/staa548"
 

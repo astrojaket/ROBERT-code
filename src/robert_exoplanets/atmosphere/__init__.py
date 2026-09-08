@@ -10,6 +10,9 @@ from .chemistry import (
     FixedMeanMolecularWeight,
     FreeChemistry,
     MeanMolecularWeightModel,
+    PressureQuenchChemistry,
+    QuenchDiagnostics,
+    QuenchGroup,
 )
 from .state import AtmosphereState
 from .temperature import (
@@ -32,6 +35,9 @@ __all__ = [
     "FixedMeanMolecularWeight",
     "FreeChemistry",
     "MeanMolecularWeightModel",
+    "PressureQuenchChemistry",
+    "QuenchDiagnostics",
+    "QuenchGroup",
     "IsothermalTemperatureProfile",
     "MadhusudhanSeager2009TemperatureProfile",
     "ParmentierGuillot2014TemperatureProfile",

@@ -82,6 +82,9 @@ Responsibilities:
   contamination models.
 - Supply effective temperature, log surface gravity, and metallicity to a
   selected stellar-spectrum model, or carry an explicitly prepared spectrum.
+- Supply immutable photosphere, active-region, and optional transit-chord
+  spectra to a stellar-contamination component without embedding its arithmetic
+  in the transmission solver.
 
 Ownership:
 
@@ -217,6 +220,10 @@ Responsibilities:
 - Produce composition arrays under an explicit convention, such as VMR or mass
   fraction.
 - Validate normalization rules.
+- Expose deterministic parameter requirements and science-relevant provenance.
+- When decorated by a disequilibrium transform, retain base-model output
+  contracts and make pressure-domain, interpolation, and closure policies
+  explicit.
 
 Ownership:
 

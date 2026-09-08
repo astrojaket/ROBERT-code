@@ -11,33 +11,13 @@ from robert_exoplanets.io.task_config import load_task_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_CONFIG = (
-    ROOT
-    / "configurations"
-    / "targets"
-    / "WASP-69b"
-    / "wasp69b_cloud_free_R1000.yaml"
+SOURCE_CONFIG = ROOT / "configurations" / "emission.yaml"
+OE_CONFIG = ROOT / "configurations" / "optimal_estimation.yaml"
+MULTINEST_CONFIGS = (
+    ROOT / "configurations" / "emission.yaml",
+    ROOT / "configurations" / "two_region_emission.yaml",
 )
-OE_CONFIG = (
-    ROOT
-    / "configurations"
-    / "targets"
-    / "WASP-69b"
-    / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation.yaml"
-)
-NESTED_CONFIGS = (
-    ROOT
-    / "configurations"
-    / "targets"
-    / "WASP-69b"
-    / "wasp69b_cloud_free_native_pg14_R1000.yaml",
-    ROOT
-    / "configurations"
-    / "targets"
-    / "WASP-69b"
-    / "wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml",
-)
-TEMPLATE = ROOT / "configurations" / "examples" / "TEMPLATE_all_supported_options.yaml"
+TEMPLATE = ROOT / "configurations" / "quickstart.yaml"
 
 
 def test_create_run_directory_copies_runners_and_isolates_writable_paths(
@@ -53,7 +33,7 @@ def test_create_run_directory_copies_runners_and_isolates_writable_paths(
     )
     config = load_task_config(run_directory / "configuration.yaml")
 
-    assert run_directory.name == "wasp69b-cloud-free-native-modes-R1000"
+    assert run_directory.name == "hot-jupiter-emission-r1000"
     assert (run_directory / "source_configuration.yaml").is_file()
     assert (run_directory / "run_retrieval.py").is_file()
     assert (run_directory / "run_oe_from_nested.py").is_file()
@@ -112,8 +92,8 @@ def test_create_run_directory_uses_one_rank_for_optimal_estimation(
     assert "ROBERT_MPI_RANKS=1" in readme
 
 
-@pytest.mark.parametrize("config_path", NESTED_CONFIGS)
-def test_create_run_directory_uses_128_ranks_for_nested_workflows(
+@pytest.mark.parametrize("config_path", MULTINEST_CONFIGS)
+def test_create_run_directory_uses_128_ranks_for_multinest_workflows(
     tmp_path: Path,
     config_path: Path,
 ) -> None:

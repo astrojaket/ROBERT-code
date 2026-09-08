@@ -336,113 +336,18 @@ pass:
 ROBERT_PYMULTINEST_MEASUREMENTS = DEFERRED_TO_CLUSTER
 ```
 
-Run the following six commands on the cluster after acquiring the verified
-Smith, August, PHOENIX, and pRT inputs. Each command has a distinct output and
-report path. The commands use PyMultiNest with the MultiNest backend only,
-one MPI process, and six numerical threads as the current ceiling. Accept a
-production thread count only if the measured peak RSS is strictly below
-`1.9 GiB`; reduce the thread values together if the six-thread run exceeds
-that limit. Set `PYSYN_CDBS` to the cluster's explicit PHOENIX root.
 
-```bash
-export PYSYN_CDBS=/cluster/path/PYSYN_CDBS
-export W77_SMITH=$PWD/external_data/wasp77ab_smith2024
-export W77_NIRSPEC=$PWD/data/jwst_emission_spectra
-export W77_INPUT=$PWD/external_data/petitRADTRANS/input_data
-export W77_STRIDE=$PWD/docs/data/wasp77ab_lbl_sampling_20260831.json
-export W77_H2O=$W77_INPUT/opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5
-export W77_CO=$W77_INPUT/opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5
+## 8. Current boundary
 
-OMP_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 MKL_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6 \
-VECLIB_MAXIMUM_THREADS=6 NUMBA_NUM_THREADS=6 OMP_THREAD_LIMIT=6 \
-mpirun -np 1 conda run -n robert-exoplanets python \
-examples/run_wasp77ab_robert_joint_pymultinest.py --mode hrs_only \
---smith-data-root "$W77_SMITH" --nirspec-data-root "$W77_NIRSPEC" \
---h2o-table "$W77_H2O" --co-table "$W77_CO" --stride-report "$W77_STRIDE" \
---stellar-spectrum-model phoenix --pysyn-cdbs-root "$PYSYN_CDBS" \
---hminus on --preflight --run-pymultinest \
---output-root "$PWD/cluster_outputs/wasp77ab/hrs_only/hminus_on" \
---report "$PWD/cluster_reports/wasp77ab_hrs_only_hminus_on.json" --max-memory-gib 1.9
+The deterministic source, HRS, LRS, real-grid, fixed-template, and
+operator-level injection records are complete for their declared scope. The
+fixed-template fits are comparison records, and the operator injection is a
+plumbing check; neither is a real-data atmospheric posterior recovery.
 
-OMP_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 MKL_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6 \
-VECLIB_MAXIMUM_THREADS=6 NUMBA_NUM_THREADS=6 OMP_THREAD_LIMIT=6 \
-mpirun -np 1 conda run -n robert-exoplanets python \
-examples/run_wasp77ab_robert_joint_pymultinest.py --mode hrs_only \
---smith-data-root "$W77_SMITH" --nirspec-data-root "$W77_NIRSPEC" \
---h2o-table "$W77_H2O" --co-table "$W77_CO" --stride-report "$W77_STRIDE" \
---stellar-spectrum-model phoenix --pysyn-cdbs-root "$PYSYN_CDBS" \
---hminus off --preflight --run-pymultinest \
---output-root "$PWD/cluster_outputs/wasp77ab/hrs_only/hminus_off" \
---report "$PWD/cluster_reports/wasp77ab_hrs_only_hminus_off.json" --max-memory-gib 1.9
-
-OMP_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 MKL_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6 \
-VECLIB_MAXIMUM_THREADS=6 NUMBA_NUM_THREADS=6 OMP_THREAD_LIMIT=6 \
-mpirun -np 1 conda run -n robert-exoplanets python \
-examples/run_wasp77ab_robert_joint_pymultinest.py --mode lrs_only \
---smith-data-root "$W77_SMITH" --nirspec-data-root "$W77_NIRSPEC" \
---h2o-table "$W77_H2O" --co-table "$W77_CO" --stride-report "$W77_STRIDE" \
---stellar-spectrum-model phoenix --pysyn-cdbs-root "$PYSYN_CDBS" \
---hminus on --preflight --run-pymultinest \
---output-root "$PWD/cluster_outputs/wasp77ab/lrs_only/hminus_on" \
---report "$PWD/cluster_reports/wasp77ab_lrs_only_hminus_on.json" --max-memory-gib 1.9
-
-OMP_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 MKL_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6 \
-VECLIB_MAXIMUM_THREADS=6 NUMBA_NUM_THREADS=6 OMP_THREAD_LIMIT=6 \
-mpirun -np 1 conda run -n robert-exoplanets python \
-examples/run_wasp77ab_robert_joint_pymultinest.py --mode lrs_only \
---smith-data-root "$W77_SMITH" --nirspec-data-root "$W77_NIRSPEC" \
---h2o-table "$W77_H2O" --co-table "$W77_CO" --stride-report "$W77_STRIDE" \
---stellar-spectrum-model phoenix --pysyn-cdbs-root "$PYSYN_CDBS" \
---hminus off --preflight --run-pymultinest \
---output-root "$PWD/cluster_outputs/wasp77ab/lrs_only/hminus_off" \
---report "$PWD/cluster_reports/wasp77ab_lrs_only_hminus_off.json" --max-memory-gib 1.9
-
-OMP_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 MKL_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6 \
-VECLIB_MAXIMUM_THREADS=6 NUMBA_NUM_THREADS=6 OMP_THREAD_LIMIT=6 \
-mpirun -np 1 conda run -n robert-exoplanets python \
-examples/run_wasp77ab_robert_joint_pymultinest.py --mode joint \
---smith-data-root "$W77_SMITH" --nirspec-data-root "$W77_NIRSPEC" \
---h2o-table "$W77_H2O" --co-table "$W77_CO" --stride-report "$W77_STRIDE" \
---stellar-spectrum-model phoenix --pysyn-cdbs-root "$PYSYN_CDBS" \
---hminus on --preflight --run-pymultinest \
---output-root "$PWD/cluster_outputs/wasp77ab/joint/hminus_on" \
---report "$PWD/cluster_reports/wasp77ab_joint_hminus_on.json" --max-memory-gib 1.9
-
-OMP_NUM_THREADS=6 OPENBLAS_NUM_THREADS=6 MKL_NUM_THREADS=6 NUMEXPR_NUM_THREADS=6 \
-VECLIB_MAXIMUM_THREADS=6 NUMBA_NUM_THREADS=6 OMP_THREAD_LIMIT=6 \
-mpirun -np 1 conda run -n robert-exoplanets python \
-examples/run_wasp77ab_robert_joint_pymultinest.py --mode joint \
---smith-data-root "$W77_SMITH" --nirspec-data-root "$W77_NIRSPEC" \
---h2o-table "$W77_H2O" --co-table "$W77_CO" --stride-report "$W77_STRIDE" \
---stellar-spectrum-model phoenix --pysyn-cdbs-root "$PYSYN_CDBS" \
---hminus off --preflight --run-pymultinest \
---output-root "$PWD/cluster_outputs/wasp77ab/joint/hminus_off" \
---report "$PWD/cluster_reports/wasp77ab_joint_hminus_off.json" --max-memory-gib 1.9
-```
-
-Each completed cluster report must record both seeds, evidence and combined
-uncertainty, posterior intervals, component residual statistics, H-minus
-on/off comparison, all seven thread values, MPI world size, peak RSS, and
-input/output hashes. Until those measurements exist, do not describe the
-real-data ROBERT sampler as passed.
-
-## 8. Acceptance sequence
-
-1. Keep the deterministic source, HRS, LRS, and real-grid records unchanged
-   unless their inputs or checks change.
-2. Run reduced-matrix HRS injections and null/shuffled-phase checks. Label
-   them partial validation because the public cube is already reduced.
-3. The fixed-template HRS-only, LRS-only, and joint PyMultiNest reference fits
-   are complete. Compare with Smith's anchors, but do not require identical
-   posteriors because the likelihood and opacity choices differ.
-4. The operator-level ROBERT injection validation is complete and pass. Keep
-   it separate from posterior recovery; its H-minus on/off result is finite
-   path validation only.
-5. Run the shared-VMR ROBERT pilot on a cluster, including H-minus on/off
-   evidence under the same data and response definitions. Record its
-   two-seed evidence and resource gates.
-6. Add the six-parameter P--T model, explicit covariance if published, and
-   optional sensitivity nights before claiming a literature reproduction.
+The shared-VMR real-data sampler remains deferred to a cluster. A six-parameter
+non-isothermal P--T model and any published covariance definition are required
+before a literature reproduction can be claimed. The public reduced cube also
+limits the HRS result to partial validation of the original observing analysis.
 
 Smith's main joint anchors remain useful comparison values: log10(H2O VMR)
 `-4.02 +0.07/-0.06`, log10(CO VMR) `-3.91 +/- 0.13`, `T0 = 1400 +30/-40 K`,

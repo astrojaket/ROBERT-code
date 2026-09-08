@@ -28,7 +28,7 @@ def test_auto_mpi_processes_prefers_inner_communicator_on_glamdring(
     monkeypatch,
 ) -> None:
     config = load_task_config(
-        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "emission.yaml"
     )
     monkeypatch.setenv("SLURM_NTASKS", "1")
     monkeypatch.setenv("ROBERT_MPI_RANKS", "12")
@@ -96,7 +96,7 @@ def _table(species: str) -> CorrelatedKTable:
 
 def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
     config = load_task_config(
-        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "emission.yaml"
     )
     observation = Observation.from_arrays(
         wavelength=[2.0, 2.5],
@@ -117,7 +117,7 @@ def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
     monkeypatch.setattr(configured_tasks, "load_nemesispy_cia_table", lambda: None)
 
     class StubForwardModel:
-        models = {"f322w2": SimpleNamespace(opacity_identifiers={})}
+        models = {"f322w2": SimpleNamespace(opacity_identifiers={}, manifest_metadata={})}
 
         def __call__(self, parameters):
             return {}
@@ -141,7 +141,7 @@ def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
 
 def test_configured_two_region_problem_builds_independent_columns(monkeypatch) -> None:
     base = load_task_config(
-        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "emission.yaml"
     )
     raw = deepcopy(base.model_dump(mode="python"))
     species = tuple(raw["opacity"]["species"])
@@ -199,7 +199,7 @@ def test_configured_two_region_problem_builds_independent_columns(monkeypatch) -
     monkeypatch.setattr(configured_tasks, "load_nemesispy_cia_table", lambda: None)
 
     class StubRegionalModel:
-        models = {"f322w2": SimpleNamespace(opacity_identifiers={})}
+        models = {"f322w2": SimpleNamespace(opacity_identifiers={}, manifest_metadata={})}
 
         def __call__(self, parameters):
             return {}
@@ -218,3 +218,35 @@ def test_configured_two_region_problem_builds_independent_columns(monkeypatch) -
     assert captured[0].cloud_model is None
     assert captured[1].chemistry_model.__class__.__name__ == "FreeChemistry"
     assert captured[1].cloud_model.__class__.__name__ == "ParameterizedDeckHazeCloudModel"
+
+
+def test_stellar_contamination_changes_configured_science_identity() -> None:
+    config = load_task_config(ROOT / "configurations" / "transmission.yaml")
+    raw = config.model_dump(mode="python")
+    raw["stellar_contamination"] = {
+        "model": "poseidon_rackham",
+        "regions": [{"name": "spot", "kind": "spot", "temperature_k": 4000.0,
+                     "covering_fraction": 0.1}],
+    }
+    spotted = TaskConfig.model_validate(raw)
+    assert configured_tasks._configured_science_sha256(config) != (
+        configured_tasks._configured_science_sha256(spotted)
+    )
+
+
+def test_quench_pressure_prior_respects_each_regional_pressure_grid() -> None:
+    config = load_task_config(ROOT / "configurations" / "two_region_emission.yaml")
+    raw = config.model_dump(mode="python")
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench", "preset": "custom",
+        "groups": [{"pressure_parameter": "log_Pq", "species": ["CO2"]}],
+    }
+    raw["parameters"] = [*raw["parameters"], {
+        "name": "log_Pq", "prior": {"type": "uniform", "lower": -5.0, "upper": 1.0},
+    }]
+    TaskConfig.model_validate(raw)
+    raw["disk_emission"]["cold_region"]["atmosphere"]["pressure"] = {
+        "top_bar": 0.01, "bottom_bar": 100.0, "layers": 80,
+    }
+    with pytest.raises(ValueError, match="quench-pressure prior log_Pq must lie within"):
+        TaskConfig.model_validate(raw)

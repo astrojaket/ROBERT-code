@@ -27,7 +27,7 @@ from robert_exoplanets import (
 )
 
 from benchmark_wasp69b_multi_instrument import _canonicalize_g, _config
-from retrieve_wasp69b_nircam_cloud_free import (
+from _wasp_emission_benchmark import (
     DATA,
     SPECIES,
     _cia_tables,

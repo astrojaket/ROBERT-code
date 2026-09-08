@@ -112,9 +112,7 @@ def _parse_args() -> argparse.Namespace:
         default=(
             ROOT
             / "configurations"
-            / "targets"
-            / "WASP-69b"
-            / "wasp69b_cloud_free_R1000.yaml"
+            / "emission.yaml"
         ),
         help="source task YAML; its run.name becomes the folder name",
     )

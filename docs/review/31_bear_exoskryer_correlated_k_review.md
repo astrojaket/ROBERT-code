@@ -132,9 +132,10 @@ float64 scientific reference must remain unchanged.
 
 Whole-model compilation is most valuable when several independent likelihood
 points can be evaluated together. Before adopting JAX as another backend,
-benchmark parallel UltraNest likelihood calls and batched parameter vectors
-against the current Numba kernel to determine whether the workload is large
-enough to amortize compilation and dispatch costs.
+benchmark parallel PyMultiNest likelihood evaluations and batched parameter
+vectors against the current Numba kernel to determine whether the workload is
+large enough to amortize compilation and dispatch costs. Keep Optimal
+Estimation as the separate route for supported independent-Gaussian problems.
 
 ## Decision
 

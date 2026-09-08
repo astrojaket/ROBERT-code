@@ -154,12 +154,15 @@ Public API:
 - `StellarSpectrumModel`.
 - `PhoenixStellarSpectrumModel`.
 - `BlackbodyStellarSpectrumModel`.
+- `StellarContaminationModel` and immutable contamination results.
 
 Internal implementation:
 
 - Stellar-atmosphere catalog interpolation and coverage validation.
 - Flux-conserving preparation on immutable spectral grids.
 - Explicit surface-flux and radiance conventions.
+- Disk-mixture and transit-chord stellar-contamination transforms prepared on
+  native forward-model grids.
 
 Allowed dependencies:
 
@@ -239,6 +242,7 @@ Public API:
 - `ChemistryModel`.
 - `FreeChemistry`.
 - `EquilibriumChemistry`.
+- `PressureQuenchChemistry` and explicit `QuenchGroup` definitions.
 - Backend protocols.
 
 Internal implementation:
@@ -246,6 +250,8 @@ Internal implementation:
 - Free abundance transforms.
 - Equilibrium grid adapters.
 - Quench approximations when validated.
+- Pure chemistry decorators that preserve base-model provenance and remain
+  outside radiative-transfer implementations.
 
 Allowed dependencies:
 

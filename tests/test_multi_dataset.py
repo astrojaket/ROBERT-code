@@ -219,8 +219,11 @@ def test_smoke_preflight_checks_both_hybrid_manifests(monkeypatch) -> None:
     config = load_task_config(
         ROOT
         / "configurations"
-        / "targets/WASP-69b/wasp69b_cloud_free_native_pg14_R1000_optimal_estimation_to_multinest.yaml"
+        / "optimal_estimation.yaml"
     )
+    config = config.model_copy(update={"sampler": config.sampler.model_copy(
+        update={"engine": "optimal_estimation_to_multinest"}
+    )})
     calls = []
 
     def capture_manifest(problem, *, method, settings, random_seed):

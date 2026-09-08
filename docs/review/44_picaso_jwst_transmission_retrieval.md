@@ -77,19 +77,21 @@ a material partial-shell aerosol bias.
 
 ## Reproduction
 
-Run from the `robert-exoplanets` conda environment:
+The benchmark used a generated configuration with external PICASO data. That
+configuration is no longer a maintained public entry point. The current public
+CLI can run the bundled transmission validation:
 
 ```bash
-python examples/picaso_jwst_transmission_retrieval.py \
-  --config configurations/picaso_jwst_transmission_retrieval_multinest.yaml
-
-mpiexec -n 2 python run_retrieval.py \
-  --config configurations/picaso_jwst_transmission_retrieval_multinest.yaml
-
-python examples/picaso_jwst_transmission_retrieval.py \
-  --config configurations/picaso_jwst_transmission_retrieval_multinest.yaml \
-  --evaluate-result
+conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
+  --config configurations/transmission.yaml --generate
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configurations/transmission.yaml
 ```
+
+This command is a synthetic R=100 check. It does not reproduce the R=15,000
+PICASO contract or the figures above. Reproduce this historical result only
+with the original external PICASO inputs and a benchmark-specific resolved
+configuration.
 
 Generated artifacts are under
 `examples/outputs/picaso_jwst_transmission_retrieval/`, including the external

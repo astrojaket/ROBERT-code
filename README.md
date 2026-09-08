@@ -20,7 +20,7 @@ The standard YAML runners cover the configured emission and transmission
 workflows. Line-by-line opacity, high-resolution observations, covariance
 likelihoods, and accelerator paths also have Python APIs and dedicated scripts;
 they are not all options in the standard YAML schema. See the
-[capability audit](docs/review/53_repository_audit_2026-09-07.md) and
+[supported methods](docs/supported_methods.md) and
 [development roadmap](docs/architecture/development_roadmap.md) for current
 interfaces, validation limits, and next steps.
 
@@ -63,10 +63,10 @@ export PYSYN_CDBS=/path/to/synphot/reference-data
 with `bodies.star.spectrum_model: blackbody` does not require those files.
 
 JWST configurations default to R=1000 tables in
-`opacity_data/ktables_exomol/`. The local collection contains 16 tables copied
-from `Dropbox/NemesisPy-Docker/ktables_exomol/`; its checksum manifest is
-`opacity_data/ktables_exomol/local_copy_manifest.json`. These large files stay
-outside Git. Each instrument retains its own wavelength coverage and bin edges.
+`opacity_data/ktables_exomol/`. These large files stay outside Git and must be
+installed separately. See the [external-input tutorial](docs/tutorials/02_external_inputs_and_specialised_retrievals.md)
+for the required gases and download limits. Each instrument retains its own
+wavelength coverage and bin edges.
 
 ROBERT also includes ready-to-use R=100 correlated-k tables for H2O, CO, CO2, CH4,
 NH3, and HCN from 0.3 to 15 microns. They are suitable for quick forward
@@ -78,12 +78,13 @@ Verify the installation:
 ```bash
 conda run -n robert-exoplanets python -m pytest
 conda run -n robert-exoplanets python run_retrieval.py \
-  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml \
+  --config configurations/quickstart.yaml \
   --validate-only
 ```
 
 The bundled quickstart configuration is stored at
-`configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml`.
+`configurations/quickstart.yaml`. It uses the bundled R=100 tables. Use
+`configurations/emission.yaml` for the R=1000 WASP-69b science example.
 
 ### End-to-end installation validation
 
@@ -111,15 +112,15 @@ Start with a schema-version-2 YAML configuration. Each parameter may have a
 
 ```bash
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml \
+  --config configurations/quickstart.yaml \
   --validate-only
 
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml \
+  --config configurations/quickstart.yaml \
   --prepare-opacity
 
 conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart/wasp80b_cloud_free_native_pg14_R100.yaml
+  --config configurations/quickstart.yaml
 ```
 
 The model is written to `outputs/forward_model.npz`. With forward plotting
@@ -169,7 +170,7 @@ and an Oxford Glamdring launcher:
 ```bash
 conda run -n robert-exoplanets python scripts/create_run_directory.py \
   --project-dir /path/to/runs \
-  --config configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml
+  --config configurations/emission.yaml
 ```
 
 See [Running retrievals](docs/retrievals.md) for detailed local, standard
@@ -182,4 +183,7 @@ and post-processing.
 - [Configuration reference](docs/configuration.md)
 - [Portable observation format](docs/data/observation_format.md)
 - [Post-processing and plotting](docs/postprocessing.md)
-- [Complete annotated YAML](configurations/examples/TEMPLATE_all_supported_options.yaml)
+- [Maintained configurations](configurations/README.md)
+- [Supported methods](docs/supported_methods.md)
+- [Bundled forward and retrieval tutorial](docs/tutorials/01_bundled_forward_and_retrieval.md)
+- [External inputs and specialised retrieval tutorial](docs/tutorials/02_external_inputs_and_specialised_retrievals.md)

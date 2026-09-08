@@ -13,8 +13,8 @@ from robert_exoplanets.io.task_config import load_task_config
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIGURATIONS = {
-    "emission": ROOT / "configurations" / "quickstart/r100_emission_validation.yaml",
-    "transmission": ROOT / "configurations" / "quickstart/r100_transmission_validation.yaml",
+    "emission": ROOT / "configurations" / "quickstart.yaml",
+    "transmission": ROOT / "configurations" / "transmission.yaml",
 }
 REFERENCE = ROOT / "data" / "validation" / "r100_quickstart"
 NOTEBOOK = (

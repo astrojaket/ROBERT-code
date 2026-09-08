@@ -1,13 +1,34 @@
 include AGENTS.md
 include CHANGELOG.md
 include environment.yml
+include run_forward.py run_retrieval.py postprocess_forward.py postprocess_retrieval.py
+include run_oe_from_nested.py
+recursive-include scripts *.py
 recursive-include docs *.md
 recursive-include examples *.py *.ipynb
-recursive-include configurations *.yaml *.md
+include configurations/*.yaml configurations/*.md
+prune configurations/outputs
+prune configurations/opacity_cache
+prune configurations/scratch
+prune configurations/retrievals
 recursive-include data/chemistry/fastchem *
+recursive-include data/observations *.txt *.md
+recursive-include data/optical_constants *.txt *.md
+recursive-include data/wasp69b_schlawin2024 *.dat *.md ReadMe
+recursive-include data/wasp80b_wiser2025 *.txt *.md *.sha256
+recursive-include data/jwst_emission_spectra *.tbl *.yaml *.json *.md
 recursive-include data/validation *.md *.json *.csv
 recursive-include src/robert_exoplanets/data/opacities *.kta *.json *.md
+
+recursive-include tests/fixtures *.json *.yaml
 global-exclude .DS_Store
 global-exclude *.py[cod]
 prune examples/notebooks/.ipynb_checkpoints
 prune examples/outputs
+
+prune studies
+prune CLR_Bias_Study
+prune GJ_12b
+prune Solar_System_Models
+prune emission-intercomparison-paper
+prune literature-clr-retrievals

@@ -20,6 +20,8 @@ from robert_exoplanets.atmosphere import (
     FastChemEquilibriumChemistry,
     FreeChemistry,
     IsothermalTemperatureProfile,
+    PressureQuenchChemistry,
+    QuenchGroup,
     MadhusudhanSeager2009TemperatureProfile,
     ParmentierGuillot2014TemperatureProfile,
     SplineTemperatureProfile,
@@ -63,6 +65,11 @@ from robert_exoplanets.rt import (
     load_nemesispy_cia_table,
     normal_emission_geometry,
     OpticalConstantsCatalog,
+)
+
+from robert_exoplanets.stellar import (
+    StellarHeterogeneityDefinition,
+    prepare_stellar_contamination_model,
 )
 
 from .task_config import (
@@ -653,6 +660,19 @@ def _temperature_profile(config: TemperatureConfig, *, gravity: float):
 
 
 def _chemistry_components(config: ChemistryConfig):
+    chemistry, mean_molecular_weight, opacity_free_species = _base_chemistry_components(config)
+    quenching = getattr(config, "quenching", None)
+    if quenching is not None:
+        chemistry = PressureQuenchChemistry(
+            base_model=chemistry,
+            groups=tuple(QuenchGroup(group.pressure_parameter, group.species)
+                         for group in quenching.resolved_groups()),
+            preset=quenching.preset,
+        )
+    return chemistry, mean_molecular_weight, opacity_free_species
+
+
+def _base_chemistry_components(config: ChemistryConfig):
     if config.model == "fastchem_equilibrium":
         chemistry = FastChemEquilibriumChemistry(
             fastchem_path=config.fastchem_path,
@@ -849,6 +869,8 @@ def build_problem(
         for dataset in observations.datasets
     }
     regions = configured_regions(config)
+    stellar_contamination_metadata = {"stellar_contamination": "disabled"}
+    regional_metadata = {}
     regional_models = {}
     regional_opacity_ids = {}
     for region in regions:
@@ -892,6 +914,42 @@ def build_problem(
         else:
             dataset_models = {}
             for dataset in observations.datasets:
+                contamination_model = None
+                if config.stellar_contamination is not None:
+                    contamination = config.stellar_contamination
+                    contamination_model = prepare_stellar_contamination_model(
+                        star,
+                        dataset.observation.spectral_grid,
+                        heterogeneities=tuple(
+                            StellarHeterogeneityDefinition(
+                                name=region.name,
+                                kind=region.kind,
+                                temperature_k=region.temperature_k,
+                                covering_fraction=region.covering_fraction,
+                                covering_fraction_parameter=(
+                                    region.covering_fraction_parameter
+                                ),
+                                log_g_cgs=region.log_g_cgs,
+                                metallicity_dex=region.metallicity_dex,
+                            )
+                            for region in contamination.regions
+                        ),
+                        transit_chord_temperature_k=(
+                            contamination.transit_chord_temperature_k
+                        ),
+                        transit_chord_log_g_cgs=(
+                            contamination.transit_chord_log_g_cgs
+                        ),
+                        transit_chord_metallicity_dex=(
+                            contamination.transit_chord_metallicity_dex
+                        ),
+                        spectrum_model=star_item.spectrum_model,
+                        metadata={"configured_model": contamination.model},
+                    )
+                    if stellar_contamination_metadata.get("stellar_contamination") == "disabled":
+                        stellar_contamination_metadata = dict(
+                            contamination_model.manifest_metadata
+                        )
                 factory = ParameterizedTransmissionFactoryConfig(
                     planet=planet,
                     star=star,
@@ -905,6 +963,7 @@ def build_problem(
                     opacity_binning=None,
                     model=model_config,
                     cloud_model=cloud,
+                    stellar_contamination=contamination_model,
                 )
                 dataset_models[dataset.name] = build_parameterized_transmission_model(
                     factory,
@@ -916,6 +975,8 @@ def build_problem(
                 for dataset, model in dataset_models.items()
                 for key, value in model.opacity_identifiers.items()
             }
+        first_model = next(iter(regional_model.models.values()))
+        regional_metadata[region.name] = dict(first_model.manifest_metadata)
         regional_models[region.name] = regional_model
 
     disk_mode = config.disk_emission.model
@@ -952,6 +1013,10 @@ def build_problem(
         ),
         invalid_loglike=-1.0e100,
         metadata={
+            **(regional_metadata["primary"] if "primary" in regional_metadata else
+               {f"{region}:{key}": value for region, entries in regional_metadata.items()
+                for key, value in entries.items()}),
+            **stellar_contamination_metadata,
             "configured_science_sha256": _configured_science_sha256(config),
             "configuration_schema_version": str(config.schema_version),
             "opacity_resolution": config.opacity.resolution,
@@ -971,7 +1036,7 @@ def _configured_science_sha256(config: TaskConfig) -> str:
 
     fields = (
         "bodies", "atmosphere", "clouds", "disk_emission", "opacity",
-        "radiative_transfer", "likelihood", "observations", "parameters",
+        "radiative_transfer", "stellar_contamination", "likelihood", "observations", "parameters",
     )
     values = config.model_dump(mode="json", include=set(fields))
     values["opacity"].pop("cache_directory", None)

@@ -25,6 +25,7 @@ from robert_exoplanets.rt.mie import (
 def _cpu_jax(monkeypatch: pytest.MonkeyPatch) -> None:
     """Algorithmic parity is portable; Metal execution needs a visible Apple GPU."""
     monkeypatch.setenv("JAX_PLATFORMS", "cpu")
+    pytest.importorskip("jax")
 
 
 @pytest.mark.parametrize(

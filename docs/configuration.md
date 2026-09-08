@@ -4,14 +4,17 @@ ROBERT's command-line interface uses a strict schema-version-2 YAML file.
 Unknown keys, inconsistent parameter references, invalid physical ranges, and
 unsupported model combinations are errors.
 
-Start with the [complete annotated template](../configurations/examples/TEMPLATE_all_supported_options.yaml)
-or copy a maintained YAML from `configurations/quickstart/`,
-`configurations/examples/`, or `configurations/targets/`.
+Start with one of the maintained root configurations in
+[`configurations/`](../configurations/): `quickstart.yaml` is the bundled
+R=100 emission check, `transmission.yaml` is the bundled R=100 transmission
+check, and `emission.yaml`, `cloudy_emission.yaml`,
+`optimal_estimation.yaml`, `two_region_emission.yaml`, and
+`rocky_transmission_clr.yaml` are the R=1000 science examples. The public
+files are short, self-contained starting points; this document is the full
+option reference when you need to adapt a model.
 
-The quickstart directory contains the bundled R=100 forward and validation
-cases. The examples directory contains reusable synthetic and PICASO cases.
-The targets directory contains the canonical WASP-69b and WASP-80b workflows,
-including their matched retrieval matrices.
+Distinct PICASO and six-gas regression inputs are kept under
+`tests/fixtures/configurations/` and are not public starting configurations.
 
 This schema covers a subset of the Python API. `opacity.format` accepts
 `exomol_kta` and `exomol_cross_section_hdf`; `likelihood.model` accepts
@@ -65,6 +68,42 @@ bodies:
 A planet may supply `gravity_m_s2` instead of `mass_kg`. Stellar
 `spectrum_model` is `phoenix` or `blackbody`.
 
+Transmission TSLE uses the same `bodies.star.spectrum_model` selection. A
+complete spot-plus-facula example is:
+
+```yaml
+stellar_contamination:
+  model: poseidon_rackham
+  regions:
+    - name: cool_spot
+      kind: spot
+      temperature_k: 4000.0
+      covering_fraction_parameter: f_spot
+    - name: hot_facula
+      kind: facula
+      temperature_k: 5200.0
+      covering_fraction_parameter: f_fac
+parameters:
+  - {name: f_spot, prior: {type: uniform, lower: 0.0, upper: 0.4}}
+  - {name: f_fac, prior: {type: uniform, lower: 0.0, upper: 0.4}}
+```
+
+Omitting `stellar_contamination` leaves transmission output unchanged. Each
+region chooses exactly one fixed `covering_fraction` or
+`covering_fraction_parameter`. Fraction priors must be uniform within `[0, 1]`,
+and fixed fractions plus all prior upper bounds must sum to at most one. Spot
+temperatures must be cooler and facular temperatures hotter than
+`bodies.star.effective_temperature_k`. The default omitted chord is the
+immaculate photosphere and matches POSEIDON; `transit_chord_temperature_k`
+enables ROBERT's broader explicit-chord extension. See [Transit light source
+effect and stellar contamination](theory/stellar_contamination.md) for the
+equations, assumptions, preparation order, degeneracies, and validation scope.
+
+The WASP-69 benchmark opacity set follows the molecules named in Schlawin et
+al.: H2O, CO2, CO, CH4, NH3, and SO2. The first five use FastChem equilibrium
+profiles. SO2 follows the paper's PICASO retrieval treatment as a constant
+abundance controlled by `log_SO2`:
+
 ## Observations
 
 Supported loaders are `robert_npz`, `bello_arufe2025_l9859b`,
@@ -86,6 +125,77 @@ observations:
 
 Only selected, statistically independent datasets should be included. Every
 named nuisance parameter must appear in `parameters`.
+
+### Pressure-quench retrievals
+
+FastChem equilibrium profiles can be decorated with explicit pressure-quench
+groups. Each `pressure_parameter` is `log10(P_q / bar)`, and its prior belongs
+in the normal `parameters` list. Bounds are a user and science-case choice;
+ROBERT does not impose the Taylor et al. `[-5.5, 2]` range globally. Use a
+`uniform` prior for a uniform prior on the logarithmic parameter—a
+`log_uniform` prior would apply another logarithm and is not the intended
+semantics.
+
+One species in a group gives arbitrary molecular quenching. This example uses
+CO2, demonstrating that CH4 and NH3 are not hard-coded:
+
+```yaml
+atmosphere:
+  chemistry:
+    model: fastchem_equilibrium
+    fastchem_path: /path/to/fastchem
+    species:
+      - {label: H2O, fastchem_name: H2O1}
+      - {label: CO, fastchem_name: C1O1}
+      - {label: CO2, fastchem_name: C1O2}
+    quenching:
+      model: pressure_quench
+      preset: custom
+      groups:
+        - {pressure_parameter: log_Pq_CO2, species: [CO2]}
+parameters:
+  - {name: log_Pq_CO2, unit: log10(bar), prior: {type: uniform, lower: -4.0, upper: 1.0}}
+```
+
+Multiple species may share a pressure, and multiple independent groups may be
+declared:
+
+```yaml
+quenching:
+  model: pressure_quench
+  preset: custom
+  groups:
+    - {pressure_parameter: log_Pq_C_subset, species: [H2O, CO, CO2]}
+    - {pressure_parameter: log_Pq_CH4, species: [CH4]}
+    - {pressure_parameter: log_Pq_NH3, species: [NH3]}
+```
+
+The Taylor et al. (2026) hot-Jupiter grouped preset is shorter:
+
+```yaml
+quenching:
+  model: pressure_quench
+  preset: taylor_2026_hot_jupiter_element_grouped
+parameters:
+  - {name: log_Pq_C, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}}
+  - {name: log_Pq_N, unit: log10(bar), prior: {type: uniform, lower: -5.5, upper: 2.0}}
+```
+
+It applies `log_Pq_C` to H2O, CO, CO2, and CH4, and `log_Pq_N` to
+NH3. It deliberately does not add N2. "Elemental" means grouped molecular
+profiles here, not an elemental-conservation calculation. Custom Python groups
+may include N2 if the base model produces it.
+
+Strict YAML quenching currently supports the FastChem base. The Python
+decorator is general for profile-producing `ChemistryModel` implementations;
+ROBERT's configured free chemistry is constant with altitude, so quenching it
+would be a no-op and is rejected as an unknown configuration field. See
+[Chemistry](theory/chemistry.md) for interpolation, bounds, closure,
+provenance, and validation-level details.
+
+Free-chemistry nested sampling also accepts a joint CLR prior. All retrieved
+abundances must use one shared group; the configured background gas is the
+derived final composition category:
 
 ## Atmosphere
 
@@ -170,8 +280,9 @@ available. Set it to `scipy` to force the scientific reference implementation.
 
 ### Molecular opacity locations
 
-R=1000 is the default resolution for JWST work. The target configurations and
-template select the repository's `opacity_data/ktables_exomol/` directory.
+R=1000 is the default resolution for JWST work. The maintained science
+configurations select the repository's `opacity_data/ktables_exomol/`
+directory.
 The local 16-table collection was copied from
 `Dropbox/NemesisPy-Docker/ktables_exomol/` and verified by SHA-256. Its
 `local_copy_manifest.json` records file identities. The directory is ignored

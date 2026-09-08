@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Consolidated public configurations into seven independent examples and added
+  paired forward-model and retrieval tutorials. Removed obsolete task reports
+  and duplicate entrypoints; documented current methods and validation limits
+  in `docs/supported_methods.md`. Scientific studies remain outside Git.
+- Excluded the derived NIRCam overlap average from the two-region example,
+  consistent with the other published-data examples. Its likelihood uses only
+  the three independent observing modes. Replaced its cluster-specific MPI
+  rank count with automatic local selection.
+- Integrated typed pressure-quench chemistry into configured atmosphere
+  regions, with explicit interpolation, parameter checks, and provenance.
+  Analytic and integration tests cover this convention; independent NemesisPy
+  profile parity remains open.
 - Removed UltraNest execution, configuration, dependencies, and stale example
   loops. PyMultiNest is the supported sampler; Optimal Estimation remains
   available. Added checked retrieval contracts, explicit resume settings, and
@@ -16,8 +28,8 @@
 
 - Audited the working-tree capability boundaries, shortened the roadmap and
   repeated benchmark text, and distinguished standard YAML workflows from
-  specialized Python APIs. See the 2026-09-07 repository audit for findings
-  and verification limits.
+  specialized Python APIs. See `docs/supported_methods.md` for current
+  verification limits.
 
 - Accelerated cloudy SH4 retrievals with a parity-checked Numba banded solver,
   spectrum-only contractions, shared multi-dataset atmospheric state,
@@ -43,14 +55,24 @@
 - Ported the Stage-9 MultiNest finalization fixes: arbitrary non-negative seeds
   are mapped into the native generator's safe range, and global evidence is
   recovered without parsing malformed unrelated per-mode statistics.
-- Persisted the numerical q16/q50/q84 posterior predictive products shown in
-  retrieval spectrum and temperature plots, and clarified best-fit residual,
-  posterior-median, and interval labels.
+- Persisted median and central 1-sigma/2-sigma predictive products from the
+  same 100 weighted posterior draws for spectra, temperature, VMR, and cloud
+  profiles. Curves and bands default to `mediumpurple`.
 - Removed superseded clear-sky compatibility APIs, the configuration-level
   MIRI offset shorthand, target-specific Slurm scripts, the old DiRAC runbook,
   and the pre-YAML HAT-P-32b example bundle.
 - Generalized the portable observation API and schema for emission,
   transmission, and relative-flux spectra.
+
+- Added typed transit light source effect / stellar-contamination support for
+  transmission: immutable disk/chord/factor outputs, PHOENIX-backed
+  spot/facula preparation, fixed or retrieved projected covering fractions,
+  application on each configured observation dataset grid, strict schema-v2 YAML and manifest
+  provenance, an explicit-chord extension, and exact POSEIDON v1.4 transform
+  parity across homogeneous, spot, facula, and mixed JWST-range cases. The
+  validation claim is limited to the transform, not stellar grids or surface
+  evolution.
+
 - Fixed the bundled L 98-59 b Eureka! spectrum integrity check by recording the
   SHA-256 of the repository-normalized text while retaining upstream Zenodo
   checksum provenance.

@@ -104,7 +104,7 @@ prepared opacity identity, and hashes of the pressure, spectral, and base
 temperature grids.
 
 For a complete target configuration, copy
-`configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml` and change the science inputs
+`configurations/emission.yaml` and change the science inputs
 rather than copying or editing the retrieval implementation.
 
 ## Current Scope
@@ -205,14 +205,12 @@ four-g-ordinate, six-angle benchmark, median wall times were 0.304 s for Toon
 and 0.798 s for SH4 on the validation laptop: SH4 was 2.62 times slower. The
 repeatable benchmark is `examples/benchmark_sh4_rt.py`.
 
-The next controlled comparison uses real molecular correlated-k structure from
-the bundled HAT-P-32b ExoMolOP/exo_k archives. ROBERT assembles H2O, CO, CO2,
-CH4, NH3, and HCN by random overlap and passes the identical 20-g optical-depth
-cube to PICASO. Across 117 spectral bins, the maximum disk-integrated residual
-is 0.0507% and the RMS disk residual is 0.0151%. The realistic FastChem+CIA
-HAT-P-32b case agrees to 0.00361% maximum disk difference. See
-`examples/compare_molecular_emission_picaso.py` and
-`docs/review/15_molecular_emission_picaso_comparison.md`.
+The current independent molecular-opacity attribution uses full-native PICASO
+and ROBERT grids on the exact 48-layer JWST-like transmission atmosphere. The
+common-bin comparison reports 38.84 ppm RMS and 88.20 ppm maximum difference.
+This is cross-code evidence, not a production equivalence gate. See
+`examples/benchmark_picaso_robert_molecular_opacity_discrepancy.py` and the
+[final attribution](../review/45_final_molecular_opacity_attribution.md).
 
 When an atmosphere supplies temperatures at pressure edges, clear thermal
 emission uses the exact formal integral for a Planck source linear in optical
@@ -238,6 +236,10 @@ opacity once and evaluates temperature, chemistry, opacity, and RT for every
 parameter vector. The name uses *transmission* because it predicts a
 transmission spectrum/transit depth; *transit model* would more naturally imply
 a time-dependent light-curve calculation, which ROBERT does not perform here.
+An optional stellar-contamination component multiplies the native planet-only
+depth before instrument response; its disk/chord flux convention, POSEIDON
+benchmark, and limitations are defined in [Transit light source effect and
+stellar contamination](stellar_contamination.md).
 
 The planetary radius is an explicit reference radius at a configured reference
 pressure. Reference pressures outside the atmospheric grid are rejected rather

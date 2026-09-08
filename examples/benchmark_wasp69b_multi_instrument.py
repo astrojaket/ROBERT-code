@@ -59,7 +59,7 @@ except ModuleNotFoundError:  # Direct execution from the examples directory.
     from wasp69b_target import PLANET, PLANET_GRAVITY_M_S2, STAR
 
 if __package__:
-    from .retrieve_wasp69b_nircam_cloud_free import (
+    from ._wasp_emission_benchmark import (
         CACHE,
         DATA,
         FASTCHEM,
@@ -68,7 +68,7 @@ if __package__:
         _load_table,
     )
 else:
-    from retrieve_wasp69b_nircam_cloud_free import (
+    from _wasp_emission_benchmark import (
         CACHE,
         DATA,
         FASTCHEM,

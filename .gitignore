@@ -57,3 +57,11 @@ data/validation/**
 !data/validation/**/*.csv
 !data/validation/**/README.md
 docs/data/emission_intercomparison/
+
+# Local research studies are not part of the public package.
+/studies/
+/CLR_Bias_Study/
+/GJ_12b/
+/Solar_System_Models/
+/emission-intercomparison-paper/
+/literature-clr-retrievals/

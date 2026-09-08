@@ -1,7 +1,7 @@
 # Running retrievals
 
-ROBERT runs optimal estimation, PyMultiNest, and optimal-estimation
-to nested-sampling workflows from one schema-version-2 YAML file. The same
+ROBERT runs optimal estimation and PyMultiNest nested-sampling workflows from
+one schema-version-2 YAML file. The same
 configuration defines the observations, atmosphere, opacity, radiative
 transfer, likelihood, priors, inference settings, runtime, and plotting.
 
@@ -11,7 +11,8 @@ Optimal estimation uses independent Gaussian errors. Covariance and profiled
 high-resolution likelihoods require their full scalar objective through nested
 sampling; their diagonal diagnostic uncertainties are not valid OE inputs.
 Specialized Python retrieval problems are not all supported by this YAML
-runner. See the [capability audit](review/53_repository_audit_2026-09-07.md).
+runner. See the [supported-methods and validation summary](supported_methods.md)
+for the current capability boundary.
 
 CLR composition priors support the joint unit-cube transform for direct nested
 sampling. Their scalar prior-density and posterior-density APIs are unsupported
@@ -21,6 +22,10 @@ Python.
 This guide first creates and checks a run directory, then gives separate
 instructions for a local machine, a standard Slurm cluster, and the Oxford
 Physics Glamdring cluster.
+
+The commands below describe execution only. Use the [supported-methods and
+validation summary](supported_methods.md) before treating a retrieval result as
+scientific evidence.
 
 ## 1. Install the complete environment
 
@@ -52,7 +57,7 @@ different models being combined:
 ```bash
 python scripts/create_run_directory.py \
   --project-dir /path/to/robert-runs \
-  --config configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml \
+  --config configurations/emission.yaml \
   --slurm-account my-account \
   --slurm-partition compute \
   --slurm-time 48:00:00 \
@@ -420,14 +425,19 @@ include:
 - a best-fit residual panel;
 - posterior marginals, correlations, and a corner plot when dimensionality
   permits;
-- temperature-pressure median and central 68% interval;
-- observation-grid and native-grid spectral median and central 68% posterior
-  predictive interval where supported;
-- `posterior_predictive_quantiles.npz`, containing the q16/q50/q84 numerical
-  products shown in the interval plots; and
+- temperature-pressure, VMR, and cloud-profile medians and central 1-sigma
+  and 2-sigma intervals;
+- observation-grid and native-grid spectral medians and central 1-sigma
+  and 2-sigma predictive intervals where supported;
+- `posterior_predictive_quantiles.npz`, containing the numerical products
+  shown in the interval plots; and
 - a plot manifest recording source and appearance settings.
 
 The result's parameter names and order drive all plots. No truth or reference
 marker is drawn unless one is explicitly available. Residuals are calculated
 from the reported best-fit model; posterior-median markers and intervals are
 labeled separately.
+
+The default uses the same 100 weighted-resampled posterior draws for all
+predictive products. Curves and bands use `mediumpurple`. See
+[post-processing](postprocessing.md) for saved arrays and reproducibility settings.

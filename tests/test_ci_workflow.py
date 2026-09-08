@@ -27,7 +27,7 @@ def test_ci_validates_the_generalized_yaml_workflow() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "python run_retrieval.py" in text
-    assert "configurations/targets/WASP-69b/wasp69b_cloud_free_R1000.yaml" in text
+    assert "configurations/emission.yaml" in text
     assert "--validate-only" in text
 
 

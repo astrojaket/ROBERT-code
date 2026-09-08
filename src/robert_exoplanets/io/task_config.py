@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import log10
 from pathlib import Path
 import os
 from typing import Annotated, Literal
@@ -54,6 +55,73 @@ class StarConfig(ConfigModel):
 class BodiesConfig(ConfigModel):
     planet: PlanetConfig
     star: StarConfig
+
+
+class StellarContaminationRegionConfig(ConfigModel):
+    """One fixed-temperature active region in the visible stellar disk."""
+
+    name: str = Field(min_length=1)
+    kind: Literal["spot", "facula", "heterogeneity"]
+    temperature_k: PositiveFloat
+    covering_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
+    covering_fraction_parameter: str | None = None
+    log_g_cgs: float | None = None
+    metallicity_dex: float | None = None
+
+    @model_validator(mode="after")
+    def require_one_fraction_source(self) -> "StellarContaminationRegionConfig":
+        if (self.covering_fraction is None) == (
+            self.covering_fraction_parameter is None
+        ):
+            raise ValueError(
+                "provide exactly one of covering_fraction or covering_fraction_parameter"
+            )
+        if (
+            self.covering_fraction_parameter is not None
+            and not self.covering_fraction_parameter.strip()
+        ):
+            raise ValueError("covering_fraction_parameter must be non-empty")
+        return self
+
+
+class StellarContaminationConfig(ConfigModel):
+    """Rackham/POSEIDON stellar-contamination transform configuration."""
+
+    model: Literal["poseidon_rackham"] = "poseidon_rackham"
+    regions: tuple[StellarContaminationRegionConfig, ...] = ()
+    transit_chord_temperature_k: PositiveFloat | None = None
+    transit_chord_log_g_cgs: float | None = None
+    transit_chord_metallicity_dex: float | None = None
+
+    @model_validator(mode="after")
+    def validate_regions(self) -> "StellarContaminationConfig":
+        names = tuple(region.name for region in self.regions)
+        if len(set(names)) != len(names):
+            raise ValueError("stellar contamination region names must be unique")
+        parameters = tuple(
+            region.covering_fraction_parameter
+            for region in self.regions
+            if region.covering_fraction_parameter is not None
+        )
+        if len(set(parameters)) != len(parameters):
+            raise ValueError(
+                "stellar covering-fraction parameter names must be unique"
+            )
+        fixed_total = sum(
+            region.covering_fraction or 0.0 for region in self.regions
+        )
+        if fixed_total > 1.0:
+            raise ValueError(
+                "fixed stellar heterogeneity fractions must sum to at most one"
+            )
+        if self.transit_chord_temperature_k is None and (
+            self.transit_chord_log_g_cgs is not None
+            or self.transit_chord_metallicity_dex is not None
+        ):
+            raise ValueError(
+                "transit chord log_g/metallicity require transit_chord_temperature_k"
+            )
+        return self
 
 
 class DatasetNuisanceConfig(ConfigModel):
@@ -189,6 +257,66 @@ class ChemistrySpeciesConfig(ConfigModel):
     fastchem_name: str = Field(min_length=1)
 
 
+class QuenchGroupConfig(ConfigModel):
+    """One explicit set of molecular profiles sharing a quench pressure."""
+
+    pressure_parameter: str = Field(
+        min_length=1,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*$",
+    )
+    species: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_species(self) -> "QuenchGroupConfig":
+        if any(not species.strip() for species in self.species):
+            raise ValueError("quench group species names must not be empty")
+        if len(set(self.species)) != len(self.species):
+            raise ValueError("quench group species must be unique")
+        return self
+
+
+class PressureQuenchConfig(ConfigModel):
+    """Pressure-quench decorator applied to the configured base chemistry."""
+
+    model: Literal["pressure_quench"] = "pressure_quench"
+    preset: Literal[
+        "custom",
+        "taylor_2026_hot_jupiter_element_grouped",
+    ] = "custom"
+    groups: tuple[QuenchGroupConfig, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_groups(self) -> "PressureQuenchConfig":
+        if self.preset == "custom" and not self.groups:
+            raise ValueError("custom pressure quenching requires at least one group")
+        if self.preset != "custom" and self.groups:
+            raise ValueError("pressure-quench presets do not accept custom groups")
+        groups = self.resolved_groups()
+        parameters = tuple(group.pressure_parameter for group in groups)
+        if len(set(parameters)) != len(parameters):
+            raise ValueError("quench pressure parameter names must be unique")
+        species = tuple(item for group in groups for item in group.species)
+        if len(set(species)) != len(species):
+            raise ValueError("a species may belong to only one quench group")
+        return self
+
+    def resolved_groups(self) -> tuple[QuenchGroupConfig, ...]:
+        """Return explicit groups for custom configuration or a named preset."""
+
+        if self.preset == "custom":
+            return self.groups
+        return (
+            QuenchGroupConfig(
+                pressure_parameter="log_Pq_C",
+                species=("H2O", "CO", "CO2", "CH4"),
+            ),
+            QuenchGroupConfig(
+                pressure_parameter="log_Pq_N",
+                species=("NH3",),
+            ),
+        )
+
+
 class FastChemConfig(ConfigModel):
     model: Literal["fastchem_equilibrium"]
     fastchem_path: Path
@@ -196,6 +324,7 @@ class FastChemConfig(ConfigModel):
     metallicity_parameter: str = "metallicity"
     carbon_to_oxygen_parameter: str = "CtoO"
     constant_log10_vmr_parameters: dict[str, str] | None = Field(default_factory=dict)
+    quenching: PressureQuenchConfig | None = None
 
     @model_validator(mode="after")
     def validate_constant_overrides(self) -> "FastChemConfig":
@@ -212,6 +341,31 @@ class FastChemConfig(ConfigModel):
             raise ValueError("constant log10 VMR parameter names must not be empty")
         if len(set(parameters)) != len(parameters):
             raise ValueError("constant log10 VMR parameter names must be unique")
+        if self.quenching is not None:
+            groups = self.quenching.resolved_groups()
+            quench_species = {
+                species for group in groups for species in group.species
+            }
+            missing = sorted(quench_species - labels)
+            if missing:
+                raise ValueError(
+                    "quench species missing from FastChem labels: "
+                    + ", ".join(missing)
+                )
+            base_parameters = {
+                self.metallicity_parameter,
+                self.carbon_to_oxygen_parameter,
+                *parameters,
+            }
+            quench_parameters = {
+                group.pressure_parameter for group in groups
+            }
+            collisions = sorted(base_parameters & quench_parameters)
+            if collisions:
+                raise ValueError(
+                    "quench parameters collide with FastChem parameters: "
+                    + ", ".join(collisions)
+                )
         return self
 
 
@@ -648,6 +802,7 @@ class TaskConfig(ConfigModel):
     paths: TaskPathsConfig | None = None
     run: RunConfig
     bodies: BodiesConfig
+    stellar_contamination: StellarContaminationConfig | None = None
     observations: ObservationsConfig
     atmosphere: AtmosphereConfig
     clouds: CloudsConfig = CloudFreeConfig()
@@ -683,12 +838,59 @@ class TaskConfig(ConfigModel):
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")
         required: set[str] = set()
+        parameter_configs = {item.name: item for item in self.parameters}
+        stellar_contamination = self.stellar_contamination
+        if stellar_contamination is not None:
+            if self.radiative_transfer.model != "transmission":
+                raise ValueError(
+                    "stellar_contamination is only supported for transmission"
+                )
+            photosphere_temperature = self.bodies.star.effective_temperature_k
+            for region in stellar_contamination.regions:
+                if region.kind == "spot" and region.temperature_k >= photosphere_temperature:
+                    raise ValueError(
+                        "stellar spot temperature must be cooler than the photosphere"
+                    )
+                if region.kind == "facula" and region.temperature_k <= photosphere_temperature:
+                    raise ValueError(
+                        "stellar facula temperature must be hotter than the photosphere"
+                    )
+                if region.covering_fraction_parameter is not None:
+                    required.add(region.covering_fraction_parameter)
         for region in regions:
             required.update(_required_chemistry_parameters(region.atmosphere.chemistry))
             required.update(
                 _required_temperature_parameters(region.atmosphere.temperature)
             )
             required.update(_required_cloud_parameters(region.clouds))
+            quenching = getattr(region.atmosphere.chemistry, "quenching", None)
+            if quenching is not None:
+                quench_parameters = tuple(
+                    group.pressure_parameter for group in quenching.resolved_groups()
+                )
+                required.update(quench_parameters)
+                lower_domain = log10(region.atmosphere.pressure.top_bar)
+                upper_domain = log10(region.atmosphere.pressure.bottom_bar)
+                for name in quench_parameters:
+                    parameter = parameter_configs.get(name)
+                    if parameter is None:
+                        continue
+                    if parameter.prior.type != "uniform":
+                        raise ValueError(
+                            "log10 quench-pressure parameters require uniform priors, "
+                            "not priors that transform an already logarithmic value: "
+                            + name
+                        )
+                    if (
+                        parameter.prior.lower < lower_domain
+                        or parameter.prior.upper > upper_domain
+                    ):
+                        raise ValueError(
+                            f"quench-pressure prior {name} must lie within the pressure "
+                            f"grid layer-center domain [{lower_domain}, {upper_domain}] "
+                            "log10(bar)"
+                        )
+
         disk_mode = _disk_emission_mode(self.disk_emission)
         if disk_mode == "diluted_one_region":
             required.add(self.disk_emission.dilution_parameter)
@@ -813,6 +1015,25 @@ class TaskConfig(ConfigModel):
                 "required model parameters are missing: "
                 + ", ".join(missing_parameters)
             )
+        if stellar_contamination is not None:
+            maximum_fraction = sum(
+                region.covering_fraction or 0.0
+                for region in stellar_contamination.regions
+            )
+            for region in stellar_contamination.regions:
+                parameter_name = region.covering_fraction_parameter
+                if parameter_name is None:
+                    continue
+                prior = parameter_configs[parameter_name].prior
+                if prior.type != "uniform" or prior.lower < 0.0 or prior.upper > 1.0:
+                    raise ValueError(
+                        "stellar covering-fraction parameters require uniform priors within [0, 1]"
+                    )
+                maximum_fraction += prior.upper
+            if maximum_fraction > 1.0:
+                raise ValueError(
+                    "stellar covering-fraction prior upper bounds and fixed fractions must sum to at most one"
+                )
         return self
 
 

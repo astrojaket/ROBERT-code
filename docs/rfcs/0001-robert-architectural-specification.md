@@ -212,8 +212,9 @@ Dependency rules:
 - Core scientific packages must not depend on CLI, examples, notebooks, or
   sampler implementations.
 - Cross-package cycles are forbidden.
-- Optional runtime systems such as MPI, JAX, CUDA, PyMultiNest, or UltraNest are
-  adapter dependencies, not core dependencies.
+- Optional runtime systems such as MPI, JAX, and CUDA are adapter dependencies,
+  not core dependencies. PyMultiNest is the supported nested-sampling adapter;
+  Optimal Estimation remains a separate retrieval route.
 
 The full package contract is specified in the
 [Software Architecture Document](../architecture/software_architecture_document.md).

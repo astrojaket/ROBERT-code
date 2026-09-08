@@ -20,9 +20,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 if __package__:
-    from . import retrieve_wasp69b_cloud_free_native_modes as retrieval
+    from . import _wasp_native_benchmark as retrieval
 else:
-    import retrieve_wasp69b_cloud_free_native_modes as retrieval
+    import _wasp_native_benchmark as retrieval
 
 
 OUTPUT = retrieval.OUTPUT

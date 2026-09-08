@@ -108,7 +108,7 @@ def test_wasp77ab_loader_accepts_the_new_config_loader_literal() -> None:
 
 def test_configured_task_loader_reads_wasp77ab_archive() -> None:
     base = load_task_config(
-        ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
+        ROOT / "configurations" / "emission.yaml"
     )
     raw = deepcopy(base.model_dump(mode="python"))
     raw["observations"]["loader"] = "august2023_wasp77ab"

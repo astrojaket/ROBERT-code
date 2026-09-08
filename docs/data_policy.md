@@ -29,6 +29,13 @@ must not be independently tuned.
 
 ## Storage policy
 
+GitHub contains the reusable working package, its public examples, documentation,
+and compact regression evidence. Target-specific studies, proposal simulations,
+batch sweeps, chains, and paper products stay outside the public distribution.
+Promote a validated method into `src/` with a small regression test and a reusable
+example; do not publish the study folder to expose that method.
+
+
 - Source code, tests, YAML configuration, Slurm scripts, Markdown, output-free
   tutorial notebooks, and lightweight required reference inputs belong in Git.
 - R=100 K-tables may be packaged only for the six documented starter species

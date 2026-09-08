@@ -64,8 +64,11 @@ cases.
 
 ## WASP-69b readiness and limits
 
-`examples/retrieve_wasp69b_mie_cloud.py` builds the 280-point NIRCam+MIRI
-problem and supports:
+The maintained public entry point is `run_retrieval.py` with the catalog
+configuration `configurations/cloudy_emission.yaml`.
+Create an isolated run directory as described in [Running retrievals](../retrievals.md),
+then use the generated `run_retrieval.py` for validation and inference. The
+catalog and direct optical-constant modes are:
 
 - `catalog`: fixed laboratory optical constants (default `MgSiO3`), 12 fitted
   parameters;

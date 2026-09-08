@@ -14,6 +14,8 @@ from robert_exoplanets.io.configured_tasks import (
     _configured_science_sha256,
     _load_cached_table,
     _preparation_fingerprint,
+
+    build_problem,
     load_observations as load_configured_observations,
     prepare_opacity,
 )
@@ -32,56 +34,42 @@ from robert_exoplanets.instruments import (
 from robert_exoplanets.core import RobertConfigError
 from robert_exoplanets.retrieval.samplers.multinest import MULTINEST_MAX_SEED
 
+from robert_exoplanets.opacity import CorrelatedKTable
+from robert_exoplanets.retrieval.manifest import build_run_manifest
+
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE = (
-    ROOT
-    / "configurations"
-    / "targets"
-    / "WASP-69b"
-    / "wasp69b_cloud_free_R1000.yaml"
-)
-TEMPLATE = ROOT / "configurations" / "examples" / "TEMPLATE_all_supported_options.yaml"
-TRANSMISSION = (
-    ROOT
-    / "configurations"
-    / "examples"
-    / "synthetic_transmission_injection_recovery_multinest.yaml"
+EXAMPLE = ROOT / "configurations" / "emission.yaml"
+TEMPLATE = ROOT / "configurations" / "quickstart.yaml"
+TRANSMISSION = ROOT / "configurations" / "transmission.yaml"
+HDF_TRANSMISSION = (
+    ROOT / "tests" / "fixtures" / "configurations" / "synthetic_transmission.yaml"
 )
 MULTISPECIES_TRANSMISSION = (
-    ROOT
-    / "configurations"
-    / "examples"
-    / "synthetic_six_molecule_transmission_injection_recovery_multinest.yaml"
+    ROOT / "tests" / "fixtures" / "configurations" / "six_gas_transmission.yaml"
 )
 CLOUDY_MULTISPECIES_TRANSMISSION = (
     ROOT
+    / "tests"
+    / "fixtures"
     / "configurations"
-    / "examples"
-    / "synthetic_six_molecule_cloudy_transmission_injection_recovery_multinest.yaml"
+    / "six_gas_cloudy_transmission.yaml"
 )
-TARGETS = ROOT / "configurations" / "targets"
-DEFAULTS = tuple(
-    sorted(
-        (
-            *TARGETS.glob("WASP-*/*.yaml"),
-            ROOT
-            / "configurations"
-            / "quickstart"
-            / "wasp80b_cloud_free_native_pg14_R100.yaml",
-        )
-    )
-)
+CONFIGURATIONS = ROOT / "configurations"
+DEFAULTS = tuple(sorted(CONFIGURATIONS.glob("*.yaml")))
 SHIPPED_CONFIGURATIONS = tuple(
     sorted(
         path
-        for path in (ROOT / "configurations").rglob("*.yaml")
+        for path in (
+            *CONFIGURATIONS.glob("*.yaml"),
+            *(ROOT / "tests" / "fixtures" / "configurations").glob("*.yaml"),
+        )
         if "outputs" not in path.parts and "opacity_cache" not in path.parts
     )
 )
 
 
-def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
+def test_emission_example_exposes_complete_native_mode_run() -> None:
     config = load_task_config(EXAMPLE)
 
     assert config.schema_version == 2
@@ -104,6 +92,15 @@ def test_wasp69b_example_exposes_complete_native_mode_run() -> None:
     assert config.bodies.star.metallicity_dex == 0.0
 
 
+@pytest.mark.parametrize("name", ["emission", "cloudy_emission", "optimal_estimation", "two_region_emission"])
+def test_published_emission_examples_exclude_derived_overlap_average(name) -> None:
+    config = load_task_config(CONFIGURATIONS / f"{name}.yaml")
+    observations = load_configured_observations(config)
+    assert tuple(dataset.name for dataset in observations.datasets) == (
+        "f322w2", "f444w", "lrs"
+    )
+
+
 def test_yaml_rejects_direct_self_extension_with_actionable_message(
     tmp_path: Path,
 ) -> None:
@@ -115,6 +112,267 @@ def test_yaml_rejects_direct_self_extension_with_actionable_message(
         match="configuration extends itself.*must not contain an extends entry",
     ):
         load_task_config(source)
+
+def test_yaml_configures_arbitrary_molecular_pressure_quenching() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "preset": "custom",
+        "groups": [
+            {
+                "pressure_parameter": "log_Pq_CO2",
+                "species": ["CO2"],
+            },
+            {
+                "pressure_parameter": "log_Pq_water_carbon",
+                "species": ["H2O", "CO"],
+            },
+        ],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_CO2",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "log_Pq_water_carbon",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -4.0, "upper": 1.0},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+
+    quenching = parsed.atmosphere.chemistry.quenching
+    assert quenching is not None
+    assert quenching.preset == "custom"
+    assert quenching.groups[0].species == ("CO2",)
+    assert quenching.groups[1].species == ("H2O", "CO")
+
+
+def test_yaml_configures_taylor_2026_grouped_quench_preset() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "preset": "taylor_2026_hot_jupiter_element_grouped",
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_C",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "log_Pq_N",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+    groups = parsed.atmosphere.chemistry.quenching.resolved_groups()
+
+    assert groups[0].pressure_parameter == "log_Pq_C"
+    assert groups[0].species == ("H2O", "CO", "CO2", "CH4")
+    assert groups[1].species == ("NH3",)
+    assert all("N2" not in group.species for group in groups)
+
+
+@pytest.mark.parametrize(
+    ("quenching", "message"),
+    [
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "log Pq", "species": ["CO2"]}
+                ],
+            },
+            "pressure_parameter",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "log_Pq_1", "species": ["CO2"]},
+                    {"pressure_parameter": "log_Pq_2", "species": ["CO2"]},
+                ],
+            },
+            "only one quench group",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "log_Pq_X", "species": ["C2H2"]}
+                ],
+            },
+            "missing from FastChem labels",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {"pressure_parameter": "metallicity", "species": ["CO2"]}
+                ],
+            },
+            "collide with FastChem parameters",
+        ),
+        (
+            {
+                "model": "pressure_quench",
+                "groups": [
+                    {
+                        "pressure_parameter": "log_Pq_CO2",
+                        "species": ["CO2"],
+                        "interpolation": "nearest",
+                    }
+                ],
+            },
+            "Extra inputs are not permitted",
+        ),
+    ],
+)
+def test_yaml_rejects_malformed_pressure_quenching(quenching, message) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = quenching
+
+    with pytest.raises(ValidationError, match=message):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_requires_every_quench_pressure_prior() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+        ],
+    }
+
+    with pytest.raises(ValidationError, match="log_Pq_CO2"):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_rejects_quenching_for_constant_with_altitude_free_chemistry() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_H2O", "species": ["H2O"]}
+        ],
+    }
+
+    with pytest.raises(ValidationError, match="quenching"):
+        TaskConfig.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("prior", "message"),
+    [
+        (
+            {"type": "log_uniform", "lower": 0.01, "upper": 1.0},
+            "already logarithmic",
+        ),
+        (
+            {"type": "uniform", "lower": -7.0, "upper": 1.0},
+            "pressure grid layer-center domain",
+        ),
+    ],
+)
+def test_yaml_validates_quench_prior_semantics_and_grid_domain(prior, message) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+        ],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {"name": "log_Pq_CO2", "prior": prior},
+    ]
+
+    with pytest.raises(ValidationError, match=message):
+        TaskConfig.model_validate(raw)
+
+
+def test_configured_fastchem_is_wrapped_by_pressure_quench_decorator(
+    monkeypatch,
+) -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["bodies"]["star"]["spectrum_model"] = "blackbody"
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+        ],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_CO2",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+    ]
+    parsed = TaskConfig.model_validate(raw)
+    observation = Observation.from_arrays(
+        wavelength=[3.0, 4.0],
+        wavelength_bin_edges=[2.5, 3.5, 4.5],
+        flux=[1.0e-3, 1.0e-3],
+        uncertainty=[1.0e-5, 1.0e-5],
+        flux_unit="eclipse_depth",
+        observable="eclipse_depth",
+    )
+    observations = ObservationCollection(
+        datasets=(ObservationDataset(name="nircam", observation=observation),)
+    )
+
+    def fake_table(_config, _dataset_name, species):
+        return CorrelatedKTable(
+            species=species,
+            pressure_bar=np.array([1.0e-6, 100.0]),
+            temperature_K=np.array([500.0, 2500.0]),
+            wavenumber_cm_inverse=10000.0 / observation.spectral_grid.values,
+            g_samples=np.array([0.5]),
+            g_weights=np.array([1.0]),
+            kcoeff=np.full((2, 2, 2, 1), 1.0e-24),
+            metadata={"checksum_sha256": f"configured-{species}"},
+        )
+
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks._load_cached_table",
+        fake_table,
+    )
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks.load_nemesispy_cia_table",
+        lambda: None,
+    )
+
+    problem = build_problem(parsed, observations)
+    manifest = build_run_manifest(
+        problem,
+        method="unit-test",
+        settings={},
+        random_seed=7,
+    )
+
+    assert "log_Pq_CO2" in problem.parameter_names
+    assert problem.metadata["chemistry_quench_scheme"] == "pressure_quench"
+    assert problem.metadata["chemistry_quench_groups"] == "log_Pq_CO2:CO2"
+    assert problem.metadata["chemistry_quench_pressure_semantics"] == "log10(P_q/bar)"
+    assert manifest.problem_metadata["chemistry_quench_scheme"] == "pressure_quench"
+    assert manifest.problem_metadata["chemistry_quench_closure_policy"] == (
+        "no_renormalization"
+    )
 
 
 def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
@@ -272,7 +530,7 @@ def test_resume_science_identity_excludes_budget_but_includes_fixed_physics() ->
 
 
 def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
-    config = load_task_config(TRANSMISSION)
+    config = load_task_config(HDF_TRANSMISSION)
 
     assert config.observations.loader == "robert_npz"
     assert config.opacity.format == "exomol_cross_section_hdf"
@@ -284,6 +542,225 @@ def test_yaml_configures_transmission_and_real_exomol_h2o() -> None:
     assert config.sampler.engine == "multinest"
     assert config.sampler.live_points == 40
     assert config.runtime.mpi_processes == 2
+
+
+
+def test_yaml_configures_poseidon_rackham_stellar_contamination() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {
+        "model": "poseidon_rackham",
+        "regions": [
+            {
+                "name": "cool_spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            },
+            {
+                "name": "hot_facula",
+                "kind": "facula",
+                "temperature_k": 5700.0,
+                "covering_fraction": 0.1,
+            },
+        ],
+        "transit_chord_temperature_k": 5250.0,
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.5},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+    round_trip = TaskConfig.model_validate(parsed.model_dump(mode="python"))
+
+    assert parsed.stellar_contamination is not None
+    assert parsed.stellar_contamination.regions[0].kind == "spot"
+    assert parsed.stellar_contamination.regions[1].covering_fraction == 0.1
+    assert parsed.stellar_contamination.transit_chord_temperature_k == 5250.0
+    assert round_trip == parsed
+
+
+def test_stellar_contamination_requires_valid_temperature_and_fraction_priors() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {
+        "regions": [
+            {
+                "name": "cool_spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            }
+        ]
+    }
+    with pytest.raises(ValidationError, match="f_spot"):
+        TaskConfig.model_validate(raw)
+
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": -0.1, "upper": 0.5},
+        },
+    ]
+    with pytest.raises(ValidationError, match=r"within \[0, 1\]"):
+        TaskConfig.model_validate(raw)
+
+    raw["parameters"][-1]["prior"] = {
+        "type": "uniform",
+        "lower": 0.0,
+        "upper": 0.5,
+    }
+    raw["stellar_contamination"]["regions"][0]["temperature_k"] = 6000.0
+    with pytest.raises(ValidationError, match="cooler than the photosphere"):
+        TaskConfig.model_validate(raw)
+
+
+def test_stellar_contamination_mixture_prior_must_close() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {
+        "regions": [
+            {
+                "name": "spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            },
+            {
+                "name": "facula",
+                "kind": "facula",
+                "temperature_k": 5700.0,
+                "covering_fraction_parameter": "f_fac",
+            },
+        ]
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.7},
+        },
+        {
+            "name": "f_fac",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.4},
+        },
+    ]
+
+    with pytest.raises(ValidationError, match="sum to at most one"):
+        TaskConfig.model_validate(raw)
+
+
+def test_stellar_contamination_is_rejected_for_emission() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["stellar_contamination"] = {"regions": []}
+
+    with pytest.raises(ValidationError, match="only supported for transmission"):
+        TaskConfig.model_validate(raw)
+
+
+def test_configured_multi_dataset_tsle_parameter_changes_each_spectrum(
+    monkeypatch,
+) -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["bodies"]["star"]["spectrum_model"] = "blackbody"
+    raw["stellar_contamination"] = {
+        "regions": [
+            {
+                "name": "spot",
+                "kind": "spot",
+                "temperature_k": 4800.0,
+                "covering_fraction_parameter": "f_spot",
+            }
+        ]
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "f_spot",
+            "prior": {"type": "uniform", "lower": 0.0, "upper": 0.3},
+        },
+    ]
+    parsed = TaskConfig.model_validate(raw)
+    observations = ObservationCollection(
+        datasets=(
+            ObservationDataset(
+                name="blue",
+                observation=Observation.from_arrays(
+                    [1.0, 1.5],
+                    [0.01, 0.01],
+                    [1.0e-4, 1.0e-4],
+                    wavelength_bin_edges=[0.9, 1.2, 1.8],
+                    flux_unit="transit_depth",
+                    observable="transit_depth",
+                ),
+            ),
+            ObservationDataset(
+                name="red",
+                observation=Observation.from_arrays(
+                    [3.0, 4.0],
+                    [0.01, 0.01],
+                    [1.0e-4, 1.0e-4],
+                    wavelength_bin_edges=[2.5, 3.5, 4.5],
+                    flux_unit="transit_depth",
+                    observable="transit_depth",
+                ),
+            ),
+        )
+    )
+
+    def fake_table(_config, dataset, species):
+        dataset_name = dataset.name
+        wavelength = (
+            np.array([1.0, 1.5])
+            if dataset_name == "blue"
+            else np.array([3.0, 4.0])
+        )
+        return CorrelatedKTable(
+            species=species,
+            pressure_bar=np.array([1.0e-6, 100.0]),
+            temperature_K=np.array([500.0, 2000.0]),
+            wavenumber_cm_inverse=10000.0 / wavelength,
+            g_samples=np.array([0.5]),
+            g_weights=np.array([1.0]),
+            kcoeff=np.full((2, 2, 2, 1), 1.0e-24),
+            metadata={"checksum_sha256": f"{dataset_name}-{species}"},
+        )
+
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks._load_cached_table",
+        fake_table,
+    )
+    monkeypatch.setattr(
+        "robert_exoplanets.io.configured_tasks.load_nemesispy_cia_table",
+        lambda: None,
+    )
+    problem = build_problem(parsed, observations)
+    baseline = problem.parameters.vector_to_mapping(problem.parameters.midpoint_vector())
+    baseline["f_spot"] = 0.0
+    spotted = {**baseline, "f_spot": 0.2}
+
+    homogeneous_spectra = problem.model_spectra(baseline)
+    spotted_spectra = problem.model_spectra(spotted)
+
+    assert set(spotted_spectra) == {"blue", "red"}
+    assert all(
+        np.all(spotted_spectra[name].values > homogeneous_spectra[name].values)
+        for name in spotted_spectra
+    )
+    assert problem.metadata["stellar_contamination"] == "enabled"
+    assert problem.metadata["stellar_contamination_required_parameters"] == "f_spot"
+    assert problem.opacity_identifiers == {
+        "blue:H2O": "blue-H2O",
+        "red:H2O": "red-H2O",
+    }
+
 
 
 def test_yaml_configures_six_molecule_transmission_recovery() -> None:
@@ -350,7 +827,7 @@ def test_deck_haze_yaml_is_shared_by_transmission_and_emission(source: Path) -> 
 
 
 def test_transmission_radius_parameter_must_be_in_retrieval_parameters() -> None:
-    config = load_task_config(TRANSMISSION)
+    config = load_task_config(HDF_TRANSMISSION)
     raw = deepcopy(config.model_dump(mode="python"))
     raw["parameters"] = [
         item for item in raw["parameters"] if item["name"] != "radius_scale"
@@ -469,7 +946,7 @@ def _cross_section_cache_fixture(
     tmp_path: Path,
 ) -> tuple[TaskConfig, ObservationCollection, Path]:
     h5py = pytest.importorskip("h5py")
-    config = load_task_config(TRANSMISSION)
+    config = load_task_config(HDF_TRANSMISSION)
     source = tmp_path / "source"
     source.mkdir()
     with h5py.File(source / "H2O.h5", "w") as handle:
@@ -660,12 +1137,11 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
     assert parsed.atmosphere.temperature.profile_path == Path("inputs/pt.csv")
 
 
-def test_all_shipped_wasp_defaults_resolve_and_validate() -> None:
-    assert DEFAULTS
+def test_all_public_configurations_resolve_and_validate() -> None:
+    assert len(DEFAULTS) == 7
     resolutions = []
     for path in DEFAULTS:
         config = load_task_config(path)
-        assert config.run.name.startswith(("wasp69b-", "wasp80b-"))
         resolutions.append(config.opacity.resolution)
     assert set(resolutions) == {"R100", "R1000"}
 
@@ -679,9 +1155,7 @@ def test_all_shipped_multinest_seeds_fit_legacy_fortran_range() -> None:
 
 
 def test_mie_catalog_configuration_is_valid_for_transmission() -> None:
-    config = load_task_config(
-        TARGETS / "WASP-69b" / "wasp69b_mie_catalog_pg14_R1000.yaml"
-    )
+    config = load_task_config(ROOT / "configurations" / "cloudy_emission.yaml")
     raw = deepcopy(config.model_dump(mode="python"))
     raw["radiative_transfer"]["model"] = "transmission"
 
@@ -691,66 +1165,78 @@ def test_mie_catalog_configuration_is_valid_for_transmission() -> None:
     assert parsed.clouds.model == "mie_catalog"
 
 
-@pytest.mark.parametrize(
-    ("suffix", "engine"),
-    [
-        ("optimal_estimation", "optimal_estimation"),
-        ("optimal_estimation_to_multinest", "optimal_estimation_to_multinest"),
-    ],
-)
-@pytest.mark.parametrize("scenario", ["cloud_free_native_pg14", "mie_catalog_pg14"])
-def test_wasp69b_inference_benchmarks_only_change_run_controls(
-    scenario: str, suffix: str, engine: str
-) -> None:
-    baseline = load_task_config(
-        TARGETS / "WASP-69b" / f"wasp69b_{scenario}_R1000.yaml"
-    )
-    benchmark = load_task_config(
-        TARGETS / "WASP-69b" / f"wasp69b_{scenario}_R1000_{suffix}.yaml"
-    )
+def test_optimal_estimation_keeps_emission_science_configuration() -> None:
+    baseline = load_task_config(ROOT / "configurations" / "emission.yaml")
+    benchmark = load_task_config(ROOT / "configurations" / "optimal_estimation.yaml")
 
     assert baseline.sampler.engine == "multinest"
-    assert benchmark.sampler.engine == engine
-    assert baseline.sampler.live_points == 400
-    if engine != "optimal_estimation":
-        assert benchmark.sampler.live_points == 400
-    assert baseline.plotting.enabled is True
-    assert benchmark.plotting.enabled is True
+    assert benchmark.sampler.engine == "optimal_estimation"
+    assert benchmark.sampler.oe_max_iterations == 8
     for section in (
         "bodies",
         "observations",
         "atmosphere",
         "clouds",
-        "opacity",
+        "disk_emission",
         "radiative_transfer",
         "likelihood",
         "parameters",
     ):
         assert getattr(benchmark, section) == getattr(baseline, section)
+    assert benchmark.opacity.format == baseline.opacity.format
+    assert benchmark.opacity.resolution == baseline.opacity.resolution
+    assert benchmark.opacity.species == baseline.opacity.species
+    assert benchmark.opacity.binning == baseline.opacity.binning
 
 
-def test_direct_nk_default_replaces_catalogue_cloud_fields() -> None:
-    config = load_task_config(
-        TARGETS / "WASP-69b" / "wasp69b_mie_direct_nk_pg14_R1000.yaml"
-    )
-
-    assert config.clouds.model == "mie_direct_nk"
-    assert len(config.clouds.real_index_parameter_names) == 6
-
-
-def test_complete_template_uses_one_top_level_path_block() -> None:
+def test_public_quickstart_uses_one_top_level_path_block() -> None:
     config = load_task_config(TEMPLATE)
 
     assert config.clouds.model == "none"
     assert config.paths is not None
     assert config.observations.path == config.paths.observations_directory
-    assert config.atmosphere.chemistry.fastchem_path == config.paths.fastchem_directory
-    assert config.opacity.path == config.paths.k_table_directory
-    assert config.opacity.cache_directory == ROOT / "configurations" / "examples" / "opacity_cache"
-    assert config.outputs.directory == ROOT / "configurations" / "examples" / "outputs"
-    assert config.runtime.scratch_directory == ROOT / "configurations" / "examples" / "scratch"
+    assert config.atmosphere.chemistry.model == "free"
+    assert config.paths.fastchem_directory is None
+    assert config.paths.k_table_directory is None
+    assert config.opacity.path.is_dir()
+    assert config.opacity.cache_directory.resolve() == ROOT / "examples" / "outputs" / "r100_validation" / "emission" / "opacity_cache"
+    assert config.outputs.directory.resolve() == ROOT / "examples" / "outputs" / "r100_validation" / "emission"
+    assert config.runtime.scratch_directory.resolve() == ROOT / "examples" / "outputs" / "r100_validation" / "emission" / "scratch"
     assert config.plotting.enabled is True
-    assert config.plotting.dataset_colors["f322w2"] == "mediumpurple"
+    assert config.plotting.dataset_colors["synthetic_emission"] == "mediumpurple"
+
+
+def test_public_configurations_have_distinct_writable_output_roots() -> None:
+    output_roots = {
+        load_task_config(path).outputs.directory.resolve() for path in DEFAULTS
+    }
+
+    assert len(output_roots) == len(DEFAULTS)
+
+
+def test_public_rocky_clr_configuration_keeps_l9859b_data_matched_to_planet() -> None:
+    config = load_task_config(ROOT / "configurations" / "rocky_transmission_clr.yaml")
+
+    assert config.bodies.planet.name == "L 98-59 b"
+    assert config.observations.loader == "bello_arufe2025_l9859b"
+    assert config.observations.path.resolve() == (
+        ROOT / "data" / "observations" / "l98_59b_bello_arufe2025"
+    )
+    assert config.opacity.resolution == "R1000"
+    assert config.sampler.engine == "multinest"
+    assert all(
+        parameter.prior.type == "centered_log_ratio"
+        for parameter in config.parameters[:3]
+    )
+
+
+def test_public_transmission_configuration_is_a_bundled_r100_free_chemistry_check() -> None:
+    config = load_task_config(ROOT / "configurations" / "transmission.yaml")
+
+    assert config.opacity.resolution == "R100"
+    assert config.opacity.format == "exomol_kta"
+    assert config.atmosphere.chemistry.model == "free"
+    assert config.radiative_transfer.model == "transmission"
 
 
 def test_legacy_housekeeping_path_block_is_rejected() -> None:

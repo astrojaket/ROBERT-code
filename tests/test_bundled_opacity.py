@@ -22,7 +22,7 @@ from robert_exoplanets.opacity import CorrelatedKOpacityProvider, read_kta_heade
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE = ROOT / "configurations" / "targets/WASP-69b/wasp69b_cloud_free_R1000.yaml"
+EXAMPLE = ROOT / "configurations" / "emission.yaml"
 
 
 def test_bundled_r100_manifest_matches_every_distributed_table() -> None:

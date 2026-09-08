@@ -34,7 +34,7 @@ import scipy
 from robert_exoplanets import ParameterizedEmissionForwardModel
 from robert_exoplanets.core import Spectrum
 
-from retrieve_wasp69b_mie_cloud import SPECIES, build_problem
+from _wasp_cloud_benchmark import SPECIES, build_problem
 
 
 PARAMETERS = {

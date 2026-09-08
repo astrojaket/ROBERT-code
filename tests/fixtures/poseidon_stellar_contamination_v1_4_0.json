@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "benchmark": "poseidon_stellar_contamination_transform",
+  "validation_scope": "Rackham/POSEIDON multiplicative transform only; analytic Planck inputs isolate the transform and do not validate stellar atmosphere grids",
+  "poseidon": {
+    "repository": "https://github.com/MartianColonist/POSEIDON",
+    "version": "1.4.0",
+    "commit": "d1632214c9f3087e367a8d752454f3668fc30e18",
+    "source_file": "POSEIDON/stellar.py",
+    "source_sha256": "b9bb31d04b4b1bc04b7d9ab62d86aa932a78f139d208440abe8e5740c67252e3",
+    "execution": "AST-extracted unmodified official function bodies with decorators removed"
+  },
+  "input": {
+    "wavelength_range_micron": [0.6, 12.0],
+    "wavelength_points": 257,
+    "sampling": "geometric",
+    "photosphere_temperature_k": 5200.0,
+    "stellar_input": "independent analytic Planck radiance",
+    "planet_depth": "nonconstant deterministic analytic spectrum"
+  },
+  "tolerances": {
+    "max_abs_factor_residual": 2e-15,
+    "max_abs_depth_residual": 2e-17,
+    "rms_depth_residual": 5e-18,
+    "basis": "float64 operation-order parity with no grid interpolation"
+  },
+  "metrics": {
+    "max_abs_factor_residual": 0.0,
+    "max_abs_depth_residual": 0.0,
+    "rms_depth_residual": 0.0
+  },
+  "passed": true,
+  "cases": [
+    {
+      "name": "homogeneous",
+      "fractions": [],
+      "temperatures_k": [],
+      "sample_wavelength_micron": [0.6, 1.268845516128677, 2.6832815729997477, 5.674449654019056, 12.0],
+      "poseidon_contamination_factor": [1.0, 1.0, 1.0, 1.0, 1.0],
+      "poseidon_observed_depth": [0.008000000000055841, 0.008107578072958185, 0.008000402211832009, 0.008029993979758551, 0.007999195648918465],
+      "max_abs_factor_residual": 0.0,
+      "max_abs_depth_residual": 0.0,
+      "rms_depth_residual": 0.0
+    },
+    {
+      "name": "cool_spot",
+      "fractions": [0.18],
+      "temperatures_k": [4200.0],
+      "sample_wavelength_micron": [0.6, 1.268845516128677, 2.6832815729997477, 5.674449654019056, 12.0],
+      "poseidon_contamination_factor": [1.1368290296069141, 1.0847794162423932, 1.0574693689562586, 1.0455144876935887, 1.0402779872797494],
+      "poseidon_observed_depth": [0.009094632236918794, 0.008794933809123207, 0.00846018027834225, 0.008395475041929864, 0.00832138714951383],
+      "max_abs_factor_residual": 0.0,
+      "max_abs_depth_residual": 0.0,
+      "rms_depth_residual": 0.0
+    },
+    {
+      "name": "hot_facula",
+      "fractions": [0.12],
+      "temperatures_k": [6000.0],
+      "sample_wavelength_micron": [0.6, 1.268845516128677, 2.6832815729997477, 5.674449654019056, 12.0],
+      "poseidon_contamination_factor": [0.9059313105728194, 0.9544731203476178, 0.9709359605919143, 0.977146179744864, 0.9797353204520286],
+      "poseidon_observed_depth": [0.007247450484633143, 0.007738465341758325, 0.007767878206666788, 0.007846477940695325, 0.007837094512451605],
+      "max_abs_factor_residual": 0.0,
+      "max_abs_depth_residual": 0.0,
+      "rms_depth_residual": 0.0
+    },
+    {
+      "name": "spot_and_facula",
+      "fractions": [0.18, 0.12],
+      "temperatures_k": [4200.0, 6000.0],
+      "sample_wavelength_micron": [0.6, 1.268845516128677, 2.6832815729997477, 5.674449654019056, 12.0],
+      "poseidon_contamination_factor": [1.0168014285096434, 1.031411810536251, 1.0250229499068195, 1.0205589226184446, 1.0183658761169752],
+      "poseidon_observed_depth": [0.008134411428133927, 0.008362251779293811, 0.008200595875613089, 0.008195082004614983, 0.008146107885241947],
+      "max_abs_factor_residual": 0.0,
+      "max_abs_depth_residual": 0.0,
+      "rms_depth_residual": 0.0
+    }
+  ]
+}

@@ -35,7 +35,6 @@ for _thread_variable in (
     os.environ[_thread_variable] = "3"
 os.environ.setdefault("OMPI_MCA_btl", "self")
 
-import h5py  # noqa: E402
 import numpy as np  # noqa: E402
 try:  # noqa: E402
     import petitRADTRANS
@@ -216,6 +215,8 @@ def _table_preflight(
 ) -> dict[str, object]:
     if not path.is_file():
         raise FileNotFoundError(f"missing pRT line-by-line table: {path}")
+    import h5py
+
     with h5py.File(path, "r") as handle:
         required = ("bin_edges", "xsecarr", "p", "t", "mol_mass")
         missing = [name for name in required if name not in handle]

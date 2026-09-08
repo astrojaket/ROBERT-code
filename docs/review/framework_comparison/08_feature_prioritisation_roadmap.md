@@ -1,8 +1,13 @@
 # Feature Prioritisation Roadmap
 
-## Must-Have
+The current retrieval baseline uses PyMultiNest for nested sampling and keeps
+Optimal Estimation as a separate route for supported independent Gaussian
+problems. The rows below describe remaining extensions beyond that baseline.
 
-These are required before ROBERT should be used for real JWST emission retrievals.
+## Current baseline
+
+These capabilities form the current supported release boundary. Scientific
+evidence remains case-specific and is recorded in the validation summary.
 
 | Feature | Why it is required | Evidence from ecosystem |
 | --- | --- | --- |
@@ -17,24 +22,24 @@ These are required before ROBERT should be used for real JWST emission retrieval
 | Simple cloud model | JWST spectra often require cloud/haze flexibility | All modern frameworks include clouds. |
 | Instrument response/binning | Retrieval must compare model to real JWST data | pRT, POSEIDON, PICASO, Exo_Skryer. |
 | Gaussian likelihood with jitter/offsets | Multi-instrument JWST needs nuisance parameters | POSEIDON, pRT, Brewster, Exo_Skryer. |
-| dynesty sampler adapter | Accessible nested-sampling baseline | Common Python retrieval choice. |
+| PyMultiNest nested-sampling adapter | Tested nested-sampling baseline | MPI and MultiNest dependency isolation. |
+| Optimal estimation route | Independent Gaussian retrieval method | Explicit observation and Jacobian contract. |
 | Reproducible output manifest | Scientific traceability | Lessons from all mature workflows. |
 | End-to-end smoke example | Prevents architecture from becoming theoretical | NEMESIS, CHIMERA, Brewster examples are valuable. |
 
-## Nice-to-Have
+## Remaining extensions
 
-These should follow once the must-have path is tested.
+These require a stated observing need and a separate validation case.
 
 | Feature | Benefit | Dependency |
 | --- | --- | --- |
-| UltraNest adapter | Independent nested-sampling backend | Stable likelihood API. |
-| PyMultiNest adapter | Cluster and legacy comparison support | Optional dependency isolation. |
+| Additional nested-sampler adapters | Independent comparisons after the PyMultiNest baseline is stable | A separate scientific need and validation case. |
 | Covariance likelihood | Handles correlated data products | Observation/covariance schema. |
-| Equilibrium chemistry backend | Common comparative retrieval mode | Chemistry interface and validation data. |
+| Chemistry extensions | Broader disequilibrium or photochemistry beyond the current equilibrium and analytic pressure-quench paths | Chemistry interface and independent validation data. |
 | Opacity-sampling / line-by-line mode | High-resolution and validation use cases | Opacity provider abstraction. |
-| Stellar contamination model | Important for transmission and some emission analyses | Star model and instrument response. |
+| Stellar-contamination extensions | Surface maps, limb darkening, and active-region evolution beyond the current TSLE route | Stellar model, response contract, and independent validation data. |
 | Patchy/cloud-column mixing | Cloud inhomogeneity without full 3D | Column abstraction. |
-| Transmission RT | Broadens science scope | Atmosphere and opacity interfaces stable. |
+| Cloudy transmission extensions | Scattering return and refraction beyond the current absorption-dominated route | Atmosphere, opacity, and geometry interfaces stable. |
 | ArviZ output | Standard posterior analysis | Sampler-independent result schema. |
 | Documentation notebooks | User onboarding | Stable API and small fixtures. |
 
@@ -58,10 +63,10 @@ These are valuable but likely to introduce significant complexity.
 
 1. Foundation: grids, state objects, config, manifests, observations.
 2. Forward model: opacity provider, CIA/Rayleigh, emission RT, diagnostics.
-3. Retrieval: likelihood, priors, dynesty adapter, result schema.
+3. Retrieval: likelihood, priors, PyMultiNest adapter, optimal-estimation route, result schema.
 4. Scientific examples: clear, cloudy, multi-instrument JWST emission.
-5. Extension: covariance, equilibrium chemistry, line-by-line/OS, second sampler.
-6. New modes: transmission, patchy columns, stellar contamination.
+5. Extension: covariance, chemistry extensions, line-by-line/OS; defer additional samplers.
+6. New modes: transmission extensions, patchy columns, and TSLE extensions.
 
 ## Non-Goals for the First Real Release
 
