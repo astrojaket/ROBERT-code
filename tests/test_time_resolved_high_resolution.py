@@ -153,15 +153,34 @@ def test_velocity_formula_and_positive_redshift_sign() -> None:
 
 def test_ccf_diagnostics_and_scale_parameter_alias() -> None:
     flux = np.asarray([[[1.0, 2.0, 4.0, 8.0], [2.0, 3.0, 5.0, 9.0]]])
-    observation = _observation(flux)
-    wavelength = observation.order_wavelengths[0]
-    template = _template(wavelength, np.linspace(0.1, 0.4, wavelength.size))
+    # Distinct frame velocities preserve model structure after PCA filtering.
+    observation = _observation(flux, fixed_velocity=np.asarray([0.0, 1000.0]))
+    template_wavelength = np.linspace(0.9, 1.1, 1001)
+    template_ratio = 0.1 + 0.3 * np.exp(
+        -0.5 * ((template_wavelength - 1.015) / 0.005) ** 2
+    )
+    template = _template(template_wavelength, template_ratio)
     prepared = TimeResolvedHighResolutionLikelihood(n_components=1).prepare(observation)
+    model = prepared.evaluate_model(template, {"a": 0.0})
+    assert np.all(np.ptp(model.centered_model, axis=-1) > 0.0)
     ccf = prepared.ccf(template, {"a": 0.0})
     assert ccf.shape == (1, 2)
     assert np.all(np.isfinite(ccf))
     mapped = prepared.ccf_map(template, [-10.0, 10.0], [-2.0, 2.0])
     assert mapped.shape == (2, 2)
+
+
+def test_ccf_is_nan_for_an_exact_zero_variance_model() -> None:
+    flux = np.asarray([[[1.0, 2.0, 4.0, 8.0], [2.0, 3.0, 5.0, 9.0]]])
+    observation = _observation(flux)
+    wavelength = observation.order_wavelengths[0]
+    template = _template(wavelength, np.zeros(wavelength.size))
+    prepared = TimeResolvedHighResolutionLikelihood(n_components=0).prepare(observation)
+
+    ccf = prepared.ccf(template, {"a": 0.0})
+
+    assert ccf.shape == (1, 2)
+    assert np.all(np.isnan(ccf))
 
 
 def test_global_clip_zero_fills_data_but_retains_model_pixel_count() -> None:

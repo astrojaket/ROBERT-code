@@ -31,7 +31,8 @@ The Python distribution is named `robert-exoplanets`.
 
 ## Installation
 
-The complete reproducible installation uses Conda and Python 3.12:
+Install Conda, then run these commands from a ROBERT checkout. Conda supplies
+Python 3.12 and the required libraries:
 
 ```bash
 git clone git@github.com:astrojaket/ROBERT-code.git
@@ -43,6 +44,33 @@ conda activate robert-exoplanets
 This environment includes the compiled MPICH, MultiNest, and PyMultiNest
 libraries as well as FastChem, opacity, plotting, notebook, and test
 dependencies.
+
+### First forward model and retrieval
+
+The bundled quickstart needs no external observations, opacity downloads, or
+stellar files. Generate its synthetic data, run the forward model, then run
+and plot a small PyMultiNest retrieval:
+
+```bash
+conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
+  --config configurations/quickstart.yaml --generate
+conda run -n robert-exoplanets python run_forward.py \
+  --config configurations/quickstart.yaml
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configurations/quickstart.yaml
+conda run -n robert-exoplanets python postprocess_retrieval.py \
+  --config configurations/quickstart.yaml
+conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
+  --config configurations/quickstart.yaml --evaluate
+```
+
+Results go to `examples/outputs/r100_validation/emission/`. The last command
+checks recovery of the known injected abundance. Repeat these commands with
+`configurations/transmission.yaml` for a transit retrieval. See the
+[bundled tutorial](docs/tutorials/01_bundled_forward_and_retrieval.md) for each
+step and the saved plots.
+
+### Other installation and input choices
 
 For a smaller editable installation into an existing Python 3.10–3.14
 environment:
