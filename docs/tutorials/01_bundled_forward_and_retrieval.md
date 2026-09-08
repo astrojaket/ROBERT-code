@@ -5,107 +5,146 @@ the clear and cloudy hot-Jupiter emission configurations. Use the same YAML for
 a forward model and for a retrieval: `parameters.value` is used by a forward
 run, while the prior is used by a retrieval.
 
-Run commands from the ROBERT repository root. The commands below select the
-supported environment for every Python call:
+Keep the source checkout for code and shared inputs. Create every simulation in
+an external run directory. The run directory contains its own
+`configuration.yaml`, `outputs/`, `opacity_cache/`, and `scratch/` directories;
+published observations, bundled opacity tables, FastChem inputs, and the
+editable package remain shared inputs and are read-only during a run.
+
+Run source commands from the ROBERT repository root. The commands below select
+the supported environment for every Python call:
 
 ```bash
 conda run -n robert-exoplanets python --version
 export JAX_PLATFORMS=cpu
 ```
 
-## 1. Validate the two small cases
+## 1. Create and run an external R=100 validation case
 
 The maintained [emission validation YAML](../../configurations/quickstart.yaml)
 uses the bundled H2O R=100 table, a spline temperature profile, and a
-synthetic emission observation. The maintained [transmission validation YAML](../../configurations/transmission.yaml)
-uses the same table, an isothermal profile, and a synthetic transmission
-observation. Both cases use a blackbody star and a Gaussian likelihood.
-
-Validate both files before preparing any data:
+synthetic emission observation. Create the run from the checkout, then work
+only in the copied run directory:
 
 ```bash
-conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart.yaml \
-  --validate-only
+cd /path/to/ROBERT-code
+export ROBERT_CODE=$PWD
 
-conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/transmission.yaml \
-  --validate-only
+conda run -n robert-exoplanets python scripts/create_run_directory.py \
+  --project-dir "$HOME/ROBERT-runs" \
+  --config configurations/quickstart.yaml
+cd "$HOME/ROBERT-runs/quickstart-emission-r100"
 ```
 
-Generate the synthetic observation and the first opacity cache with the
-maintained injection script. The script uses the fixed values in each YAML and
-writes ignored files below `examples/outputs/r100_validation/`:
+`create_run_directory.py` creates small forward, retrieval, and post-processing
+runner wrappers and writes a resolved `configuration.yaml`. The wrappers
+dispatch to the current checkout, so source-code fixes flow into an existing
+run. Edit only `configuration.yaml` for run-specific choices. Keep
+`source_configuration.yaml`, the runner wrappers, and shared input paths
+unchanged. The run's `outputs/`, `opacity_cache/`, and
+`scratch/` directories hold all generated observations, checkpoints, caches,
+and runtime files.
+
+Validate and initialize the generated configuration, then generate the synthetic
+observation with the source-controlled validation script:
 
 ```bash
-conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
-  --config configurations/quickstart.yaml --generate
-conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
-  --config configurations/transmission.yaml --generate
+conda run -n robert-exoplanets python run_forward.py \
+  --config configuration.yaml --validate-only
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --validate-only
+conda run -n robert-exoplanets python run_forward.py \
+  --config configuration.yaml --initialize
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --initialize
+
+conda run -n robert-exoplanets python \
+  "$ROBERT_CODE/examples/r100_injection_recovery.py" \
+  --config configuration.yaml --generate
 ```
 
-After generation, run one case through the complete forward workflow:
+Run the forward model and its diagnostics from the external run:
 
 ```bash
-CONFIG=configurations/quickstart.yaml
-
 conda run -n robert-exoplanets python run_forward.py \
-  --config "$CONFIG" --initialize
+  --config configuration.yaml --prepare-opacity
 conda run -n robert-exoplanets python run_forward.py \
-  --config "$CONFIG" --prepare-opacity
-conda run -n robert-exoplanets python run_forward.py \
-  --config "$CONFIG"
+  --config configuration.yaml
 conda run -n robert-exoplanets python postprocess_forward.py \
-  --config "$CONFIG"
+  --config configuration.yaml
 ```
 
-The forward run writes `forward_model.npz` below the configured output
-directory. The last command writes the forward fit and residual plots. Use the
-transmission YAML in `CONFIG` to repeat the same sequence for transit depth.
-
-## 2. Run a bundled-opacity retrieval
-
-The retrieval runner has four useful preflight actions. `--validate-only`
-checks the resolved YAML. `--initialize` creates output, cache, and scratch
-directories. `--prepare-opacity` prepares one cache for each selected dataset.
-`--smoke-only` builds the model and evaluates one prior-midpoint likelihood.
-
-```bash
-CONFIG=configurations/transmission.yaml
-
-conda run -n robert-exoplanets python run_retrieval.py \
-  --config "$CONFIG" --validate-only
-conda run -n robert-exoplanets python run_retrieval.py \
-  --config "$CONFIG" --initialize
-conda run -n robert-exoplanets python run_retrieval.py \
-  --config "$CONFIG" --prepare-opacity
-conda run -n robert-exoplanets python run_retrieval.py \
-  --config "$CONFIG" --smoke-only
-```
-
-After these checks pass, run PyMultiNest by omitting the action flag:
+Run the retrieval preflight, then sample and evaluate the recovery:
 
 ```bash
 conda run -n robert-exoplanets python run_retrieval.py \
-  --config "$CONFIG"
+  --config configuration.yaml --prepare-opacity
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --smoke-only
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml
 conda run -n robert-exoplanets python postprocess_retrieval.py \
-  --config "$CONFIG"
+  --config configuration.yaml
+conda run -n robert-exoplanets python \
+  "$ROBERT_CODE/examples/r100_injection_recovery.py" \
+  --config configuration.yaml --evaluate
 ```
 
-PyMultiNest is the supported nested sampler. Keep `sampler.engine: multinest`
-and use a new output directory when you change the data, opacity resolution,
-model, or prior. Do not combine checkpoints from different configurations.
+The forward model and recovery report are written below the external run's
+`outputs/` directory. The same workflow applies to the maintained
+[transmission validation YAML](../../configurations/transmission.yaml). Give it
+its own run directory so its outputs and checkpoints cannot mix with the
+emission case:
 
-With plotting enabled, post-processing uses one weighted-resampled set of 100
-posterior parameter vectors for the predictive products. It evaluates the same
-draws for every supported product and writes
-`posterior_predictive_quantiles.npz`. The file contains the five ordered levels
-lower 2-sigma, lower 1-sigma, median, upper 1-sigma, and upper 2-sigma, plus
-the draw vectors and the native wavelength or pressure coordinates. The plots
-use `mediumpurple` for the median and the two bands. Each observation dataset
-keeps its own wavelength grid.
+```bash
+cd "$ROBERT_CODE"
+conda run -n robert-exoplanets python scripts/create_run_directory.py \
+  --project-dir "$HOME/ROBERT-runs" \
+  --config configurations/transmission.yaml
+cd "$HOME/ROBERT-runs/hot-jupiter-transmission-r100"
+conda run -n robert-exoplanets python run_forward.py \
+  --config configuration.yaml --validate-only
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --validate-only
+conda run -n robert-exoplanets python run_forward.py \
+  --config configuration.yaml --initialize
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --initialize
+conda run -n robert-exoplanets python \
+  "$ROBERT_CODE/examples/r100_injection_recovery.py" \
+  --config configuration.yaml --generate
+conda run -n robert-exoplanets python run_forward.py \
+  --config configuration.yaml --prepare-opacity
+conda run -n robert-exoplanets python run_forward.py \
+  --config configuration.yaml
+conda run -n robert-exoplanets python postprocess_forward.py \
+  --config configuration.yaml
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml --smoke-only
+conda run -n robert-exoplanets python run_retrieval.py \
+  --config configuration.yaml
+conda run -n robert-exoplanets python postprocess_retrieval.py \
+  --config configuration.yaml
+conda run -n robert-exoplanets python \
+  "$ROBERT_CODE/examples/r100_injection_recovery.py" \
+  --config configuration.yaml --evaluate
+```
 
-## 3. Change the physical model
+### Work from a notebook
+
+Copy a notebook to the external run area before editing it. Keep notebook
+outputs and generated figures outside the source checkout, and call validation
+scripts through `$ROBERT_CODE` as above. The complete Conda installation uses
+an editable package, so source-code fixes are available to the notebook after
+restarting its kernel; the run's `configuration.yaml` remains the only file to
+edit for run settings. For example, from an external run directory:
+
+```bash
+cp "$ROBERT_CODE/examples/notebooks/r100_emission_transmission_validation.ipynb" \
+  .
+```
+
+## 2. Change the physical model
 
 Copy a maintained YAML to a new run directory before changing it. The main
 sections to edit are:
@@ -129,7 +168,7 @@ in `opacity.species` and map each species to its parameter in
 clouds, regional emission, or dataset nuisance settings must occur once in
 `parameters`.
 
-## 4. Clear, cloudy, and two-region hot-Jupiter emission
+## 3. Clear, cloudy, and two-region hot-Jupiter emission
 
 The canonical [clear WASP-69b emission configuration](../../configurations/emission.yaml)
 uses the native F322W2, F444W, and MIRI/LRS data modes. The [one-region cloudy
@@ -172,11 +211,14 @@ Cloudy transmission follows the same command flow. Start from the [maintained
 configuration inventory](../../configurations/README.md) and the [configuration
 reference](../configuration.md),
 set `radiative_transfer.model: transmission`, and set `clouds.model: deck_haze`
-with its four cloud parameters. The cloudy transmission example uses external
-cross-section HDF files. A clear transmission run can start from
+with its four cloud parameters. The `deck_haze` model can use the bundled H2O
+R=100 table in the small transmission validation case. Cross-section HDF input
+is needed only when the selected YAML sets
+`opacity.format: exomol_cross_section_hdf`; see the configuration reference for
+the required paths and cloud parameters. A clear transmission run can start from
 `configurations/transmission.yaml` by keeping `clouds.model: none`.
 
-## 5. Keep instruments independent
+## 4. Keep instruments independent
 
 List only statistically independent datasets in `observations.datasets`. Each
 dataset keeps its own coordinate values, bin edges, unit, and uncertainty. A

@@ -1,13 +1,13 @@
 # Bundled R=100 quickstart. The R=1000 science default is emission.yaml.
-# Replace the synthetic observation path only after generating new data.
+# The generated observation is stored in the external ROBERT-runs directory.
 
 schema_version: 2
 paths:
-  observations_directory: ../examples/outputs/r100_validation/emission/synthetic_observation.npz
-  opacity_cache_directory: ../examples/outputs/r100_validation/emission/opacity_cache
-  output_directory: ../examples/outputs/r100_validation/emission
-  scratch_directory: ../examples/outputs/r100_validation/emission/scratch
-  project_directory: ..
+  observations_directory: ../../ROBERT-runs/quickstart-emission-r100/outputs/synthetic_observation.npz
+  opacity_cache_directory: ../../ROBERT-runs/quickstart-emission-r100/opacity_cache
+  output_directory: ../../ROBERT-runs/quickstart-emission-r100/outputs
+  scratch_directory: ../../ROBERT-runs/quickstart-emission-r100/scratch
+  project_directory: ../../ROBERT-runs/quickstart-emission-r100
 run:
   name: quickstart-emission-r100
   description: Bundled R=100 H2O emission injection-recovery quickstart. Use emission.yaml

@@ -5,10 +5,10 @@ schema_version: 2
 paths:
   observations_directory: ../data/observations/l98_59b_bello_arufe2025
   k_table_directory: ../opacity_data/ktables_exomol
-  output_directory: ../examples/outputs/l98_59b_rocky_transmission_clr
-  opacity_cache_directory: ../examples/outputs/l98_59b_rocky_transmission_clr/opacity_cache
-  scratch_directory: ../examples/outputs/l98_59b_rocky_transmission_clr/scratch
-  project_directory: ..
+  output_directory: ../../ROBERT-runs/l98-59b-rocky-transmission-clr/outputs
+  opacity_cache_directory: ../../ROBERT-runs/l98-59b-rocky-transmission-clr/opacity_cache
+  scratch_directory: ../../ROBERT-runs/l98-59b-rocky-transmission-clr/scratch
+  project_directory: ../../ROBERT-runs/l98-59b-rocky-transmission-clr
 run:
   name: l98-59b-rocky-transmission-clr
   description: L 98-59 b terrestrial transmission retrieval using the published Bello-Arufe

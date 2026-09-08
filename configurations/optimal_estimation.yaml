@@ -6,10 +6,10 @@ paths:
   observations_directory: ../data/wasp69b_schlawin2024
   fastchem_directory: ../data/chemistry/fastchem
   k_table_directory: ../opacity_data/ktables_exomol
-  output_directory: ../examples/outputs/hot_jupiter_optimal_estimation
-  opacity_cache_directory: ../examples/outputs/hot_jupiter_optimal_estimation/opacity_cache
-  scratch_directory: ../examples/outputs/hot_jupiter_optimal_estimation/scratch
-  project_directory: ..
+  output_directory: ../../ROBERT-runs/hot-jupiter-optimal-estimation/outputs
+  opacity_cache_directory: ../../ROBERT-runs/hot-jupiter-optimal-estimation/opacity_cache
+  scratch_directory: ../../ROBERT-runs/hot-jupiter-optimal-estimation/scratch
+  project_directory: ../../ROBERT-runs/hot-jupiter-optimal-estimation
 run:
   name: hot-jupiter-optimal-estimation
   description: WASP-69b cloud-free PG14 emission benchmark using optimal estimation.

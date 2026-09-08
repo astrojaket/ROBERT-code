@@ -31,7 +31,7 @@ The Python distribution is named `robert-exoplanets`.
 
 ## Installation
 
-Install Conda, then run these commands from a ROBERT checkout. Conda supplies
+Install Conda, then obtain ROBERT and create its environment. Conda supplies
 Python 3.12 and the required libraries:
 
 ```bash
@@ -47,33 +47,48 @@ dependencies.
 
 ### First forward model and retrieval
 
-The bundled quickstart needs no external observations, opacity downloads, or
-stellar files. Generate its synthetic data, run the forward model, then run
-and plot a small PyMultiNest retrieval:
+Keep the checkout as the software directory. Create each simulation in a
+separate directory, then edit that run's `configuration.yaml`. From the
+ROBERT checkout:
 
 ```bash
-conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
-  --config configurations/quickstart.yaml --generate
-conda run -n robert-exoplanets python run_forward.py \
+export ROBERT_CODE="$PWD"
+conda run -n robert-exoplanets python scripts/create_run_directory.py \
+  --project-dir "$HOME/ROBERT-runs" \
   --config configurations/quickstart.yaml
-conda run -n robert-exoplanets python run_retrieval.py \
-  --config configurations/quickstart.yaml
-conda run -n robert-exoplanets python postprocess_retrieval.py \
-  --config configurations/quickstart.yaml
-conda run -n robert-exoplanets python examples/r100_injection_recovery.py \
-  --config configurations/quickstart.yaml --evaluate
+cd "$HOME/ROBERT-runs/quickstart-emission-r100"
 ```
 
-Results go to `examples/outputs/r100_validation/emission/`. The last command
-checks recovery of the known injected abundance. Repeat these commands with
-`configurations/transmission.yaml` for a transit retrieval. See the
+The bundled quickstart needs no external observations, opacity downloads, or
+stellar files. Generate its synthetic data, run the model, then run and plot
+a small PyMultiNest retrieval:
+
+```bash
+conda run -n robert-exoplanets python "$ROBERT_CODE/examples/r100_injection_recovery.py" \
+  --config configuration.yaml --generate
+conda run -n robert-exoplanets python run_forward.py --config configuration.yaml
+conda run -n robert-exoplanets python run_retrieval.py --config configuration.yaml
+conda run -n robert-exoplanets python postprocess_retrieval.py --config configuration.yaml
+conda run -n robert-exoplanets python "$ROBERT_CODE/examples/r100_injection_recovery.py" \
+  --config configuration.yaml --evaluate
+```
+
+Results go to this run's `outputs/` directory. Its `opacity_cache/` and
+`scratch/` also stay outside ROBERT. The last command checks recovery of the
+known injected abundance. Create another run from
+`configurations/transmission.yaml` for the transit case. See the
 [bundled tutorial](docs/tutorials/01_bundled_forward_and_retrieval.md) for each
 step and the saved plots.
 
+The environment uses an editable installation: updating the ROBERT checkout
+updates the package used by these runs. Keep each run's configuration and
+inputs in place. An existing checkpoint still belongs to its recorded code
+and model; do not resume it across a change in scientific implementation.
+
 ### Other installation and input choices
 
-For a smaller editable installation into an existing Python 3.10–3.14
-environment:
+From the ROBERT checkout, a smaller editable installation into an existing
+Python 3.10–3.14 environment is also possible:
 
 ```bash
 python -m pip install -e ".[dev,opacity,retrieval]"
@@ -101,7 +116,7 @@ NH3, and HCN from 0.3 to 15 microns. They are suitable for quick forward
 models and HST/WFC3-scale analyses. Select `opacity.resolution: R100` and omit
 `paths.k_table_directory` to use them.
 
-Verify the installation:
+From the ROBERT checkout, verify the installation:
 
 ```bash
 conda run -n robert-exoplanets python -m pytest
@@ -138,35 +153,22 @@ batch queue. Representative passing reports are stored under
 Start with a schema-version-2 YAML configuration. Each parameter may have a
 `value`; ROBERT uses the prior midpoint where `value` is omitted.
 
-```bash
-conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart.yaml \
-  --validate-only
-
-conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart.yaml \
-  --prepare-opacity
-
-conda run -n robert-exoplanets python run_forward.py \
-  --config configurations/quickstart.yaml
-```
-
-The model is written to `outputs/forward_model.npz`. With forward plotting
-enabled in YAML, ROBERT also writes fit diagnostics and a spectrum/residual
-figure under `outputs/plots/forward/`.
-
-For higher-resolution work, download the checksum-pinned ExoMolOP R=1000
-parents into the standard external-data layout:
+From the isolated run directory:
 
 ```bash
-robert-opacity-download --directory opacity_data/ktables_exomol
+conda run -n robert-exoplanets python run_forward.py --config configuration.yaml --validate-only
+conda run -n robert-exoplanets python run_forward.py --config configuration.yaml --prepare-opacity
+conda run -n robert-exoplanets python run_forward.py --config configuration.yaml
 ```
 
-This downloads about 1.4 GB and writes `R1000/H2O_R1000.kta`,
-`R1000/CO_R1000.kta`, and the corresponding CO2, CH4, NH3, and HCN files.
-Point `paths.k_table_directory` at `opacity_data/ktables_exomol`. R=15000 data
-are not distributed with ROBERT; contact Jake Taylor directly for access to
-the validated high-resolution data workflow.
+The model is written to the run's `outputs/forward_model.npz`. With forward
+plotting enabled, diagnostics and figures go to `outputs/plots/forward/`.
+
+For R=1000 work, download the ExoMolOP files once into a shared data directory.
+Set `paths.k_table_directory` in each run to that same absolute location. The
+[opacity input guide](docs/theory/opacity_data.md) gives the download links,
+filenames, supported layouts, and separate high-resolution routes. Preparing
+a new instrument grid does not require another source download.
 
 See [Forward-model generation](docs/forward_models.md) for the full
 configuration-to-spectrum workflow, output schema, troubleshooting, a

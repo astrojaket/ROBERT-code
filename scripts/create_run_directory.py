@@ -10,7 +10,7 @@ import shutil
 
 import yaml
 
-from robert_exoplanets.io.task_config import load_task_config
+from robert_exoplanets.io.task_config import TaskConfig, load_task_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,8 +24,8 @@ _SBATCH = """#!/bin/bash -l
 #SBATCH --ntasks={ntasks}
 #SBATCH --ntasks-per-node={ntasks_per_node}
 #SBATCH --time={walltime}
-#SBATCH --output=%x-%j.out
-#SBATCH --error=%x-%j.err
+#SBATCH --output={run_directory}/slurm-%x-%j.out
+#SBATCH --error={run_directory}/slurm-%x-%j.err
 {mail_directives}
 #SBATCH --chdir={run_directory}
 
@@ -52,8 +52,8 @@ mpirun -np "${{SLURM_NTASKS}}" python -u run_retrieval.py --config configuration
 _README = """# {run_name}
 
 This directory is one isolated ROBERT run. It contains the exact source YAML,
-the generated execution YAML, retrieval/forward runners, general post-processing
-scripts, and the Slurm submission script.
+the generated execution YAML, runner wrappers, general post-processing scripts,
+and the Slurm submission script.
 
 `configuration.yaml` is the file to edit before preparation or submission. Its
 writable paths are deliberately local to this directory:
@@ -61,6 +61,13 @@ writable paths are deliberately local to this directory:
 - `outputs/` — MultiNest checkpoints and run products;
 - `opacity_cache/` — K-tables prepared onto the selected observation bins; and
 - `scratch/` — Numba and Matplotlib runtime files.
+
+Slurm stdout and stderr are also written into this run directory, even when
+`sbatch` is called from the ROBERT source checkout.
+
+The small Python runner wrappers dispatch to the current installed editable
+ROBERT checkout at `{robert_root}`. This keeps code updates available to the
+run without copying a second package tree.
 
 The input data, FastChem, and K-table paths remain the values selected in the
 source configuration. `source_configuration.yaml` is the unmodified copy for
@@ -133,6 +140,82 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _relative_to(path: Path, root: Path) -> Path | None:
+    """Return ``path`` relative to ``root`` when it is inside that root."""
+
+    try:
+        return path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+
+
+def _runner_wrapper(filename: str) -> str:
+    """Return a tiny runner that executes the current checkout entry point."""
+
+    source = str((ROOT / filename).resolve())
+    return (
+        "#!/usr/bin/env python3\n"
+        '"""Dispatch this run to the current ROBERT checkout."""\n\n'
+        "import runpy\n\n"
+        f"runpy.run_path({source!r}, run_name=\"__main__\")\n"
+    )
+
+
+def _relocate_observation(
+    config: TaskConfig,
+    run_directory: Path,
+) -> tuple[Path, Path | None]:
+    """Relocate a source-run observation reference into the new run.
+
+    Generated observations are files below the source output directory.  Keep
+    shared directories and files elsewhere at their existing absolute paths;
+    copying an arbitrary input directory would make a run unexpectedly large.
+    """
+
+    source_observation = config.observations.path.resolve()
+    source_output = config.outputs.directory.resolve()
+    relative = _relative_to(source_observation, source_output)
+    if relative is None:
+        return source_observation, None
+    if source_observation.exists() and not source_observation.is_file():
+        raise ValueError(
+            "cannot copy an observation directory from the source run output: "
+            f"{source_observation}; keep large input directories shared"
+        )
+    target = (run_directory / "outputs" / relative).resolve()
+    return target, source_observation if source_observation.is_file() else None
+
+
+def _validate_generated_run(
+    config: TaskConfig,
+    run_directory: Path,
+    observation_path: Path,
+) -> None:
+    """Validate the generated config and every writable run path."""
+
+    paths = (
+        ("project_directory", config.paths.project_directory, run_directory),
+        ("output_directory", config.outputs.directory, run_directory / "outputs"),
+        (
+            "opacity_cache_directory",
+            config.opacity.cache_directory,
+            run_directory / "opacity_cache",
+        ),
+        ("scratch_directory", config.runtime.scratch_directory, run_directory / "scratch"),
+    )
+    for name, actual_path, expected_path in paths:
+        if actual_path.resolve() != expected_path.resolve():
+            raise ValueError(
+                f"generated {name} must stay inside run directory {run_directory}: "
+                f"{actual_path}"
+            )
+    if config.observations.path.resolve() != observation_path.resolve():
+        raise ValueError(
+            "generated observations path does not match the isolated run path: "
+            f"{config.observations.path}"
+        )
+
+
 def create_run_directory(
     *,
     project_dir: Path,
@@ -154,12 +237,29 @@ def create_run_directory(
             "run.name may contain only letters, numbers, '.', '_' and '-': "
             f"{run_name!r}"
         )
-    run_directory = project_dir.expanduser().resolve() / run_name
+    run_directory = (project_dir.expanduser().resolve() / run_name).resolve()
+    if _relative_to(run_directory, ROOT) is not None:
+        raise ValueError(
+            f"run directory must be outside the ROBERT checkout: {run_directory}"
+        )
     if run_directory.exists():
         raise FileExistsError(
             f"run directory already exists: {run_directory}; choose a new run.name"
         )
+    if slurm_tasks is not None and slurm_tasks < 1:
+        raise ValueError("slurm_tasks must be positive")
+    if glamdring_ranks is not None and glamdring_ranks < 1:
+        raise ValueError("glamdring_ranks must be positive")
+    observation_path, source_observation = _relocate_observation(
+        config,
+        run_directory,
+    )
     run_directory.mkdir(parents=True)
+    for directory_name in ("outputs", "opacity_cache", "scratch"):
+        (run_directory / directory_name).mkdir()
+    if source_observation is not None:
+        observation_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_observation, observation_path)
 
     shutil.copy2(source, run_directory / "source_configuration.yaml")
     for filename in (
@@ -168,9 +268,13 @@ def create_run_directory(
         "run_forward.py",
         "postprocess_retrieval.py",
         "postprocess_forward.py",
-        "submit.sh",
     ):
-        shutil.copy2(ROOT / filename, run_directory / filename)
+        (run_directory / filename).write_text(
+            _runner_wrapper(filename),
+            encoding="utf-8",
+        )
+        (run_directory / filename).chmod(0o755)
+    shutil.copy2(ROOT / "submit.sh", run_directory / "submit.sh")
 
     generated = config.model_dump(mode="json", exclude_none=True)
     configured_paths = config.paths
@@ -182,7 +286,7 @@ def create_run_directory(
     paths.update(
         {
             "project_directory": ".",
-            "observations_directory": str(config.observations.path),
+            "observations_directory": str(observation_path),
             "k_table_directory": str(config.opacity.path),
         }
     )
@@ -218,12 +322,7 @@ def create_run_directory(
         yaml.safe_dump(generated, sort_keys=False), encoding="utf-8"
     )
     # Validate the generated file before declaring the directory ready.
-    load_task_config(execution_config)
-
-    if slurm_tasks is not None and slurm_tasks < 1:
-        raise ValueError("slurm_tasks must be positive")
-    if glamdring_ranks is not None and glamdring_ranks < 1:
-        raise ValueError("glamdring_ranks must be positive")
+    generated_config = load_task_config(execution_config)
     is_oe_only = config.sampler.engine == "optimal_estimation"
     nodes = 1
     ntasks = slurm_tasks or (1 if is_oe_only else 128)
@@ -268,8 +367,14 @@ def create_run_directory(
             nodes=nodes,
             ntasks=ntasks,
             glamdring_ranks=glamdring_processes,
+            robert_root=ROOT,
         ),
         encoding="utf-8",
+    )
+    _validate_generated_run(
+        generated_config,
+        run_directory,
+        observation_path,
     )
     return run_directory
 

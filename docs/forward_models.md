@@ -44,21 +44,26 @@ export PYSYN_CDBS=/path/to/synphot/reference-data
 test -d "$PYSYN_CDBS/grid/phoenix"
 ```
 
-## 2. Choose and copy a configuration
+## 2. Create an external run configuration
 
 For a complete list of fields, read the
-[configuration reference](configuration.md). For a shorter working example, copy
-one of the maintained configurations:
+[configuration reference](configuration.md). Create a run directory from the
+checkout, then edit the generated `configuration.yaml`:
 
 ```bash
-cp configurations/quickstart.yaml my_forward_model.yaml
+cd /path/to/ROBERT-code
+export ROBERT_CODE=$PWD
+conda run -n robert-exoplanets python scripts/create_run_directory.py \
+  --project-dir "$HOME/ROBERT-runs" \
+  --config configurations/quickstart.yaml
+cd "$HOME/ROBERT-runs/quickstart-emission-r100"
 ```
 
 That example uses the six bundled R=100 molecular tables and a blackbody
 stellar spectrum, so it runs without an external opacity or PHOENIX data
 directory.
 
-Give the run a unique name and make all machine-specific input paths valid:
+Make all machine-specific input paths valid in the generated configuration:
 
 ```yaml
 schema_version: 2
@@ -97,17 +102,49 @@ pressure and temperature grid with eight g-points. They require no
 `k_table_directory` and are intended for quick forward models and
 resolution-appropriate observations such as HST/WFC3.
 
-For R=1000 models, download the larger ExoMolOP parents:
+For R=1000 models, use one shared external ExoMolOP source collection. Download
+the six tables supported by the ROBERT downloader once:
 
 ```bash
-robert-opacity-download --directory opacity_data/ktables_exomol
+conda run -n robert-exoplanets robert-opacity-download \
+  --directory /shared/ROBERT-data/ktables_exomol
 ```
 
-Add `k_table_directory: ./opacity_data/ktables_exomol` beneath `paths` and set
-`opacity.resolution: R1000`. The command writes standardized filenames beneath
-an `R1000/` subdirectory and verifies every source checksum. R=15000 data are
-not distributed with ROBERT; contact Jake Taylor directly for the validated
-high-resolution data workflow.
+The command writes canonical `<species>_R1000.kta` files beneath
+`/shared/ROBERT-data/ktables_exomol/R1000` and verifies their SHA-256 values.
+The maintained hot-Jupiter configurations also request SO2, and the L 98-59 b
+CLR configuration requests SO2 and H2S. Download those additional ExoMolOP
+files and save them as `SO2_R1000.kta` and `H2S_R1000.kta` in the same selected
+directory, following the exact links and checks in
+[Opacity Data](theory/opacity_data.md).
+
+An existing flat collection is valid when it has no `R1000/` child. If that
+child exists, the loader uses it and does not search the flat files, so do not
+run the six-table downloader into a flat collection that contains additional
+gases unless the child contains every selected gas. Point the external YAML to
+the shared source and keep each run outside the checkout:
+
+```yaml
+paths:
+  project_directory: .
+  k_table_directory: /shared/ROBERT-data/ktables_exomol
+```
+
+The source collection can be read-only and is reused by multiple runs.
+`--prepare-opacity` writes derived tables to each run's opacity cache and does
+not change the source files.
+
+For R=15000 opacity sampling, use the public
+`examples/download_exomol_opacity_sampling.py` workflow described in
+[Opacity Data](theory/opacity_data.md). These ExoMolOP/TauREx HDF5 cross
+sections are separate from R=1000 KTA inputs and from true line-by-line data.
+In a configured YAML, `opacity.format: exomol_cross_section_hdf` converts them
+to correlated-k tables during preparation; use the Python provider for native
+opacity sampling.
+For true petitRADTRANS line-by-line inputs, use the public
+[petitRADTRANS high-resolution guide](https://petitradtrans.readthedocs.io/en/latest/content/notebooks/high_resolution_spectra.html)
+and its documented R=1e6 input-data paths. ROBERT's LBL examples expect those
+external files; they do not download them.
 
 The principal forward-model choices are:
 

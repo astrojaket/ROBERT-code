@@ -7,10 +7,10 @@ paths:
   fastchem_directory: ../data/chemistry/fastchem
   k_table_directory: ../opacity_data/ktables_exomol
   optical_constants_directory: ../data/optical_constants/exo_skryer
-  output_directory: ../examples/outputs/hot_jupiter_cloudy_emission
-  opacity_cache_directory: ../examples/outputs/hot_jupiter_cloudy_emission/opacity_cache
-  scratch_directory: ../examples/outputs/hot_jupiter_cloudy_emission/scratch
-  project_directory: ..
+  output_directory: ../../ROBERT-runs/hot-jupiter-cloudy-emission-r1000/outputs
+  opacity_cache_directory: ../../ROBERT-runs/hot-jupiter-cloudy-emission-r1000/opacity_cache
+  scratch_directory: ../../ROBERT-runs/hot-jupiter-cloudy-emission-r1000/scratch
+  project_directory: ../../ROBERT-runs/hot-jupiter-cloudy-emission-r1000
 run:
   name: hot-jupiter-cloudy-emission-r1000
   description: WASP-69b one-region PG14 emission retrieval with a fixed MgSiO3 catalogue

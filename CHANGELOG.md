@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Made public simulations default to external `ROBERT-runs/` directories.
+  Run creation isolates generated observations, caches, Slurm logs, and results;
+  small runner wrappers use the current checkout after software updates.
+  Tutorials and notebooks use copied run configurations and shared source inputs.
 - Consolidated public configurations into seven independent examples and added
   paired forward-model and retrieval tutorials. Removed obsolete task reports
   and duplicate entrypoints; documented current methods and validation limits

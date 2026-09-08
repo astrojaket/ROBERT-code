@@ -36,6 +36,10 @@ The Python distribution name is `robert-exoplanets`; avoid introducing packaging
 - Follow `docs/data_policy.md`: retain required lightweight inputs and compact
   benchmark test oracles, but do not commit heavy opacity data or generated
   scientific products.
+- Keep user simulations outside the ROBERT checkout. Use
+  `scripts/create_run_directory.py` for run configurations, runner wrappers,
+  outputs, prepared caches, scratch files, and cluster logs. Reuse shared
+  opacity inputs across runs; do not download or copy them for each simulation.
 - Use `opacity_data/ktables_exomol/` as the default R=1000 source for JWST
   work. The local tables were copied from Dropbox and verified by checksum.
   Keep each instrument's wavelength coverage and bin edges separate. Use

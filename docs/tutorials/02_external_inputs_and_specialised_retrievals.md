@@ -10,37 +10,71 @@ Conda environment for every ROBERT command.
 
 ## 1. Prepare an external R=1000 hot-Jupiter run
 
-Download the checksum-pinned ExoMolOP R=1000 parents into a project-local
-directory:
+Download the checksum-pinned ExoMolOP R=1000 parents once into a shared source
+collection. For example, use `/shared/ROBERT-data/ktables_exomol`:
 
 ```bash
 conda run -n robert-exoplanets robert-opacity-download \
-  --directory opacity_data/ktables_exomol
+  --directory /shared/ROBERT-data/ktables_exomol
 ```
 
 This command obtains only H2O, CO, CO2, CH4, NH3, and HCN R=1000 tables. It
 does not obtain SO2 or H2S. The canonical emission files require SO2, and the
 rocky CLR file requires SO2 and H2S, so the downloader alone is insufficient
-for those runs. Obtain the extra ExoMolOP tables through the established
-external-input workflow described in [Opacity Data](../theory/opacity_data.md)
-and [Forward-model generation](../forward_models.md), then check the selected
-species and source checksums before `--prepare-opacity`. Keep these large
-tables outside Git.
+for those runs. Obtain the extra ExoMolOP tables from the public links in
+[Opacity Data](../theory/opacity_data.md), save them as `SO2_R1000.kta` and
+`H2S_R1000.kta`, and check the listed release and local SHA-256 values before
+`--prepare-opacity`.
+
+For a new collection, keep every selected gas in one directory:
+
+```text
+/shared/ROBERT-data/ktables_exomol/R1000/
+├── H2O_R1000.kta
+├── H2S_R1000.kta
+├── SO2_R1000.kta
+└── ...
+```
+
+The loader uses `R1000/` when it exists. A pre-existing flat collection is
+valid only when it has no `R1000/` child. Do not mix the layouts, because flat
+files are hidden when the child directory exists. Long upstream ExoMol names
+must be saved or renamed to the canonical `<species>_R1000.kta` names. Keep
+the source collection outside Git and reuse it as read-only input.
 
 The canonical [WASP-69b cloud-free native configuration](../../configurations/emission.yaml)
 uses these tables with the native NIRCam and MIRI/LRS datasets and a
 400-live-point PyMultiNest run. The
 [cloudy entry](../../configurations/cloudy_emission.yaml)
-adds fixed MgSiO3 Mie optical constants. Copy one YAML to an isolated run
-directory, then set these paths for the local machine:
+adds fixed MgSiO3 Mie optical constants. Create an external run directory from
+the checkout, then edit its generated `configuration.yaml`:
+
+```bash
+cd /path/to/ROBERT-code
+export ROBERT_CODE=$PWD
+conda run -n robert-exoplanets python scripts/create_run_directory.py \
+  --project-dir /shared/ROBERT-runs \
+  --config configurations/emission.yaml
+cd /shared/ROBERT-runs/hot-jupiter-emission-r1000
+```
+
+Do not copy the source YAML by hand. The creator writes resolved paths and the
+run wrappers. Edit only the generated configuration for machine-specific
+inputs:
 
 ```yaml
 paths:
+  project_directory: .
   observations_directory: /data/wasp69b_schlawin2024
   fastchem_directory: /data/chemistry/fastchem
-  k_table_directory: /data/opacity_data/ktables_exomol
+  k_table_directory: /shared/ROBERT-data/ktables_exomol
   optical_constants_directory: /data/optical_constants/exo_skryer
 ```
+
+`--prepare-opacity` reads this shared collection and writes derived tables to
+the run's `opacity_cache`; it does not modify the source files. Keep each run
+directory and its results outside the ROBERT checkout. Use a new cache when
+the species, resolution, instrument grid, or preparation settings change.
 
 Set `bodies.star.spectrum_model: phoenix` when the PHOENIX reference data are
 available. Before model construction, set the Synphot reference-data root:
@@ -55,10 +89,10 @@ need PHOENIX files. A PHOENIX model needs the star effective temperature,
 `log_g_cgs`, and metallicity values that select a grid point. Check the planet
 radius and mass, because they set the gravity and emission geometry.
 
-Run the standard preflight sequence with the copied YAML:
+Run the standard preflight sequence with the generated YAML:
 
 ```bash
-CONFIG=/path/to/run/configuration.yaml
+CONFIG=configuration.yaml
 
 conda run -n robert-exoplanets python run_retrieval.py \
   --config "$CONFIG" --validate-only
@@ -80,6 +114,40 @@ PyMultiNest result. For an optimal-estimation comparison, use the maintained
 [WASP-69b OE configuration](../../configurations/optimal_estimation.yaml)
 with `sampler.engine: optimal_estimation`. OE is a separate Gaussian workflow;
 do not use it for a CLR prior or for a covariance/profile likelihood.
+
+### R=15000 opacity sampling and true line-by-line inputs
+
+The separate ExoMolOP opacity-sampling workflow downloads six R=15000 TauREx
+HDF5 cross sections into a shared collection:
+
+```bash
+conda run -n robert-exoplanets python \
+  /path/to/ROBERT/examples/download_exomol_opacity_sampling.py \
+  /shared/ROBERT-data/exomol_xsec
+```
+
+The files are named `<species>.h5`. Use a separate YAML path and set
+`opacity.format: exomol_cross_section_hdf` when you want ROBERT to convert
+them to correlated-k tables during preparation; do not mix this collection
+with the R=1000 KTA directory. For native opacity sampling, use the Python
+provider shown in [Opacity Data](../theory/opacity_data.md). These files are
+not true line-by-line inputs.
+
+For true petitRADTRANS line-by-line work, follow the
+[petitRADTRANS high-resolution guide](https://petitradtrans.readthedocs.io/en/latest/content/notebooks/high_resolution_spectra.html).
+Use its R=1e6 `.xsec.petitRADTRANS.h5` files in the documented tree, for
+example:
+
+```text
+input_data/opacities/lines/line_by_line/H2O/1H2-16O/
+└── 1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5
+input_data/opacities/lines/line_by_line/CO/12C-16O/
+└── 12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5
+```
+
+The ROBERT LBL benchmark examples expect these external pRT files; ROBERT
+does not download them. See [Opacity Data](../theory/opacity_data.md) for the
+distinction between these files and the R=15000 TauREx collection.
 
 ## 2. Adapt the data and atmosphere
 

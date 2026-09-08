@@ -50,9 +50,8 @@ The MPI library report and `mpiexec` must describe MPICH/Hydra.
 
 ## 2. Create one isolated run directory
 
-Copying a YAML and editing it in place is sufficient locally, but isolated
-directories make cluster runs reproducible and prevent checkpoints from
-different models being combined:
+Keep simulations outside the ROBERT checkout, on both local machines and
+clusters. From the checkout, create a run directory:
 
 ```bash
 python scripts/create_run_directory.py \
@@ -81,7 +80,10 @@ The resulting `/path/to/robert-runs/<run.name>/` contains:
 - `submit.sh`: the Oxford Glamdring wrapper; and
 - `README.md`: commands and paths for that run.
 
-Writable products are local to the directory:
+Edit only the generated `configuration.yaml`. Shared observations and opacity
+paths remain absolute; updating the software checkout does not move them.
+
+Writable products are local to the run directory:
 
 - `outputs/` contains result phases, snapshots, diagnostics, and plots;
 - `opacity_cache/` contains tables prepared for the selected datasets; and
@@ -183,8 +185,9 @@ robert-opacity-download --directory opacity_data/ktables_exomol
 ```
 
 Set `paths.k_table_directory: ./opacity_data/ktables_exomol` for those tables.
-R=15000 data are not distributed with ROBERT; contact Jake Taylor directly for
-the validated high-resolution data workflow.
+Download the source collection once and reuse its absolute path in all runs.
+The [opacity input guide](theory/opacity_data.md) gives additional gas links
+and distinguishes R=15000 cross sections from true line-by-line inputs.
 
 ### End-to-end local recovery check
 

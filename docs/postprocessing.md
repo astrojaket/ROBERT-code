@@ -1,6 +1,8 @@
 # Post-processing and plotting
 
 ROBERT separates inference and forward-model products from visualization.
+Run these commands from the simulation directory outside the ROBERT checkout.
+All relative `outputs/` paths below refer to that simulation directory.
 Configured forward runs write `forward_model.npz`. Retrieval phases write
 `result.json` and `result_arrays.npz`. They also save the best-fit spectrum and
 observation for each supported dataset in `best_fit_prediction.json` and

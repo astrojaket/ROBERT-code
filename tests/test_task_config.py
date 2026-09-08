@@ -39,6 +39,7 @@ from robert_exoplanets.retrieval.manifest import build_run_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RUNS_ROOT = ROOT.parent / "ROBERT-runs"
 EXAMPLE = ROOT / "configurations" / "emission.yaml"
 TEMPLATE = ROOT / "configurations" / "quickstart.yaml"
 TRANSMISSION = ROOT / "configurations" / "transmission.yaml"
@@ -1143,6 +1144,19 @@ def test_all_public_configurations_resolve_and_validate() -> None:
     for path in DEFAULTS:
         config = load_task_config(path)
         resolutions.append(config.opacity.resolution)
+        run_root = RUNS_ROOT / config.run.name
+        assert config.paths is not None
+        assert config.paths.project_directory.resolve() == run_root.resolve()
+        assert config.outputs.directory.resolve() == (run_root / "outputs").resolve()
+        assert config.opacity.cache_directory.resolve() == (
+            run_root / "opacity_cache"
+        ).resolve()
+        assert config.runtime.scratch_directory.resolve() == (
+            run_root / "scratch"
+        ).resolve()
+        assert ROOT not in config.outputs.directory.resolve().parents
+        assert ROOT not in config.opacity.cache_directory.resolve().parents
+        assert ROOT not in config.runtime.scratch_directory.resolve().parents
     assert set(resolutions) == {"R100", "R1000"}
 
 
@@ -1199,11 +1213,43 @@ def test_public_quickstart_uses_one_top_level_path_block() -> None:
     assert config.paths.fastchem_directory is None
     assert config.paths.k_table_directory is None
     assert config.opacity.path.is_dir()
-    assert config.opacity.cache_directory.resolve() == ROOT / "examples" / "outputs" / "r100_validation" / "emission" / "opacity_cache"
-    assert config.outputs.directory.resolve() == ROOT / "examples" / "outputs" / "r100_validation" / "emission"
-    assert config.runtime.scratch_directory.resolve() == ROOT / "examples" / "outputs" / "r100_validation" / "emission" / "scratch"
+    run_root = RUNS_ROOT / config.run.name
+    assert config.opacity.cache_directory.resolve() == run_root / "opacity_cache"
+    assert config.outputs.directory.resolve() == run_root / "outputs"
+    assert config.runtime.scratch_directory.resolve() == run_root / "scratch"
+    assert config.observations.path.resolve() == (
+        run_root / "outputs" / "synthetic_observation.npz"
+    )
     assert config.plotting.enabled is True
     assert config.plotting.dataset_colors["synthetic_emission"] == "mediumpurple"
+
+
+def test_public_transmission_synthetic_observation_is_outside_checkout() -> None:
+    config = load_task_config(ROOT / "configurations" / "transmission.yaml")
+    run_root = RUNS_ROOT / config.run.name
+
+    assert config.observations.path.resolve() == (
+        run_root / "outputs" / "synthetic_observation.npz"
+    )
+    assert ROOT not in config.observations.path.resolve().parents
+
+
+def test_public_configurations_keep_shared_input_paths() -> None:
+    expected_observations = {
+        "emission.yaml": ROOT / "data" / "wasp69b_schlawin2024",
+        "cloudy_emission.yaml": ROOT / "data" / "wasp69b_schlawin2024",
+        "optimal_estimation.yaml": ROOT / "data" / "wasp69b_schlawin2024",
+        "two_region_emission.yaml": ROOT / "data" / "wasp69b_schlawin2024",
+        "rocky_transmission_clr.yaml": (
+            ROOT / "data" / "observations" / "l98_59b_bello_arufe2025"
+        ),
+    }
+    for filename, expected in expected_observations.items():
+        config = load_task_config(CONFIGURATIONS / filename)
+        assert config.observations.path.resolve() == expected.resolve()
+        assert config.opacity.path.resolve() == (
+            ROOT / "opacity_data" / "ktables_exomol"
+        ).resolve()
 
 
 def test_public_configurations_have_distinct_writable_output_roots() -> None:

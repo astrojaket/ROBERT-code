@@ -30,7 +30,10 @@ models and resolution-appropriate data such as HST/WFC3. They retain all 22
 pressure points, all 27 temperature points, and eight g-points. Their source
 URLs, input and output checksums, transformation settings, attribution, and
 licence are recorded in
-`src/robert_exoplanets/data/opacities/R100/provenance.json`.
+checked-in [provenance record](../../src/robert_exoplanets/data/opacities/R100/provenance.json),
+which is also used by the downloader.
+The [ExoMol data index](https://exomol.com/data/) provides the upstream
+molecule and dataset navigation.
 
 The opacity implementation can:
 
@@ -86,14 +89,118 @@ Strict pressure/temperature coverage remains the default. The clipping policy
 exists to reproduce NemesisPy's documented implementation behavior at table
 boundaries and is included in prepared-opacity cache identity and provenance.
 
+## Reusing external R=1000 tables
+
+R=1000 tables are large external inputs. Download them once into a shared
+source collection, such as `/shared/ROBERT-data/ktables_exomol`, and point each
+run to that collection. The path may be absolute and read-only. Keep the run
+directory, prepared opacity cache, outputs, and scratch files outside the
+checkout, for example under `/shared/ROBERT-runs/wasp69b-clear`.
+
+For a new collection, use one directory for all selected gases:
+
+```text
+/shared/ROBERT-data/ktables_exomol/
+└── R1000/
+    ├── CO2_R1000.kta
+    ├── H2O_R1000.kta
+    ├── H2S_R1000.kta
+    ├── SO2_R1000.kta
+    └── ...
+```
+
+`CorrelatedKOpacityProvider.from_exomol_kta_directory` first uses
+`<root>/R1000` when that directory exists. An existing flat collection is also
+valid when it has no `R1000/` child, and a path ending in `R1000` is valid. Do
+not split one run between these layouts: once `<root>/R1000` exists, files in
+the flat root are not searched. Every selected file must end in
+`_<resolution>.kta`; for R=1000 the canonical names are `H2O_R1000.kta`,
+`SO2_R1000.kta`, and so on. The loader takes the species name from the text
+before the first underscore, so save or rename long upstream ExoMol names to
+these canonical names.
+
+Use the shared source root in each configuration. In a generated external run
+directory, keep the project path local to that run:
+
+```yaml
+paths:
+  project_directory: .
+  k_table_directory: /shared/ROBERT-data/ktables_exomol
+
+opacity:
+  format: exomol_kta
+  resolution: R1000
+```
+
+`--prepare-opacity` reads the source files and writes derived tables and a
+manifest to the configured opacity cache, normally below
+`project_directory/opacity_cache/R1000`. It does not modify the shared source
+files. A new cache is needed when species, resolution, target grid, or other
+preparation settings change.
+
+The six tables supported by `robert-opacity-download` have the following
+public source files. The URLs are the ExoMolOP NEMESIS
+R=1000 products. The exact SHA-256 values and source metadata are in the
+checked-in [provenance record](../../src/robert_exoplanets/data/opacities/R100/provenance.json),
+which is also used by the downloader.
+
+| Species | Save as | ExoMolOP R=1000 KTA |
+| --- | --- | --- |
+| H2O | `H2O_R1000.kta` | [download](https://www.exomol.com/db/H2O/1H2-16O/POKAZATEL/1H2-16O__POKAZATEL__R1000_0.3-50mu.ktable.NEMESIS.kta) |
+| CO | `CO_R1000.kta` | [download](https://www.exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.R1000_0.3-50mu.ktable.NEMESIS.kta) |
+| CO2 | `CO2_R1000.kta` | [download](https://www.exomol.com/db/CO2/12C-16O2/UCL-4000/12C-16O2__UCL-4000.R1000_0.3-50mu.ktable.NEMESIS.kta) |
+| CH4 | `CH4_R1000.kta` | [download](https://www.exomol.com/db/CH4/12C-1H4/YT34to10/12C-1H4__YT34to10.R1000_0.3-50mu.ktable.NEMESIS.kta) |
+| NH3 | `NH3_R1000.kta` | [download](https://www.exomol.com/db/NH3/14N-1H3/CoYuTe/14N-1H3__CoYuTe.R1000_0.3-50mu.ktable.NEMESIS.kta) |
+| HCN | `HCN_R1000.kta` | [download](https://www.exomol.com/db/HCN/1H-12C-14N/Harris/1H-12C-14N__Harris.R1000_0.3-50mu.ktable.NEMESIS.kta) |
+
+Run the checksum-pinned downloader for these six files:
+
+```bash
+conda run -n robert-exoplanets robert-opacity-download \
+  --directory /shared/ROBERT-data/ktables_exomol
+```
+
+The downloader creates `R1000/` when the selected root is not already named
+`R1000`. If an existing collection is flat, use it as a flat collection or
+use a clean source root for this command. Running the command in a flat root
+creates a partial `R1000/` directory and can hide the other flat files from
+the loader.
+
+The maintained hot-Jupiter configurations also use SO2, and the L 98-59 b CLR
+configuration uses SO2 and H2S. These two additional R=1000 products are not
+included in the downloader. Their public ExoMol source pages and direct KTA
+files are:
+
+| Species | Save as | Source page | Direct KTA file | Public release check |
+| --- | --- | --- | --- | --- |
+| SO2 | `SO2_R1000.kta` | [ExoAmes](https://www.exomol.com/data/molecules/SO2/32S-16O2/ExoAmes/) | [download](https://www.exomol.com/db/SO2/32S-16O2/ExoAmes/32S-16O2__ExoAmes.R1000_0.3-50mu.ktable.NEMESIS.kta) | [Zenodo 5716834](https://zenodo.org/records/5716834) MD5 `f2e4ec8cc8bcd5cf8310f276527def0a`; SHA-256 `dcbde137f1b7e9ed8bb79e0a72a964acfef9b8bfd1163dd2c705227da80a088d` |
+| H2S | `H2S_R1000.kta` | [AYT2](https://www.exomol.com/data/molecules/H2S/1H2-32S/) | [download](https://www.exomol.com/db/H2S/1H2-32S/AYT2/1H2-32S__AYT2.R1000_0.3-50mu.ktable.NEMESIS.kta) | [Zenodo 5716825](https://zenodo.org/records/5716825) MD5 `83eee902df6f71334561153bdeab78c1`; SHA-256 `b2d7107e60c1c2bd7c69853975616d143d3c4812b6ffc32b3f06566e0ffb47dc` |
+
+The ExoMol/Zenodo records provide MD5 for these large files. The SHA-256
+values above were measured from files that match those published MD5 values. Compute and record a
+SHA-256 value after every download. Save the files with the canonical names in
+the same selected directory as the six downloader files.
+For example:
+
+```bash
+mkdir -p /shared/ROBERT-data/ktables_exomol/R1000
+curl -L --fail \
+  --output /shared/ROBERT-data/ktables_exomol/R1000/SO2_R1000.kta \
+  'https://www.exomol.com/db/SO2/32S-16O2/ExoAmes/32S-16O2__ExoAmes.R1000_0.3-50mu.ktable.NEMESIS.kta'
+shasum -a 256 /shared/ROBERT-data/ktables_exomol/R1000/SO2_R1000.kta
+```
+
 ## Selecting opacity sampling
 
 Opacity sampling is currently a **beta** backend: it works and is covered by
 numerical parity tests, but its sampling strategy is not yet validated broadly
 enough for production retrievals. Correlated-k remains the default.
 
-Downloaded cross sections stay outside Git under `opacity_data/`. A provider
-and an explicit sampling grid can be constructed with:
+Downloaded cross sections stay outside Git in a shared source collection such
+as `/shared/ROBERT-data/exomol_xsec`. R=15000 ExoMolOP cross sections are a
+separate opacity-sampling input; they are not R=1000 KTA files and are not
+true line-by-line data. A provider and an explicit sampling grid can be
+constructed with:
 
 ```python
 from pathlib import Path
@@ -101,7 +208,7 @@ from pathlib import Path
 from robert_exoplanets import OpacitySamplingProvider
 
 species = ("H2O", "CO", "CO2", "CH4", "NH3", "HCN")
-root = Path("opacity_data/exomol_xsec")
+root = Path("/shared/ROBERT-data/exomol_xsec")
 provider = OpacitySamplingProvider.from_exomol_paths(
     {name: root / f"{name}.h5" for name in species}
 )
@@ -118,6 +225,59 @@ selection of physical samples. The default strict interpolation policy raises
 outside the ExoMol pressure or temperature grid; append `_clip` to the provider
 interpolation policy only for a documented comparison requiring boundary
 clamping.
+
+The public downloader for this backend obtains the same six species and writes
+`<species>.h5` files:
+
+```bash
+conda run -n robert-exoplanets python \
+  examples/download_exomol_opacity_sampling.py \
+  /shared/ROBERT-data/exomol_xsec
+```
+
+Set `opacity.format: exomol_cross_section_hdf` and point
+`paths.k_table_directory` to `/shared/ROBERT-data/exomol_xsec` when using these
+files in a configured run. That configured path converts the HDF5 cross
+sections to correlated-k tables during preparation; it is not native opacity
+sampling. Use the `OpacitySamplingProvider.from_exomol_paths` example above for
+the native sampling API. In both cases, keep the source collection shared and
+read-only and write derived data to the run's cache.
+
+### True line-by-line inputs
+
+The R=15000 files above use the ExoMolOP/TauREx HDF5 format and the ROBERT
+opacity-sampling provider. They must not be renamed as petitRADTRANS
+line-by-line files. For true petitRADTRANS line-by-line work, follow the
+[petitRADTRANS high-resolution guide](https://petitradtrans.readthedocs.io/en/latest/content/notebooks/high_resolution_spectra.html)
+and its [opacity input guide](https://petitradtrans.readthedocs.io/en/latest/content/adding_opacities.html).
+The standard files are R=1,000,000 `.xsec.petitRADTRANS.h5` files under the
+petitRADTRANS input-data tree, for example:
+
+```text
+input_data/opacities/lines/line_by_line/H2O/1H2-16O/
+└── 1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5
+input_data/opacities/lines/line_by_line/CO/12C-16O/
+└── 12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5
+```
+
+The optional independent petitRADTRANS oracle defaults to a narrow H2O file.
+Give it a shared input-data root, override H2O with the full-range file shown
+above, and write its result outside the checkout:
+
+```bash
+conda run -n petitradtrans-stable python \
+  examples/run_petitradtrans3_lbl_kband_reference.py \
+  --input-data /shared/ROBERT-data/petitRADTRANS/input_data \
+  --h2o-table opacities/lines/line_by_line/H2O/1H2-16O/1H2-16O__POKAZATEL.R1e6_0.3-28mu.xsec.petitRADTRANS.h5 \
+  --co-table opacities/lines/line_by_line/CO/12C-16O/12C-16O__HITEMP.R1e6_0.3-28mu.xsec.petitRADTRANS.h5 \
+  --output /shared/ROBERT-runs/lbl-reference/reference.npz
+```
+
+The LBL examples in this repository expect these external files and do not
+download them. Keep the input-data root shared and read-only, and record the
+source paths and checksums with the resulting oracle. A ROBERT
+`LineByLineOpacityProvider` can read the same pRT files directly; running the
+independent pRT oracle is optional.
 
 For observed spectra, `StratifiedSamplingObservationResponse` can select a
 fixed number of native opacity samples inside every observation bin and then

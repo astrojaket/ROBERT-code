@@ -3,11 +3,11 @@
 
 schema_version: 2
 paths:
-  observations_directory: ../examples/outputs/r100_validation/transmission/synthetic_observation.npz
-  opacity_cache_directory: ../examples/outputs/r100_validation/transmission/opacity_cache
-  output_directory: ../examples/outputs/r100_validation/transmission
-  scratch_directory: ../examples/outputs/r100_validation/transmission/scratch
-  project_directory: ..
+  observations_directory: ../../ROBERT-runs/hot-jupiter-transmission-r100/outputs/synthetic_observation.npz
+  opacity_cache_directory: ../../ROBERT-runs/hot-jupiter-transmission-r100/opacity_cache
+  output_directory: ../../ROBERT-runs/hot-jupiter-transmission-r100/outputs
+  scratch_directory: ../../ROBERT-runs/hot-jupiter-transmission-r100/scratch
+  project_directory: ../../ROBERT-runs/hot-jupiter-transmission-r100
 run:
   name: hot-jupiter-transmission-r100
   description: Bundled R=100 hot-Jupiter free-chemistry transmission quickstart. For

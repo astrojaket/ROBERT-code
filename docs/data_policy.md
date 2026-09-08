@@ -51,10 +51,14 @@ example; do not publish the study folder to expose that method.
   record is published, documentation must link to the upstream source and must
   not invent a ROBERT DOI.
 
-Use `external_data/`, `opacity_data/`, or another location outside the checkout
-for large local assets. These directories and common scientific binary formats
-are ignored by Git. Paths in YAML files are explicit and should be changed for
-each machine or cluster.
+Keep simulation directories outside the checkout, including generated
+observations, prepared caches, Slurm logs, checkpoints, results, and plots.
+`scripts/create_run_directory.py` creates this layout and rejects a destination
+inside ROBERT. Download large shared inputs once into a separate data directory
+and reuse their absolute paths across runs. Existing `external_data/` and
+`opacity_data/` collections are also ignored by Git, but are not locations for
+new simulation outputs. Configure input locations once for each machine or
+cluster; software updates do not require copying those data into each run.
 
 ## External inputs currently used by examples
 

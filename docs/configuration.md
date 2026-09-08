@@ -37,8 +37,11 @@ paths:
 ```
 
 Relative paths resolve from the YAML file. ROBERT expands `${VARIABLE}` and
-rejects undefined variables. Writable directories default to `outputs/`,
-`opacity_cache/`, and `scratch/` beneath `project_directory`.
+rejects undefined variables. Create simulation directories outside the ROBERT
+checkout with `scripts/create_run_directory.py`, then edit the generated YAML.
+Writable directories default to `outputs/`, `opacity_cache/`, and `scratch/`
+beneath that run's `project_directory`. The maintained source templates also
+place writable defaults in a sibling `ROBERT-runs/` directory.
 Use the top-level `paths` block for all machine-specific locations. The old
 `housekeeping` alias is not supported; move those entries under `paths`.
 Omit `k_table_directory` when using the bundled R=100 tables. R=1000 tables
@@ -222,8 +225,9 @@ atmosphere:
 
 Temperature models are `parmentier_guillot_2014`, `isothermal`, `tabulated`,
 `madhusudhan_seager_2009`, and `spline`. Chemistry models are
-`fastchem_equilibrium` and `free`. The annotated template lists the required
-fields for each choice.
+`fastchem_equilibrium` and `free`. Start from the maintained
+[examples](../configurations/README.md), then validate each change with
+`--validate-only` to check its required fields.
 
 ## Clouds and projected emission
 
@@ -283,11 +287,16 @@ available. Set it to `scipy` to force the scientific reference implementation.
 R=1000 is the default resolution for JWST work. The maintained science
 configurations select the repository's `opacity_data/ktables_exomol/`
 directory.
-The local 16-table collection was copied from
-`Dropbox/NemesisPy-Docker/ktables_exomol/` and verified by SHA-256. Its
-`local_copy_manifest.json` records file identities. The directory is ignored
-by Git. Direct `SPECIES_R1000.kta` files and a nested `R1000/` directory are
-both accepted by the table reader.
+Download each source collection once and reuse it across simulations. The
+directory is ignored by Git. Direct `SPECIES_R1000.kta` files and a nested
+`R1000/` directory are both accepted by the table reader. If `R1000/` exists,
+it takes precedence: keep every selected gas in that directory rather than
+splitting the collection between layouts.
+
+Use an absolute `paths.k_table_directory` to share one collection between
+projects. Relative paths resolve from the YAML file, not the shell directory.
+Prepared opacity caches belong to the run and its instrument grids; they do
+not require another download of the source tables.
 
 For combined instruments, keep a separate observation grid and bin edges for
 each dataset. ROBERT prepares the same molecular input tables on each grid;
@@ -341,9 +350,10 @@ opacity:
 ```
 
 The downloader retains the upstream ExoMolOP source identity and verifies the
-same SHA-256 checksums used to generate the bundled tables. R=15000 data are
-not bundled or downloaded by this command; contact Jake Taylor directly for
-the validated high-resolution data workflow.
+same SHA-256 checksums used to generate the bundled tables. It supplies these
+six gases only. Add the SO2 or H2S files required by your configuration to the
+same directory. The [opacity input guide](theory/opacity_data.md) gives the
+ExoMol links, filenames, and separate high-resolution input routes.
 
 For transmission, set `model: transmission` and configure
 `reference_pressure_bar`, optional `radius_scale_parameter`,
