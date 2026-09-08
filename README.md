@@ -177,6 +177,10 @@ standalone Python example, and the
 
 ## Retrievals
 
+Use the plain-text [run checklist](RUN_STEPS.txt) for the command order on a
+local laptop, DiRAC, or another Slurm cluster. It covers new runs, model checks,
+submission, monitoring, checkpoint resume, and posterior plots.
+
 Validate, initialize, prepare opacity, and smoke-test a retrieval before
 starting inference:
 

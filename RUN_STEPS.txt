@@ -1,0 +1,251 @@
+ROBERT - GENERAL RUN CHECKLIST
+Local laptop | DiRAC | Other Slurm clusters
+
+ORDER
+Create run -> edit configuration -> validate -> prepare opacity -> check model
+-> record software -> run retrieval -> check convergence -> make plots.
+
+Use this after installation. See README.md for installation instructions.
+Run one step at a time. Stop and resolve any error before continuing.
+DiRAC is a service with several sites; its Slurm settings are site-specific.
+
+
+1. SET YOUR PATHS [laptop or cluster login node]
+
+Replace these example paths with the paths on the current machine:
+
+  export ROBERT_CODE=/absolute/path/to/ROBERT-code
+  export ROBERT_ENV=/absolute/path/to/envs/robert-exoplanets
+  export ROBERT_RUNS=/absolute/path/to/ROBERT-runs/experiment-01
+
+Use "conda env list" to find the environment path.
+All commands below select that environment with -p "$ROBERT_ENV".
+For a named environment, -n robert-exoplanets is an alternative to -p PATH.
+Keep run directories outside the code checkout. Use a new experiment name
+for each different model, dataset, prior set, or independent retrieval.
+
+Check the installation:
+  conda run -p "$ROBERT_ENV" python -m pip check
+  conda run -p "$ROBERT_ENV" python -c 'import robert_exoplanets; print(robert_exoplanets.__file__)'
+
+For a PHOENIX star, also set the actual shared reference-data path:
+  export PYSYN_CDBS=/absolute/path/to/synphot/reference-data
+  test -d "$PYSYN_CDBS/grid/phoenix"
+
+
+2. CREATE A NEW RUN [laptop or cluster login node]
+
+Choose a template from configurations/README.md. For example:
+
+  cd "$ROBERT_CODE"
+  conda run -p "$ROBERT_ENV" python scripts/create_run_directory.py \
+    --project-dir "$ROBERT_RUNS" --config configurations/emission.yaml \
+    --slurm-tasks 4 --slurm-time 12:00:00
+
+The script prints the new directory. Set ROBERT_RUN to that exact path:
+  export ROBERT_RUN=/absolute/path/printed/by/the/script
+  cd "$ROBERT_RUN"
+
+The final folder name comes from run.name in the source template.
+The Slurm settings above are starting examples, not required resources.
+For optimal estimation, select --slurm-tasks 1.
+On a cluster, you can also pass --slurm-account ACCOUNT and
+--slurm-partition PARTITION when creating the run.
+For an existing run, skip creation and set ROBERT_RUN to its directory.
+
+
+3. EDIT THE RUN CONFIGURATION [before starting inference]
+
+  nano configuration.yaml
+
+Check:
+  - System properties, observations, and independent dataset names.
+  - Temperature profile, chemistry, clouds, and radiative transfer.
+  - Parameter priors and sampler settings.
+  - Shared observation, opacity, chemistry, and stellar input paths.
+  - paths.project_directory: .
+
+Use literal paths in YAML; shell variables do not update the configuration.
+Edit the generated configuration.yaml, not source_configuration.yaml.
+
+For JWST R=1000 work, set opacity.resolution: R1000 and point
+paths.k_table_directory to the shared table collection. An R1000 child
+directory takes precedence over flat files in the parent. All selected gases
+must be available there. The standard downloader does not include SO2 or H2S.
+Reuse source tables; keep each run's prepared cache separate.
+
+The bundled quickstart.yaml and transmission.yaml need synthetic observations.
+Generate these during step 4. Real-data runs use their supplied observations.
+
+
+4. VALIDATE AND CHECK THE MODEL
+
+On a laptop: use the local terminal.
+On a cluster: obtain a compute allocation for opacity preparation and model
+calculations. Do not run these calculations on the login node.
+
+Example Slurm interactive allocation; replace account and partition:
+  srun --account=ACCOUNT --partition=PARTITION --nodes=1 --ntasks=1 \
+    --cpus-per-task=1 --mem=16G --time=01:00:00 --pty bash -i
+
+The example resource request may need more memory or time for your model.
+In the compute shell, restore your exported paths if needed. Use the same
+Conda installation as the batch job. Do not load a second MPI implementation.
+
+On either platform:
+  cd "$ROBERT_RUN"
+  export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+  export NUMEXPR_NUM_THREADS=1 NUMBA_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1
+  export MPLBACKEND=Agg
+  export NUMBA_CACHE_DIR="$ROBERT_RUN/scratch/numba"
+  export MPLCONFIGDIR="$ROBERT_RUN/scratch/matplotlib"
+  mkdir -p "$NUMBA_CACHE_DIR" "$MPLCONFIGDIR"
+
+  conda run -p "$ROBERT_ENV" python run_retrieval.py --config configuration.yaml --validate-only
+  conda run -p "$ROBERT_ENV" python run_retrieval.py --config configuration.yaml --initialize
+
+For the bundled quickstart.yaml or transmission.yaml ONLY:
+  conda run -p "$ROBERT_ENV" python "$ROBERT_CODE/examples/r100_injection_recovery.py" --config configuration.yaml --generate
+
+For every run, continue with:
+  conda run --no-capture-output -p "$ROBERT_ENV" python run_retrieval.py --config configuration.yaml --prepare-opacity
+  conda run --no-capture-output -p "$ROBERT_ENV" python run_retrieval.py --config configuration.yaml --smoke-only
+  conda run --no-capture-output -p "$ROBERT_ENV" python run_forward.py --config configuration.yaml
+  conda run -p "$ROBERT_ENV" python postprocess_forward.py --config configuration.yaml
+
+Preparation writes the instrument-specific opacity cache.
+The smoke check evaluates one prior-midpoint likelihood.
+Inspect outputs/forward_model.npz and outputs/plots/forward/.
+The forward model uses configured values; it is not a fitted solution.
+
+On a cluster, use "exit" to release the interactive allocation.
+
+
+5. SAVE THE SOFTWARE RECORD [laptop or cluster login node]
+
+  cd "$ROBERT_RUN"
+  command -v git
+  git -C "$ROBERT_CODE" rev-parse HEAD > code_commit.txt
+  git -C "$ROBERT_CODE" diff --binary HEAD > code_changes.patch
+  git -C "$ROBERT_CODE" status --short > code_status.txt
+  conda list -p "$ROBERT_ENV" --explicit > conda-explicit.txt
+  conda run -p "$ROBERT_ENV" python -m pip freeze > pip-freeze.txt
+
+Use a machine shell where Git is available. If code_status.txt lists
+untracked source files used by the run, preserve those files too.
+Keep the code and environment unchanged during inference and checkpoint resume.
+
+
+6A. RUN ON A LAPTOP [choose this OR 6B]
+
+One process (also the standard choice for optimal estimation):
+  cd "$ROBERT_RUN"
+  conda run --no-capture-output -p "$ROBERT_ENV" python -u run_retrieval.py --config configuration.yaml
+
+For MultiNest with several available CPU cores, use the environment's MPI:
+  conda run -p "$ROBERT_ENV" python -c 'from mpi4py import MPI; print(MPI.Get_library_version())'
+  conda run -p "$ROBERT_ENV" mpiexec -version
+  conda run --no-capture-output -p "$ROBERT_ENV" mpiexec -n 4 python -u run_retrieval.py --config configuration.yaml
+
+Run only ONE of these retrieval commands for a new run. Four processes are
+an example; choose a count your laptop can support. Keep thread limits from
+step 4. runtime.mpi_processes: auto uses the launched MPI world.
+The launcher, mpi4py, and compiled MultiNest must use a compatible MPI stack.
+Keep the laptop awake and the foreground terminal open until the run finishes.
+
+
+6B. RUN ON DiRAC OR ANOTHER SLURM CLUSTER [login node]
+
+  cd "$ROBERT_RUN"
+  export ROBERT_CONDA_ROOT="$(conda info --base)"
+  export ROBERT_CONDA_ENV="$ROBERT_ENV"
+  nano submit.sbatch
+
+Check account, partition, time, nodes, task count, memory, and any site limits.
+Set --cpus-per-task=1 for one thread per MPI process.
+The generated script uses absolute run paths and these Conda variables.
+Ensure those variables and PYSYN_CDBS (when required) reach the batch job.
+Save their exports in the script if your site does not export the login shell.
+Use the site's supported MPI launch method with the matching Conda MPI stack.
+
+Fresh environment.yml installations use MPICH/Hydra. Do not add OpenMPI or
+Intel MPI modules to that stack. Single-node Hydra fork-launch instructions
+are in docs/retrievals.md; a fork launcher must never be used across nodes.
+
+  grep '^#SBATCH' submit.sbatch
+  bash -n submit.sbatch
+  sbatch --test-only submit.sbatch
+
+If your site lacks --test-only, omit that check. It checks scheduling, not
+the model, and DOES NOT submit the job. Submit once with:
+  sbatch submit.sbatch
+
+Save the number from "Submitted batch job ...":
+  JOB_ID=REPLACE_WITH_SUBMITTED_JOB_NUMBER
+
+DiRAC note: inspect "scontrol show partition PARTITION". A partition with
+OverSubscribe=EXCLUSIVE allocates whole nodes. Allocated CPUs can exceed
+the requested MPI process count. Check the job's MPI world size separately.
+
+
+7. MONITOR AND CHECK CONVERGENCE
+
+From the run directory, on the laptop or cluster login node:
+  conda run -p "$ROBERT_ENV" robert-retrieval-status outputs/multinest
+
+For optimal estimation, use outputs/optimal_estimation instead.
+For Slurm jobs, also use:
+  squeue -u "$USER"
+  scontrol show job "$JOB_ID"
+  sacct -j "$JOB_ID" --format=JobID,State,ExitCode,Elapsed,MaxRSS
+
+The generated job logs are slurm-RUN_NAME-JOB_ID.out and .err in the run
+directory. Use "tail -f LOG_FILE" to follow one. Ctrl-C stops following the
+log, not the batch job.
+
+An empty queue or exit code zero does not establish sampler convergence.
+Check sampler_status.json and result.json in the sampler output directory.
+
+
+8. RESUME AN UNFINISHED MULTINEST RUN
+
+Wait for the previous process or batch job to end. Resolve any reported error.
+Keep the checkpoints and set sampler.resume: resume.
+Keep data, physics, priors, live points, seed, and MPI layout unchanged.
+Repeat the SAME launch command or submit the SAME submit.sbatch.
+Do not use resume: overwrite when continuing a checkpoint.
+Do not run two independent jobs in one run directory.
+Use a new directory for a changed experiment. See docs/retrievals.md for
+the complete resume rules and settings that may change between attempts.
+
+
+9. MAKE POSTERIOR PLOTS [after convergence]
+
+On a laptop: use the local terminal.
+On a cluster: obtain another compute allocation and restore step 4's environment.
+
+  cd "$ROBERT_RUN"
+  conda run --no-capture-output -p "$ROBERT_ENV" python postprocess_retrieval.py --config configuration.yaml
+
+Inspect outputs/plots/multinest/ or outputs/plots/optimal_estimation/.
+Check fit residuals, parameter limits, spectra, T-P and VMR profiles, and
+cloud profiles where supported. Nested-posterior products use the same
+100 weighted draws and mediumpurple curves and bands. OE products use a
+labelled Gaussian approximation rather than a sampled nested posterior.
+
+For the bundled synthetic recovery tests only:
+  conda run -p "$ROBERT_ENV" python "$ROBERT_CODE/examples/r100_injection_recovery.py" --config configuration.yaml --evaluate
+
+Keep configurations, software records, manifests, numerical results, and plots
+together. Back up important results outside temporary cluster scratch storage.
+Release an interactive allocation with "exit" when finished.
+
+NEXT EXPERIMENT: choose a new ROBERT_RUNS directory and repeat from step 2.
+Reuse the shared source inputs. Do not copy old checkpoints into a new run.
+
+MORE DETAIL
+  README.md                 installation
+  configurations/README.md  template choices
+  docs/configuration.md     YAML settings and priors
+  docs/retrievals.md         MPI, Slurm, resume, and Oxford Glamdring
+  docs/postprocessing.md    saved results and plots
