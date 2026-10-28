@@ -210,6 +210,107 @@ def test_virga_cloud_uses_pressure_edges_and_maps_layers_and_wavelengths(
     assert cloud.metadata["cloud_virga_do_virtual"] == "false"
 
 
+def test_virga_cloud_resolves_retrieved_fsed_and_log10_kzz(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    model = _model(
+        directory,
+        fsed=None,
+        fsed_parameter="cloud_fsed",
+        kz_cm2_s=None,
+        log10_kz_cm2_s_parameter="cloud_log10_kzz",
+    )
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+
+    (cloud,) = model.evaluate(
+        _gas_optical_depth(),
+        parameters={"cloud_fsed": 0.6, "cloud_log10_kzz": 8.0},
+    )
+
+    assert model.required_parameters == ("cloud_fsed", "cloud_log10_kzz")
+    assert fake_atmospheres[0].constructor_kwargs["fsed"] == pytest.approx(0.6)
+    assert fake_atmospheres[0].ptk_call["kz_min"] == pytest.approx(1.0e8)
+    np.testing.assert_allclose(fake_atmospheres[0].ptk_call["df"]["kz"], 1.0e8)
+    assert cloud.metadata["cloud_fsed"] == "retrieved_parameter:cloud_fsed"
+    assert cloud.metadata["cloud_kz_cm2_s"] == ("retrieved_parameter:cloud_log10_kzz")
+    assert cloud.metadata["cloud_fsed_used"] == "0.59999999999999998"
+    assert cloud.metadata["cloud_kz_cm2_s_used"] == "100000000"
+
+
+def test_virga_cloud_requires_retrieved_controls_and_valid_runtime_values(
+    tmp_path: Path,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    model = _model(
+        directory,
+        fsed=None,
+        fsed_parameter="cloud_fsed",
+        kz_cm2_s=None,
+        log10_kz_cm2_s_parameter="cloud_log10_kzz",
+    )
+
+    with pytest.raises(RobertValidationError, match="fsed parameter is missing"):
+        model.evaluate(_gas_optical_depth(), parameters={})
+    with pytest.raises(RobertValidationError, match="finite and positive"):
+        model.evaluate(
+            _gas_optical_depth(),
+            parameters={"cloud_fsed": 0.0, "cloud_log10_kzz": 8.0},
+        )
+    with pytest.raises(RobertValidationError, match=r"lie in \[-300, 300\]"):
+        model.evaluate(
+            _gas_optical_depth(),
+            parameters={"cloud_fsed": 0.6, "cloud_log10_kzz": 301.0},
+        )
+
+
+def test_virga_model_rejects_control_source_and_name_collisions(
+    tmp_path: Path,
+) -> None:
+    directory = _mie_directory(tmp_path)
+
+    with pytest.raises(RobertValidationError, match="exactly one of fixed fsed"):
+        _model(directory, fsed=None)
+    with pytest.raises(RobertValidationError, match="exactly one of fixed fsed"):
+        _model(directory, fsed_parameter="cloud_fsed")
+    with pytest.raises(
+        RobertValidationError, match="parameter names must be different"
+    ):
+        _model(
+            directory,
+            fsed=None,
+            fsed_parameter="same_parameter",
+            kz_cm2_s=None,
+            log10_kz_cm2_s_parameter="same_parameter",
+        )
+
+
+def test_virga_model_preserves_legacy_positional_control_order(
+    tmp_path: Path,
+) -> None:
+    directory = _mie_directory(tmp_path)
+
+    model = VirgaEddySedCloudModel(
+        ("MgSiO3",),
+        {"MgSiO3": 1.0e-3},
+        directory,
+        0.5,
+        1.0e6,
+        1.5,
+        2.0,
+        0.0,
+        "sh4",
+        {"source": "legacy-positional"},
+    )
+
+    assert model.fsed == pytest.approx(0.5)
+    assert model.kz_cm2_s == pytest.approx(1.0e6)
+    assert model.metallicity == pytest.approx(1.5)
+    assert model.geometric_stddev == pytest.approx(2.0)
+    assert model.metadata["source"] == "legacy-positional"
+
+
 def test_virga_cloud_interpolates_wavenumber_targets_without_extrapolation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

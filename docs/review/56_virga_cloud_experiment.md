@@ -8,7 +8,8 @@ real MgSiO3 example. Install `virga-exo` separately in the
 
 The provider requires explicit condensable gas mass mixing ratios, Kzz,
 sedimentation efficiency, particle-distribution width, and a Mie table for
-each condensate. The initial controls are fixed, not retrieved. Gravity and
+each condensate. Sedimentation efficiency and log10(Kzz / (cm^2/s)) can be
+fixed or retrieved; other Virga controls are fixed. Gravity and
 mean molecular weight must be uniform, and pressure-edge temperatures must be
 available. Its optical output uses the Virga asymmetry-factor closure rather
 than ROBERT's exact Mie phase moments. Compare spectra with a high-stream
@@ -32,6 +33,11 @@ clouds:
 
 The abundance is an illustrative input, not a recommended physical prior.
 Transmission also requires `radiative_transfer.gravity_model: constant`.
+To retrieve the two controls, replace `fsed` and `kz_cm2_s` with
+`fsed_parameter` and `log10_kz_cm2_s_parameter`, respectively, and define
+their priors in the normal `parameters` list. The former is positive and
+dimensionless; the latter is a uniform prior on the base-10 logarithm of Kzz
+in cm^2/s. Use scientifically justified bounds for the chosen atmosphere.
 
 FastChem condensate diagnostics are a separate opt-in Python API. They report
 FastChem's fictitious condensate number densities and element condensation

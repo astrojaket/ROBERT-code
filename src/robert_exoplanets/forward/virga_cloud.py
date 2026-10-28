@@ -44,29 +44,36 @@ class VirgaEddySedCloudModel:
     Parameters use Virga's conventions:
 
     - ``gas_mass_mixing_ratios`` are bottom gas mass mixing ratios in g/g.
-    - ``kz_cm2_s`` is a constant eddy diffusion coefficient in cm^2/s.
+    - Set exactly one of ``fsed`` or ``fsed_parameter``. A retrieved fsed value
+      is the positive, dimensionless value used by Virga.
+    - Set exactly one of ``kz_cm2_s`` or ``log10_kz_cm2_s_parameter``. The
+      retrieved value is log10(Kzz / (cm^2/s)).
     - ``metallicity`` is a linear factor relative to solar, not log metallicity.
     - ``geometric_stddev`` is the width of Virga's lognormal size distribution.
     - ``mie_directory`` contains precomputed ``<condensible>.mieff`` tables.
 
-    The initial adapter supports a constant Kzz, constant fsed, a lognormal
-    particle distribution, homogeneous spherical particles, and constant
-    atmospheric mean molecular weight and gravity. It passes ROBERT pressure
-    edges and temperature edges to Virga, so each Virga layer maps to one
-    ROBERT pressure layer. It fails on non-matching grids instead of silently
-    rebinning pressure layers.
+    A retrieved log10 Kzz value must lie in [-300, 300]. This bound prevents
+    floating-point underflow or overflow during conversion to Kzz. A retrieved
+    fsed value must be finite and positive. The adapter supports constant
+    controls, a lognormal particle distribution, homogeneous spherical
+    particles, and constant atmospheric mean molecular weight and gravity. It
+    passes ROBERT pressure edges and temperature edges to Virga, so each Virga
+    layer maps to one ROBERT pressure layer. It fails on non-matching grids
+    instead of silently rebinning pressure layers.
     """
 
     condensibles: tuple[str, ...]
     gas_mass_mixing_ratios: Mapping[str, float]
     mie_directory: Path | str
-    fsed: float
-    kz_cm2_s: float
+    fsed: float | None = None
+    kz_cm2_s: float | None = None
     metallicity: float = 1.0
     geometric_stddev: float = 2.0
     supersaturation: float = 0.0
     multiple_scattering_backend: str = "sh4"
     metadata: Mapping[str, str] = field(default_factory=dict)
+    fsed_parameter: str | None = None
+    log10_kz_cm2_s_parameter: str | None = None
 
     def __post_init__(self) -> None:
         condensibles = tuple(str(item).strip() for item in self.condensibles)
@@ -90,8 +97,23 @@ class VirgaEddySedCloudModel:
                 "Virga condensible gas mass mixing ratios must sum to no more than one"
             )
 
-        fsed = _finite_positive(self.fsed, "fsed")
-        kz = _finite_positive(self.kz_cm2_s, "kz_cm2_s")
+        fsed = None if self.fsed is None else _finite_positive(self.fsed, "fsed")
+        fsed_parameter = _optional_parameter_name(self.fsed_parameter, "fsed_parameter")
+        _validate_control_source(fsed, fsed_parameter, "fsed")
+
+        kz = (
+            None
+            if self.kz_cm2_s is None
+            else _finite_positive(self.kz_cm2_s, "kz_cm2_s")
+        )
+        log10_kz_parameter = _optional_parameter_name(
+            self.log10_kz_cm2_s_parameter, "log10_kz_cm2_s_parameter"
+        )
+        _validate_control_source(kz, log10_kz_parameter, "Kzz")
+        if fsed_parameter is not None and fsed_parameter == log10_kz_parameter:
+            raise RobertValidationError(
+                "Virga fsed and log10 Kzz parameter names must be different"
+            )
         metallicity = _finite_positive(self.metallicity, "metallicity")
         width = float(self.geometric_stddev)
         if not np.isfinite(width) or width <= 1.0:
@@ -130,6 +152,8 @@ class VirgaEddySedCloudModel:
         object.__setattr__(self, "mie_directory", mie_directory)
         object.__setattr__(self, "fsed", fsed)
         object.__setattr__(self, "kz_cm2_s", kz)
+        object.__setattr__(self, "fsed_parameter", fsed_parameter)
+        object.__setattr__(self, "log10_kz_cm2_s_parameter", log10_kz_parameter)
         object.__setattr__(self, "metallicity", metallicity)
         object.__setattr__(self, "geometric_stddev", width)
         object.__setattr__(self, "supersaturation", supersaturation)
@@ -138,13 +162,17 @@ class VirgaEddySedCloudModel:
 
     @property
     def required_parameters(self) -> tuple[str, ...]:
-        """This bounded provider uses fixed cloud controls, not retrieval values."""
+        """Return the retrieved Virga controls used by this provider."""
 
-        return ()
+        return tuple(
+            name
+            for name in (self.fsed_parameter, self.log10_kz_cm2_s_parameter)
+            if name is not None
+        )
 
     @property
     def manifest_metadata(self) -> Mapping[str, str]:
-        """Return the fixed Virga assumptions for the run manifest."""
+        """Return the Virga assumptions and control sources for the manifest."""
 
         return immutable_mapping(
             {
@@ -158,8 +186,16 @@ class VirgaEddySedCloudModel:
                     f"{name}:{self.gas_mass_mixing_ratios[name]:.17g}"
                     for name in self.condensibles
                 ),
-                "cloud_fsed": f"{self.fsed:.17g}",
-                "cloud_kz_cm2_s": f"{self.kz_cm2_s:.17g}",
+                "cloud_fsed": _control_source_metadata(self.fsed, self.fsed_parameter),
+                "cloud_kz_cm2_s": _control_source_metadata(
+                    self.kz_cm2_s, self.log10_kz_cm2_s_parameter
+                ),
+                "cloud_fsed_parameter": self.fsed_parameter or "fixed",
+                "cloud_fsed_units": "dimensionless",
+                "cloud_log10_kz_cm2_s_parameter": (
+                    self.log10_kz_cm2_s_parameter or "fixed"
+                ),
+                "cloud_kz_units": "cm^2/s",
                 "cloud_metallicity_linear_solar": f"{self.metallicity:.17g}",
                 "cloud_geometric_stddev": f"{self.geometric_stddev:.17g}",
                 "cloud_supersaturation": f"{self.supersaturation:.17g}",
@@ -184,7 +220,7 @@ class VirgaEddySedCloudModel:
     ) -> tuple[CloudOpticalProperties, ...]:
         """Run Virga and return its layer optical properties on ROBERT's grid."""
 
-        del parameters  # Cloud controls are fixed by this provider's constructor.
+        fsed, kz_cm2_s = self._resolved_controls(parameters)
         atmosphere = gas_optical_depth.atmosphere
         pressure_grid = atmosphere.pressure_grid
         if atmosphere.temperature_edges is None:
@@ -234,7 +270,7 @@ class VirgaEddySedCloudModel:
         ptk = {
             "pressure": np.asarray(pressure_bar, dtype=float),
             "temperature": temperature_edges,
-            "kz": np.full(pressure_bar.size, self.kz_cm2_s, dtype=float),
+            "kz": np.full(pressure_bar.size, kz_cm2_s, dtype=float),
         }
 
         virga, virga_version = _load_virga()
@@ -243,7 +279,7 @@ class VirgaEddySedCloudModel:
 
             virga_atmosphere = virga.Atmosphere(
                 list(self.condensibles),
-                fsed=self.fsed,
+                fsed=fsed,
                 mh=self.metallicity,
                 mmw=mean_molecular_weight,
                 sig=self.geometric_stddev,
@@ -260,7 +296,7 @@ class VirgaEddySedCloudModel:
             # floor from silently replacing the user's constant profile.
             virga_atmosphere.ptk(
                 df=ptk,
-                kz_min=self.kz_cm2_s,
+                kz_min=kz_cm2_s,
             )
             result = virga.compute(
                 virga_atmosphere,
@@ -279,9 +315,56 @@ class VirgaEddySedCloudModel:
             gas_optical_depth,
             condensibles=self.condensibles,
             virga_version=virga_version,
-            model_metadata=self.manifest_metadata,
+            model_metadata={
+                **self.manifest_metadata,
+                "cloud_fsed_used": f"{fsed:.17g}",
+                "cloud_kz_cm2_s_used": f"{kz_cm2_s:.17g}",
+            },
         )
         return (cloud,)
+
+    def _resolved_controls(
+        self,
+        parameters: Mapping[str, float],
+    ) -> tuple[float, float]:
+        if self.fsed_parameter is None:
+            assert self.fsed is not None
+            fsed = self.fsed
+        else:
+            if self.fsed_parameter not in parameters:
+                raise RobertValidationError(
+                    "Virga fsed parameter is missing: " + self.fsed_parameter
+                )
+            fsed = _finite_positive(
+                parameters[self.fsed_parameter],
+                f"Virga fsed parameter {self.fsed_parameter}",
+            )
+
+        if self.log10_kz_cm2_s_parameter is None:
+            assert self.kz_cm2_s is not None
+            kz_cm2_s = self.kz_cm2_s
+        else:
+            name = self.log10_kz_cm2_s_parameter
+            if name not in parameters:
+                raise RobertValidationError(
+                    "Virga log10 Kzz parameter is missing: " + name
+                )
+            try:
+                log10_kz = float(parameters[name])
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise RobertValidationError(
+                    f"Virga log10 Kzz parameter {name} must be numeric"
+                ) from exc
+            if not np.isfinite(log10_kz) or not -300.0 <= log10_kz <= 300.0:
+                raise RobertValidationError(
+                    f"Virga log10 Kzz parameter {name} must be finite and lie in [-300, 300]"
+                )
+            kz_cm2_s = float(10.0**log10_kz)
+            if not np.isfinite(kz_cm2_s) or kz_cm2_s <= 0.0:
+                raise RobertValidationError(
+                    f"Virga log10 Kzz parameter {name} does not produce a finite positive Kzz"
+                )
+        return fsed, kz_cm2_s
 
 
 def _cloud_optics_from_virga(
@@ -516,10 +599,43 @@ def _uniform_profile(values: object, message: str) -> float:
 
 
 def _finite_positive(value: object, name: str) -> float:
-    number = float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RobertValidationError(f"{name} must be finite and positive") from exc
     if not np.isfinite(number) or number <= 0.0:
         raise RobertValidationError(f"{name} must be finite and positive")
     return number
+
+
+def _optional_parameter_name(value: object | None, label: str) -> str | None:
+    if value is None:
+        return None
+    name = str(value).strip()
+    if not name:
+        raise RobertValidationError(f"{label} must be a non-empty name")
+    return name
+
+
+def _validate_control_source(
+    fixed_value: float | None,
+    parameter_name: str | None,
+    label: str,
+) -> None:
+    if (fixed_value is None) == (parameter_name is None):
+        raise RobertValidationError(
+            f"provide exactly one of fixed {label} or its retrieval parameter"
+        )
+
+
+def _control_source_metadata(
+    fixed_value: float | None,
+    parameter_name: str | None,
+) -> str:
+    if parameter_name is not None:
+        return f"retrieved_parameter:{parameter_name}"
+    assert fixed_value is not None
+    return f"{fixed_value:.17g}"
 
 
 __all__ = ["VirgaEddySedCloudModel"]

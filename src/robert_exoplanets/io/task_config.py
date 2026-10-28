@@ -568,19 +568,24 @@ class MieDirectNkCloudConfig(ConfigModel):
 
 
 class VirgaEddySedCloudConfig(ConfigModel):
-    """Fixed Virga eddy-sed controls and explicit gas abundance inputs.
+    """Virga eddy-sed controls with explicit fixed or retrieved values.
 
     Virga checks gravity and mean molecular weight for layer constancy at
     runtime. Transmission tasks must select constant gravity. This fixed
-    configuration does not add retrieval parameters.
+    configuration uses bottom gas mass mixing ratios in g/g. Set exactly one
+    of ``fsed`` and ``fsed_parameter``, and exactly one of ``kz_cm2_s`` and
+    ``log10_kz_cm2_s_parameter``. Retrieved fsed is positive and dimensionless;
+    retrieved log10 Kzz is in cm^2/s.
     """
 
     model: Literal["virga_eddy_sed"]
     condensibles: tuple[str, ...] = Field(min_length=1)
     gas_mass_mixing_ratios: dict[str, PositiveFloat]
     mie_directory: Path
-    fsed: PositiveFloat
-    kz_cm2_s: PositiveFloat
+    fsed: PositiveFloat | None = None
+    fsed_parameter: str | None = None
+    kz_cm2_s: PositiveFloat | None = None
+    log10_kz_cm2_s_parameter: str | None = None
     metallicity: PositiveFloat = 1.0
     geometric_stddev: PositiveFloat = 2.0
     supersaturation: float = Field(default=0.0, ge=0.0)
@@ -619,6 +624,18 @@ class VirgaEddySedCloudConfig(ConfigModel):
                 "Virga condensible gas mass mixing ratios must sum to no more than one"
             )
 
+        fsed_parameter = _optional_parameter_name(self.fsed_parameter, "fsed_parameter")
+        _validate_control_source(self.fsed, fsed_parameter, "fsed")
+        log10_kz_parameter = _optional_parameter_name(
+            self.log10_kz_cm2_s_parameter,
+            "log10_kz_cm2_s_parameter",
+        )
+        _validate_control_source(self.kz_cm2_s, log10_kz_parameter, "Kzz")
+        if fsed_parameter is not None and fsed_parameter == log10_kz_parameter:
+            raise ValueError(
+                "Virga fsed and log10 Kzz parameter names must be different"
+            )
+
         controls = (
             ("fsed", self.fsed),
             ("kz_cm2_s", self.kz_cm2_s),
@@ -626,7 +643,7 @@ class VirgaEddySedCloudConfig(ConfigModel):
             ("geometric_stddev", self.geometric_stddev),
             ("supersaturation", self.supersaturation),
         )
-        if any(not isfinite(float(value)) for _, value in controls):
+        if any(value is not None and not isfinite(float(value)) for _, value in controls):
             raise ValueError("Virga cloud controls must be finite")
         if self.geometric_stddev <= 1.0:
             raise ValueError(
@@ -635,6 +652,8 @@ class VirgaEddySedCloudConfig(ConfigModel):
 
         object.__setattr__(self, "condensibles", condensibles)
         object.__setattr__(self, "gas_mass_mixing_ratios", gas_mmr)
+        object.__setattr__(self, "fsed_parameter", fsed_parameter)
+        object.__setattr__(self, "log10_kz_cm2_s_parameter", log10_kz_parameter)
         return self
 
 
@@ -941,6 +960,8 @@ class TaskConfig(ConfigModel):
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")
         required: set[str] = set()
+        non_virga_required: set[str] = set()
+        virga_parameter_roles: dict[str, str] = {}
         parameter_configs = {item.name: item for item in self.parameters}
         stellar_contamination = self.stellar_contamination
         if stellar_contamination is not None:
@@ -960,18 +981,57 @@ class TaskConfig(ConfigModel):
                     )
                 if region.covering_fraction_parameter is not None:
                     required.add(region.covering_fraction_parameter)
+                    non_virga_required.add(region.covering_fraction_parameter)
         for region in regions:
-            required.update(_required_chemistry_parameters(region.atmosphere.chemistry))
-            required.update(
-                _required_temperature_parameters(region.atmosphere.temperature)
+            chemistry_parameters = _required_chemistry_parameters(
+                region.atmosphere.chemistry
             )
-            required.update(_required_cloud_parameters(region.clouds))
+            temperature_parameters = _required_temperature_parameters(
+                region.atmosphere.temperature
+            )
+            cloud_parameters = _required_cloud_parameters(region.clouds)
+            required.update(chemistry_parameters)
+            required.update(temperature_parameters)
+            required.update(cloud_parameters)
+            non_virga_required.update(chemistry_parameters)
+            non_virga_required.update(temperature_parameters)
+            if region.clouds.model == "virga_eddy_sed":
+                controls = (
+                    (region.clouds.fsed_parameter, "fsed"),
+                    (region.clouds.log10_kz_cm2_s_parameter, "log10 Kzz"),
+                )
+                for name, control in controls:
+                    if name is None:
+                        continue
+                    previous_control = virga_parameter_roles.get(name)
+                    if previous_control is not None and previous_control != control:
+                        raise ValueError(
+                            f"Virga parameter {name} is used for both "
+                            f"{previous_control} and {control}"
+                        )
+                    virga_parameter_roles[name] = control
+                    parameter = parameter_configs.get(name)
+                    if parameter is not None:
+                        _validate_virga_prior(parameter, control)
+                region_parameter_names = set(virga_parameter_roles)
+                collisions = region_parameter_names.intersection(
+                    chemistry_parameters | temperature_parameters
+                )
+                if collisions:
+                    raise ValueError(
+                        "Virga cloud control parameters collide with chemistry or "
+                        "temperature parameters in "
+                        f"{region.name}: " + ", ".join(sorted(collisions))
+                    )
+            else:
+                non_virga_required.update(cloud_parameters)
             quenching = getattr(region.atmosphere.chemistry, "quenching", None)
             if quenching is not None:
                 quench_parameters = tuple(
                     group.pressure_parameter for group in quenching.resolved_groups()
                 )
                 required.update(quench_parameters)
+                non_virga_required.update(quench_parameters)
                 lower_domain = log10(region.atmosphere.pressure.top_bar)
                 upper_domain = log10(region.atmosphere.pressure.bottom_bar)
                 for name in quench_parameters:
@@ -1015,9 +1075,11 @@ class TaskConfig(ConfigModel):
         disk_mode = _disk_emission_mode(self.disk_emission)
         if disk_mode == "diluted_one_region":
             required.add(self.disk_emission.dilution_parameter)
+            non_virga_required.add(self.disk_emission.dilution_parameter)
             fraction_parameter = self.disk_emission.dilution_parameter
         elif disk_mode == "two_region":
             required.add(self.disk_emission.hot_fraction_parameter)
+            non_virga_required.add(self.disk_emission.hot_fraction_parameter)
             fraction_parameter = self.disk_emission.hot_fraction_parameter
         else:
             fraction_parameter = None
@@ -1064,6 +1126,15 @@ class TaskConfig(ConfigModel):
                 )
                 if parameter is not None
             )
+            non_virga_required.update(
+                parameter
+                for parameter in (
+                    option.offset_parameter,
+                    option.uncertainty_scale_parameter,
+                    option.jitter_parameter,
+                )
+                if parameter is not None
+            )
         radiative_transfer = self.radiative_transfer
         if radiative_transfer.model == "transmission" and disk_mode != "one_region":
             raise ValueError(
@@ -1081,6 +1152,7 @@ class TaskConfig(ConfigModel):
                 )
             if radiative_transfer.radius_scale_parameter is not None:
                 required.add(radiative_transfer.radius_scale_parameter)
+                non_virga_required.add(radiative_transfer.radius_scale_parameter)
         clr_parameters = {
             item.name: item.prior
             for item in self.parameters
@@ -1130,6 +1202,12 @@ class TaskConfig(ConfigModel):
                 raise ValueError(
                     "centered_log_ratio priors currently require direct nested sampling"
                 )
+        collisions = set(virga_parameter_roles).intersection(non_virga_required)
+        if collisions:
+            raise ValueError(
+                "Virga cloud control parameters collide with other model parameters: "
+                + ", ".join(sorted(collisions))
+            )
         missing_parameters = sorted(required - set(names))
         if missing_parameters:
             raise ValueError(
@@ -1281,7 +1359,14 @@ def _required_cloud_parameters(config: CloudsConfig) -> set[str]:
     if config.model == "none":
         return set()
     if config.model == "virga_eddy_sed":
-        return set()
+        return {
+            name
+            for name in (
+                config.fsed_parameter,
+                config.log10_kz_cm2_s_parameter,
+            )
+            if name is not None
+        }
     required = {
         config.log10_mass_fraction_parameter,
         config.log10_radius_micron_parameter,
@@ -1292,6 +1377,70 @@ def _required_cloud_parameters(config: CloudsConfig) -> set[str]:
         required.update(config.real_index_parameter_names)
         required.update(config.log10_imaginary_index_parameter_names)
     return required
+
+
+def _optional_parameter_name(value: str | None, label: str) -> str | None:
+    if value is None:
+        return None
+    name = value.strip()
+    if not name:
+        raise ValueError(f"{label} must be a non-empty name")
+    return name
+
+
+def _validate_control_source(
+    fixed_value: float | None,
+    parameter_name: str | None,
+    label: str,
+) -> None:
+    if (fixed_value is None) == (parameter_name is None):
+        raise ValueError(
+            f"provide exactly one of fixed {label} or its retrieval parameter"
+        )
+
+
+def _validate_virga_prior(parameter: ParameterConfig, control: str) -> None:
+    prior = parameter.prior
+    if not isfinite(prior.lower) or not isfinite(prior.upper):
+        raise ValueError(
+            f"Virga {control} prior bounds must be finite: {parameter.name}"
+        )
+
+    if control == "fsed":
+        if prior.type not in {"uniform", "log_uniform"} or prior.lower <= 0.0:
+            raise ValueError(
+                f"Virga fsed parameter {parameter.name} requires positive uniform "
+                "or log-uniform bounds"
+            )
+        if parameter.unit is not None and parameter.unit.strip().lower() not in {
+            "1",
+            "dimensionless",
+        }:
+            raise ValueError(
+                f"Virga fsed parameter {parameter.name} requires a dimensionless unit"
+            )
+        return
+
+    if prior.type != "uniform":
+        raise ValueError(
+            f"Virga log10 Kzz parameter {parameter.name} requires a uniform prior; "
+            "its values are already logarithmic"
+        )
+    if prior.lower < -300.0 or prior.upper > 300.0:
+        raise ValueError(
+            f"Virga log10 Kzz prior {parameter.name} must lie within [-300, 300] "
+            "log10(cm^2/s)"
+        )
+    if parameter.unit is not None and parameter.unit.strip().lower() not in {
+        "dex",
+        "log10(cm^2/s)",
+        "log10(cm2/s)",
+        "log10(cm^2 s^-1)",
+    }:
+        raise ValueError(
+            f"Virga log10 Kzz parameter {parameter.name} unit must describe "
+            "log10(cm^2/s)"
+        )
 
 
 def load_task_config(path: str | Path) -> TaskConfig:
