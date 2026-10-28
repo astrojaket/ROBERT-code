@@ -567,11 +567,83 @@ class MieDirectNkCloudConfig(ConfigModel):
         return self
 
 
+class VirgaEddySedCloudConfig(ConfigModel):
+    """Fixed Virga eddy-sed controls and explicit gas abundance inputs.
+
+    Virga checks gravity and mean molecular weight for layer constancy at
+    runtime. Transmission tasks must select constant gravity. This fixed
+    configuration does not add retrieval parameters.
+    """
+
+    model: Literal["virga_eddy_sed"]
+    condensibles: tuple[str, ...] = Field(min_length=1)
+    gas_mass_mixing_ratios: dict[str, PositiveFloat]
+    mie_directory: Path
+    fsed: PositiveFloat
+    kz_cm2_s: PositiveFloat
+    metallicity: PositiveFloat = 1.0
+    geometric_stddev: PositiveFloat = 2.0
+    supersaturation: float = Field(default=0.0, ge=0.0)
+    multiple_scattering_backend: Literal[
+        "two_stream", "toon_hemispheric_mean", "sh4", "p3"
+    ] = "sh4"
+
+    @model_validator(mode="after")
+    def validate_virga_controls(self) -> "VirgaEddySedCloudConfig":
+        condensibles = tuple(str(name).strip() for name in self.condensibles)
+        if any(not name for name in condensibles):
+            raise ValueError("Virga condensibles must be non-empty names")
+        if len(set(condensibles)) != len(condensibles):
+            raise ValueError("Virga condensibles must be unique")
+
+        gas_mmr: dict[str, float] = {}
+        for raw_name, raw_value in self.gas_mass_mixing_ratios.items():
+            name = str(raw_name).strip()
+            if not name or name in gas_mmr:
+                raise ValueError(
+                    "Virga gas_mass_mixing_ratios keys must be non-empty and unique"
+                )
+            value = float(raw_value)
+            if not isfinite(value) or value <= 0.0:
+                raise ValueError(
+                    f"Virga gas mass mixing ratio for {name} must be finite and positive"
+                )
+            gas_mmr[name] = value
+        if set(gas_mmr) != set(condensibles):
+            raise ValueError(
+                "gas_mass_mixing_ratios must provide exactly one value for each "
+                "Virga condensible"
+            )
+        if sum(gas_mmr.values()) > 1.0:
+            raise ValueError(
+                "Virga condensible gas mass mixing ratios must sum to no more than one"
+            )
+
+        controls = (
+            ("fsed", self.fsed),
+            ("kz_cm2_s", self.kz_cm2_s),
+            ("metallicity", self.metallicity),
+            ("geometric_stddev", self.geometric_stddev),
+            ("supersaturation", self.supersaturation),
+        )
+        if any(not isfinite(float(value)) for _, value in controls):
+            raise ValueError("Virga cloud controls must be finite")
+        if self.geometric_stddev <= 1.0:
+            raise ValueError(
+                "Virga geometric_stddev must be greater than one for its lognormal distribution"
+            )
+
+        object.__setattr__(self, "condensibles", condensibles)
+        object.__setattr__(self, "gas_mass_mixing_ratios", gas_mmr)
+        return self
+
+
 CloudsConfig = Annotated[
     CloudFreeConfig
     | DeckHazeCloudConfig
     | MieCatalogCloudConfig
-    | MieDirectNkCloudConfig,
+    | MieDirectNkCloudConfig
+    | VirgaEddySedCloudConfig,
     Field(discriminator="model"),
 ]
 
@@ -813,6 +885,7 @@ class TaskPathsConfig(ConfigModel):
     output_directory: Path | None = None
     scratch_directory: Path | None = None
     optical_constants_directory: Path | None = None
+    virga_mie_directory: Path | None = None
 
 
 class TaskConfig(ConfigModel):
@@ -842,6 +915,16 @@ class TaskConfig(ConfigModel):
         if len(set(opacity)) != len(opacity):
             raise ValueError("opacity.species contains duplicates")
         regions = configured_regions(self)
+        if (
+            self.radiative_transfer.model == "transmission"
+            and self.radiative_transfer.gravity_model != "constant"
+            and any(region.clouds.model == "virga_eddy_sed" for region in regions)
+        ):
+            raise ValueError(
+                "Virga clouds require radiative_transfer.gravity_model=constant "
+                "for transmission; the Virga adapter also checks constant mean "
+                "molecular weight at runtime"
+            )
         for region in regions:
             chemistry = _chemistry_species(region.atmosphere.chemistry)
             if len(set(chemistry)) != len(chemistry):
@@ -1197,6 +1280,8 @@ def _required_cloud_parameters(config: CloudsConfig) -> set[str]:
         }
     if config.model == "none":
         return set()
+    if config.model == "virga_eddy_sed":
+        return set()
     required = {
         config.log10_mass_fraction_parameter,
         config.log10_radius_micron_parameter,
@@ -1224,12 +1309,15 @@ def load_task_config(path: str | Path) -> TaskConfig:
         ("opacity", "path"),
         ("opacity", "cache_directory"),
         ("clouds", "optical_constants_path"),
+        ("clouds", "mie_directory"),
         ("disk_emission", "hot_region", "atmosphere", "chemistry", "fastchem_path"),
         ("disk_emission", "hot_region", "atmosphere", "temperature", "profile_path"),
         ("disk_emission", "hot_region", "clouds", "optical_constants_path"),
+        ("disk_emission", "hot_region", "clouds", "mie_directory"),
         ("disk_emission", "cold_region", "atmosphere", "chemistry", "fastchem_path"),
         ("disk_emission", "cold_region", "atmosphere", "temperature", "profile_path"),
         ("disk_emission", "cold_region", "clouds", "optical_constants_path"),
+        ("disk_emission", "cold_region", "clouds", "mie_directory"),
         ("paths", "project_directory"),
         ("paths", "observations_directory"),
         ("paths", "fastchem_directory"),
@@ -1238,6 +1326,7 @@ def load_task_config(path: str | Path) -> TaskConfig:
         ("paths", "output_directory"),
         ("paths", "scratch_directory"),
         ("paths", "optical_constants_directory"),
+        ("paths", "virga_mie_directory"),
         ("outputs", "directory"),
         ("runtime", "scratch_directory"),
     ):
@@ -1344,6 +1433,12 @@ def _fill_regional_input_paths(raw: dict, path_config: dict) -> None:
             clouds.setdefault(
                 "optical_constants_path", path_config["optical_constants_directory"]
             )
+        if (
+            isinstance(clouds, dict)
+            and clouds.get("model") == "virga_eddy_sed"
+            and path_config.get("virga_mie_directory") is not None
+        ):
+            clouds.setdefault("mie_directory", path_config["virga_mie_directory"])
 
 
 def _load_yaml_mapping(source: Path, ancestors: tuple[Path, ...] = ()) -> dict:

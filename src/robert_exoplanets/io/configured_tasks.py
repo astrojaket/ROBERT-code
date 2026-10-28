@@ -44,6 +44,7 @@ from robert_exoplanets.forward import (
     build_parameterized_emission_model,
     build_parameterized_transmission_model,
 )
+from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
 from robert_exoplanets.instruments import ObservationCollection, ObservationDataset
 from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
 from robert_exoplanets.opacity import CorrelatedKOpacityProvider, CorrelatedKTable
@@ -742,6 +743,18 @@ def _cloud_model(config: CloudsConfig):
             deck_asymmetry_factor=config.deck_asymmetry_factor,
             haze_single_scattering_albedo=config.haze_single_scattering_albedo,
             haze_asymmetry_factor=config.haze_asymmetry_factor,
+            multiple_scattering_backend=config.multiple_scattering_backend,
+        )
+    if config.model == "virga_eddy_sed":
+        return VirgaEddySedCloudModel(
+            condensibles=config.condensibles,
+            gas_mass_mixing_ratios=config.gas_mass_mixing_ratios,
+            mie_directory=config.mie_directory,
+            fsed=config.fsed,
+            kz_cm2_s=config.kz_cm2_s,
+            metallicity=config.metallicity,
+            geometric_stddev=config.geometric_stddev,
+            supersaturation=config.supersaturation,
             multiple_scattering_backend=config.multiple_scattering_backend,
         )
     if config.model == "mie_catalog":
