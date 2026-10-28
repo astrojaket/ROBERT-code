@@ -418,6 +418,55 @@ def test_virga_cloud_requires_edge_temperature_and_uniform_state(
         )
 
 
+def test_virga_cloud_scalar_mmw_override_is_limited_to_cloud_calculation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    model = _model(directory, mean_molecular_weight_amu=2.35)
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    gas_optical_depth = _gas_optical_depth(
+        mean_molecular_weight=np.array([2.3, 2.5])
+    )
+
+    (cloud,) = model.evaluate(gas_optical_depth, parameters={})
+
+    assert fake_atmospheres[0].constructor_kwargs["mmw"] == pytest.approx(2.35)
+    np.testing.assert_allclose(
+        gas_optical_depth.atmosphere.mean_molecular_weight,
+        [2.3, 2.5],
+    )
+    assert cloud.metadata["cloud_mean_molecular_weight_policy_used"] == (
+        "cloud_only_scalar_override"
+    )
+    assert float(
+        cloud.metadata["cloud_mean_molecular_weight_profile_min_amu"]
+    ) == pytest.approx(2.3)
+    assert float(
+        cloud.metadata["cloud_mean_molecular_weight_profile_max_amu"]
+    ) == pytest.approx(2.5)
+    assert float(
+        cloud.metadata["cloud_mean_molecular_weight_amu_used"]
+    ) == pytest.approx(2.35)
+    assert float(
+        cloud.metadata["cloud_mean_molecular_weight_override_amu"]
+    ) == pytest.approx(2.35)
+    assert cloud.metadata["cloud_mean_molecular_weight_is_approximation"] == "true"
+    assert cloud.metadata["cloud_mean_molecular_weight_approximation_scope"] == (
+        "virga_cloud_microphysics_only; "
+        "ROBERT_gas_and_rt_use_original_atmosphere_profile"
+    )
+
+
+@pytest.mark.parametrize("value", [0.0, -2.3, float("nan"), float("inf")])
+def test_virga_cloud_scalar_mmw_override_must_be_finite_and_positive(
+    tmp_path: Path,
+    value: float,
+) -> None:
+    with pytest.raises(RobertValidationError, match="mean_molecular_weight_amu"):
+        _model(_mie_directory(tmp_path), mean_molecular_weight_amu=value)
+
+
 def test_virga_cloud_requires_explicit_gas_mass_mixing_ratios_and_mie_files(
     tmp_path: Path,
 ) -> None:

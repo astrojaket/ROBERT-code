@@ -757,6 +757,7 @@ def _cloud_model(config: CloudsConfig):
             metallicity=config.metallicity,
             geometric_stddev=config.geometric_stddev,
             supersaturation=config.supersaturation,
+            mean_molecular_weight_amu=config.mean_molecular_weight_amu,
             multiple_scattering_backend=config.multiple_scattering_backend,
         )
     if config.model == "mie_catalog":

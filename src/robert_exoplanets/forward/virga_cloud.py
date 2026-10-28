@@ -51,12 +51,19 @@ class VirgaEddySedCloudModel:
     - ``metallicity`` is a linear factor relative to solar, not log metallicity.
     - ``geometric_stddev`` is the width of Virga's lognormal size distribution.
     - ``mie_directory`` contains precomputed ``<condensible>.mieff`` tables.
+    - ``mean_molecular_weight_amu`` is an optional cloud-only scalar override.
+      Without it, the atmosphere MMW profile must be uniform. With it, Virga
+      uses the configured scalar for its cloud calculation while ROBERT keeps
+      the complete profile for the gas and radiative-transfer calculations.
+      If the override differs from the atmosphere profile, this is an explicit
+      approximation, not a variable-MMW Virga calculation.
 
     A retrieved log10 Kzz value must lie in [-300, 300]. This bound prevents
     floating-point underflow or overflow during conversion to Kzz. A retrieved
     fsed value must be finite and positive. The adapter supports constant
     controls, a lognormal particle distribution, homogeneous spherical
-    particles, and constant atmospheric mean molecular weight and gravity. It
+    particles, constant gravity, and constant atmospheric mean molecular
+    weight by default. It
     passes ROBERT pressure edges and temperature edges to Virga, so each Virga
     layer maps to one ROBERT pressure layer. It fails on non-matching grids
     instead of silently rebinning pressure layers.
@@ -74,6 +81,7 @@ class VirgaEddySedCloudModel:
     metadata: Mapping[str, str] = field(default_factory=dict)
     fsed_parameter: str | None = None
     log10_kz_cm2_s_parameter: str | None = None
+    mean_molecular_weight_amu: float | None = None
 
     def __post_init__(self) -> None:
         condensibles = tuple(str(item).strip() for item in self.condensibles)
@@ -126,6 +134,14 @@ class VirgaEddySedCloudModel:
             raise RobertValidationError(
                 "supersaturation must be finite and non-negative"
             )
+        mean_molecular_weight_amu = (
+            None
+            if self.mean_molecular_weight_amu is None
+            else _finite_positive(
+                self.mean_molecular_weight_amu,
+                "mean_molecular_weight_amu",
+            )
+        )
 
         backend = str(self.multiple_scattering_backend).strip().lower()
         if backend not in _SUPPORTED_MULTIPLE_SCATTERING_BACKENDS:
@@ -159,6 +175,11 @@ class VirgaEddySedCloudModel:
         object.__setattr__(self, "supersaturation", supersaturation)
         object.__setattr__(self, "multiple_scattering_backend", backend)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+        object.__setattr__(
+            self,
+            "mean_molecular_weight_amu",
+            mean_molecular_weight_amu,
+        )
 
     @property
     def required_parameters(self) -> tuple[str, ...]:
@@ -200,6 +221,21 @@ class VirgaEddySedCloudModel:
                 "cloud_geometric_stddev": f"{self.geometric_stddev:.17g}",
                 "cloud_supersaturation": f"{self.supersaturation:.17g}",
                 "cloud_particle_distribution": "lognormal_homogeneous_spheres",
+                "cloud_mean_molecular_weight_input_units": "amu",
+                "cloud_mean_molecular_weight_policy": (
+                    "uniform_atmosphere_profile_required"
+                    if self.mean_molecular_weight_amu is None
+                    else "cloud_only_scalar_override"
+                ),
+                "cloud_mean_molecular_weight_override_amu": (
+                    "not_set"
+                    if self.mean_molecular_weight_amu is None
+                    else f"{self.mean_molecular_weight_amu:.17g}"
+                ),
+                "cloud_mean_molecular_weight_scope": (
+                    "virga_cloud_microphysics_only; "
+                    "ROBERT_gas_and_rt_use_original_atmosphere_profile"
+                ),
                 "cloud_phase_function_closure": (
                     "henyey_greenstein_from_virga_asymmetry"
                 ),
@@ -242,10 +278,42 @@ class VirgaEddySedCloudModel:
             gas_optical_depth.gravity_m_s2,
             "Virga requires constant gravity across the atmosphere",
         )
-        mean_molecular_weight = _uniform_profile(
+        mean_molecular_weight_profile = np.asarray(
             atmosphere.mean_molecular_weight,
-            "Virga requires constant mean molecular weight across the atmosphere",
+            dtype=float,
         )
+        if (
+            mean_molecular_weight_profile.shape != (pressure_grid.n_layers,)
+            or not np.all(np.isfinite(mean_molecular_weight_profile))
+            or np.any(mean_molecular_weight_profile <= 0.0)
+        ):
+            raise RobertValidationError(
+                "Virga requires a finite positive mean molecular weight profile "
+                "with one value per atmosphere layer"
+            )
+        mean_molecular_weight_profile_min = float(
+            np.min(mean_molecular_weight_profile)
+        )
+        mean_molecular_weight_profile_max = float(
+            np.max(mean_molecular_weight_profile)
+        )
+        if self.mean_molecular_weight_amu is None:
+            mean_molecular_weight = _uniform_profile(
+                mean_molecular_weight_profile,
+                "Virga requires constant mean molecular weight across the atmosphere; "
+                "set mean_molecular_weight_amu to use a cloud-only scalar override",
+            )
+            mean_molecular_weight_policy = "uniform_atmosphere_profile"
+            mean_molecular_weight_is_approximation = False
+        else:
+            mean_molecular_weight = self.mean_molecular_weight_amu
+            mean_molecular_weight_policy = "cloud_only_scalar_override"
+            mean_molecular_weight_is_approximation = not np.allclose(
+                mean_molecular_weight_profile,
+                mean_molecular_weight,
+                rtol=1.0e-10,
+                atol=0.0,
+            )
 
         pressure_bar = pressure_values_in_unit(
             pressure_grid.edges,
@@ -319,6 +387,30 @@ class VirgaEddySedCloudModel:
                 **self.manifest_metadata,
                 "cloud_fsed_used": f"{fsed:.17g}",
                 "cloud_kz_cm2_s_used": f"{kz_cm2_s:.17g}",
+                "cloud_mean_molecular_weight_policy_used": (
+                    mean_molecular_weight_policy
+                ),
+                "cloud_mean_molecular_weight_profile_min_amu": (
+                    f"{mean_molecular_weight_profile_min:.17g}"
+                ),
+                "cloud_mean_molecular_weight_profile_max_amu": (
+                    f"{mean_molecular_weight_profile_max:.17g}"
+                ),
+                "cloud_mean_molecular_weight_amu_used": (
+                    f"{mean_molecular_weight:.17g}"
+                ),
+                "cloud_mean_molecular_weight_override_amu": (
+                    "not_set"
+                    if self.mean_molecular_weight_amu is None
+                    else f"{self.mean_molecular_weight_amu:.17g}"
+                ),
+                "cloud_mean_molecular_weight_is_approximation": (
+                    str(mean_molecular_weight_is_approximation).lower()
+                ),
+                "cloud_mean_molecular_weight_approximation_scope": (
+                    "virga_cloud_microphysics_only; "
+                    "ROBERT_gas_and_rt_use_original_atmosphere_profile"
+                ),
             },
         )
         return (cloud,)

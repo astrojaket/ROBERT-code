@@ -102,6 +102,37 @@ def test_load_and_factory_build_fixed_virga_cloud_from_yaml(tmp_path: Path) -> N
     assert cloud.gas_mass_mixing_ratios == {"KCl": 1.0e-4}
     assert cloud.required_parameters == ()
     assert cloud.manifest_metadata["cloud_provider"] == "virga-exo"
+    assert cloud.mean_molecular_weight_amu is None
+    assert cloud.manifest_metadata["cloud_mean_molecular_weight_input_units"] == "amu"
+    assert cloud.manifest_metadata["cloud_mean_molecular_weight_policy"] == (
+        "uniform_atmosphere_profile_required"
+    )
+
+
+def test_yaml_passes_cloud_only_mmw_override_to_virga_model(tmp_path: Path) -> None:
+    mie_directory = _make_mie_table(tmp_path / "mie")
+    cloud_config = _virga_cloud(mie_directory)
+    cloud_config["mean_molecular_weight_amu"] = 2.35
+    source = _write_config(tmp_path, EMISSION, cloud=cloud_config)
+
+    config = load_task_config(source)
+    cloud = configured_tasks._cloud_model(config.clouds)
+
+    assert isinstance(config.clouds, VirgaEddySedCloudConfig)
+    assert config.clouds.mean_molecular_weight_amu == pytest.approx(2.35)
+    assert isinstance(cloud, configured_tasks.VirgaEddySedCloudModel)
+    assert cloud.mean_molecular_weight_amu == pytest.approx(2.35)
+    assert cloud.manifest_metadata["cloud_mean_molecular_weight_input_units"] == "amu"
+    assert cloud.manifest_metadata["cloud_mean_molecular_weight_policy"] == (
+        "cloud_only_scalar_override"
+    )
+    assert cloud.manifest_metadata["cloud_mean_molecular_weight_override_amu"] == (
+        "2.3500000000000001"
+    )
+    assert cloud.manifest_metadata["cloud_mean_molecular_weight_scope"] == (
+        "virga_cloud_microphysics_only; "
+        "ROBERT_gas_and_rt_use_original_atmosphere_profile"
+    )
 
 
 def test_global_virga_mie_path_fills_top_level_and_regional_clouds(
@@ -298,6 +329,8 @@ def test_virga_retrieval_parameter_names_must_not_collide_with_other_models(
         ({"gas_mass_mixing_ratios": {"KCl": 1.1}}, "sum to no more than one"),
         ({"geometric_stddev": 1.0}, "greater than one"),
         ({"fsed": float("inf")}, "finite"),
+        ({"mean_molecular_weight_amu": 0.0}, "greater than 0"),
+        ({"mean_molecular_weight_amu": float("inf")}, "finite"),
     ],
 )
 def test_virga_config_rejects_invalid_fixed_controls(

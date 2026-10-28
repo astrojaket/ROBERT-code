@@ -571,8 +571,11 @@ class VirgaEddySedCloudConfig(ConfigModel):
     """Virga eddy-sed controls with explicit fixed or retrieved values.
 
     Virga checks gravity and mean molecular weight for layer constancy at
-    runtime. Transmission tasks must select constant gravity. This fixed
-    configuration uses bottom gas mass mixing ratios in g/g. Set exactly one
+    runtime. ``mean_molecular_weight_amu`` is an opt-in scalar override for
+    Virga cloud microphysics only; ROBERT retains the full atmosphere profile
+    for gas and radiative transfer. Transmission tasks must select constant
+    gravity. This fixed configuration uses bottom gas mass mixing ratios in
+    g/g. Set exactly one
     of ``fsed`` and ``fsed_parameter``, and exactly one of ``kz_cm2_s`` and
     ``log10_kz_cm2_s_parameter``. Retrieved fsed is positive and dimensionless;
     retrieved log10 Kzz is in cm^2/s.
@@ -589,6 +592,7 @@ class VirgaEddySedCloudConfig(ConfigModel):
     metallicity: PositiveFloat = 1.0
     geometric_stddev: PositiveFloat = 2.0
     supersaturation: float = Field(default=0.0, ge=0.0)
+    mean_molecular_weight_amu: PositiveFloat | None = None
     multiple_scattering_backend: Literal[
         "two_stream", "toon_hemispheric_mean", "sh4", "p3"
     ] = "sh4"
@@ -642,6 +646,7 @@ class VirgaEddySedCloudConfig(ConfigModel):
             ("metallicity", self.metallicity),
             ("geometric_stddev", self.geometric_stddev),
             ("supersaturation", self.supersaturation),
+            ("mean_molecular_weight_amu", self.mean_molecular_weight_amu),
         )
         if any(value is not None and not isfinite(float(value)) for _, value in controls):
             raise ValueError("Virga cloud controls must be finite")
