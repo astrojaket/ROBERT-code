@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import log10
+from math import isfinite, log10
 from pathlib import Path
 import os
 from typing import Annotated, Literal
@@ -284,6 +284,11 @@ class PressureQuenchConfig(ConfigModel):
         "taylor_2026_hot_jupiter_element_grouped",
     ] = "custom"
     groups: tuple[QuenchGroupConfig, ...] = ()
+    ch4_gradient_parameter: str | None = Field(
+        default=None,
+        min_length=1,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*$",
+    )
 
     @model_validator(mode="after")
     def validate_groups(self) -> "PressureQuenchConfig":
@@ -298,6 +303,10 @@ class PressureQuenchConfig(ConfigModel):
         species = tuple(item for group in groups for item in group.species)
         if len(set(species)) != len(species):
             raise ValueError("a species may belong to only one quench group")
+        if self.ch4_gradient_parameter is not None and "CH4" not in species:
+            raise ValueError(
+                "ch4_gradient_parameter requires CH4 in a pressure-quench group"
+            )
         return self
 
     def resolved_groups(self) -> tuple[QuenchGroupConfig, ...]:
@@ -366,6 +375,17 @@ class FastChemConfig(ConfigModel):
                     "quench parameters collide with FastChem parameters: "
                     + ", ".join(collisions)
                 )
+            gradient_parameter = self.quenching.ch4_gradient_parameter
+            if gradient_parameter is not None:
+                gradient_collisions = {gradient_parameter} & (
+                    base_parameters | quench_parameters
+                )
+                if gradient_collisions:
+                    raise ValueError(
+                        "CH4 gradient parameter collides with FastChem or quench "
+                        "parameters: "
+                        + ", ".join(sorted(gradient_collisions))
+                    )
         return self
 
 
@@ -890,6 +910,24 @@ class TaskConfig(ConfigModel):
                             f"grid layer-center domain [{lower_domain}, {upper_domain}] "
                             "log10(bar)"
                         )
+                gradient_parameter = quenching.ch4_gradient_parameter
+                if gradient_parameter is not None:
+                    parameter = parameter_configs.get(gradient_parameter)
+                    if parameter is not None:
+                        if parameter.unit is not None:
+                            unit = parameter.unit.strip().lower()
+                            if unit not in {"1", "dimensionless"}:
+                                raise ValueError(
+                                    "CH4 gradient parameter requires a dimensionless unit: "
+                                    + gradient_parameter
+                                )
+                        if not isfinite(parameter.prior.lower) or not isfinite(
+                            parameter.prior.upper
+                        ):
+                            raise ValueError(
+                                "CH4 gradient parameter prior bounds must be finite: "
+                                + gradient_parameter
+                            )
 
         disk_mode = _disk_emission_mode(self.disk_emission)
         if disk_mode == "diluted_one_region":
@@ -1094,11 +1132,17 @@ def _chemistry_species(config: ChemistryConfig) -> tuple[str, ...]:
 
 def _required_chemistry_parameters(config: ChemistryConfig) -> set[str]:
     if config.model == "fastchem_equilibrium":
-        return {
+        required = {
             config.metallicity_parameter,
             config.carbon_to_oxygen_parameter,
             *(config.constant_log10_vmr_parameters or {}).values(),
         }
+        if (
+            config.quenching is not None
+            and config.quenching.ch4_gradient_parameter is not None
+        ):
+            required.add(config.quenching.ch4_gradient_parameter)
+        return required
     required = _retrieved_free_chemistry_parameters(config)
     if config.phantom_mean_molecular_weight_parameter is not None:
         required.add(config.phantom_mean_molecular_weight_parameter)

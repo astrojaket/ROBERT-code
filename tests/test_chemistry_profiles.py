@@ -232,8 +232,8 @@ def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     grid = PressureGrid.logspace(1.0e-4, 1.0e-2, n_layers=2, unit="bar")
     chemistry = FastChemEquilibriumChemistry(
         fastchem_path=fastchem_path,
-        fastchem_species=("H2O1", "C1O1", "O2S1", "H2", "He"),
-        labels=("H2O", "CO", "SO2", "H2", "He"),
+        fastchem_species=("H2O1", "C1O1", "O2S1", "H2", "He", "H"),
+        labels=("H2O", "CO", "SO2", "H2", "He", "H"),
         constant_log10_vmr_parameters={"SO2": "log_SO2"},
     )
 
@@ -244,11 +244,24 @@ def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     )
 
     assert chemistry.required_parameters() == ("metallicity", "CtoO", "log_SO2")
-    assert set(composition) == {"H2O", "CO", "SO2", "H2", "He"}
+    assert set(composition) == {"H2O", "CO", "SO2", "H2", "He", "H"}
     np.testing.assert_allclose(composition["SO2"], np.full(2, 1.0e-7))
     assert np.all(composition["H2"] > 0.0)
+    assert np.all(composition["H"] > 0.0)
     assert np.all(composition["He"] > 0.0)
     assert composition["H2"].flags.writeable is False
+    mean_molecular_weight = CompositionMeanMolecularWeight(
+        normalization="raw_sum"
+    ).evaluate(composition, grid)
+    expected = (
+        composition["H2O"] * 18.01528
+        + composition["CO"] * 28.0101
+        + composition["SO2"] * 64.066
+        + composition["H2"] * 2.01588
+        + composition["He"] * 4.002602
+        + composition["H"] * 1.00794
+    )
+    np.testing.assert_allclose(mean_molecular_weight, expected)
     enriched = chemistry.evaluate(
         {"metallicity": 1.0, "CtoO": 0.8, "log_SO2": -6.0},
         grid,

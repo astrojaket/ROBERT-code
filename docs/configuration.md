@@ -196,6 +196,35 @@ would be a no-op and is rejected as an unknown configuration field. See
 [Chemistry](theory/chemistry.md) for interpolation, bounds, closure,
 provenance, and validation-level details.
 
+To test a CH4 gradient above its quench pressure, add the optional
+`ch4_gradient_parameter` field. Omit it to keep the default constant profile.
+CH4 must be in a quench group and in the FastChem species list:
+
+```yaml
+quenching:
+  model: pressure_quench
+  preset: custom
+  groups:
+    - {pressure_parameter: log_Pq_CH4, species: [CH4]}
+  ch4_gradient_parameter: alpha_CH4
+```
+
+Add both parameters to the normal `parameters` list, for example:
+
+```yaml
+parameters:
+  - {name: log_Pq_CH4, unit: log10(bar), prior: {type: uniform, lower: -4.0, upper: 1.0}}
+  - {name: alpha_CH4, unit: dimensionless, prior: {type: uniform, lower: -1.0, upper: 1.0}}
+```
+
+These bounds are examples, not calibrated recommendations. The slope is
+`d ln(X_CH4) / d ln(P)` above `P_q`. Positive values give depletion with
+height; negative values give enrichment. A slope of zero recovers the current
+rule. The field also works with the grouped preset; only CH4 gets the slope.
+This experimental profile is not a kinetics or conservation solver. See the
+[chemistry guide](theory/chemistry.md#optional-ch4-gradient-above-the-quench-pressure)
+for its bounds and validation limits.
+
 Free-chemistry nested sampling also accepts a joint CLR prior. All retrieved
 abundances must use one shared group; the configured background gas is the
 derived final composition category:

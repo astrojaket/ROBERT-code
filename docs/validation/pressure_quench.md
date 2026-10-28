@@ -5,6 +5,15 @@ analytic profiles. That establishes the validation level **tested**. It does
 not establish agreement with the research version of NemesisPy or reproduce a
 published retrieval.
 
+The optional CH4 gradient is an empirical extension. Its analytic tests cover
+the power-law profile, the zero-slope limit, pressure units and grid order,
+abundance bounds, and composition diagnostics. Configuration and forward-model
+tests check parameter discovery and integration. These checks establish
+software behavior only. They do not validate the profile against the 3D
+simulations in Zamyatina et al. (2026), establish spectral retrieval accuracy,
+or extend the NemesisPy parity claim. The oracle contract below applies to
+the original constant-abundance rule (or the zero-slope limit).
+
 At implementation time, Taylor et al. (2026) defined the piecewise quench
 profile but did not specify the off-grid numerical convention. The paper's
 data-availability statement says generated data are available on request, and

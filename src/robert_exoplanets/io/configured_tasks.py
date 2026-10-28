@@ -668,6 +668,7 @@ def _chemistry_components(config: ChemistryConfig):
             groups=tuple(QuenchGroup(group.pressure_parameter, group.species)
                          for group in quenching.resolved_groups()),
             preset=quenching.preset,
+            ch4_gradient_parameter=quenching.ch4_gradient_parameter,
         )
     return chemistry, mean_molecular_weight, opacity_free_species
 

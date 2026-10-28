@@ -152,9 +152,33 @@ def test_yaml_configures_arbitrary_molecular_pressure_quenching() -> None:
     assert quenching.preset == "custom"
     assert quenching.groups[0].species == ("CO2",)
     assert quenching.groups[1].species == ("H2O", "CO")
+    assert quenching.ch4_gradient_parameter is None
 
 
-def test_yaml_configures_taylor_2026_grouped_quench_preset() -> None:
+def test_yaml_pressure_quench_ch4_gradient_is_disabled_by_default() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [{"pressure_parameter": "log_Pq_H2O", "species": ["H2O"]}],
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_H2O",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.atmosphere.chemistry.quenching.ch4_gradient_parameter is None
+
+
+@pytest.mark.parametrize("gradient_enabled", [False, True])
+def test_yaml_configures_taylor_2026_grouped_quench_preset(
+    gradient_enabled: bool,
+) -> None:
     config = load_task_config(EXAMPLE)
     raw = deepcopy(config.model_dump(mode="python"))
     raw["atmosphere"]["chemistry"]["quenching"] = {
@@ -172,6 +196,18 @@ def test_yaml_configures_taylor_2026_grouped_quench_preset() -> None:
             "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
         },
     ]
+    if gradient_enabled:
+        raw["atmosphere"]["chemistry"]["quenching"][
+            "ch4_gradient_parameter"
+        ] = "alpha_CH4"
+        raw["parameters"] = [
+            *raw["parameters"],
+            {
+                "name": "alpha_CH4",
+                "unit": "1",
+                "prior": {"type": "uniform", "lower": -1.0, "upper": 1.0},
+            },
+        ]
 
     parsed = TaskConfig.model_validate(raw)
     groups = parsed.atmosphere.chemistry.quenching.resolved_groups()
@@ -180,6 +216,11 @@ def test_yaml_configures_taylor_2026_grouped_quench_preset() -> None:
     assert groups[0].species == ("H2O", "CO", "CO2", "CH4")
     assert groups[1].species == ("NH3",)
     assert all("N2" not in group.species for group in groups)
+    expected_gradient = "alpha_CH4" if gradient_enabled else None
+    assert (
+        parsed.atmosphere.chemistry.quenching.ch4_gradient_parameter
+        == expected_gradient
+    )
 
 
 @pytest.mark.parametrize(
@@ -260,6 +301,116 @@ def test_yaml_requires_every_quench_pressure_prior() -> None:
         TaskConfig.model_validate(raw)
 
 
+def _ch4_gradient_raw() -> dict:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "log_Pq_CH4", "species": ["CH4"]}
+        ],
+        "ch4_gradient_parameter": "alpha_CH4",
+    }
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "log_Pq_CH4",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "alpha_CH4",
+            "unit": "dimensionless",
+            "prior": {"type": "uniform", "lower": -1.0, "upper": 1.0},
+        },
+    ]
+    return raw
+
+
+def test_yaml_requires_a_prior_for_the_ch4_gradient_parameter() -> None:
+    raw = _ch4_gradient_raw()
+    raw["parameters"] = [
+        item for item in raw["parameters"] if item["name"] != "alpha_CH4"
+    ]
+
+    with pytest.raises(ValidationError, match="alpha_CH4"):
+        TaskConfig.model_validate(raw)
+
+
+@pytest.mark.parametrize(
+    ("quenching_update", "parameters_update", "message"),
+    [
+        (
+            {"groups": [{"pressure_parameter": "log_Pq_H2O", "species": ["H2O"]}]},
+            None,
+            "requires CH4 in a pressure-quench group",
+        ),
+        (
+            {"ch4_gradient_parameter": "alpha-CH4"},
+            None,
+            "ch4_gradient_parameter",
+        ),
+        (
+            {"ch4_gradient_parameter": "metallicity"},
+            None,
+            "CH4 gradient parameter collides with FastChem or quench parameters",
+        ),
+        (
+            {"ch4_gradient_parameter": "log_Pq_CH4"},
+            None,
+            "CH4 gradient parameter collides with FastChem or quench parameters",
+        ),
+        (
+            {},
+            {"unit": "K"},
+            "requires a dimensionless unit",
+        ),
+        (
+            {},
+            {"unit": "dex"},
+            "requires a dimensionless unit",
+        ),
+    ],
+)
+def test_yaml_rejects_invalid_ch4_gradient_configuration(
+    quenching_update, parameters_update, message
+) -> None:
+    raw = _ch4_gradient_raw()
+    raw["atmosphere"]["chemistry"]["quenching"].update(quenching_update)
+    if parameters_update is not None:
+        gradient = next(
+            item for item in raw["parameters"] if item["name"] == "alpha_CH4"
+        )
+        gradient.update(parameters_update)
+
+    with pytest.raises(ValidationError, match=message):
+        TaskConfig.model_validate(raw)
+
+
+def test_yaml_allows_finite_log_uniform_ch4_gradient_prior_and_missing_unit() -> None:
+    raw = _ch4_gradient_raw()
+    gradient = next(
+        item for item in raw["parameters"] if item["name"] == "alpha_CH4"
+    )
+    gradient.pop("unit")
+    gradient["prior"] = {"type": "log_uniform", "lower": 0.01, "upper": 1.0}
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.atmosphere.chemistry.quenching.ch4_gradient_parameter == "alpha_CH4"
+
+
+def test_yaml_rejects_non_finite_ch4_gradient_prior_bounds() -> None:
+    raw = _ch4_gradient_raw()
+    gradient = next(
+        item for item in raw["parameters"] if item["name"] == "alpha_CH4"
+    )
+    gradient["prior"]["upper"] = float("inf")
+
+    with pytest.raises(ValidationError, match="prior bounds must be finite"):
+        TaskConfig.model_validate(raw)
+
+
 def test_yaml_rejects_quenching_for_constant_with_altitude_free_chemistry() -> None:
     config = load_task_config(TRANSMISSION)
     raw = deepcopy(config.model_dump(mode="python"))
@@ -305,8 +456,9 @@ def test_yaml_validates_quench_prior_semantics_and_grid_domain(prior, message) -
         TaskConfig.model_validate(raw)
 
 
+@pytest.mark.parametrize("gradient_enabled", [False, True])
 def test_configured_fastchem_is_wrapped_by_pressure_quench_decorator(
-    monkeypatch,
+    monkeypatch, gradient_enabled: bool
 ) -> None:
     config = load_task_config(EXAMPLE)
     raw = deepcopy(config.model_dump(mode="python"))
@@ -314,9 +466,16 @@ def test_configured_fastchem_is_wrapped_by_pressure_quench_decorator(
     raw["atmosphere"]["chemistry"]["quenching"] = {
         "model": "pressure_quench",
         "groups": [
-            {"pressure_parameter": "log_Pq_CO2", "species": ["CO2"]}
+            {
+                "pressure_parameter": "log_Pq_CO2",
+                "species": ["CO2", *(["CH4"] if gradient_enabled else [])],
+            }
         ],
     }
+    if gradient_enabled:
+        raw["atmosphere"]["chemistry"]["quenching"][
+            "ch4_gradient_parameter"
+        ] = "alpha_CH4"
     raw["parameters"] = [
         *raw["parameters"],
         {
@@ -324,6 +483,15 @@ def test_configured_fastchem_is_wrapped_by_pressure_quench_decorator(
             "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
         },
     ]
+    if gradient_enabled:
+        raw["parameters"] = [
+            *raw["parameters"],
+            {
+                "name": "alpha_CH4",
+                "unit": "dimensionless",
+                "prior": {"type": "uniform", "lower": -1.0, "upper": 1.0},
+            },
+        ]
     parsed = TaskConfig.model_validate(raw)
     observation = Observation.from_arrays(
         wavelength=[3.0, 4.0],
@@ -368,12 +536,29 @@ def test_configured_fastchem_is_wrapped_by_pressure_quench_decorator(
 
     assert "log_Pq_CO2" in problem.parameter_names
     assert problem.metadata["chemistry_quench_scheme"] == "pressure_quench"
-    assert problem.metadata["chemistry_quench_groups"] == "log_Pq_CO2:CO2"
+    assert problem.metadata["chemistry_quench_groups"] == (
+        "log_Pq_CO2:CO2|CH4" if gradient_enabled else "log_Pq_CO2:CO2"
+    )
     assert problem.metadata["chemistry_quench_pressure_semantics"] == "log10(P_q/bar)"
     assert manifest.problem_metadata["chemistry_quench_scheme"] == "pressure_quench"
     assert manifest.problem_metadata["chemistry_quench_closure_policy"] == (
         "no_renormalization"
     )
+    if gradient_enabled:
+        assert "alpha_CH4" in problem.parameter_names
+        assert problem.metadata["chemistry_ch4_gradient_parameter"] == "alpha_CH4"
+        assert problem.metadata["chemistry_ch4_gradient_profile"] == (
+            "empirical_power_law_for_P_le_Pq"
+        )
+        assert problem.metadata["chemistry_ch4_gradient_validation_level"] == (
+            "experimental_unit_tested_not_science_demonstrated"
+        )
+        assert manifest.problem_metadata["chemistry_ch4_gradient_parameter"] == (
+            "alpha_CH4"
+        )
+    else:
+        assert "alpha_CH4" not in problem.parameter_names
+        assert "chemistry_ch4_gradient_parameter" not in problem.metadata
 
 
 def test_yaml_can_select_blackbody_stellar_spectrum() -> None:
@@ -449,6 +634,72 @@ def test_yaml_resolves_independent_two_region_physics() -> None:
     assert cold.atmosphere.temperature.model == "isothermal"
     assert cold.atmosphere.chemistry.model == "free"
     assert cold.clouds.model == "deck_haze"
+
+
+def test_yaml_supports_a_ch4_gradient_in_one_regional_chemistry_model() -> None:
+    raw = _two_region_raw()
+    raw["atmosphere"]["chemistry"]["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "hot_log_Pq_CH4", "species": ["CH4"]}
+        ],
+        "ch4_gradient_parameter": "hot_alpha_CH4",
+    }
+    regional_chemistry = deepcopy(raw["atmosphere"]["chemistry"])
+    regional_chemistry["quenching"] = {
+        "model": "pressure_quench",
+        "groups": [
+            {"pressure_parameter": "cold_log_Pq_CH4", "species": ["CH4"]}
+        ],
+        "ch4_gradient_parameter": "cold_alpha_CH4",
+    }
+    raw["disk_emission"]["cold_region"]["atmosphere"]["chemistry"] = (
+        regional_chemistry
+    )
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "hot_log_Pq_CH4",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "hot_alpha_CH4",
+            "unit": "dimensionless",
+            "prior": {"type": "uniform", "lower": -1.0, "upper": 1.0},
+        },
+        {
+            "name": "cold_log_Pq_CH4",
+            "unit": "log10(bar)",
+            "prior": {"type": "uniform", "lower": -5.5, "upper": 2.0},
+        },
+        {
+            "name": "cold_alpha_CH4",
+            "unit": "dimensionless",
+            "prior": {"type": "uniform", "lower": -1.0, "upper": 1.0},
+        },
+    ]
+
+    missing_cold_gradient = deepcopy(raw)
+    missing_cold_gradient["parameters"] = [
+        item
+        for item in missing_cold_gradient["parameters"]
+        if item["name"] != "cold_alpha_CH4"
+    ]
+    with pytest.raises(ValidationError, match="cold_alpha_CH4"):
+        TaskConfig.model_validate(missing_cold_gradient)
+
+    parsed = TaskConfig.model_validate(raw)
+    hot, cold = configured_regions(parsed)
+
+    assert (
+        hot.atmosphere.chemistry.quenching.ch4_gradient_parameter
+        == "hot_alpha_CH4"
+    )
+    assert (
+        cold.atmosphere.chemistry.quenching.ch4_gradient_parameter
+        == "cold_alpha_CH4"
+    )
 
 
 def test_two_region_yaml_requires_the_area_fraction_parameter() -> None:

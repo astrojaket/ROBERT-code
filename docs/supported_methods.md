@@ -48,6 +48,12 @@ authoritative NemesisPy profile oracle is available. No Taylor et al. retrieval
 reproduction has been run. The [oracle contract](validation/pressure_quench.md)
 defines what evidence is needed before either claim changes.
 
+An optional `ch4_gradient_parameter` enables an experimental power-law CH4
+profile above its quench pressure. The default is unchanged. The signed,
+dimensionless slope is an empirical retrieval parameter, not a chemical rate
+or a transport calculation. See the [chemistry guide](theory/chemistry.md#optional-ch4-gradient-above-the-quench-pressure)
+for the equation, composition limits, and validation status.
+
 ## Stellar contamination
 
 The transit light source effect (TSLE) is a typed transform applied to the

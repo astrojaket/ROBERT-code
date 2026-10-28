@@ -105,6 +105,45 @@ not `cross-framework validated`; no retrieval reproduction has been run, so it
 is not `science demonstrated`. The reproducible oracle exchange contract is
 documented in [Pressure-quench validation](../validation/pressure_quench.md).
 
+### Optional CH4 gradient above the quench pressure
+
+The default remains the constant-abundance rule above `P_q`. Set
+`ch4_gradient_parameter` to the name of a retrieved, dimensionless parameter
+`alpha` to enable an experimental CH4 profile:
+
+```text
+P > P_q:  X_CH4(P) = X_CH4,base(P)
+P <= P_q: X_CH4(P) = X_CH4,base(P_q) * (P / P_q)**alpha
+```
+
+CH4 must belong to a configured quench group. That group's pressure is the
+anchor, including when the group also contains other species. Only CH4 gets
+the gradient; other group members retain the constant-abundance rule.
+The anchor uses the existing linear-VMR interpolation in log pressure.
+`alpha = 0` recovers the original profile exactly. Positive `alpha` decreases
+CH4 with height, and negative `alpha` increases it. A zero anchor stays zero.
+Nonfinite results and CH4 VMR greater than one are rejected; the model does
+not clip or renormalize the profile. Composition and elemental drift remain
+available through `evaluate_with_diagnostics()`.
+
+This is an empirical sensitivity model motivated by the nonuniform profiles
+in [Zamyatina et al. (2026)](https://arxiv.org/abs/2610.33643), not an equation
+derived or calibrated in that paper. It does not solve transport, kinetics,
+photochemistry, or elemental conservation. Software and analytic profile
+tests do not establish scientific validity or retrieval accuracy. Use explicit
+priors and compare against the constant-profile baseline before interpreting
+the gradient or quench pressure physically.
+
+Python example (the base model must produce CH4):
+
+```python
+chemistry = PressureQuenchChemistry(
+    base_model=base_chemistry,
+    groups=(QuenchGroup("log_Pq_CH4", ("CH4",)),),
+    ch4_gradient_parameter="alpha_CH4",
+)
+```
+
 ## Free Chemistry
 
 `FreeChemistry` is the first retrieval-facing chemistry model in ROBERT. It is

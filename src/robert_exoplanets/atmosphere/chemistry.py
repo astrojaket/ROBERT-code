@@ -18,6 +18,7 @@ from robert_exoplanets.core._immutability import immutable_mapping
 DEFAULT_MOLECULAR_MASSES: Mapping[str, float] = {
     "H2": 2.01588,
     "He": 4.002602,
+    "H": 1.00794,
     "H2O": 18.01528,
     "CO": 28.0101,
     "CO2": 44.0095,
@@ -267,12 +268,21 @@ class PressureQuenchChemistry:
     linear VMR interpolation in ``log10(P / bar)`` between layer centers. The
     inclusive layer-center domain is enforced; extrapolation is forbidden.
     Quenched profiles are not renormalized.
+
+    An optional ``ch4_gradient_parameter`` enables an experimental profile for
+    CH4 at and above its quench level:
+    ``X_CH4(P) = X_CH4(P_q) * (P / P_q)**alpha``. The signed, dimensionless
+    ``alpha`` is ``d ln(X_CH4) / d ln(P)``; positive values deplete CH4 with
+    height, while negative values enrich it. This empirical sensitivity model
+    is inspired by Zamyatina et al. (2026), arXiv:2610.33643, but its equation
+    is not derived from that paper and is not a kinetics or transport model.
     """
 
     base_model: ChemistryModel
     groups: tuple[QuenchGroup, ...]
     name: str = "pressure-quench"
     preset: str = "custom"
+    ch4_gradient_parameter: str | None = None
     convention: str = field(init=False)
     metadata: Mapping[str, str] = field(init=False)
 
@@ -289,6 +299,13 @@ class PressureQuenchChemistry:
         if any(not isinstance(group, QuenchGroup) for group in groups):
             raise RobertValidationError(
                 "pressure-quench groups must be QuenchGroup instances"
+            )
+
+        gradient_parameter = self.ch4_gradient_parameter
+        if gradient_parameter is not None:
+            gradient_parameter = _validate_parameter_name(
+                gradient_parameter,
+                context="CH4 gradient parameter name",
             )
 
         parameters = tuple(group.pressure_parameter for group in groups)
@@ -313,6 +330,11 @@ class PressureQuenchChemistry:
                 "quench species missing from base chemistry: " + ", ".join(missing)
             )
 
+        if gradient_parameter is not None and "CH4" not in selected_species:
+            raise RobertValidationError(
+                "CH4 must be included in a quench group when the CH4 gradient is enabled"
+            )
+
         base_parameters = tuple(self.base_model.required_parameters())
         collisions = sorted(set(base_parameters).intersection(parameters))
         if collisions:
@@ -324,6 +346,15 @@ class PressureQuenchChemistry:
             raise RobertValidationError(
                 "base chemistry required parameters must be unique"
             )
+        if gradient_parameter is not None:
+            gradient_collisions = sorted(
+                {gradient_parameter}.intersection((*base_parameters, *parameters))
+            )
+            if gradient_collisions:
+                raise RobertValidationError(
+                    "CH4 gradient parameter collides with base chemistry or quench "
+                    "pressure parameters: " + ", ".join(gradient_collisions)
+                )
 
         convention = str(self.base_model.convention)
         if convention != "volume_mixing_ratio":
@@ -355,8 +386,34 @@ class PressureQuenchChemistry:
                 ),
             }
         )
+        if gradient_parameter is not None:
+            base_metadata.update(
+                {
+                    "quench_profile_rule": (
+                        "base_for_P_gt_Pq;CH4_power_law_and_other_group_species_"
+                        "freeze_for_P_le_Pq"
+                    ),
+                    "ch4_gradient_profile": "empirical_power_law_for_P_le_Pq",
+                    "ch4_gradient_parameter": gradient_parameter,
+                    "ch4_gradient_parameter_semantics": (
+                        "dimensionless_alpha=d_ln_X_CH4/d_ln_P; signed"
+                    ),
+                    "ch4_gradient_sign": (
+                        "alpha_positive_depletes_with_height;"
+                        "alpha_negative_enriches_with_height"
+                    ),
+                    "ch4_gradient_reference": (
+                        "inspiration_only_Zamyatina_et_al_2026_arXiv_2610.33643;"
+                        "equation_not_derived_from_paper"
+                    ),
+                    "ch4_gradient_validation_level": (
+                        "experimental_unit_tested_not_science_demonstrated"
+                    ),
+                }
+            )
         object.__setattr__(self, "groups", groups)
         object.__setattr__(self, "preset", str(self.preset))
+        object.__setattr__(self, "ch4_gradient_parameter", gradient_parameter)
         object.__setattr__(self, "convention", convention)
         object.__setattr__(self, "metadata", immutable_mapping(base_metadata))
 
@@ -367,11 +424,12 @@ class PressureQuenchChemistry:
         return self.base_model.species
 
     def required_parameters(self) -> tuple[str, ...]:
-        """Return base parameters followed by quench parameters in group order."""
+        """Return base, quench, and optional gradient parameters in stable order."""
 
         return (
             *self.base_model.required_parameters(),
             *(group.pressure_parameter for group in self.groups),
+            *((self.ch4_gradient_parameter,) if self.ch4_gradient_parameter else ()),
         )
 
     @classmethod
@@ -379,6 +437,8 @@ class PressureQuenchChemistry:
         cls,
         base_model: ChemistryModel,
         species_parameters: Mapping[str, str],
+        *,
+        ch4_gradient_parameter: str | None = None,
     ) -> "PressureQuenchChemistry":
         """Decorate arbitrary base species with independent quench pressures."""
 
@@ -388,12 +448,15 @@ class PressureQuenchChemistry:
                 QuenchGroup.molecular(species, parameter)
                 for species, parameter in species_parameters.items()
             ),
+            ch4_gradient_parameter=ch4_gradient_parameter,
         )
 
     @classmethod
     def taylor_2026_hot_jupiter_element_grouped(
         cls,
         base_model: ChemistryModel,
+        *,
+        ch4_gradient_parameter: str | None = None,
     ) -> "PressureQuenchChemistry":
         """Build the paper-exact species grouping (which deliberately omits N2)."""
 
@@ -410,6 +473,7 @@ class PressureQuenchChemistry:
                 ),
             ),
             preset="taylor_2026_hot_jupiter_element_grouped",
+            ch4_gradient_parameter=ch4_gradient_parameter,
         )
 
     def evaluate(
@@ -455,6 +519,16 @@ class PressureQuenchChemistry:
         domain_max = float(np.max(log_pressure_bar))
         order = np.argsort(log_pressure_bar)
 
+        ch4_gradient = (
+            _parameter_value(
+                parameters,
+                self.ch4_gradient_parameter,
+                context="CH4 gradient chemistry",
+            )
+            if self.ch4_gradient_parameter is not None
+            else None
+        )
+
         for group in self.groups:
             log_quench_pressure = _parameter_value(
                 parameters,
@@ -479,7 +553,65 @@ class PressureQuenchChemistry:
                     )
                 )
                 transformed = np.array(equilibrium, dtype=float, copy=True)
-                transformed[freeze_mask] = quench_vmr
+                if species == "CH4" and ch4_gradient is not None:
+                    if not np.isfinite(quench_vmr):
+                        raise RobertValidationError(
+                            "CH4 gradient chemistry produced non-finite CH4 VMR"
+                        )
+                    if quench_vmr < 0.0:
+                        raise RobertValidationError(
+                            "CH4 gradient chemistry requires a non-negative quench anchor"
+                        )
+                    if np.any(transformed < 0.0):
+                        raise RobertValidationError(
+                            "CH4 gradient chemistry requires non-negative CH4 VMR"
+                        )
+                    if ch4_gradient == 0.0 or quench_vmr == 0.0:
+                        # Keep both the zero-slope legacy result and a zero anchor
+                        # exact, without introducing a floor or a log(0) value.
+                        transformed[freeze_mask] = quench_vmr
+                    else:
+                        # Work in log pressure and log abundance. This avoids an
+                        # overflowing intermediate P/Pq ratio for valid finite
+                        # pressure and slope inputs.
+                        selected_log_pressure = log_pressure_bar[freeze_mask]
+                        log_pressure_ratio = np.log(10.0) * (
+                            selected_log_pressure - log_quench_pressure
+                        )
+                        with np.errstate(over="ignore", invalid="ignore"):
+                            log_vmr = np.log(quench_vmr) + (
+                                ch4_gradient * log_pressure_ratio
+                            )
+                        if np.any(np.isnan(log_vmr)) or np.any(np.isposinf(log_vmr)):
+                            raise RobertValidationError(
+                                "CH4 gradient chemistry produced non-finite CH4 VMR"
+                            )
+                        with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+                            gradient_vmr = np.exp(log_vmr)
+                        if not np.all(np.isfinite(gradient_vmr)):
+                            raise RobertValidationError(
+                                "CH4 gradient chemistry produced non-finite CH4 VMR"
+                            )
+                        # Preserve the anchor exactly when it lies on a layer
+                        # center, including at the physical upper bound X=1.
+                        gradient_vmr[
+                            selected_log_pressure == log_quench_pressure
+                        ] = quench_vmr
+                        transformed[freeze_mask] = gradient_vmr
+                    if not np.all(np.isfinite(transformed)):
+                        raise RobertValidationError(
+                            "CH4 gradient chemistry produced non-finite CH4 VMR"
+                        )
+                    if np.any(transformed < 0.0):
+                        raise RobertValidationError(
+                            "CH4 gradient chemistry produced negative CH4 VMR"
+                        )
+                    if np.any(transformed > 1.0):
+                        raise RobertValidationError(
+                            "CH4 gradient chemistry produced CH4 VMR greater than one"
+                        )
+                else:
+                    transformed[freeze_mask] = quench_vmr
                 transformed.setflags(write=False)
                 profiles[species] = transformed
 
