@@ -21,15 +21,26 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from importlib import import_module, metadata as importlib_metadata
 from pathlib import Path
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
 
 import numpy as np
 from numpy.typing import NDArray
 
-from robert_exoplanets.core import RobertConfigError, RobertDataError, RobertValidationError
+from robert_exoplanets.core import (
+    PressureGrid,
+    RobertConfigError,
+    RobertDataError,
+    RobertValidationError,
+)
 from robert_exoplanets.core._immutability import immutable_mapping
-from robert_exoplanets.opacity import pressure_values_in_unit, spectral_grid_values_in_unit
+from robert_exoplanets.opacity import (
+    pressure_values_in_unit,
+    spectral_grid_values_in_unit,
+)
 from robert_exoplanets.rt import CloudOpticalProperties, GasOpticalDepth
+
+if TYPE_CHECKING:
+    from robert_exoplanets.atmosphere import AtmosphereState
 
 
 _SUPPORTED_MULTIPLE_SCATTERING_BACKENDS = {
@@ -38,6 +49,89 @@ _SUPPORTED_MULTIPLE_SCATTERING_BACKENDS = {
     "sh4",
     "p3",
 }
+
+
+@dataclass(frozen=True)
+class VirgaCloudProfileResult:
+    """Validated Virga condensate and radius profiles on one pressure grid.
+
+    ``condensate_mass_mixing_ratio_kg_kg`` has shape ``(n_layer, n_species)``.
+    It contains Virga's ``condensate_mmr`` values, documented in g/g; mass
+    mixing ratios have the same numeric value in kg/kg. The radius array has
+    the same shape and contains Virga's ``droplet_eff_r`` values in microns.
+    Both arrays follow the orientation and layer order in ``pressure_grid``.
+    """
+
+    condensibles: tuple[str, ...]
+    pressure_grid: PressureGrid
+    condensate_mass_mixing_ratio_kg_kg: NDArray[np.float64]
+    effective_particle_radius_micron: NDArray[np.float64]
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        condensibles = tuple(str(item).strip() for item in self.condensibles)
+        if not condensibles or any(not item for item in condensibles):
+            raise RobertValidationError(
+                "Virga profile condensibles must be non-empty names"
+            )
+        if len(set(condensibles)) != len(condensibles):
+            raise RobertValidationError("Virga profile condensibles must be unique")
+        if not isinstance(self.pressure_grid, PressureGrid):
+            raise RobertValidationError(
+                "Virga profile pressure_grid must be a PressureGrid"
+            )
+        expected_shape = (self.pressure_grid.n_layers, len(condensibles))
+        condensate = np.array(
+            self.condensate_mass_mixing_ratio_kg_kg,
+            dtype=np.float64,
+            copy=True,
+        )
+        radius = np.array(
+            self.effective_particle_radius_micron,
+            dtype=np.float64,
+            copy=True,
+        )
+        if condensate.shape != expected_shape or radius.shape != expected_shape:
+            raise RobertValidationError(
+                "Virga cloud profile arrays must have shape "
+                f"{expected_shape}; received {condensate.shape} and {radius.shape}"
+            )
+        if not np.all(np.isfinite(condensate)) or np.any(condensate < 0.0):
+            raise RobertValidationError(
+                "Virga condensate mass mixing ratios must be finite and non-negative"
+            )
+        if not np.all(np.isfinite(radius)) or np.any(radius < 0.0):
+            raise RobertValidationError(
+                "Virga effective particle radii must be finite and non-negative"
+            )
+        if np.any((condensate > 0.0) & (radius <= 0.0)):
+            raise RobertValidationError(
+                "Virga effective particle radius must be positive where condensate exists"
+            )
+        condensate.setflags(write=False)
+        radius.setflags(write=False)
+        object.__setattr__(self, "condensibles", condensibles)
+        object.__setattr__(self, "condensate_mass_mixing_ratio_kg_kg", condensate)
+        object.__setattr__(self, "effective_particle_radius_micron", radius)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+    @property
+    def condensate_mass_mixing_ratio_unit(self) -> str:
+        """Mass-ratio unit of ``condensate_mass_mixing_ratio_kg_kg``."""
+
+        return "kg/kg"
+
+    @property
+    def effective_particle_radius_unit(self) -> str:
+        """Radius unit of ``effective_particle_radius_micron``."""
+
+        return "micron"
+
+    @property
+    def pressure_orientation(self) -> str:
+        """Layer ordering used by both profiles."""
+
+        return self.pressure_grid.orientation
 
 
 @dataclass(frozen=True)
@@ -105,7 +199,9 @@ class VirgaEddySedCloudModel:
                 "Virga condensible"
             )
         gas_mmr = {
-            name: _finite_positive(raw_gas_mmr[name], f"gas mass mixing ratio for {name}")
+            name: _finite_positive(
+                raw_gas_mmr[name], f"gas mass mixing ratio for {name}"
+            )
             for name in condensibles
         }
         if sum(gas_mmr.values()) > 1.0:
@@ -269,9 +365,57 @@ class VirgaEddySedCloudModel:
         parameters: Mapping[str, float],
     ) -> tuple[CloudOpticalProperties, ...]:
         """Run Virga and return its layer optical properties on ROBERT's grid."""
+        atmosphere = gas_optical_depth.atmosphere
+        result, virga_version, model_metadata = self._run_virga(
+            atmosphere,
+            gas_optical_depth.gravity_m_s2,
+            parameters,
+        )
+        cloud = _cloud_optics_from_virga(
+            result,
+            gas_optical_depth,
+            condensibles=self.condensibles,
+            virga_version=virga_version,
+            model_metadata=model_metadata,
+        )
+        return (cloud,)
+
+    def compute_cloud_profiles(
+        self,
+        atmosphere: AtmosphereState,
+        gravity_m_s2: object,
+        parameters: Mapping[str, float],
+    ) -> "VirgaCloudProfileResult":
+        """Run Virga and return its physical layer profiles on ROBERT's grid.
+
+        This runs a fresh Virga calculation for each call. It uses the same
+        atmosphere, gravity, retrieved controls, and fixed cloud settings as
+        :meth:`evaluate`; it does not reuse state from another posterior draw.
+        The returned condensate mass fraction uses the numeric g/g values from
+        Virga, which are also the mass-ratio values in kg/kg. Radius values
+        come from Virga's ``droplet_eff_r`` field in microns.
+        """
+
+        result, version, model_metadata = self._run_virga(
+            atmosphere, gravity_m_s2, parameters
+        )
+        return _cloud_profiles_from_virga(
+            result,
+            pressure_grid=atmosphere.pressure_grid,
+            condensibles=self.condensibles,
+            virga_version=version,
+            model_metadata=model_metadata,
+        )
+
+    def _run_virga(
+        self,
+        atmosphere: AtmosphereState,
+        gravity_profile: object,
+        parameters: Mapping[str, float],
+    ) -> tuple[object, str, Mapping[str, str]]:
+        """Run Virga once after validating the shared physical state."""
 
         fsed, kz_cm2_s = self._resolved_controls(parameters)
-        atmosphere = gas_optical_depth.atmosphere
         pressure_grid = atmosphere.pressure_grid
         if atmosphere.temperature_edges is None:
             raise RobertValidationError(
@@ -288,8 +432,11 @@ class VirgaEddySedCloudModel:
                 f"{atmosphere.mean_molecular_weight_unit!r}"
             )
 
+        gravity_values = np.asarray(gravity_profile, dtype=float)
+        if gravity_values.ndim == 0:
+            gravity_values = np.full(pressure_grid.n_layers, float(gravity_values))
         gravity_m_s2 = _uniform_profile(
-            gas_optical_depth.gravity_m_s2,
+            gravity_values,
             "Virga requires constant gravity across the atmosphere",
         )
         mean_molecular_weight_profile = np.asarray(
@@ -305,12 +452,8 @@ class VirgaEddySedCloudModel:
                 "Virga requires a finite positive mean molecular weight profile "
                 "with one value per atmosphere layer"
             )
-        mean_molecular_weight_profile_min = float(
-            np.min(mean_molecular_weight_profile)
-        )
-        mean_molecular_weight_profile_max = float(
-            np.max(mean_molecular_weight_profile)
-        )
+        mean_molecular_weight_profile_min = float(np.min(mean_molecular_weight_profile))
+        mean_molecular_weight_profile_max = float(np.max(mean_molecular_weight_profile))
         if self.mean_molecular_weight_amu is None:
             mean_molecular_weight = _uniform_profile(
                 mean_molecular_weight_profile,
@@ -330,16 +473,16 @@ class VirgaEddySedCloudModel:
             )
 
         pressure_bar = pressure_values_in_unit(
-            pressure_grid.edges,
-            pressure_grid.unit,
-            "bar",
+            pressure_grid.edges, pressure_grid.unit, "bar"
         )
         temperature_edges = np.asarray(atmosphere.temperature_edges, dtype=float)
         if temperature_edges.shape != (pressure_grid.n_layers + 1,):
             raise RobertValidationError(
                 "atmosphere.temperature_edges must match pressure-grid edges"
             )
-        if not np.all(np.isfinite(temperature_edges)) or np.any(temperature_edges <= 0.0):
+        if not np.all(np.isfinite(temperature_edges)) or np.any(
+            temperature_edges <= 0.0
+        ):
             raise RobertValidationError(
                 "atmosphere.temperature_edges must be finite and positive"
             )
@@ -385,10 +528,7 @@ class VirgaEddySedCloudModel:
             )
             # Set kz_min to the configured value. This prevents Virga's default
             # floor from silently replacing the user's constant profile.
-            virga_atmosphere.ptk(
-                df=ptk,
-                kz_min=kz_cm2_s,
-            )
+            virga_atmosphere.ptk(df=ptk, kz_min=kz_cm2_s)
             result = virga.compute(
                 virga_atmosphere,
                 directory=str(self.mie_directory),
@@ -401,54 +541,44 @@ class VirgaEddySedCloudModel:
                 f"{', '.join(self.condensibles)}: {exc}"
             ) from exc
 
-        cloud = _cloud_optics_from_virga(
-            result,
-            gas_optical_depth,
-            condensibles=self.condensibles,
-            virga_version=virga_version,
-            model_metadata={
-                **self.manifest_metadata,
-                "cloud_virga_gas_mole_fractions": ",".join(
-                    f"{name}:{virga_gas_mole_fractions[name]:.17g}"
-                    for name in self.condensibles
-                ),
-                "cloud_virga_gas_molecular_weights_amu": ",".join(
-                    f"{name}:{virga_gas_molecular_weights[name]:.17g}"
-                    for name in self.condensibles
-                ),
-                "cloud_virga_gas_mean_molecular_weight_amu_used": (
-                    f"{mean_molecular_weight:.17g}"
-                ),
-                "cloud_virga_gas_mass_fraction_roundtrip_validated": "true",
-                "cloud_fsed_used": f"{fsed:.17g}",
-                "cloud_kz_cm2_s_used": f"{kz_cm2_s:.17g}",
-                "cloud_mean_molecular_weight_policy_used": (
-                    mean_molecular_weight_policy
-                ),
-                "cloud_mean_molecular_weight_profile_min_amu": (
-                    f"{mean_molecular_weight_profile_min:.17g}"
-                ),
-                "cloud_mean_molecular_weight_profile_max_amu": (
-                    f"{mean_molecular_weight_profile_max:.17g}"
-                ),
-                "cloud_mean_molecular_weight_amu_used": (
-                    f"{mean_molecular_weight:.17g}"
-                ),
-                "cloud_mean_molecular_weight_override_amu": (
-                    "not_set"
-                    if self.mean_molecular_weight_amu is None
-                    else f"{self.mean_molecular_weight_amu:.17g}"
-                ),
-                "cloud_mean_molecular_weight_is_approximation": (
-                    str(mean_molecular_weight_is_approximation).lower()
-                ),
-                "cloud_mean_molecular_weight_approximation_scope": (
-                    "virga_cloud_microphysics_only; "
-                    "ROBERT_gas_and_rt_use_original_atmosphere_profile"
-                ),
-            },
-        )
-        return (cloud,)
+        metadata = {
+            **self.manifest_metadata,
+            "cloud_virga_gas_mole_fractions": ",".join(
+                f"{name}:{virga_gas_mole_fractions[name]:.17g}"
+                for name in self.condensibles
+            ),
+            "cloud_virga_gas_molecular_weights_amu": ",".join(
+                f"{name}:{virga_gas_molecular_weights[name]:.17g}"
+                for name in self.condensibles
+            ),
+            "cloud_virga_gas_mean_molecular_weight_amu_used": (
+                f"{mean_molecular_weight:.17g}"
+            ),
+            "cloud_virga_gas_mass_fraction_roundtrip_validated": "true",
+            "cloud_fsed_used": f"{fsed:.17g}",
+            "cloud_kz_cm2_s_used": f"{kz_cm2_s:.17g}",
+            "cloud_mean_molecular_weight_policy_used": mean_molecular_weight_policy,
+            "cloud_mean_molecular_weight_profile_min_amu": (
+                f"{mean_molecular_weight_profile_min:.17g}"
+            ),
+            "cloud_mean_molecular_weight_profile_max_amu": (
+                f"{mean_molecular_weight_profile_max:.17g}"
+            ),
+            "cloud_mean_molecular_weight_amu_used": (f"{mean_molecular_weight:.17g}"),
+            "cloud_mean_molecular_weight_override_amu": (
+                "not_set"
+                if self.mean_molecular_weight_amu is None
+                else f"{self.mean_molecular_weight_amu:.17g}"
+            ),
+            "cloud_mean_molecular_weight_is_approximation": (
+                str(mean_molecular_weight_is_approximation).lower()
+            ),
+            "cloud_mean_molecular_weight_approximation_scope": (
+                "virga_cloud_microphysics_only; "
+                "ROBERT_gas_and_rt_use_original_atmosphere_profile"
+            ),
+        }
+        return result, virga_version, metadata
 
     def _resolved_controls(
         self,
@@ -494,6 +624,134 @@ class VirgaEddySedCloudModel:
         return fsed, kz_cm2_s
 
 
+def _cloud_profiles_from_virga(
+    result: object,
+    *,
+    pressure_grid: PressureGrid,
+    condensibles: tuple[str, ...],
+    virga_version: str,
+    model_metadata: Mapping[str, str],
+) -> VirgaCloudProfileResult:
+    """Validate Virga's physical profile fields and align their layer order."""
+
+    if not isinstance(result, Mapping):
+        raise RobertDataError("Virga compute(as_dict=True) must return a mapping")
+    required = (
+        "pressure",
+        "pressure_unit",
+        "condensate_mmr",
+        "droplet_eff_r",
+        "r_units",
+        "condensibles",
+    )
+    missing = tuple(key for key in required if key not in result)
+    if missing:
+        raise RobertDataError(
+            "Virga result is missing required cloud profile fields: "
+            + ", ".join(missing)
+        )
+
+    returned_condensibles = tuple(str(item) for item in result["condensibles"])
+    if returned_condensibles != condensibles:
+        raise RobertDataError(
+            "Virga result condensible order does not match the requested species"
+        )
+    _validate_virga_pressure_layers(result, pressure_grid)
+
+    expected_shape = (pressure_grid.n_layers, len(condensibles))
+    condensate_mmr = np.asarray(result["condensate_mmr"], dtype=np.float64)
+    if condensate_mmr.shape != expected_shape:
+        raise RobertDataError(
+            "Virga condensate_mmr must have shape "
+            f"{expected_shape}; received {condensate_mmr.shape}"
+        )
+    if not np.all(np.isfinite(condensate_mmr)) or np.any(condensate_mmr < 0.0):
+        raise RobertDataError(
+            "Virga condensate_mmr must contain finite non-negative values"
+        )
+
+    radius_unit = str(result["r_units"]).strip().lower().replace("μ", "u")
+    if radius_unit not in {"micron", "microns", "um"}:
+        raise RobertDataError(
+            f"Virga droplet_eff_r must use microns; received {result['r_units']!r}"
+        )
+    radius = np.asarray(result["droplet_eff_r"], dtype=np.float64)
+    if radius.shape != expected_shape:
+        raise RobertDataError(
+            "Virga droplet_eff_r must have shape "
+            f"{expected_shape}; received {radius.shape}"
+        )
+    if not np.all(np.isfinite(radius)) or np.any(radius < 0.0):
+        raise RobertDataError(
+            "Virga droplet_eff_r must contain finite non-negative values"
+        )
+    if np.any((condensate_mmr > 0.0) & (radius <= 0.0)):
+        raise RobertDataError(
+            "Virga droplet_eff_r must be positive where condensate_mmr is positive"
+        )
+
+    if pressure_grid.orientation == "decreasing":
+        condensate_mmr = condensate_mmr[::-1]
+        radius = radius[::-1]
+
+    metadata = {
+        **dict(model_metadata),
+        "virga_version": virga_version,
+        "virga_profile_condensate_field": "condensate_mmr",
+        "virga_profile_condensate_source_unit": "g/g",
+        "virga_profile_condensate_unit": "kg/kg",
+        "virga_profile_condensate_unit_conversion": (
+            "mass_ratio_numeric_value_is_unchanged_from_g/g_to_kg/kg"
+        ),
+        "virga_profile_radius_field": "droplet_eff_r",
+        "virga_profile_radius_unit": "micron",
+        "virga_profile_species_order": ",".join(condensibles),
+        "virga_profile_pressure_layer_mapping": "matched_pressure_edges",
+        "virga_profile_pressure_orientation": pressure_grid.orientation,
+        "virga_profile_source_layer_orientation": "increasing_pressure",
+        "virga_profile_layer_reversal_applied": str(
+            pressure_grid.orientation == "decreasing"
+        ).lower(),
+    }
+    return VirgaCloudProfileResult(
+        condensibles=condensibles,
+        pressure_grid=pressure_grid,
+        condensate_mass_mixing_ratio_kg_kg=condensate_mmr,
+        effective_particle_radius_micron=radius,
+        metadata=metadata,
+    )
+
+
+def _validate_virga_pressure_layers(
+    result: Mapping[str, object], pressure_grid: PressureGrid
+) -> None:
+    """Require Virga layer centers to match ROBERT's pressure-edge intervals."""
+
+    pressure_unit = str(result["pressure_unit"])
+    virga_pressure = pressure_values_in_unit(result["pressure"], pressure_unit, "bar")
+    if virga_pressure.ndim != 1 or not np.all(np.isfinite(virga_pressure)):
+        raise RobertDataError(
+            "Virga pressure layers must be a finite one-dimensional array"
+        )
+    edges_bar = pressure_values_in_unit(
+        pressure_grid.edges,
+        pressure_grid.unit,
+        "bar",
+    )
+    ascending_edges = np.sort(edges_bar)
+    expected_pressure = 0.5 * (ascending_edges[:-1] + ascending_edges[1:])
+    if virga_pressure.shape != expected_pressure.shape or not np.allclose(
+        virga_pressure,
+        expected_pressure,
+        rtol=1.0e-10,
+        atol=1.0e-14,
+    ):
+        raise RobertDataError(
+            "Virga pressure layers do not match ROBERT's pressure-edge intervals; "
+            "the adapter requires one Virga layer per ROBERT layer"
+        )
+
+
 def _cloud_optics_from_virga(
     result: object,
     gas_optical_depth: GasOpticalDepth,
@@ -520,8 +778,7 @@ def _cloud_optics_from_virga(
     missing = tuple(key for key in required if key not in result)
     if missing:
         raise RobertDataError(
-            "Virga result is missing required documented fields: "
-            + ", ".join(missing)
+            "Virga result is missing required documented fields: " + ", ".join(missing)
         )
 
     returned_condensibles = tuple(str(item) for item in result["condensibles"])
@@ -530,28 +787,8 @@ def _cloud_optics_from_virga(
             "Virga result condensible order does not match the requested species"
         )
 
-    pressure_unit = str(result["pressure_unit"])
-    virga_pressure = pressure_values_in_unit(
-        result["pressure"], pressure_unit, "bar"
-    )
     pressure_grid = gas_optical_depth.pressure_grid
-    edges_bar = pressure_values_in_unit(
-        pressure_grid.edges,
-        pressure_grid.unit,
-        "bar",
-    )
-    ascending_edges = np.sort(edges_bar)
-    expected_pressure = 0.5 * (ascending_edges[:-1] + ascending_edges[1:])
-    if virga_pressure.shape != expected_pressure.shape or not np.allclose(
-        virga_pressure,
-        expected_pressure,
-        rtol=1.0e-10,
-        atol=1.0e-14,
-    ):
-        raise RobertDataError(
-            "Virga pressure layers do not match ROBERT's pressure-edge intervals; "
-            "the adapter requires one Virga layer per ROBERT layer"
-        )
+    _validate_virga_pressure_layers(result, pressure_grid)
 
     n_layers = pressure_grid.n_layers
     wave_micron = _virga_wavelength_micron(result["wave"], result["wave_unit"])
@@ -685,11 +922,11 @@ def _virga_gas_mole_fractions_from_mass_fractions(
                 raise ValueError("gas molecular weight must be finite and positive")
 
             mass_fraction = float(gas_mass_mixing_ratios[species])
-            mole_fraction = (
-                mass_fraction * mean_molecular_weight / gas_molecular_weight
-            )
+            mole_fraction = mass_fraction * mean_molecular_weight / gas_molecular_weight
             if not np.isfinite(mole_fraction) or mole_fraction <= 0.0:
-                raise ValueError("converted gas mole fraction must be finite and positive")
+                raise ValueError(
+                    "converted gas mole fraction must be finite and positive"
+                )
 
             _, recovered_mass_fraction, _ = gas_property(
                 mean_molecular_weight,
@@ -792,11 +1029,15 @@ def _interpolate_spectrum(
 def _uniform_profile(values: object, message: str) -> float:
     profile = np.asarray(values, dtype=float)
     if profile.ndim != 1 or profile.size == 0 or not np.all(np.isfinite(profile)):
-        raise RobertValidationError("Virga state profiles must be finite one-dimensional arrays")
+        raise RobertValidationError(
+            "Virga state profiles must be finite one-dimensional arrays"
+        )
     if not np.allclose(profile, profile[0], rtol=1.0e-10, atol=0.0):
         raise RobertValidationError(message)
     if profile[0] <= 0.0:
-        raise RobertValidationError("Virga gravity and mean molecular weight must be positive")
+        raise RobertValidationError(
+            "Virga gravity and mean molecular weight must be positive"
+        )
     return float(profile[0])
 
 
@@ -840,4 +1081,4 @@ def _control_source_metadata(
     return f"{fixed_value:.17g}"
 
 
-__all__ = ["VirgaEddySedCloudModel"]
+__all__ = ["VirgaCloudProfileResult", "VirgaEddySedCloudModel"]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -22,7 +23,7 @@ from robert_exoplanets.opacity import (
     EvaluatedCorrelatedKOpacity,
     PreparedCorrelatedKOpacity,
 )
-from robert_exoplanets.rt import assemble_gas_optical_depth
+from robert_exoplanets.rt import OpticalConstantsCatalog, assemble_gas_optical_depth
 
 _DEFAULT_TEMPERATURE_EDGES = object()
 
@@ -38,13 +39,29 @@ def _pressure_grid() -> PressureGrid:
 
 def _gas_optical_depth(
     *,
+    pressure_grid: PressureGrid | None = None,
     temperature_edges: np.ndarray | None | object = _DEFAULT_TEMPERATURE_EDGES,
     gravity_m_s2: np.ndarray | float = 15.0,
     mean_molecular_weight: np.ndarray | float = 2.3,
     mean_molecular_weight_unit: str = "amu",
     spectral_grid: SpectralGrid | None = None,
 ):
-    pressure_grid = _pressure_grid()
+    pressure_grid = _pressure_grid() if pressure_grid is None else pressure_grid
+    if pressure_grid.n_layers == 2:
+        layer_temperature = np.array([1050.0, 850.0])
+        default_temperature_edges = np.array([1100.0, 1000.0, 700.0])
+        if pressure_grid.orientation == "increasing":
+            layer_temperature = layer_temperature[::-1]
+            default_temperature_edges = default_temperature_edges[::-1]
+    else:
+        layer_temperature = np.linspace(1050.0, 850.0, pressure_grid.n_layers)
+        if pressure_grid.orientation == "increasing":
+            layer_temperature = layer_temperature[::-1]
+        default_temperature_edges = np.linspace(
+            1100.0, 700.0, pressure_grid.n_layers + 1
+        )
+        if pressure_grid.orientation == "increasing":
+            default_temperature_edges = default_temperature_edges[::-1]
     grid = spectral_grid or SpectralGrid(
         values=np.array([2.0, 4.0]),
         unit="micron",
@@ -52,9 +69,9 @@ def _gas_optical_depth(
     )
     atmosphere = AtmosphereState(
         pressure_grid=pressure_grid,
-        temperature=np.array([1050.0, 850.0]),
+        temperature=layer_temperature,
         temperature_edges=(
-            np.array([1100.0, 1000.0, 700.0])
+            default_temperature_edges
             if temperature_edges is _DEFAULT_TEMPERATURE_EDGES
             else temperature_edges
         ),
@@ -123,6 +140,8 @@ def _result(
     single_scattering: np.ndarray | None = None,
     asymmetry: np.ndarray | None = None,
     condensate_mmr: np.ndarray | None = None,
+    droplet_eff_r: np.ndarray | None = None,
+    r_units: str = "micron",
     pressure: np.ndarray | None = None,
     condensibles=("MgSiO3",),
 ):
@@ -148,10 +167,14 @@ def _result(
             else asymmetry
         ),
         "condensate_mmr": (
-            np.array([[2.0e-5], [1.0e-5]])
-            if condensate_mmr is None
-            else condensate_mmr
+            np.array([[2.0e-5], [1.0e-5]]) if condensate_mmr is None else condensate_mmr
         ),
+        "droplet_eff_r": (
+            np.tile(np.array([[2.0], [1.0]]), (1, len(condensibles)))
+            if droplet_eff_r is None
+            else droplet_eff_r
+        ),
+        "r_units": r_units,
         "condensibles": condensibles,
     }
 
@@ -238,9 +261,156 @@ def test_virga_cloud_uses_pressure_edges_and_maps_layers_and_wavelengths(
     assert cloud.metadata["cloud_virga_gas_mole_fractions"] == (
         f"MgSiO3:{expected_mole_fraction:.17g}"
     )
-    assert cloud.metadata["cloud_virga_gas_molecular_weights_amu"] == "MgSiO3:100.40000000000001"
-    assert cloud.metadata["cloud_virga_gas_mean_molecular_weight_amu_used"] == "2.2999999999999998"
+    assert (
+        cloud.metadata["cloud_virga_gas_molecular_weights_amu"]
+        == "MgSiO3:100.40000000000001"
+    )
+    assert (
+        cloud.metadata["cloud_virga_gas_mean_molecular_weight_amu_used"]
+        == "2.2999999999999998"
+    )
     assert cloud.metadata["cloud_virga_gas_mass_fraction_roundtrip_validated"] == "true"
+
+
+@pytest.mark.parametrize(
+    ("orientation", "expected_condensate", "expected_radius"),
+    [
+        ("decreasing", [1.0e-5, 2.0e-5], [1.0, 2.0]),
+        ("increasing", [2.0e-5, 1.0e-5], [2.0, 1.0]),
+    ],
+)
+def test_virga_cloud_profiles_use_validated_outputs_and_pressure_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    orientation: str,
+    expected_condensate: list[float],
+    expected_radius: list[float],
+) -> None:
+    directory = _mie_directory(tmp_path)
+    pressure_grid = (
+        _pressure_grid()
+        if orientation == "decreasing"
+        else PressureGrid(
+            edges=np.array([0.01, 0.1, 1.0]),
+            centers=np.sqrt(np.array([0.01, 0.1]) * np.array([0.1, 1.0])),
+        )
+    )
+    atmosphere = _gas_optical_depth(pressure_grid=pressure_grid).atmosphere
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    model = _model(directory)
+
+    profiles = model.compute_cloud_profiles(
+        atmosphere,
+        gravity_m_s2=np.full(pressure_grid.n_layers, 15.0),
+        parameters={},
+    )
+
+    assert isinstance(profiles, virga_cloud.VirgaCloudProfileResult)
+    assert profiles.condensibles == ("MgSiO3",)
+    assert profiles.pressure_grid is pressure_grid
+    assert profiles.pressure_orientation == orientation
+    assert profiles.condensate_mass_mixing_ratio_unit == "kg/kg"
+    assert profiles.effective_particle_radius_unit == "micron"
+    np.testing.assert_allclose(
+        profiles.condensate_mass_mixing_ratio_kg_kg[:, 0], expected_condensate
+    )
+    np.testing.assert_allclose(
+        profiles.effective_particle_radius_micron[:, 0], expected_radius
+    )
+    assert not profiles.condensate_mass_mixing_ratio_kg_kg.flags.writeable
+    assert not profiles.effective_particle_radius_micron.flags.writeable
+    assert profiles.metadata["virga_profile_condensate_source_unit"] == "g/g"
+    assert profiles.metadata["virga_profile_radius_field"] == "droplet_eff_r"
+    assert profiles.metadata["virga_profile_pressure_orientation"] == orientation
+    assert (
+        profiles.metadata["virga_profile_layer_reversal_applied"]
+        == str(orientation == "decreasing").lower()
+    )
+    assert fake_atmospheres[0].gravity_call["gravity"] == pytest.approx(1500.0)
+
+
+@pytest.mark.parametrize(
+    ("result_edits", "message"),
+    [
+        ({"remove": "droplet_eff_r"}, "droplet_eff_r"),
+        ({"r_units": "cm"}, "must use microns"),
+        ({"droplet_eff_r": np.array([[1.0], [1.0], [1.0]])}, "shape"),
+        ({"droplet_eff_r": np.array([[0.0], [1.0]])}, "must be positive"),
+        ({"droplet_eff_r": np.array([[np.nan], [1.0]])}, "finite non-negative"),
+    ],
+)
+def test_virga_cloud_profile_rejects_invalid_radius_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    result_edits: dict[str, object],
+    message: str,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    result = _result()
+    if "remove" in result_edits:
+        result.pop(str(result_edits["remove"]))
+    else:
+        result.update(result_edits)
+    _install_fake_virga(monkeypatch, result=result)
+    model = _model(directory)
+
+    with pytest.raises(RobertDataError, match=message):
+        model.compute_cloud_profiles(
+            _gas_optical_depth().atmosphere,
+            gravity_m_s2=15.0,
+            parameters={},
+        )
+
+
+def test_virga_cloud_profile_runs_fresh_solve_for_each_parameter_draw(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    model = _model(
+        directory,
+        fsed=None,
+        fsed_parameter="cloud_fsed",
+        kz_cm2_s=None,
+        log10_kz_cm2_s_parameter="log10_kzz",
+    )
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    virga, _ = virga_cloud._load_virga()
+    compute_count = 0
+
+    def compute(atmosphere, **kwargs):
+        nonlocal compute_count
+        assert atmosphere in fake_atmospheres
+        compute_count += 1
+        result = _result()
+        result["condensate_mmr"] = np.full((2, 1), compute_count * 1.0e-5, dtype=float)
+        result["droplet_eff_r"] = np.full((2, 1), compute_count, dtype=float)
+        return result
+
+    virga.compute = compute
+    atmosphere = _gas_optical_depth().atmosphere
+
+    first = model.compute_cloud_profiles(
+        atmosphere,
+        15.0,
+        {"cloud_fsed": 0.5, "log10_kzz": 8.0},
+    )
+    second = model.compute_cloud_profiles(
+        atmosphere,
+        15.0,
+        {"cloud_fsed": 2.0, "log10_kzz": 10.0},
+    )
+
+    assert len(fake_atmospheres) == 2
+    assert fake_atmospheres[0] is not fake_atmospheres[1]
+    assert fake_atmospheres[0].constructor_kwargs["fsed"] == pytest.approx(0.5)
+    assert fake_atmospheres[1].constructor_kwargs["fsed"] == pytest.approx(2.0)
+    assert fake_atmospheres[0].ptk_call["kz_min"] == pytest.approx(1.0e8)
+    assert fake_atmospheres[1].ptk_call["kz_min"] == pytest.approx(1.0e10)
+    np.testing.assert_allclose(first.condensate_mass_mixing_ratio_kg_kg, 1.0e-5)
+    np.testing.assert_allclose(second.condensate_mass_mixing_ratio_kg_kg, 2.0e-5)
+    np.testing.assert_allclose(first.effective_particle_radius_micron, 1.0)
+    np.testing.assert_allclose(second.effective_particle_radius_micron, 2.0)
 
 
 def test_virga_cloud_converts_each_condensible_mass_fraction_with_its_molecular_weight(
@@ -283,7 +453,9 @@ def test_virga_cloud_rejects_gas_property_conversion_that_does_not_recover_mass_
     virga, _ = virga_cloud._load_virga()
     virga.gas_properties.MgSiO3 = lambda mmw, *, mh, gas_mmr: (100.4, gas_mmr, 3.192)
 
-    with pytest.raises(RobertDataError, match="did not recover the configured mass mixing ratio"):
+    with pytest.raises(
+        RobertDataError, match="did not recover the configured mass mixing ratio"
+    ):
         model.evaluate(_gas_optical_depth(), parameters={})
 
 
@@ -445,10 +617,22 @@ def test_virga_cloud_rejects_non_matching_pressure_layers(
 @pytest.mark.parametrize(
     ("field", "values", "message"),
     [
-        ("opd_per_layer", np.array([[-1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]), "non-negative"),
-        ("single_scattering", np.array([[0.1, 0.2, 1.1], [0.4, 0.5, 0.6]]), r"in \[0, 1\]"),
+        (
+            "opd_per_layer",
+            np.array([[-1.0, 1.0, 1.0], [1.0, 1.0, 1.0]]),
+            "non-negative",
+        ),
+        (
+            "single_scattering",
+            np.array([[0.1, 0.2, 1.1], [0.4, 0.5, 0.6]]),
+            r"in \[0, 1\]",
+        ),
         ("asymmetry", np.array([[0.1, 0.2, 0.3], [0.4, 0.5, 1.1]]), r"in \[-1, 1\]"),
-        ("condensate_mmr", np.array([[1.0e-5, 2.0e-5], [2.0e-5, 3.0e-5]]), "condensate_mmr must have shape"),
+        (
+            "condensate_mmr",
+            np.array([[1.0e-5, 2.0e-5], [2.0e-5, 3.0e-5]]),
+            "condensate_mmr must have shape",
+        ),
     ],
 )
 def test_virga_output_is_validated(
@@ -502,9 +686,7 @@ def test_virga_cloud_scalar_mmw_override_is_limited_to_cloud_calculation(
     directory = _mie_directory(tmp_path)
     model = _model(directory, mean_molecular_weight_amu=2.35)
     fake_atmospheres = _install_fake_virga(monkeypatch)
-    gas_optical_depth = _gas_optical_depth(
-        mean_molecular_weight=np.array([2.3, 2.5])
-    )
+    gas_optical_depth = _gas_optical_depth(mean_molecular_weight=np.array([2.3, 2.5]))
 
     (cloud,) = model.evaluate(gas_optical_depth, parameters={})
 
@@ -592,3 +774,81 @@ def test_missing_virga_dependency_has_actionable_error(
     with pytest.raises(RobertConfigError, match="optional 'virga-exo' package"):
         virga_cloud._load_virga()
 
+
+@pytest.mark.skipif(
+    os.environ.get("ROBERT_RUN_VIRGA_TESTS") != "1",
+    reason="set ROBERT_RUN_VIRGA_TESTS=1 to run the optional Virga profile test",
+)
+def test_real_virga_cloud_profiles_are_finite_and_pressure_aligned(
+    tmp_path: Path,
+) -> None:
+    virga = pytest.importorskip(
+        "virga.justdoit",
+        reason="install virga-exo 2.x to run the Virga profile integration test",
+    )
+    repository = Path(__file__).resolve().parents[1]
+    refractive_index = OpticalConstantsCatalog(
+        repository / "data" / "optical_constants" / "exo_skryer"
+    ).load("MgSiO3")
+    refrind_directory = tmp_path / "refrind"
+    mie_directory = tmp_path / "mie"
+    refrind_directory.mkdir()
+    mie_directory.mkdir()
+    np.savetxt(
+        refrind_directory / "MgSiO3.refrind",
+        np.column_stack(
+            (
+                np.arange(1, refractive_index.wavelength_micron.size + 1),
+                refractive_index.wavelength_micron,
+                refractive_index.real_index,
+                refractive_index.imaginary_index,
+            )
+        ),
+        fmt=("%d", "%.10g", "%.10g", "%.10g"),
+    )
+    virga.calc_mie_db(
+        "MgSiO3",
+        virga_dir=str(refrind_directory),
+        dir_out=str(mie_directory),
+        rmin=1.0e-8,
+        rmax=1.0e-2,
+        nradii=20,
+        logspace=True,
+        aggregates=False,
+        fort_calc_mie=False,
+    )
+
+    n_layers = 16
+    edges = np.logspace(1.0, -5.0, n_layers + 1)
+    pressure_grid = PressureGrid(
+        edges=edges,
+        centers=np.sqrt(edges[:-1] * edges[1:]),
+        unit="bar",
+    )
+    temperature_edges = np.linspace(1800.0, 850.0, n_layers + 1)
+    atmosphere = AtmosphereState(
+        pressure_grid=pressure_grid,
+        temperature=0.5 * (temperature_edges[:-1] + temperature_edges[1:]),
+        temperature_edges=temperature_edges,
+        composition={"H2O": np.full(n_layers, 1.0e-3)},
+        mean_molecular_weight=2.3,
+    )
+    model = _model(
+        mie_directory,
+        gas_mass_mixing_ratios={"MgSiO3": 2.75e-3},
+        kz_cm2_s=1.0e8,
+    )
+
+    profiles = model.compute_cloud_profiles(atmosphere, 15.0, {})
+
+    condensate = profiles.condensate_mass_mixing_ratio_kg_kg
+    radius = profiles.effective_particle_radius_micron
+    assert profiles.pressure_orientation == "decreasing"
+    assert condensate.shape == (n_layers, 1)
+    assert radius.shape == (n_layers, 1)
+    assert np.all(np.isfinite(condensate)) and np.all(condensate >= 0.0)
+    assert np.all(np.isfinite(radius)) and np.all(radius >= 0.0)
+    assert np.max(condensate) > 0.0
+    assert np.all(radius[condensate > 0.0] > 0.0)
+    assert profiles.metadata["virga_profile_condensate_source_unit"] == "g/g"
+    assert profiles.metadata["virga_profile_radius_unit"] == "micron"

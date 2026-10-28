@@ -72,8 +72,11 @@ def cloud_profiles(
     ``condensate_mass_fraction`` and ``particle_radius``.  A deck plus haze
     returns layer extinction optical depths at the model's haze reference
     wavelength; that wavelength is part of each profile name.  Unsupported
-    custom cloud implementations raise :class:`CloudProfileUnavailableError`
-    so a collector can record an explicit unavailable diagnostic.
+    cloud implementations raise :class:`CloudProfileUnavailableError` so a
+    collector can record an explicit unavailable diagnostic. Virga returns a
+    separate mass-fraction and effective-radius profile for each condensible.
+    Its adapter runs Virga for each call with the supplied atmosphere and
+    parameters; it does not reuse cloud state between posterior draws.
     """
 
     cloud_model, owner = _resolve_cloud_model(model)
@@ -84,6 +87,31 @@ def cloud_profiles(
         return _mie_profiles(cloud_model, atmosphere, parameters)
     if isinstance(cloud_model, ParameterizedDeckHazeCloudModel):
         return _deck_haze_profiles(cloud_model, owner, atmosphere, parameters)
+
+    from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
+
+    if isinstance(cloud_model, VirgaEddySedCloudModel):
+        gravity = _gravity_profile(owner, atmosphere, parameters)
+        virga_profiles = cloud_model.compute_cloud_profiles(
+            atmosphere,
+            gravity,
+            parameters,
+        )
+        profiles: CloudProfileMapping = {}
+        for index, species in enumerate(virga_profiles.condensibles):
+            profiles[f"condensate_mass_mixing_ratio_{species}"] = {
+                "values": _readonly_profile(
+                    virga_profiles.condensate_mass_mixing_ratio_kg_kg[:, index]
+                ),
+                "unit": virga_profiles.condensate_mass_mixing_ratio_unit,
+            }
+            profiles[f"effective_particle_radius_{species}"] = {
+                "values": _readonly_profile(
+                    virga_profiles.effective_particle_radius_micron[:, index]
+                ),
+                "unit": virga_profiles.effective_particle_radius_unit,
+            }
+        return profiles
 
     raise CloudProfileUnavailableError(
         "cloud profiles are unavailable for unsupported cloud model "
@@ -97,6 +125,11 @@ def _resolve_cloud_model(model: object) -> tuple[object | None, object]:
     if model is None:
         return None, model
     if isinstance(model, (ParameterizedMieCloudModel, ParameterizedDeckHazeCloudModel)):
+        return model, model
+
+    from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
+
+    if isinstance(model, VirgaEddySedCloudModel):
         return model, model
 
     cloud_model = getattr(model, "cloud_model", _MISSING)
@@ -268,15 +301,15 @@ def _gravity_profile(
     atmosphere: AtmosphereState,
     parameters: Mapping[str, float],
 ) -> NDArray[np.float64]:
-    """Return the gravity used by the owning leaf for hydrostatic cloud tau."""
+    """Return the gravity used by the owning forward-model leaf."""
 
     value = getattr(owner, "gravity_m_s2", _MISSING)
     if value is not _MISSING:
         return _positive_profile(value, atmosphere.n_layers)
 
     # Transmission computes gravity through its hydrostatic path geometry.
-    # Reuse that inexpensive geometry calculation so haze tau follows the
-    # exact same layer gravity convention as the forward model.
+    # Reuse that calculation so clouds use the exact layer gravity convention
+    # from the forward model.
     planet = getattr(owner, "planet", _MISSING)
     config = getattr(owner, "config", _MISSING)
     reference_gravity_method = getattr(owner, "_reference_gravity", None)
@@ -287,8 +320,7 @@ def _gravity_profile(
         or getattr(planet, "radius_m", None) is None
     ):
         raise CloudProfileUnavailableError(
-            "haze cloud profiles require the owning forward model's physical "
-            "gravity profile"
+            "cloud profiles require the owning forward model's physical gravity profile"
         )
 
     radius_scale = 1.0

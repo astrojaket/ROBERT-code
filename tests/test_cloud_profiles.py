@@ -21,6 +21,8 @@ from robert_exoplanets.diagnostics.cloud_profiles import (
     cloud_profiles,
 )
 from robert_exoplanets.forward.clouds import pressure_slab_layer_fractions
+from robert_exoplanets.forward import virga_cloud
+from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
 
 
 def _atmosphere() -> AtmosphereState:
@@ -28,6 +30,7 @@ def _atmosphere() -> AtmosphereState:
     return AtmosphereState(
         pressure_grid=pressure_grid,
         temperature=np.full(pressure_grid.n_layers, 1200.0),
+        temperature_edges=np.full(pressure_grid.n_layers + 1, 1200.0),
         composition={"H2": np.full(pressure_grid.n_layers, 0.85)},
         mean_molecular_weight=np.full(pressure_grid.n_layers, 2.3),
     )
@@ -160,3 +163,92 @@ def test_cloud_free_returns_empty_and_custom_cloud_is_explicitly_unavailable() -
 
     with pytest.raises(CloudProfileUnavailableError, match="unsupported cloud model"):
         cloud_profiles(SimpleNamespace(cloud_model=object()), atmosphere, {})
+
+
+def test_virga_profiles_use_physical_species_arrays_and_forward_owner(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    mie_directory = tmp_path / "mie"
+    mie_directory.mkdir()
+    (mie_directory / "MgSiO3.mieff").write_text("test Mie table", encoding="utf-8")
+    cloud = VirgaEddySedCloudModel(
+        condensibles=("MgSiO3",),
+        gas_mass_mixing_ratios={"MgSiO3": 1.0e-4},
+        mie_directory=mie_directory,
+        fsed=None,
+        fsed_parameter="virga_fsed",
+        kz_cm2_s=None,
+        log10_kz_cm2_s_parameter="virga_log10_kzz",
+    )
+    atmosphere_objects = []
+
+    class FakeAtmosphere:
+        def __init__(self, condensibles, **kwargs):
+            self.condensibles = tuple(condensibles)
+            self.constructor_kwargs = kwargs
+            self.gravity_kwargs = None
+            self.ptk_kwargs = None
+            atmosphere_objects.append(self)
+
+        def gravity(self, **kwargs):
+            self.gravity_kwargs = kwargs
+
+        def ptk(self, **kwargs):
+            self.ptk_kwargs = kwargs
+
+    gas_properties = SimpleNamespace(
+        MgSiO3=lambda mmw, *, mh=1.0, gas_mmr=0.0: (
+            100.4,
+            float(gas_mmr) * 100.4 / mmw,
+            1.0,
+        )
+    )
+
+    def compute(virga_atmosphere, **kwargs):
+        assert virga_atmosphere in atmosphere_objects
+        grid = _atmosphere().pressure_grid
+        ascending_edges = np.sort(grid.edges)
+        return {
+            "pressure": 0.5 * (ascending_edges[:-1] + ascending_edges[1:]),
+            "pressure_unit": "bar",
+            "condensate_mmr": np.arange(1.0, grid.n_layers + 1.0)[:, None] * 1.0e-5,
+            "droplet_eff_r": np.arange(10.0, 10.0 + grid.n_layers)[:, None],
+            "r_units": "micron",
+            "condensibles": ["MgSiO3"],
+        }
+
+    fake = SimpleNamespace(
+        Atmosphere=FakeAtmosphere,
+        compute=compute,
+        gas_properties=gas_properties,
+    )
+    monkeypatch.setattr(virga_cloud, "_load_virga", lambda: (fake, "2.0.2"))
+    atmosphere = _atmosphere()
+    owner = SimpleNamespace(cloud_model=cloud, gravity_m_s2=15.0)
+    parameters = {"virga_fsed": 0.6, "virga_log10_kzz": 8.0}
+
+    profiles = cloud_profiles(owner, atmosphere, parameters)
+
+    np.testing.assert_allclose(
+        profiles["condensate_mass_mixing_ratio_MgSiO3"]["values"],
+        np.arange(1.0, atmosphere.n_layers + 1.0) * 1.0e-5,
+    )
+    np.testing.assert_allclose(
+        profiles["effective_particle_radius_MgSiO3"]["values"],
+        np.arange(10.0, 10.0 + atmosphere.n_layers),
+    )
+    assert profiles["condensate_mass_mixing_ratio_MgSiO3"]["unit"] == "kg/kg"
+    assert profiles["effective_particle_radius_MgSiO3"]["unit"] == "micron"
+    assert not profiles["condensate_mass_mixing_ratio_MgSiO3"]["values"].flags.writeable
+    assert not profiles["effective_particle_radius_MgSiO3"]["values"].flags.writeable
+    assert len(atmosphere_objects) == 1
+    assert atmosphere_objects[0].constructor_kwargs["fsed"] == pytest.approx(0.6)
+    assert atmosphere_objects[0].ptk_kwargs["kz_min"] == pytest.approx(1.0e8)
+    assert atmosphere_objects[0].gravity_kwargs["gravity"] == pytest.approx(1500.0)
+
+    with pytest.raises(
+        CloudProfileUnavailableError,
+        match="owning forward model's physical gravity profile",
+    ):
+        cloud_profiles(cloud, atmosphere, parameters)

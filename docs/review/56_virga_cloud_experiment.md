@@ -58,6 +58,12 @@ particle counts. Rainout is evaluated from high to low pressure; rainout mass
 equivalents are not retained cloud-particle profiles. A condensate equilibrium
 constant table must be supplied explicitly.
 
+For posterior diagnostics, the Virga provider can return per-species layer
+condensate mass mixing ratios and effective radii from Virga's own result.
+The collector evaluates Virga with each saved posterior draw. This adds one
+cloud calculation per draw and reports a mass ratio relative to gas, not a
+gas-plus-condensate mass fraction.
+
 The optional real Virga integration check is enabled by
 `ROBERT_RUN_VIRGA_TESTS=1`; it generates an MgSiO3 Mie table from the bundled
 optical constants and compares the adapter against a direct Virga call. This
