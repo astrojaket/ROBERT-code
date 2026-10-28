@@ -52,7 +52,7 @@ def test_real_virga_cloud_controls_change_emission_spectrum(
     assert len(refractive_index.metadata["source_sha256"]) == 64
     mie_directory = _prepare_mie_table(virga, refractive_index, tmp_path)
 
-    layers = 8
+    layers = 16
     pressure_edges = np.logspace(1.0, -5.0, layers + 1)
     pressure_grid = PressureGrid(
         edges=pressure_edges,

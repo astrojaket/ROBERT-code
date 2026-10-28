@@ -168,7 +168,30 @@ def _install_fake_virga(monkeypatch, result=None):
         assert atmosphere in atmosphere_objects
         return _result() if result is None else result
 
-    fake = SimpleNamespace(Atmosphere=atmosphere_factory, compute=compute)
+    molecular_weights = {"MgSiO3": 100.4, "KCl": 74.5}
+
+    def gas_property(species):
+        gas_molecular_weight = molecular_weights[species]
+
+        def evaluate(mean_molecular_weight, *, mh=1.0, gas_mmr=None):
+            if gas_mmr is None:
+                raise AssertionError("ROBERT must pass an explicit Virga gas_mmr")
+            return (
+                gas_molecular_weight,
+                float(gas_mmr) * gas_molecular_weight / mean_molecular_weight,
+                1.0,
+            )
+
+        return evaluate
+
+    gas_properties = SimpleNamespace(
+        **{name: gas_property(name) for name in molecular_weights}
+    )
+    fake = SimpleNamespace(
+        Atmosphere=atmosphere_factory,
+        compute=compute,
+        gas_properties=gas_properties,
+    )
     monkeypatch.setattr(virga_cloud, "_load_virga", lambda: (fake, "2.0.2"))
     return atmosphere_objects
 
@@ -184,7 +207,10 @@ def test_virga_cloud_uses_pressure_edges_and_maps_layers_and_wavelengths(
     (cloud,) = model.evaluate(_gas_optical_depth(), parameters={})
 
     assert fake_atmospheres[0].condensibles == ("MgSiO3",)
-    assert fake_atmospheres[0].constructor_kwargs["gas_mmr"] == {"MgSiO3": 1.0e-3}
+    expected_mole_fraction = 1.0e-3 * 2.3 / 100.4
+    assert fake_atmospheres[0].constructor_kwargs["gas_mmr"] == {
+        "MgSiO3": pytest.approx(expected_mole_fraction)
+    }
     assert fake_atmospheres[0].constructor_kwargs["sig"] == pytest.approx(2.0)
     assert fake_atmospheres[0].gravity_call["gravity"] == pytest.approx(1500.0)
     ptk = fake_atmospheres[0].ptk_call
@@ -208,6 +234,57 @@ def test_virga_cloud_uses_pressure_edges_and_maps_layers_and_wavelengths(
         "henyey_greenstein_from_virga_asymmetry"
     )
     assert cloud.metadata["cloud_virga_do_virtual"] == "false"
+    assert cloud.metadata["cloud_gas_mass_mixing_ratios_g_g"] == "MgSiO3:0.001"
+    assert cloud.metadata["cloud_virga_gas_mole_fractions"] == (
+        f"MgSiO3:{expected_mole_fraction:.17g}"
+    )
+    assert cloud.metadata["cloud_virga_gas_molecular_weights_amu"] == "MgSiO3:100.40000000000001"
+    assert cloud.metadata["cloud_virga_gas_mean_molecular_weight_amu_used"] == "2.2999999999999998"
+    assert cloud.metadata["cloud_virga_gas_mass_fraction_roundtrip_validated"] == "true"
+
+
+def test_virga_cloud_converts_each_condensible_mass_fraction_with_its_molecular_weight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path, "MgSiO3", "KCl")
+    result = _result(
+        condensibles=("MgSiO3", "KCl"),
+        condensate_mmr=np.array([[2.0e-5, 3.0e-5], [1.0e-5, 2.0e-5]]),
+    )
+    fake_atmospheres = _install_fake_virga(monkeypatch, result=result)
+    model = _model(
+        directory,
+        condensibles=("MgSiO3", "KCl"),
+        gas_mass_mixing_ratios={"MgSiO3": 1.0e-3, "KCl": 2.0e-4},
+    )
+
+    (cloud,) = model.evaluate(_gas_optical_depth(), parameters={})
+
+    np.testing.assert_allclose(
+        [
+            fake_atmospheres[0].constructor_kwargs["gas_mmr"]["MgSiO3"],
+            fake_atmospheres[0].constructor_kwargs["gas_mmr"]["KCl"],
+        ],
+        [1.0e-3 * 2.3 / 100.4, 2.0e-4 * 2.3 / 74.5],
+        rtol=1.0e-14,
+    )
+    assert cloud.metadata["cloud_virga_gas_mass_fraction_roundtrip_validated"] == "true"
+
+
+def test_virga_cloud_rejects_gas_property_conversion_that_does_not_recover_mass_fraction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    _install_fake_virga(monkeypatch)
+    model = _model(directory)
+
+    virga, _ = virga_cloud._load_virga()
+    virga.gas_properties.MgSiO3 = lambda mmw, *, mh, gas_mmr: (100.4, gas_mmr, 3.192)
+
+    with pytest.raises(RobertDataError, match="did not recover the configured mass mixing ratio"):
+        model.evaluate(_gas_optical_depth(), parameters={})
 
 
 def test_virga_cloud_resolves_retrieved_fsed_and_log10_kzz(

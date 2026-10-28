@@ -18,6 +18,13 @@ Its optical output uses the Virga asymmetry-factor closure rather
 than ROBERT's exact Mie phase moments. Compare spectra with a high-stream
 reference before interpreting strongly forward-scattering cases.
 
+`gas_mass_mixing_ratios` are physical condensable vapor mass ratios in g/g.
+Virga 2.0.2 multiplies its explicitly supplied `gas_mmr` by the condensable
+molecular weight divided by the atmosphere molecular weight. ROBERT converts
+its mass ratio to Virga's pre-conversion input and checks the round trip.
+Earlier adapter results produced before this correction used a different
+effective abundance and must not be interpreted as that stated mass ratio.
+
 For example, set the cloud section of a supported task configuration to:
 
 ```yaml

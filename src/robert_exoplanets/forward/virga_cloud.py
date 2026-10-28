@@ -10,7 +10,10 @@ Virga requires precomputed ``<condensible>.mieff`` files. Prepare these before
 retrieval. ``gas_mass_mixing_ratios`` gives the bottom gas mass mixing ratio
 (g/g) for each condensible; the adapter does not infer these values from
 ROBERT's volume-mixing-ratio chemistry or use Virga's built-in abundance
-defaults.
+defaults. Virga's ``gas_mmr`` argument is passed through its gas-property
+functions, which convert a mole fraction to mass mixing ratio. This adapter
+therefore converts each requested mass fraction to a mole fraction and checks
+that Virga's gas-property function converts it back to the requested value.
 """
 
 from __future__ import annotations
@@ -41,7 +44,12 @@ _SUPPORTED_MULTIPLE_SCATTERING_BACKENDS = {
 class VirgaEddySedCloudModel:
     """Use Virga to calculate one or more spherical eddy-sed cloud species.
 
-    Parameters use Virga's conventions:
+    The user-facing condensable abundances are physical gas mass mixing ratios.
+    The adapter converts these to the mole fractions required by Virga's
+    ``gas_mmr`` input and validates the inverse conversion with Virga's own
+    species gas-property functions.
+
+    Parameters:
 
     - ``gas_mass_mixing_ratios`` are bottom gas mass mixing ratios in g/g.
     - Set exactly one of ``fsed`` or ``fsed_parameter``. A retrieved fsed value
@@ -207,6 +215,12 @@ class VirgaEddySedCloudModel:
                     f"{name}:{self.gas_mass_mixing_ratios[name]:.17g}"
                     for name in self.condensibles
                 ),
+                "cloud_virga_gas_mmr_input_semantics": (
+                    "mole_fraction_number_of_condensible_gas_molecules_per_total_gas_molecule"
+                ),
+                "cloud_virga_gas_mass_fraction_conversion": (
+                    "x_gas=q_gas*mean_molecular_weight/gas_molecular_weight"
+                ),
                 "cloud_fsed": _control_source_metadata(self.fsed, self.fsed_parameter),
                 "cloud_kz_cm2_s": _control_source_metadata(
                     self.kz_cm2_s, self.log10_kz_cm2_s_parameter
@@ -342,6 +356,15 @@ class VirgaEddySedCloudModel:
         }
 
         virga, virga_version = _load_virga()
+        virga_gas_mole_fractions, virga_gas_molecular_weights = (
+            _virga_gas_mole_fractions_from_mass_fractions(
+                virga.gas_properties,
+                condensibles=self.condensibles,
+                gas_mass_mixing_ratios=self.gas_mass_mixing_ratios,
+                mean_molecular_weight=mean_molecular_weight,
+                metallicity=self.metallicity,
+            )
+        )
         try:
             import astropy.units as units
 
@@ -354,7 +377,7 @@ class VirgaEddySedCloudModel:
                 param="const",
                 verbose=False,
                 supsat=self.supersaturation,
-                gas_mmr=dict(self.gas_mass_mixing_ratios),
+                gas_mmr=virga_gas_mole_fractions,
             )
             virga_atmosphere.gravity(
                 gravity=gravity_m_s2 * 100.0,
@@ -385,6 +408,18 @@ class VirgaEddySedCloudModel:
             virga_version=virga_version,
             model_metadata={
                 **self.manifest_metadata,
+                "cloud_virga_gas_mole_fractions": ",".join(
+                    f"{name}:{virga_gas_mole_fractions[name]:.17g}"
+                    for name in self.condensibles
+                ),
+                "cloud_virga_gas_molecular_weights_amu": ",".join(
+                    f"{name}:{virga_gas_molecular_weights[name]:.17g}"
+                    for name in self.condensibles
+                ),
+                "cloud_virga_gas_mean_molecular_weight_amu_used": (
+                    f"{mean_molecular_weight:.17g}"
+                ),
+                "cloud_virga_gas_mass_fraction_roundtrip_validated": "true",
                 "cloud_fsed_used": f"{fsed:.17g}",
                 "cloud_kz_cm2_s_used": f"{kz_cm2_s:.17g}",
                 "cloud_mean_molecular_weight_policy_used": (
@@ -593,10 +628,13 @@ def _load_virga():
             "dependencies. Install Virga in the active Python environment; the "
             "current Virga 2.x release requires Python 3.11 or newer."
         ) from exc
-    if not all(hasattr(virga, name) for name in ("Atmosphere", "compute")):
+    if not all(
+        hasattr(virga, name) for name in ("Atmosphere", "compute", "gas_properties")
+    ):
         raise RobertConfigError(
             "Virga cloud model requires the documented virga-exo 2.x API: "
-            "virga.justdoit.Atmosphere and virga.justdoit.compute"
+            "virga.justdoit.Atmosphere, virga.justdoit.compute, and "
+            "virga.justdoit.gas_properties"
         )
     try:
         version = importlib_metadata.version("virga-exo")
@@ -611,6 +649,78 @@ def _load_virga():
             f"Virga version {version} is not supported; install virga-exo 2.x or newer"
         )
     return virga, version
+
+
+def _virga_gas_mole_fractions_from_mass_fractions(
+    gas_properties: object,
+    *,
+    condensibles: tuple[str, ...],
+    gas_mass_mixing_ratios: Mapping[str, float],
+    mean_molecular_weight: float,
+    metallicity: float,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Convert physical gas mass fractions to Virga's mole-fraction inputs.
+
+    Virga's gas-property functions return ``q = x * mu_condensible / mu_atmos``.
+    We use the same function to get each species molecular weight, then check
+    that the converted input recovers the user's physical mass fraction.
+    """
+
+    mole_fractions: dict[str, float] = {}
+    molecular_weights: dict[str, float] = {}
+    for species in condensibles:
+        gas_property = getattr(gas_properties, species, None)
+        if not callable(gas_property):
+            raise RobertConfigError(
+                f"Virga does not provide gas properties for condensible {species!r}"
+            )
+        try:
+            gas_molecular_weight, _, _ = gas_property(
+                mean_molecular_weight,
+                mh=metallicity,
+                gas_mmr=0.0,
+            )
+            gas_molecular_weight = float(gas_molecular_weight)
+            if not np.isfinite(gas_molecular_weight) or gas_molecular_weight <= 0.0:
+                raise ValueError("gas molecular weight must be finite and positive")
+
+            mass_fraction = float(gas_mass_mixing_ratios[species])
+            mole_fraction = (
+                mass_fraction * mean_molecular_weight / gas_molecular_weight
+            )
+            if not np.isfinite(mole_fraction) or mole_fraction <= 0.0:
+                raise ValueError("converted gas mole fraction must be finite and positive")
+
+            _, recovered_mass_fraction, _ = gas_property(
+                mean_molecular_weight,
+                mh=metallicity,
+                gas_mmr=mole_fraction,
+            )
+            recovered_mass_fraction = float(recovered_mass_fraction)
+        except Exception as exc:
+            raise RobertDataError(
+                f"Virga gas-property conversion failed for {species}: {exc}"
+            ) from exc
+
+        if not np.isfinite(recovered_mass_fraction) or not np.isclose(
+            recovered_mass_fraction,
+            mass_fraction,
+            rtol=1.0e-12,
+            atol=0.0,
+        ):
+            raise RobertDataError(
+                "Virga gas-property conversion did not recover the configured "
+                f"mass mixing ratio for {species}: requested {mass_fraction:.17g} g/g, "
+                f"recovered {recovered_mass_fraction:.17g} g/g"
+            )
+        mole_fractions[species] = float(mole_fraction)
+        molecular_weights[species] = gas_molecular_weight
+
+    if sum(mole_fractions.values()) > 1.0 + 1.0e-12:
+        raise RobertValidationError(
+            "Converted Virga condensable gas mole fractions must sum to no more than one"
+        )
+    return mole_fractions, molecular_weights
 
 
 def _virga_wavelength_micron(values: object, unit: object) -> NDArray[np.float64]:

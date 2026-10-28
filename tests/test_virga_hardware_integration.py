@@ -13,6 +13,9 @@ from robert_exoplanets import OpticalConstantsCatalog
 from robert_exoplanets.atmosphere import AtmosphereState
 from robert_exoplanets.core import PressureGrid, SpectralGrid
 from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
+from robert_exoplanets.forward.virga_cloud import (
+    _virga_gas_mole_fractions_from_mass_fractions,
+)
 from robert_exoplanets.opacity import (
     EvaluatedCorrelatedKOpacity,
     PreparedCorrelatedKOpacity,
@@ -24,6 +27,46 @@ pytestmark = pytest.mark.skipif(
     os.environ.get("ROBERT_RUN_VIRGA_TESTS") != "1",
     reason="set ROBERT_RUN_VIRGA_TESTS=1 to run the optional Virga integration test",
 )
+
+
+def test_virga_supported_species_mass_fractions_round_trip_through_gas_properties() -> None:
+    """Check the adapter conversion against every installed Virga species helper."""
+
+    virga = pytest.importorskip(
+        "virga.justdoit",
+        reason="install virga-exo 2.x to run the Virga gas-property integration test",
+    )
+    condensibles = tuple(str(name) for name in virga.available())
+    mass_mixing_ratios = {name: 1.0e-8 for name in condensibles}
+    mean_molecular_weight = 2.3
+
+    mole_fractions, molecular_weights = _virga_gas_mole_fractions_from_mass_fractions(
+        virga.gas_properties,
+        condensibles=condensibles,
+        gas_mass_mixing_ratios=mass_mixing_ratios,
+        mean_molecular_weight=mean_molecular_weight,
+        metallicity=1.0,
+    )
+
+    assert len(condensibles) == 16
+    for species in condensibles:
+        assert mole_fractions[species] == pytest.approx(
+            mass_mixing_ratios[species] * mean_molecular_weight / molecular_weights[species],
+            rel=1.0e-14,
+        )
+        _, recovered_mass_fraction, _ = getattr(
+            virga.gas_properties,
+            species,
+        )(
+            mean_molecular_weight,
+            mh=1.0,
+            gas_mmr=mole_fractions[species],
+        )
+        assert recovered_mass_fraction == pytest.approx(
+            mass_mixing_ratios[species],
+            rel=1.0e-12,
+            abs=0.0,
+        )
 
 
 def test_virga_cloud_adapter_matches_direct_virga_calculation(
@@ -136,6 +179,15 @@ def test_virga_cloud_adapter_matches_direct_virga_calculation(
     assert float(np.max(condensate_mmr)) > 0.0
     assert float(np.max(direct_tau)) > 0.0
 
+    expected_virga_mole_fraction = gas_mass_mixing_ratio * 2.3 / 100.4
+    assert adapter_cloud.metadata["cloud_virga_gas_mole_fractions"] == (
+        f"MgSiO3:{expected_virga_mole_fraction:.17g}"
+    )
+    assert adapter_cloud.metadata["cloud_gas_mass_mixing_ratios_g_g"] == (
+        f"MgSiO3:{gas_mass_mixing_ratio:.17g}"
+    )
+    assert adapter_cloud.metadata["cloud_virga_gas_mass_fraction_roundtrip_validated"] == "true"
+
     np.testing.assert_allclose(adapter_cloud.extinction_tau, direct_tau, rtol=2.0e-12)
     np.testing.assert_allclose(
         adapter_cloud.single_scattering_albedo,
@@ -193,7 +245,7 @@ def _prepare_virga_mie_table(
 
 
 def _pressure_grid() -> PressureGrid:
-    edges = np.logspace(1.0, -5.0, 13)
+    edges = np.logspace(1.0, -5.0, 17)
     return PressureGrid(
         edges=edges,
         centers=np.sqrt(edges[:-1] * edges[1:]),
@@ -248,6 +300,23 @@ def _run_direct_virga(
     # pressure-edge state that the adapter builds from ROBERT's grid.
     pressure_bar = np.sort(np.asarray(pressure_grid.edges, dtype=float))
     temperature_sorted = np.asarray(temperature_edges_k, dtype=float)[::-1]
+    gas_molecular_weight, _, _ = virga.gas_properties.MgSiO3(
+        2.3,
+        mh=metallicity,
+        gas_mmr=0.0,
+    )
+    virga_gas_mole_fraction = gas_mass_mixing_ratio * 2.3 / gas_molecular_weight
+    _, recovered_gas_mass_mixing_ratio, _ = virga.gas_properties.MgSiO3(
+        2.3,
+        mh=metallicity,
+        gas_mmr=virga_gas_mole_fraction,
+    )
+    np.testing.assert_allclose(
+        recovered_gas_mass_mixing_ratio,
+        gas_mass_mixing_ratio,
+        rtol=1.0e-12,
+        atol=0.0,
+    )
     virga_atmosphere = virga.Atmosphere(
         ["MgSiO3"],
         fsed=fsed,
@@ -257,7 +326,7 @@ def _run_direct_virga(
         param="const",
         verbose=False,
         supsat=0.0,
-        gas_mmr={"MgSiO3": gas_mass_mixing_ratio},
+        gas_mmr={"MgSiO3": virga_gas_mole_fraction},
     )
     virga_atmosphere.gravity(
         gravity=1500.0,
