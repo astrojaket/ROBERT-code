@@ -149,14 +149,8 @@ class PhoenixStellarSpectrumModel:
 
         wavelength_micron = _wavelength_micron(spectral_grid)
         target_angstrom = wavelength_micron * 1.0e4
-        edge_angstrom = (
-            None
-            if spectral_grid.bin_edges is None
-            else _spectral_values_to_micron(
-                np.asarray(spectral_grid.bin_edges, dtype=float), spectral_grid.unit
-            )
-            * 1.0e4
-        )
+        bounds_micron = _spectral_bounds_to_micron(spectral_grid)
+        edge_angstrom = None if bounds_micron is None else bounds_micron * 1.0e4
         rebinned_flam = _resample_surface_flux(
             source,
             native_wavelength_angstrom,
@@ -312,12 +306,26 @@ def _resample_surface_flux(
             dtype=float,
         )
 
-    values = np.empty(target_wavelength_angstrom.size, dtype=float)
-    for index, (left, right) in enumerate(
-        zip(bin_edges_angstrom[:-1], bin_edges_angstrom[1:], strict=True)
+    if bin_edges_angstrom.ndim == 1:
+        bounds = np.column_stack(
+            (
+                np.minimum(bin_edges_angstrom[:-1], bin_edges_angstrom[1:]),
+                np.maximum(bin_edges_angstrom[:-1], bin_edges_angstrom[1:]),
+            )
+        )
+    elif bin_edges_angstrom.ndim == 2 and bin_edges_angstrom.shape == (
+        target_wavelength_angstrom.size,
+        2,
     ):
-        lower = min(float(left), float(right))
-        upper = max(float(left), float(right))
+        bounds = bin_edges_angstrom
+    else:
+        raise RobertValidationError(
+            "stellar bin integration requires contiguous edges or per-bin bounds"
+        )
+    values = np.empty(target_wavelength_angstrom.size, dtype=float)
+    for index, (lower, upper) in enumerate(bounds):
+        lower = float(lower)
+        upper = float(upper)
         inside = native_wavelength_angstrom[
             (native_wavelength_angstrom > lower)
             & (native_wavelength_angstrom < upper)
@@ -387,17 +395,36 @@ def _spectral_values_to_micron(
     return result
 
 
+def _spectral_bounds_to_micron(
+    spectral_grid: SpectralGrid,
+) -> NDArray[np.float64] | None:
+    """Convert exact spectral-bin bounds to increasing wavelength pairs."""
+
+    bounds = spectral_grid.bin_bounds
+    if bounds is None:
+        return None
+    converted = _spectral_values_to_micron(bounds, spectral_grid.unit)
+    result = np.column_stack(
+        (
+            np.minimum(converted[:, 0], converted[:, 1]),
+            np.maximum(converted[:, 0], converted[:, 1]),
+        )
+    )
+    return result
+
+
 def _output_grid(
     source: SpectralGrid,
     wavelength_micron: NDArray[np.float64],
 ) -> SpectralGrid:
-    bin_edges = (
-        None
-        if source.bin_edges is None
-        else _spectral_values_to_micron(
+    if source.bin_edges is None:
+        bin_edges = None
+    elif source.bin_edges.ndim == 1:
+        bin_edges = _spectral_values_to_micron(
             np.asarray(source.bin_edges, dtype=float), source.unit
         )
-    )
+    else:
+        bin_edges = _spectral_bounds_to_micron(source)
     return SpectralGrid(
         values=wavelength_micron,
         bin_edges=bin_edges,

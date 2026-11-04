@@ -560,6 +560,57 @@ def spectral_grid_values_in_unit(spectral_grid: SpectralGrid, unit: str) -> NDAr
     raise RobertValidationError(f"cannot convert spectral grid from {spectral_grid.unit!r} to {unit!r}")
 
 
+def spectral_grid_bin_bounds_in_unit(
+    spectral_grid: SpectralGrid,
+    unit: str,
+) -> NDArray[np.float64] | None:
+    """Return exact per-bin lower and upper bounds in ``unit``.
+
+    Rows stay in the same order as ``spectral_grid.values``. The two columns
+    are always sorted in the requested unit, including inverse wavelength /
+    wavenumber conversions.
+    """
+
+    bounds = spectral_grid.bin_bounds
+    if bounds is None:
+        return None
+    source = _spectral_unit(spectral_grid.unit)
+    target = _spectral_unit(unit)
+    if source == target:
+        return bounds
+    if source == "micron" and target == "cm^-1":
+        converted = 10000.0 / bounds
+    elif source == "cm^-1" and target == "micron":
+        converted = 10000.0 / bounds
+    else:
+        raise RobertValidationError(
+            f"cannot convert spectral bin bounds from {spectral_grid.unit!r} to {unit!r}"
+        )
+    lower = np.minimum(converted[:, 0], converted[:, 1])
+    upper = np.maximum(converted[:, 0], converted[:, 1])
+    result = np.column_stack((lower, upper))
+    result.setflags(write=False)
+    return result
+
+
+def spectral_grid_bin_edges_in_unit(
+    spectral_grid: SpectralGrid,
+    unit: str,
+) -> NDArray[np.float64] | None:
+    """Convert bin coordinates while preserving contiguous or paired shape."""
+
+    if spectral_grid.bin_edges is None:
+        return None
+    if spectral_grid.bin_edges.ndim == 2:
+        return spectral_grid_bin_bounds_in_unit(spectral_grid, unit)
+    edge_grid = SpectralGrid.from_array(
+        spectral_grid.bin_edges,
+        unit=spectral_grid.unit,
+        role="spectral_bin_edges",
+    )
+    return spectral_grid_values_in_unit(edge_grid, unit)
+
+
 def pressure_values_in_unit(values: ArrayLike, source_unit: str, target_unit: str) -> NDArray[np.float64]:
     """Return pressure values converted between common opacity-grid units."""
 

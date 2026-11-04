@@ -12,6 +12,7 @@ from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import (
     pressure_values_in_unit,
+    spectral_grid_bin_edges_in_unit,
     spectral_grid_values_in_unit,
 )
 
@@ -322,11 +323,15 @@ def solve_emission(
         _validate_path_geometry_match(gas_optical_depth, path_geometry)
 
     wavelength = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
-    output_grid = SpectralGrid.from_array(
-        wavelength,
+    output_grid = SpectralGrid(
+        values=wavelength,
         unit="micron",
         role="rt_native",
         name=gas_optical_depth.spectral_grid.name,
+        bin_edges=spectral_grid_bin_edges_in_unit(
+            gas_optical_depth.spectral_grid,
+            "micron",
+        ),
     )
     order = _top_to_bottom_order(gas_optical_depth)
     source = _layer_planck_source(wavelength, gas_optical_depth.atmosphere.temperature)
@@ -772,11 +777,15 @@ def solve_emission_spectrum(
     if path_geometry is not None:
         _validate_path_geometry_match(gas_optical_depth, path_geometry)
     wavelength = spectral_grid_values_in_unit(gas_optical_depth.spectral_grid, "micron")
-    output_grid = SpectralGrid.from_array(
-        wavelength,
+    output_grid = SpectralGrid(
+        values=wavelength,
         unit="micron",
         role="rt_native",
         name=gas_optical_depth.spectral_grid.name,
+        bin_edges=spectral_grid_bin_edges_in_unit(
+            gas_optical_depth.spectral_grid,
+            "micron",
+        ),
     )
     order = _top_to_bottom_order(gas_optical_depth)
     source = _layer_planck_source(wavelength, gas_optical_depth.atmosphere.temperature)

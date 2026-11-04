@@ -106,21 +106,16 @@ class PreparedTopHatObservationResponse:
         if source_x[0] > source_x[-1]:
             source_x = source_x[::-1]
             source_y = source_y[::-1]
-        edges = np.asarray(self.observation.wavelength_bin_edges, dtype=float)
-        reversed_observation = edges[0] > edges[-1]
-        if reversed_observation:
-            edges = edges[::-1]
-        if edges[0] < source_x[0] or edges[-1] > source_x[-1]:
+        bounds = np.asarray(self.observation.wavelength_bin_bounds, dtype=float)
+        if np.min(bounds) < source_x[0] or np.max(bounds) > source_x[-1]:
             raise RobertCoverageError("observation bins extend outside native spectrum")
 
         values = np.empty(self.observation.n_points, dtype=float)
-        for index, (lower, upper) in enumerate(zip(edges[:-1], edges[1:], strict=True)):
+        for index, (lower, upper) in enumerate(bounds):
             interior = (source_x > lower) & (source_x < upper)
             integration_x = np.concatenate(([lower], source_x[interior], [upper]))
             integration_y = np.interp(integration_x, source_x, source_y)
             values[index] = np.trapezoid(integration_y, integration_x) / (upper - lower)
-        if reversed_observation:
-            values = values[::-1]
         observed_grid = SpectralGrid(
             values=self.observation.wavelength,
             unit=self.observation.wavelength_unit,
@@ -175,14 +170,10 @@ class StratifiedSamplingObservationResponse:
         source = np.asarray(source_grid.values, dtype=float)
         if source[0] > source[-1]:
             source = source[::-1]
-        edges = np.asarray(observation.wavelength_bin_edges, dtype=float)
-        reversed_observation = edges[0] > edges[-1]
-        ascending_edges = edges[::-1] if reversed_observation else edges
+        bounds = np.asarray(observation.wavelength_bin_bounds, dtype=float)
         selected_values = []
         selected_bins = []
-        for ascending_bin, (lower, upper) in enumerate(
-            zip(ascending_edges[:-1], ascending_edges[1:], strict=True)
-        ):
+        for original_bin, (lower, upper) in enumerate(bounds):
             available = source[(source >= lower) & (source <= upper)]
             if available.size < self.samples_per_bin:
                 raise RobertCoverageError(
@@ -201,11 +192,6 @@ class StratifiedSamplingObservationResponse:
                 raise RobertCoverageError(
                     "stratified sampling selected duplicate source points; reduce samples_per_bin"
                 )
-            original_bin = (
-                observation.n_points - 1 - ascending_bin
-                if reversed_observation
-                else ascending_bin
-            )
             selected_values.extend(chosen.tolist())
             selected_bins.extend([original_bin] * self.samples_per_bin)
         order = np.argsort(selected_values)

@@ -19,10 +19,14 @@ DEFAULT_MOLECULAR_MASSES: Mapping[str, float] = {
     "H2": 2.01588,
     "He": 4.002602,
     "H": 1.00794,
+    "H-": 1.00848858,
+    "e-": 0.000548579909065,
     "H2O": 18.01528,
     "CO": 28.0101,
     "CO2": 44.0095,
     "SiO": 44.0849,
+    "TiO": 63.8664,
+    "VO": 66.9409,
     "CH4": 16.04246,
     "NH3": 17.03052,
     "HCN": 27.0253,
@@ -134,6 +138,9 @@ class _FastChemRuntime:
     fastchem: object
     solar_abundances: NDArray[np.float64]
     species_indices: NDArray[np.int64]
+    full_species_indices: NDArray[np.int64]
+    full_output_labels: tuple[str, ...]
+    full_species_masses: Mapping[str, float]
 
 
 def _pressure_values_pa(pressure_grid: PressureGrid) -> NDArray[np.float64]:
@@ -918,6 +925,7 @@ class FastChemEquilibriumChemistry:
     convention: str = "volume_mixing_ratio"
     metadata: Mapping[str, str] = field(default_factory=dict)
     element_log10_number_ratio_parameters: Mapping[str, str] = field(default_factory=dict)
+    full_equilibrium_composition: bool = False
 
     def __post_init__(self) -> None:
         path = Path(self.fastchem_path).expanduser()
@@ -929,6 +937,10 @@ class FastChemEquilibriumChemistry:
             raise RobertValidationError("fastchem_species and labels must have the same length")
         if not self.fastchem_species:
             raise RobertValidationError("FastChem chemistry requires at least one species")
+        if self.full_equilibrium_composition and self.constant_log10_vmr_parameters:
+            raise RobertValidationError(
+                "full FastChem equilibrium composition does not allow constant VMR overrides"
+            )
         labels = tuple(_validate_species_name(label) for label in self.labels)
         if len(set(labels)) != len(labels):
             raise RobertValidationError("FastChem labels must be unique")
@@ -1035,6 +1047,9 @@ class FastChemEquilibriumChemistry:
                         f"{species}:{parameter}"
                         for species, parameter in overrides.items()
                     ),
+                    "full_equilibrium_composition": str(
+                        bool(self.full_equilibrium_composition)
+                    ).lower(),
                     **dict(self.metadata),
                 }
             ),
@@ -1044,7 +1059,19 @@ class FastChemEquilibriumChemistry:
     def species(self) -> tuple[str, ...]:
         """Species produced by this chemistry model."""
 
+        if self.full_equilibrium_composition:
+            return self._runtime.full_output_labels
         return self.labels
+
+    @property
+    def full_equilibrium_molecular_masses(self) -> Mapping[str, float]:
+        """Return FastChem masses for the complete species output."""
+
+        if not self.full_equilibrium_composition:
+            raise RobertValidationError(
+                "full equilibrium masses require full_equilibrium_composition=true"
+            )
+        return self._runtime.full_species_masses
 
     def required_parameters(self) -> tuple[str, ...]:
         """Return required FastChem parameter names."""
@@ -1127,14 +1154,24 @@ class FastChemEquilibriumChemistry:
         k_b_cgs = 1.380649e-16
         gas_number_density = pressure_pa * 10.0 / (k_b_cgs * temperature)
         number_densities = np.asarray(output_data.number_densities, dtype=float)
-        vmr = number_densities[:, runtime.species_indices] / gas_number_density[:, None]
-        if vmr.shape != (pressure_grid.n_layers, len(self.labels)):
+        species_indices = (
+            runtime.full_species_indices
+            if self.full_equilibrium_composition
+            else runtime.species_indices
+        )
+        vmr = number_densities[:, species_indices] / gas_number_density[:, None]
+        expected_species = (
+            runtime.full_output_labels
+            if self.full_equilibrium_composition
+            else self.labels
+        )
+        if vmr.shape != (pressure_grid.n_layers, len(expected_species)):
             raise RobertValidationError("FastChem returned an unexpected VMR shape")
         if not np.all(np.isfinite(vmr)) or np.any(vmr < 0.0):
             raise RobertValidationError("FastChem returned invalid VMR values")
 
         profiles: dict[str, NDArray[np.float64]] = {}
-        for index, label in enumerate(self.labels):
+        for index, label in enumerate(expected_species):
             profiles[label] = _readonly_layer_array(vmr[:, index], f"{label} FastChem VMR", pressure_grid.n_layers)
         for label, parameter_name in self.constant_log10_vmr_parameters.items():
             log10_vmr = _parameter_value(
@@ -1182,6 +1219,51 @@ class FastChemEquilibriumChemistry:
         if missing:
             raise RobertConfigError("FastChem does not know species: " + ", ".join(missing))
 
+        if self.full_equilibrium_composition:
+            if len(set(self.fastchem_species)) != len(self.fastchem_species):
+                raise RobertValidationError(
+                    "full FastChem composition requires unique native species IDs"
+                )
+            full_species_indices = np.arange(fastchem.getGasSpeciesNumber(), dtype=int)
+            full_species_symbols = tuple(
+                str(fastchem.getGasSpeciesSymbol(index))
+                for index in full_species_indices
+            )
+            if not full_species_symbols or len(set(full_species_symbols)) != len(
+                full_species_symbols
+            ):
+                raise RobertConfigError(
+                    "FastChem full gas-species symbols must be non-empty and unique"
+                )
+            required_symbols = {"H2", "He", "H", "H1-", "e-"}
+            missing_symbols = sorted(required_symbols - set(full_species_symbols))
+            if missing_symbols:
+                raise RobertConfigError(
+                    "FastChem full composition is missing required gas species: "
+                    + ", ".join(missing_symbols)
+                )
+            aliases = dict(zip(self.fastchem_species, self.labels, strict=True))
+            output_labels = tuple(
+                aliases.get(symbol, "H-" if symbol == "H1-" else symbol)
+                for symbol in full_species_symbols
+            )
+            if len(set(output_labels)) != len(output_labels):
+                raise RobertConfigError(
+                    "FastChem full-composition aliases collide with native species names"
+                )
+            full_species_masses: dict[str, float] = {}
+            for index, label in enumerate(output_labels):
+                mass = float(fastchem.getGasSpeciesWeight(index))
+                if not np.isfinite(mass) or mass <= 0.0:
+                    raise RobertConfigError(
+                        f"FastChem returned an invalid mass for gas species {label}"
+                    )
+                full_species_masses[label] = mass
+        else:
+            full_species_indices = np.array([], dtype=int)
+            output_labels = ()
+            full_species_masses = {}
+
         missing_elements = [
             element
             for element in self.element_log10_number_ratio_parameters
@@ -1199,6 +1281,9 @@ class FastChemEquilibriumChemistry:
             fastchem=fastchem,
             solar_abundances=np.array(fastchem.getElementAbundances(), dtype=float),
             species_indices=np.array(species_indices, dtype=int),
+            full_species_indices=full_species_indices,
+            full_output_labels=output_labels,
+            full_species_masses=immutable_mapping(full_species_masses),
         )
 
 

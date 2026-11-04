@@ -150,11 +150,12 @@ def solve_absorption_transmission(
         raise RobertValidationError("transmission solve produced non-finite transit depths")
 
     wavelength = np.asarray(gas_optical_depth.spectral_grid.values, dtype=float)
-    output_grid = SpectralGrid.from_array(
-        wavelength,
+    output_grid = SpectralGrid(
+        values=wavelength,
         unit=gas_optical_depth.spectral_grid.unit,
         role="rt_native",
         name=gas_optical_depth.spectral_grid.name,
+        bin_edges=gas_optical_depth.spectral_grid.bin_edges,
     )
     metadata = {
         "rt_solver": "spherical_shell_absorption_transmission",

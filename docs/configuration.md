@@ -16,6 +16,57 @@ option reference when you need to adapt a model.
 Distinct PICASO and six-gas regression inputs are kept under
 `tests/fixtures/configurations/` and are not public starting configurations.
 
+## Choose a radiative-transfer mode
+
+Set `radiative_transfer.model` to `emission` or `transmission`. The YAML schema
+is shared, but each mode has a small set of controls that does not apply to the
+other mode. The maintained `emission.yaml` and `transmission.yaml` files mark
+these groups with `# Shared`, `# Emission only`, and `# Transmission only`.
+
+| Label | YAML fields | Use |
+| --- | --- | --- |
+| Mode selector | `radiative_transfer.model` | Choose `emission` or `transmission`. |
+| Shared | `paths`, `run`, `bodies`, `observations`, `atmosphere`, `opacity`, `likelihood`, `parameters`, `sampler`, `plotting`, `runtime` | Define inputs and retrieval settings. The forward model returns `eclipse_depth` for emission and `transit_depth` for transmission. A `parameters` list can include controls for the selected mode. |
+| Shared | `clouds` extinction and profile settings; `radiative_transfer.include_rayleigh`, `radiative_transfer.gas_combination`, optional `radiative_transfer.hminus_continuum` | Set atmospheric opacity terms used by either mode. Cloud `multiple_scattering_backend` settings are emission-only. |
+| Shared | `bodies.star.radius_m`, `bodies.star.spectrum_model` | The stellar radius is used in both modes. `spectrum_model` supplies the stellar spectrum for emission eclipse depth and for transmission when stellar contamination is enabled. |
+| Emission only | `disk_emission` (including region weights), `radiative_transfer.geometry`, `radiative_transfer.thermal_integration_backend`, `radiative_transfer.sh4_boundary_backend`, cloud `multiple_scattering_backend` | Set the emitting disk, thermal integration, and cloud-scattering treatment. Omit transmission-only controls. |
+| Transmission only | `stellar_contamination`, `radiative_transfer.reference_pressure_bar`, `radiative_transfer.radius_scale_parameter`, `radiative_transfer.gravity_model`, `radiative_transfer.impact_quadrature_order` | Set stellar contamination and the reference radius, gravity, and impact-ray integration. Omit emission-only controls. |
+
+H-minus is off when `radiative_transfer.hminus_continuum` is absent. The
+optional shared block accepts `hminus_species`, `hydrogen_species`,
+`electron_species`, `temperature_extrapolation`, and `spectral_extrapolation`.
+The chemistry model must provide layer VMR profiles under the configured
+species names; the defaults are `H-`, `H`, and `e-`.
+
+For FastChem chemistry, set `full_equilibrium_composition: true` under
+`atmosphere.chemistry` when H-minus is enabled. This returns the full native gas
+composition, including the `H-`, `H`, and `e-` profiles needed for the
+continuum and the species needed for mean molecular weight. Keep
+`opacity.species` limited to molecules that have opacity tables. This mode does
+not support pressure quenching or constant VMR overrides. Free chemistry must
+provide explicit layer profiles for the three continuum species. See
+[Configured H-minus examples](tutorials/06_configured_hminus.md) for complete
+FastChem and free-chemistry setups.
+
+A FastChem H-minus chemistry block keeps only the aliases needed by the model:
+
+```yaml
+atmosphere:
+  chemistry:
+    model: fastchem_equilibrium
+    fastchem_path: /path/to/fastchem
+    full_equilibrium_composition: true
+    species:
+      - {label: H2O, fastchem_name: H2O1}
+      - {label: CO, fastchem_name: C1O1}
+opacity:
+  species: [H2O, CO]
+```
+
+`opacity.species` selects line tables. It does not limit the full FastChem
+composition. The shared `hminus_continuum` block shown above enables the
+continuum.
+
 This schema covers a subset of the Python API. `opacity.format` accepts
 `exomol_kta` and `exomol_cross_section_hdf`; `likelihood.model` accepts
 `gaussian`. Line-by-line providers, correlated likelihoods, time-resolved
@@ -125,6 +176,46 @@ observations:
       uncertainty_scale_parameter: g395h_error_scale
       jitter_parameter: g395h_jitter
 ```
+
+An NPZ may store `wavelength_bin_edges` as one contiguous 1D array with
+`n_points + 1` values, or as an `n_points x 2` array of exact
+`[lower_wavelength, upper_wavelength]` pairs. The paired form keeps each
+published interval in row order, including gaps and overlaps. Every wavelength
+center must lie inside its own pair. For text-table conversion, provide both
+`bin_low_column` and `bin_high_column`; the converter keeps exact pairs unless
+the intervals meet exactly, in which case it stores legacy contiguous edges.
+Correlated-k Exo_k preparation bins each exact interval independently, so it
+does not include opacity from gaps or join overlapping windows. Line-by-line
+opacity still samples at the requested wavelength centers; a response must
+integrate the model over the stored bounds when band averages are required.
+
+With `loader: robert_npz`, `path` can name one NPZ file for one dataset, or
+a directory with one `<dataset>.npz` file for each selected dataset.
+`paths.observations_directory` fills `observations.path`, and can point to
+either form. For example, two NIRSpec detectors can use:
+
+```yaml
+paths:
+  observations_directory: ./data/wasp178b_g395h
+observations:
+  loader: robert_npz
+  datasets: [nrs1, nrs2]
+```
+
+This reads `./data/wasp178b_g395h/nrs1.npz` and
+`./data/wasp178b_g395h/nrs2.npz`. The `robert_npz` loader name stays the same.
+
+An NPZ can also include an optional `covariance` array with shape
+`n_points x n_points`. Its values use the square of the observable's units.
+The diagonal must equal `uncertainty**2`. The matrix must be finite,
+symmetric, and positive definite. The Gaussian likelihood uses the full matrix.
+An observation mask selects the matching rows and columns. `uncertainty_scale`
+scales the matrix by its square, and jitter adds `jitter**2` to its diagonal.
+Each covariance matrix applies to one dataset. Separate detector files cannot
+store covariance between detectors. For correlated observations,
+`pointwise_loglike` reports one aggregate value. Diagnostics use marginal
+standard deviations, and optimal-estimation retrievals do not support this
+covariance input.
 
 Only selected, statistically independent datasets should be included. Every
 named nuisance parameter must appear in `parameters`.
@@ -261,6 +352,9 @@ Temperature models are `parmentier_guillot_2014`, `isothermal`, `tabulated`,
 ## Clouds and projected emission
 
 Cloud models are `none`, `deck_haze`, `mie_catalog`, and `mie_direct_nk`.
+Cloud extinction and profile settings can be used in both modes.
+`multiple_scattering_backend` affects emission only. The `disk_emission`
+block, including its hot and cold region weights, also applies only to emission.
 Emission can use one region, a diluted region, or hot and cold regions:
 
 ```yaml
@@ -295,12 +389,14 @@ opacity:
     g_points: 8
 
 radiative_transfer:
-  model: emission
+  model: emission # Set to transmission for a transit-depth model.
+  # Shared
+  include_rayleigh: true
+  gas_combination: random_overlap
+  # Emission only
   geometry:
     model: normal_emission
     points: 4
-  include_rayleigh: true
-  gas_combination: random_overlap
   thermal_integration_backend: auto
   sh4_boundary_backend: auto
 ```
@@ -384,9 +480,31 @@ six gases only. Add the SO2 or H2S files required by your configuration to the
 same directory. The [opacity input guide](theory/opacity_data.md) gives the
 ExoMol links, filenames, and separate high-resolution input routes.
 
-For transmission, set `model: transmission` and configure
-`reference_pressure_bar`, optional `radius_scale_parameter`,
-`gravity_model`, and `impact_quadrature_order`.
+For transmission, set `model: transmission`. The radius in
+`bodies.planet.radius_m` is anchored at `reference_pressure_bar`. Set
+`radius_scale_parameter` only when you want to retrieve a multiplicative radius
+correction, and add that parameter to `parameters`. `gravity_model` accepts
+`constant` or `inverse_square`; `impact_quadrature_order` sets the number of
+quadrature points for the transit annulus. The top-level `stellar_contamination`
+block is also transmission-only.
+
+An optional shared H-minus block looks like this:
+
+```yaml
+radiative_transfer:
+  hminus_continuum:
+    hminus_species: H-
+    hydrogen_species: H
+    electron_species: e-
+    temperature_extrapolation: zero
+    spectral_extrapolation: zero
+```
+
+Omit this block to keep H-minus disabled. When enabled, include the required
+`H-`, `H`, and `e-` profiles in the atmosphere chemistry output. The same block
+works with emission and transmission. See
+[Configured H-minus examples](tutorials/06_configured_hminus.md) for complete
+chemistry examples.
 
 ## Parameters and likelihood
 

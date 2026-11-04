@@ -26,6 +26,59 @@ def _readonly_1d_float_array(values: ArrayLike, name: str) -> NDArray[np.float64
     return array
 
 
+def _readonly_spectral_bin_edges(
+    values: NDArray[np.float64],
+    bin_edges: ArrayLike,
+    name: str,
+) -> NDArray[np.float64]:
+    """Validate contiguous edges or exact per-bin ``[lower, upper]`` pairs."""
+
+    edges = np.array(bin_edges, dtype=float, copy=True)
+    if edges.ndim == 1:
+        if edges.size != values.size + 1:
+            raise RobertValidationError(
+                f"{name} must contain len(values) + 1 contiguous edges or one pair per value"
+            )
+        if not np.all(np.isfinite(edges)):
+            raise RobertValidationError(f"{name} must contain only finite values")
+        if not _is_strictly_monotonic(edges):
+            raise RobertValidationError(f"{name} must be strictly monotonic")
+        if np.any(edges <= 0.0):
+            raise RobertValidationError(f"{name} must be positive")
+        if values.size > 1 and np.sign(np.diff(values)[0]) != np.sign(np.diff(edges)[0]):
+            raise RobertValidationError(
+                f"{name} must have the same orientation as spectral values"
+            )
+        lower = np.minimum(edges[:-1], edges[1:])
+        upper = np.maximum(edges[:-1], edges[1:])
+    elif edges.ndim == 2:
+        if edges.shape != (values.size, 2):
+            raise RobertValidationError(
+                f"{name} per-bin bounds must have shape (len(values), 2)"
+            )
+        if not np.all(np.isfinite(edges)):
+            raise RobertValidationError(f"{name} must contain only finite values")
+        if np.any(edges <= 0.0):
+            raise RobertValidationError(f"{name} must be positive")
+        lower = edges[:, 0]
+        upper = edges[:, 1]
+        if np.any(lower >= upper):
+            raise RobertValidationError(
+                f"{name} per-bin pairs must be ordered as [lower, upper] with positive width"
+            )
+    else:
+        raise RobertValidationError(
+            f"{name} must be one-dimensional contiguous edges or two-dimensional per-bin bounds"
+        )
+
+    if np.any(values <= lower) or np.any(values >= upper):
+        raise RobertValidationError(
+            "each spectral value must lie strictly inside its bin bounds"
+        )
+    edges.setflags(write=False)
+    return edges
+
+
 def _is_strictly_monotonic(array: NDArray[np.float64]) -> bool:
     diff = np.diff(array)
     return bool(np.all(diff > 0) or np.all(diff < 0))
@@ -167,21 +220,15 @@ class SpectralGrid:
         if not self.role:
             raise RobertValidationError("spectral grid role must not be empty")
 
-        bin_edges = None
-        if self.bin_edges is not None:
-            bin_edges = _readonly_1d_float_array(self.bin_edges, "spectral bin edges")
-            if bin_edges.size != values.size + 1:
-                raise RobertValidationError("spectral bin edges must have len(values) + 1 values")
-            if not _is_strictly_monotonic(bin_edges):
-                raise RobertValidationError("spectral bin edges must be strictly monotonic")
-            if np.any(bin_edges <= 0.0):
-                raise RobertValidationError("spectral bin edges must be positive")
-            if values.size > 1 and np.sign(np.diff(values)[0]) != np.sign(np.diff(bin_edges)[0]):
-                raise RobertValidationError("spectral values and bin edges must have the same orientation")
-            bin_lower = np.minimum(bin_edges[:-1], bin_edges[1:])
-            bin_upper = np.maximum(bin_edges[:-1], bin_edges[1:])
-            if np.any(values <= bin_lower) or np.any(values >= bin_upper):
-                raise RobertValidationError("each spectral value must lie strictly inside its bin edges")
+        bin_edges = (
+            None
+            if self.bin_edges is None
+            else _readonly_spectral_bin_edges(
+                values,
+                self.bin_edges,
+                "spectral bin edges",
+            )
+        )
 
         object.__setattr__(self, "values", values)
         object.__setattr__(self, "bin_edges", bin_edges)
@@ -192,6 +239,28 @@ class SpectralGrid:
         """Number of spectral samples."""
 
         return int(self.values.size)
+
+    @property
+    def bin_bounds(self) -> NDArray[np.float64] | None:
+        """Return one ascending ``[lower, upper]`` pair per spectral value.
+
+        The stored ``bin_edges`` keeps its original one-dimensional or
+        per-bin representation. This property provides the canonical
+        per-bin view for consumers that integrate or check coverage.
+        """
+
+        if self.bin_edges is None:
+            return None
+        if self.bin_edges.ndim == 2:
+            return self.bin_edges
+        bounds = np.column_stack(
+            (
+                np.minimum(self.bin_edges[:-1], self.bin_edges[1:]),
+                np.maximum(self.bin_edges[:-1], self.bin_edges[1:]),
+            )
+        )
+        bounds.setflags(write=False)
+        return bounds
 
     @classmethod
     def from_array(

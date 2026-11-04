@@ -19,6 +19,7 @@ from typing import Any, Mapping, Protocol
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
+from scipy.linalg import solve_triangular
 
 from robert_exoplanets.core import RobertValidationError, Spectrum
 from robert_exoplanets.core._immutability import immutable_mapping
@@ -193,6 +194,49 @@ class DenseCovariance:
         object.__setattr__(self, "_cholesky", cholesky)
         object.__setattr__(self, "name", str(self.name).strip())
 
+    @classmethod
+    def _from_precomputed_cholesky(
+        cls,
+        matrix: ArrayLike,
+        cholesky: ArrayLike,
+        *,
+        name: str = "dense-covariance",
+    ) -> "DenseCovariance":
+        """Reuse a Cholesky factor already validated with an observation."""
+
+        covariance = np.asarray(matrix, dtype=float)
+        factor = np.asarray(cholesky, dtype=float)
+        if (
+            covariance.ndim != 2
+            or covariance.shape[0] != covariance.shape[1]
+            or covariance.shape[0] < 1
+            or factor.shape != covariance.shape
+        ):
+            raise RobertValidationError(
+                "precomputed covariance and Cholesky shapes must match and be square"
+            )
+        if not str(name).strip():
+            raise RobertValidationError("covariance name must not be empty")
+        if not np.all(np.isfinite(covariance)) or not np.all(np.isfinite(factor)):
+            raise RobertValidationError(
+                "precomputed covariance and Cholesky must contain only finite values"
+            )
+        if np.any(np.diag(factor) <= 0.0):
+            raise RobertValidationError(
+                "precomputed Cholesky diagonal must be positive"
+            )
+        if covariance.flags.writeable:
+            covariance = np.array(covariance, copy=True)
+            covariance.setflags(write=False)
+        if factor.flags.writeable:
+            factor = np.array(factor, copy=True)
+            factor.setflags(write=False)
+        result = object.__new__(cls)
+        object.__setattr__(result, "matrix", covariance)
+        object.__setattr__(result, "_cholesky", factor)
+        object.__setattr__(result, "name", str(name).strip())
+        return result
+
     @property
     def size(self) -> int:
         """Number of correlated data points."""
@@ -215,8 +259,12 @@ class DenseCovariance:
         """Solve the covariance system with two triangular solves."""
 
         values = _readonly_vector(vector, "covariance solve vector", self.size)
-        forward = np.linalg.solve(self._cholesky, values)
-        result = np.linalg.solve(self._cholesky.T, forward)
+        forward = solve_triangular(
+            self._cholesky, values, lower=True, check_finite=False
+        )
+        result = solve_triangular(
+            self._cholesky.T, forward, lower=False, check_finite=False
+        )
         result = np.asarray(result, dtype=float)
         result.setflags(write=False)
         return result
@@ -225,7 +273,12 @@ class DenseCovariance:
         """Return the Cholesky-whitened vector ``L^-1 vector``."""
 
         values = _readonly_vector(vector, "covariance whiten vector", self.size)
-        result = np.asarray(np.linalg.solve(self._cholesky, values), dtype=float)
+        result = np.asarray(
+            solve_triangular(
+                self._cholesky, values, lower=True, check_finite=False
+            ),
+            dtype=float,
+        )
         result.setflags(write=False)
         return result
 

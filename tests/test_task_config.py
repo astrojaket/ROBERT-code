@@ -1270,7 +1270,13 @@ def test_clr_and_phantom_configuration_is_geometry_agnostic() -> None:
         }
     )
     raw["radiative_transfer"]["model"] = "emission"
-    raw["radiative_transfer"]["radius_scale_parameter"] = None
+    for key in (
+        "reference_pressure_bar",
+        "radius_scale_parameter",
+        "gravity_model",
+        "impact_quadrature_order",
+    ):
+        raw["radiative_transfer"].pop(key, None)
 
     parsed = TaskConfig.model_validate(raw)
 

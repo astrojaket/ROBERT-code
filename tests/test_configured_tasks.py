@@ -137,6 +137,7 @@ def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
 
     assert problem.name == config.run.name
     assert captured_factories["f322w2"].opacity_free_species == ()
+    assert captured_factories["f322w2"].model.hminus_continuum is None
 
 
 def test_configured_fastchem_factory_passes_elemental_parameters() -> None:

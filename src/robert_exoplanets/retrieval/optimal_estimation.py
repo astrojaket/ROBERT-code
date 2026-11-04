@@ -46,8 +46,7 @@ def log_pressure_correlated_covariance(
         )
     log_pressure = np.log10(pressure_values)
     covariance = sigma**2 * np.exp(
-        -np.abs(log_pressure[:, np.newaxis] - log_pressure[np.newaxis, :])
-        / length
+        -np.abs(log_pressure[:, np.newaxis] - log_pressure[np.newaxis, :]) / length
     )
     covariance.setflags(write=False)
     return covariance
@@ -130,10 +129,19 @@ def run_optimal_estimation(
             "optimal estimation requires a problem implementing the explicit "
             "gaussian_inputs_from_vector capability"
         )
-    if not bool(getattr(getattr(problem, "likelihood", None), "supports_optimal_estimation", False)):
+    if not bool(
+        getattr(
+            getattr(problem, "likelihood", None), "supports_optimal_estimation", False
+        )
+    ):
         raise RobertConfigError(
             "optimal estimation requires a supported independent Gaussian "
             "likelihood; correlated or profiled likelihoods are unsupported"
+        )
+    if _has_covariance_observation(problem):
+        raise RobertConfigError(
+            "optimal estimation does not support covariance-backed observations; "
+            "use a covariance-aware retrieval method"
         )
     if any(
         isinstance(parameter.prior, CenteredLogRatioPrior)
@@ -280,6 +288,20 @@ def run_optimal_estimation(
         converged=converged,
         message=message,
         metadata={"method": "optimal_estimation", "problem": problem.name},
+    )
+
+
+def _has_covariance_observation(problem: object) -> bool:
+    """Return whether a single- or multi-dataset problem has full covariance."""
+
+    observation = getattr(problem, "observation", None)
+    if getattr(observation, "covariance", None) is not None:
+        return True
+    observations = getattr(problem, "observations", None)
+    datasets = getattr(observations, "datasets", ())
+    return any(
+        getattr(getattr(dataset, "observation", None), "covariance", None) is not None
+        for dataset in datasets
     )
 
 

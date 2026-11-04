@@ -20,6 +20,7 @@ def load_observation_npz(
     wavelength_key: str = "wavelength",
     flux_key: str = "data",
     uncertainty_key: str = "err",
+    covariance_key: str | None = None,
     wavelength_bin_edges_key: str | None = None,
     infer_bin_edges: bool = True,
     wavelength_unit: str | None = None,
@@ -51,6 +52,15 @@ def load_observation_npz(
         wavelength = np.array(archive[wavelength_key], dtype=float, copy=True)
         flux = np.array(archive[flux_key], dtype=float, copy=True)
         uncertainty = np.array(archive[uncertainty_key], dtype=float, copy=True)
+        if covariance_key is None and "covariance" in keys:
+            covariance_key = "covariance"
+        covariance = None
+        if covariance_key is not None:
+            if covariance_key not in keys:
+                raise RobertDataError(
+                    f"observation NPZ is missing covariance key {covariance_key!r}"
+                )
+            covariance = np.array(archive[covariance_key], dtype=float, copy=True)
         wavelength_bin_edges = None
         if wavelength_bin_edges_key is None and "wavelength_bin_edges" in keys:
             wavelength_bin_edges_key = "wavelength_bin_edges"
@@ -113,6 +123,7 @@ def load_observation_npz(
         instrument=instrument,
         mask=mask,
         wavelength_bin_edges=wavelength_bin_edges,
+        covariance=covariance,
         metadata={
             **stored_metadata,
             "source_path": str(file_path),
@@ -124,6 +135,11 @@ def load_observation_npz(
                 wavelength_bin_edges_key
                 if wavelength_bin_edges_key is not None
                 else "inferred_midpoints"
+            ),
+            **(
+                {"covariance_key": covariance_key}
+                if covariance_key is not None
+                else {}
             ),
         },
     )
@@ -156,6 +172,8 @@ def save_observation_npz(
         payload["mask"] = observation.mask
     if observation.wavelength_bin_edges is not None:
         payload["wavelength_bin_edges"] = observation.wavelength_bin_edges
+    if observation.covariance is not None:
+        payload["covariance"] = observation.covariance
     np.savez_compressed(output, **payload)
     return output
 
@@ -237,12 +255,12 @@ def load_observation_table(
             raise RobertDataError(
                 "every wavelength-bin upper edge must exceed its lower edge"
             )
-        edges = np.empty(wavelength.size + 1, dtype=float)
-        edges[0] = low[0]
-        edges[-1] = high[-1]
-        if wavelength.size > 1:
-            edges[1:-1] = 0.5 * (high[:-1] + low[1:])
-        edge_method = "published_lower_upper_columns_joined_at_midpoints"
+        if wavelength.size == 1 or np.array_equal(high[:-1], low[1:]):
+            edges = np.concatenate((low[:1], high))
+            edge_method = "published_contiguous_lower_upper_columns"
+        else:
+            edges = np.column_stack((low, high))
+            edge_method = "published_per_bin_lower_upper_columns"
     elif wavelength.size > 1:
         edges = infer_wavelength_bin_edges(wavelength)
 

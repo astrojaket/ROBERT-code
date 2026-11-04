@@ -801,18 +801,45 @@ def calculate_fit_statistics(
 ) -> dict[str, Any]:
     """Return total and per-dataset Gaussian fit diagnostics."""
 
+    from robert_exoplanets.likelihoods import GaussianLikelihood
+
     effective = problem.likelihood.effective_inputs_by_dataset(
         spectra, problem.observations, parameters
     )
-    per_dataset: dict[str, dict[str, float | int]] = {}
+    per_dataset: dict[str, dict[str, str | float | int]] = {}
     chi_squared = 0.0
     squared_residual_sum = 0.0
     standardized: list[np.ndarray] = []
     number_points = 0
+    has_covariance = any(
+        dataset.observation.covariance is not None
+        for dataset in problem.observations.datasets
+    )
     for name, (model, data, uncertainty) in effective.items():
+        dataset = next(
+            item for item in problem.observations.datasets if item.name == name
+        )
+        observation = dataset.observation
         residual = data - model
         standardized_residual = residual / uncertainty
         dataset_chi_squared = float(np.sum(np.square(standardized_residual)))
+        if observation.covariance is not None:
+            dataset_likelihood = GaussianLikelihood(
+                include_normalization=False,
+                offset_parameter=dataset.offset_parameter,
+                jitter_parameter=dataset.jitter_parameter,
+                uncertainty_scale_parameter=dataset.uncertainty_scale_parameter,
+                uncertainty_scale=dataset.uncertainty_scale,
+                coordinate_rtol=float(
+                    getattr(problem.likelihood, "coordinate_rtol", 1.0e-12)
+                ),
+                coordinate_atol=float(
+                    getattr(problem.likelihood, "coordinate_atol", 0.0)
+                ),
+            )
+            dataset_chi_squared = dataset_likelihood.chi_square(
+                spectra[name], observation, parameters
+            )
         count = int(data.size)
         per_dataset[name] = {
             "number_points": count,
@@ -826,6 +853,11 @@ def calculate_fit_statistics(
                 np.max(np.abs(standardized_residual))
             ),
         }
+        if observation.covariance is not None:
+            per_dataset[name]["chi_squared_basis"] = "full_covariance"
+            per_dataset[name]["standardized_residual_basis"] = (
+                "marginal_uncertainty"
+            )
         number_points += count
         chi_squared += dataset_chi_squared
         squared_residual_sum += float(np.sum(np.square(residual)))
@@ -855,7 +887,7 @@ def calculate_fit_statistics(
         survival_probability = float(
             gammaincc(0.5 * degrees_of_freedom, 0.5 * chi_squared)
         )
-    return {
+    result: dict[str, Any] = {
         "number_points": number_points,
         "number_fitted_parameters": parameter_count,
         "degrees_of_freedom": degrees_of_freedom,
@@ -878,6 +910,12 @@ def calculate_fit_statistics(
         "bic": bic,
         "per_dataset": per_dataset,
     }
+    if has_covariance:
+        result["chi_squared_basis"] = "full_covariance"
+        result["standardized_residual_summary"] = (
+            "marginal_uncertainty; it does not include covariance"
+        )
+    return result
 
 
 def posterior_summary(

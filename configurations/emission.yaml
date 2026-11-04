@@ -1,4 +1,7 @@
 # Canonical hot-Jupiter emission retrieval. R=1000 is the JWST science default.
+# Shared: paths, bodies, observations, atmosphere, cloud extinction, opacity, and inference.
+# Emission only: geometry and thermal integration are set below; disk regions and cloud scattering are in other emission examples.
+# Transmission only: transit-radius, gravity, and impact controls are in transmission.yaml.
 # Set bodies.star.spectrum_model to blackbody for a self-contained Planck check.
 
 schema_version: 2
@@ -82,11 +85,13 @@ opacity:
     remove_zeros: true
 radiative_transfer:
   model: emission
+  # Shared
+  include_rayleigh: true
+  gas_combination: random_overlap
+  # Emission only
   geometry:
     model: normal_emission
     points: 4
-  include_rayleigh: true
-  gas_combination: random_overlap
   thermal_integration_backend: auto
 likelihood:
   model: gaussian
@@ -153,7 +158,7 @@ sampler:
   resume: resume
   show_status: true
   seed: 2712
-runtime:
-  mpi_processes: auto
 plotting:
   enabled: true
+runtime:
+  mpi_processes: auto

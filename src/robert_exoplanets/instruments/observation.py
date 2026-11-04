@@ -10,7 +10,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.core.exceptions import RobertValidationError
-from robert_exoplanets.core.grids import SpectralGrid
+from robert_exoplanets.core.grids import SpectralGrid, _readonly_spectral_bin_edges
 
 
 def _readonly_array(values: ArrayLike, name: str) -> NDArray[np.float64]:
@@ -39,6 +39,10 @@ class Observation:
     mask: NDArray[np.bool_] | None = None
     wavelength_bin_edges: NDArray[np.float64] | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
+    covariance: NDArray[np.float64] | None = None
+    _covariance_cholesky: NDArray[np.float64] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     @classmethod
     def from_arrays(
@@ -52,6 +56,7 @@ class Observation:
         instrument: str | None = None,
         mask: ArrayLike | None = None,
         wavelength_bin_edges: ArrayLike | None = None,
+        covariance: ArrayLike | None = None,
     ) -> "Observation":
         """Build an observation from array-like inputs and validate it."""
 
@@ -67,6 +72,7 @@ class Observation:
             wavelength_bin_edges=(
                 None if wavelength_bin_edges is None else np.asarray(wavelength_bin_edges, dtype=float)
             ),
+            covariance=None if covariance is None else np.asarray(covariance, dtype=float),
         )
 
     def __post_init__(self) -> None:
@@ -93,22 +99,47 @@ class Observation:
                 raise RobertValidationError("mask must match wavelength shape")
             mask.setflags(write=False)
 
-        wavelength_bin_edges = None
-        if self.wavelength_bin_edges is not None:
-            wavelength_bin_edges = _readonly_array(self.wavelength_bin_edges, "wavelength_bin_edges")
-            if wavelength_bin_edges.size != wavelength.size + 1:
-                raise RobertValidationError("wavelength_bin_edges must contain n_points + 1 values")
-            edge_difference = np.diff(wavelength_bin_edges)
-            if not (np.all(edge_difference > 0.0) or np.all(edge_difference < 0.0)):
-                raise RobertValidationError("wavelength_bin_edges must be strictly monotonic")
-            if wavelength.size > 1:
-                wavelength_orientation = np.sign(np.diff(wavelength)[0])
-                if np.sign(edge_difference[0]) != wavelength_orientation:
-                    raise RobertValidationError("wavelength_bin_edges must have the same orientation as wavelength")
-            lower = np.minimum(wavelength_bin_edges[:-1], wavelength_bin_edges[1:])
-            upper = np.maximum(wavelength_bin_edges[:-1], wavelength_bin_edges[1:])
-            if np.any(wavelength <= lower) or np.any(wavelength >= upper):
-                raise RobertValidationError("each wavelength must lie strictly inside its bin edges")
+        wavelength_bin_edges = (
+            None
+            if self.wavelength_bin_edges is None
+            else _readonly_spectral_bin_edges(
+                wavelength,
+                self.wavelength_bin_edges,
+                "wavelength_bin_edges",
+            )
+        )
+        covariance = None
+        covariance_cholesky = None
+        if self.covariance is not None:
+            covariance = np.array(self.covariance, dtype=float, copy=True)
+            expected_shape = (wavelength.size, wavelength.size)
+            if covariance.shape != expected_shape:
+                raise RobertValidationError(
+                    f"covariance must have shape {expected_shape}"
+                )
+            if not np.all(np.isfinite(covariance)):
+                raise RobertValidationError(
+                    "covariance must contain only finite values"
+                )
+            if not np.allclose(covariance, covariance.T, rtol=1.0e-12, atol=0.0):
+                raise RobertValidationError("covariance must be symmetric")
+            if not np.allclose(
+                np.diag(covariance),
+                np.square(uncertainty),
+                rtol=1.0e-8,
+                atol=0.0,
+            ):
+                raise RobertValidationError(
+                    "covariance diagonal must match uncertainty squared"
+                )
+            try:
+                covariance_cholesky = np.linalg.cholesky(covariance)
+            except np.linalg.LinAlgError as exc:
+                raise RobertValidationError(
+                    "covariance must be positive definite"
+                ) from exc
+            covariance.setflags(write=False)
+            covariance_cholesky.setflags(write=False)
 
         object.__setattr__(self, "wavelength", wavelength)
         object.__setattr__(self, "flux", flux)
@@ -116,6 +147,8 @@ class Observation:
         object.__setattr__(self, "mask", mask)
         object.__setattr__(self, "wavelength_bin_edges", wavelength_bin_edges)
         object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+        object.__setattr__(self, "covariance", covariance)
+        object.__setattr__(self, "_covariance_cholesky", covariance_cholesky)
 
     @property
     def n_points(self) -> int:
@@ -141,6 +174,18 @@ class Observation:
             bin_edges=self.wavelength_bin_edges,
             metadata={"source": "observation"},
         )
+
+    @property
+    def wavelength_bin_bounds(self) -> NDArray[np.float64] | None:
+        """Return one ascending wavelength pair per observation point."""
+
+        return self.spectral_grid.bin_bounds
+
+    @property
+    def covariance_cholesky(self) -> NDArray[np.float64] | None:
+        """Return the cached Cholesky factor of the validated covariance."""
+
+        return self._covariance_cholesky
 
 def infer_wavelength_bin_edges(wavelength: ArrayLike) -> NDArray[np.float64]:
     """Infer contiguous bin edges halfway between monotonic bin centres."""

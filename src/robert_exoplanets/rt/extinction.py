@@ -20,6 +20,7 @@ from robert_exoplanets.core import (
 from robert_exoplanets.core._immutability import immutable_mapping
 from robert_exoplanets.opacity import (
     pressure_values_in_unit,
+    spectral_grid_bin_bounds_in_unit,
     spectral_grid_values_in_unit,
 )
 
@@ -606,16 +607,13 @@ def hminus_optical_depth(
         )
         bound_free_sampling = "point_evaluation_without_bin_edges"
     else:
-        edge_grid = SpectralGrid.from_array(
-            gas.spectral_grid.bin_edges,
-            unit=gas.spectral_grid.unit,
-            role="hminus-bin-edges",
+        bounds_micron = spectral_grid_bin_bounds_in_unit(
+            gas.spectral_grid,
+            "micron",
         )
-        edge_wavelength_angstrom = (
-            spectral_grid_values_in_unit(edge_grid, "micron") * 1.0e4
-        )
+        assert bounds_micron is not None
         bound_free = _hminus_bound_free_bin_cross_section(
-            edge_wavelength_angstrom
+            bounds_micron * 1.0e4
         )
         bound_free_sampling = "gray_polynomial_bin_average"
 
@@ -688,28 +686,27 @@ def _hminus_bound_free_bin_cross_section(
     """Return Gray H-minus bound-free cross-section bin averages in m^2."""
 
     edges = np.asarray(wavelengths_bin_edges_angstrom, dtype=float)
-    if edges.ndim != 1 or edges.size < 2:
-        raise RobertValidationError(
-            "H-minus wavelength bin edges must contain at least two values"
+    if edges.ndim == 1 and edges.size >= 2:
+        bounds = np.column_stack(
+            (np.minimum(edges[:-1], edges[1:]), np.maximum(edges[:-1], edges[1:]))
         )
-    if not np.all(np.isfinite(edges)) or np.any(edges <= 0.0):
+    elif edges.ndim == 2 and edges.shape[1] == 2:
+        bounds = edges
+    else:
         raise RobertValidationError(
-            "H-minus wavelength bin edges must be finite and positive"
+            "H-minus wavelength bins must use contiguous edges or per-bin [lower, upper] bounds"
         )
-    differences = np.diff(edges)
-    if not (np.all(differences > 0.0) or np.all(differences < 0.0)):
+    if not np.all(np.isfinite(bounds)) or np.any(bounds <= 0.0):
         raise RobertValidationError(
-            "H-minus wavelength bin edges must be strictly monotonic"
+            "H-minus wavelength bin bounds must be finite and positive"
         )
-    if np.all(differences < 0.0):
-        # Evaluate in the canonical ascending orientation and restore the
-        # caller's order.  The bin average is orientation independent, while
-        # directly applying the source masks to descending edges can mishandle
-        # a bin that straddles the 16400 Angstrom threshold.
-        return _hminus_bound_free_bin_cross_section(edges[::-1])[::-1]
-
-    left = edges[:-1]
-    right = edges[1:]
+    left = bounds[:, 0]
+    right = bounds[:, 1]
+    differences = right - left
+    if np.any(differences <= 0.0):
+        raise RobertValidationError(
+            "H-minus wavelength bins must have positive width"
+        )
     threshold = HMINUS_BOUND_FREE_THRESHOLD_ANGSTROM
     # This is the source algorithm for ascending wavelength edges.  It keeps
     # the pRT midpoint treatment for bins that straddle the threshold.

@@ -10,7 +10,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from robert_exoplanets.atmosphere import AtmosphereState
-from robert_exoplanets.core import RobertValidationError, Spectrum
+from robert_exoplanets.core import RobertValidationError, SpectralGrid, Spectrum
 from robert_exoplanets.core._immutability import immutable_mapping
 
 FloatArray = NDArray[np.float64]
@@ -51,15 +51,19 @@ class PosteriorSpectrumSummary:
         values = _summary_quantiles(
             self.values, wavelength.size, "posterior spectrum values"
         )
-        edges = (
-            None
-            if self.bin_edges is None
-            else _array(self.bin_edges, "posterior bin edges")
-        )
-        if edges is not None and edges.size != wavelength.size + 1:
-            raise RobertValidationError(
-                "posterior bin edges must have len(wavelength) + 1 values"
-            )
+        edges = None
+        if self.bin_edges is not None:
+            try:
+                edges = SpectralGrid(
+                    values=wavelength,
+                    unit=self.wavelength_unit,
+                    role="posterior_summary",
+                    bin_edges=self.bin_edges,
+                ).bin_edges
+            except RobertValidationError as exc:
+                raise RobertValidationError(
+                    "posterior bin bounds must match wavelength values"
+                ) from exc
         mask = None if self.mask is None else np.array(self.mask, dtype=bool, copy=True)
         if mask is not None:
             if mask.ndim != 1 or mask.shape != wavelength.shape:

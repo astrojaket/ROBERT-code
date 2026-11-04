@@ -1,5 +1,8 @@
 # Bundled R=100 transmission example for a hot-Jupiter free-chemistry run.
 # R=100 is deliberate for a local check; use R=1000 plus external tables for science.
+# Shared: paths, bodies, observations, atmosphere, cloud extinction, opacity, and inference.
+# Emission only: geometry and thermal integration are in emission.yaml; disk regions and cloud scattering are in two_region_emission.yaml.
+# Transmission only: reference radius, gravity, and impact controls are below.
 
 schema_version: 2
 paths:
@@ -69,8 +72,10 @@ opacity:
     g_points: 8
 radiative_transfer:
   model: transmission
+  # Shared
   include_rayleigh: true
   gas_combination: random_overlap
+  # Transmission only
   reference_pressure_bar: 1.0
   gravity_model: inverse_square
   impact_quadrature_order: 4

@@ -148,8 +148,8 @@ class ObservationsConfig(ConfigModel):
 
     @model_validator(mode="after")
     def validate_loader_options(self) -> "ObservationsConfig":
-        if self.loader == "robert_npz" and len(self.datasets) != 1:
-            raise ValueError("robert_npz observations require exactly one dataset name")
+        if len(set(self.datasets)) != len(self.datasets):
+            raise ValueError("observations.datasets must contain unique names")
         return self
 
 
@@ -351,6 +351,7 @@ class FastChemConfig(ConfigModel):
     constant_log10_vmr_parameters: dict[str, _FastChemParameterName] | None = Field(
         default_factory=dict
     )
+    full_equilibrium_composition: bool = False
     quenching: PressureQuenchConfig | None = None
 
     @model_validator(mode="after")
@@ -397,6 +398,15 @@ class FastChemConfig(ConfigModel):
             raise ValueError(
                 "element abundance mappings require metallicity_parameter and carbon_to_oxygen_parameter to be null"
             )
+        if self.full_equilibrium_composition:
+            if overrides:
+                raise ValueError(
+                    "full_equilibrium_composition does not allow constant VMR overrides"
+                )
+            if self.quenching is not None:
+                raise ValueError(
+                    "full_equilibrium_composition does not allow pressure quenching"
+                )
         chemistry_parameters = [
             *(
                 ()
@@ -804,9 +814,39 @@ class GeometryConfig(ConfigModel):
     points: PositiveInt = 4
 
 
+class HMinusContinuumTaskConfig(ConfigModel):
+    """Shared H-minus continuum inputs for emission and transmission."""
+
+    hminus_species: str = Field(default="H-", min_length=1)
+    hydrogen_species: str = Field(default="H", min_length=1)
+    electron_species: str = Field(default="e-", min_length=1)
+    temperature_extrapolation: Literal["zero", "raise"] = "zero"
+    spectral_extrapolation: Literal["zero", "raise"] = "zero"
+
+    @model_validator(mode="after")
+    def validate_species(self) -> "HMinusContinuumTaskConfig":
+        names = tuple(
+            name.strip()
+            for name in (self.hminus_species, self.hydrogen_species, self.electron_species)
+        )
+        if any(not name for name in names):
+            raise ValueError("H-minus continuum species names must not be empty")
+        original_names = (
+            self.hminus_species,
+            self.hydrogen_species,
+            self.electron_species,
+        )
+        if names != original_names:
+            raise ValueError("H-minus continuum species names must not have surrounding spaces")
+        if len(set(names)) != len(names):
+            raise ValueError("H-minus continuum species names must be unique")
+        return self
+
+
 class RadiativeTransferConfig(ConfigModel):
     model: Literal["emission", "transmission"] = "emission"
     geometry: GeometryConfig = GeometryConfig()
+    hminus_continuum: HMinusContinuumTaskConfig | None = None
     include_rayleigh: bool = True
     gas_combination: Literal["sum_by_g", "random_overlap"] = "random_overlap"
     thermal_integration_backend: Literal["auto", "numpy", "numba"] = "auto"
@@ -820,6 +860,53 @@ class RadiativeTransferConfig(ConfigModel):
     def validate_model_options(self) -> "RadiativeTransferConfig":
         if self.radius_scale_parameter is not None and not self.radius_scale_parameter:
             raise ValueError("radius_scale_parameter must be non-empty")
+        explicit = self.model_fields_set
+        if self.model == "transmission":
+            unused = {
+                name
+                for name in explicit.intersection(
+                    {"geometry", "thermal_integration_backend", "sh4_boundary_backend"}
+                )
+                if (
+                    (name == "geometry" and self.geometry != GeometryConfig())
+                    or (
+                        name == "thermal_integration_backend"
+                        and self.thermal_integration_backend != "auto"
+                    )
+                    or (
+                        name == "sh4_boundary_backend"
+                        and self.sh4_boundary_backend != "auto"
+                    )
+                )
+            }
+            if unused:
+                raise ValueError(
+                    "emission-only radiative_transfer options are not valid for "
+                    "transmission: " + ", ".join(sorted(unused))
+                )
+        else:
+            unused = {
+                name
+                for name in explicit.intersection(
+                {
+                    "reference_pressure_bar",
+                    "radius_scale_parameter",
+                    "gravity_model",
+                    "impact_quadrature_order",
+                }
+                )
+                if (
+                    (name == "reference_pressure_bar" and self.reference_pressure_bar != 1.0)
+                    or (name == "radius_scale_parameter" and self.radius_scale_parameter is not None)
+                    or (name == "gravity_model" and self.gravity_model != "inverse_square")
+                    or (name == "impact_quadrature_order" and self.impact_quadrature_order != 8)
+                )
+            }
+            if unused:
+                raise ValueError(
+                    "transmission-only radiative_transfer options are not valid "
+                    "for emission: " + ", ".join(sorted(unused))
+                )
         return self
 
 
@@ -1025,6 +1112,61 @@ class TaskConfig(ConfigModel):
                     f"opacity species missing from {region.name} chemistry labels: "
                     + ", ".join(missing)
                 )
+            hminus = self.radiative_transfer.hminus_continuum
+            if hminus is not None:
+                required_hminus = (
+                    hminus.hminus_species,
+                    hminus.hydrogen_species,
+                    hminus.electron_species,
+                )
+                chemistry_config = region.atmosphere.chemistry
+                full_fastchem = (
+                    chemistry_config.model == "fastchem_equilibrium"
+                    and chemistry_config.full_equilibrium_composition
+                )
+                default_full_labels = {
+                    "H-": "H1-",
+                    "H": "H",
+                    "e-": "e-",
+                }
+                missing_hminus = sorted(
+                    label
+                    for label, native in zip(
+                        required_hminus,
+                        ("H1-", "H", "e-"),
+                        strict=True,
+                    )
+                    if label not in chemistry
+                    and not (full_fastchem and default_full_labels.get(label) == native)
+                )
+                if missing_hminus:
+                    raise ValueError(
+                        "H-minus continuum requires explicit chemistry profiles in "
+                        f"{region.name}: " + ", ".join(missing_hminus)
+                    )
+                if chemistry_config.model == "fastchem_equilibrium":
+                    native_names = {
+                        item.label: item.fastchem_name
+                        for item in chemistry_config.species
+                    }
+                    expected_names = dict(
+                        zip(required_hminus, ("H1-", "H", "e-"), strict=True)
+                    )
+                    invalid = [
+                        f"{label} must map to FastChem species {native}"
+                        for label, native in expected_names.items()
+                        if native_names.get(label) != native
+                        and not (
+                            label not in native_names
+                            and full_fastchem
+                            and default_full_labels.get(label) == native
+                        )
+                    ]
+                    if invalid:
+                        raise ValueError(
+                            "H-minus continuum needs FastChem profiles for H-, H, "
+                            "and e-: " + "; ".join(invalid)
+                        )
         names = tuple(item.name for item in self.parameters)
         if len(set(names)) != len(names):
             raise ValueError("parameter names must be unique")

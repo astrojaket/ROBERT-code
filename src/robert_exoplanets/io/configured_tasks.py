@@ -62,6 +62,7 @@ from robert_exoplanets.retrieval import (
 )
 from robert_exoplanets.retrieval.manifest import build_run_manifest
 from robert_exoplanets.rt import (
+    HMinusContinuumConfig,
     gauss_legendre_disk_geometry,
     load_nemesispy_cia_table,
     normal_emission_geometry,
@@ -76,6 +77,7 @@ from robert_exoplanets.stellar import (
 from .task_config import (
     CloudsConfig,
     ChemistryConfig,
+    HMinusContinuumTaskConfig,
     ParameterConfig,
     ResolvedRegionConfig,
     TaskConfig,
@@ -169,22 +171,39 @@ def describe_config(config: TaskConfig) -> str:
 
 def load_observations(config: TaskConfig) -> ObservationCollection:
     if config.observations.loader == "robert_npz":
-        name = config.observations.datasets[0]
-        observation = load_observation_npz(config.observations.path)
-        option = config.observations.dataset_options.get(name)
-        dataset = ObservationDataset(name=name, observation=observation)
-        if option is not None:
-            dataset = replace(
-                dataset,
-                offset_parameter=option.offset_parameter,
-                jitter_parameter=option.jitter_parameter,
-                uncertainty_scale_parameter=option.uncertainty_scale_parameter,
-                uncertainty_scale=option.uncertainty_scale,
+        path = config.observations.path.expanduser()
+        names = config.observations.datasets
+        if len(names) > 1 and not path.is_dir():
+            raise RobertConfigError(
+                "robert_npz with multiple datasets requires observations.path to "
+                "be a directory containing one <dataset>.npz file per name"
+            )
+        datasets = []
+        dataset_paths = {}
+        for name in names:
+            source = path / f"{name}.npz" if path.is_dir() else path
+            observation = load_observation_npz(source)
+            dataset_paths[name] = str(source)
+            dataset = ObservationDataset(name=name, observation=observation)
+            option = config.observations.dataset_options.get(name)
+            if option is not None:
+                dataset = replace(
+                    dataset,
+                    offset_parameter=option.offset_parameter,
+                    jitter_parameter=option.jitter_parameter,
+                    uncertainty_scale_parameter=option.uncertainty_scale_parameter,
+                    uncertainty_scale=option.uncertainty_scale,
+                )
+            datasets.append(dataset)
+        collection_metadata = {"source_path": str(path)}
+        if path.is_dir():
+            collection_metadata["dataset_paths"] = ";".join(
+                f"{name}={dataset_paths[name]}" for name in names
             )
         return ObservationCollection(
-            datasets=(dataset,),
-            name=f"{name} ROBERT NPZ observation",
-            metadata={"source_path": str(config.observations.path)},
+            datasets=tuple(datasets),
+            name=f"{', '.join(names)} ROBERT NPZ observation",
+            metadata=collection_metadata,
         )
     loaders = {
         "august2023_wasp77ab": load_august2023_wasp77ab,
@@ -686,10 +705,21 @@ def _base_chemistry_components(config: ChemistryConfig):
                 config.element_log10_number_ratio_parameters
             ),
             constant_log10_vmr_parameters=(config.constant_log10_vmr_parameters or {}),
+            full_equilibrium_composition=config.full_equilibrium_composition,
+        )
+        mmw_options = (
+            {"molecular_masses": chemistry.full_equilibrium_molecular_masses}
+            if config.full_equilibrium_composition
+            else {}
         )
         return (
             chemistry,
-            CompositionMeanMolecularWeight(normalization="raw_sum"),
+            CompositionMeanMolecularWeight(
+                **mmw_options,
+                normalization=(
+                    "normalize" if config.full_equilibrium_composition else "raw_sum"
+                ),
+            ),
             (),
         )
     if config.fill_background:
@@ -870,6 +900,7 @@ def build_problem(
             thermal_integration_backend=rt.thermal_integration_backend,
             sh4_boundary_backend=rt.sh4_boundary_backend,
             stellar_spectrum_model=star_item.spectrum_model,
+            hminus_continuum=_hminus_continuum_config(rt.hminus_continuum),
             metadata={"configured_geometry": geometry_item.model},
         )
     else:
@@ -881,6 +912,7 @@ def build_problem(
             include_rayleigh=rt.include_rayleigh,
             gas_combination=rt.gas_combination,
             impact_quadrature_order=rt.impact_quadrature_order,
+            hminus_continuum=_hminus_continuum_config(rt.hminus_continuum),
             metadata={"configured_model": "transmission"},
         )
     providers = _opacity_providers(config, observations, planet=planet)
@@ -1136,6 +1168,7 @@ def build_native_emission_model(
         thermal_integration_backend=rt.thermal_integration_backend,
         sh4_boundary_backend=rt.sh4_boundary_backend,
         stellar_spectrum_model=star_item.spectrum_model,
+        hminus_continuum=_hminus_continuum_config(rt.hminus_continuum),
         metadata={
             "configured_geometry": geometry_item.model,
             "diagnostic_grid": "native_opacity",
@@ -1182,6 +1215,22 @@ def build_native_emission_model(
             dilution_parameter=disk.dilution_parameter,
         )
     return regional_models["primary"]
+
+
+def _hminus_continuum_config(
+    config: HMinusContinuumTaskConfig | None,
+) -> HMinusContinuumConfig | None:
+    """Convert the shared strict-YAML block to the existing RT config."""
+
+    if config is None:
+        return None
+    return HMinusContinuumConfig(
+        hminus_species=config.hminus_species,
+        hydrogen_species=config.hydrogen_species,
+        electron_species=config.electron_species,
+        temperature_extrapolation=config.temperature_extrapolation,
+        spectral_extrapolation=config.spectral_extrapolation,
+    )
 
 
 def smoke_evaluation(

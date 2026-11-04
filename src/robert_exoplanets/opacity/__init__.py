@@ -60,6 +60,8 @@ from .metadata import (
     OpacityStorageFormat,
     SpectralCoverage,
     pressure_values_in_unit,
+    spectral_grid_bin_bounds_in_unit,
+    spectral_grid_bin_edges_in_unit,
     spectral_grid_values_in_unit,
 )
 from .opacity_sampling import (
@@ -141,6 +143,8 @@ __all__ = [
     "pressure_values_in_unit",
     "read_kta",
     "read_kta_header",
+    "spectral_grid_bin_bounds_in_unit",
+    "spectral_grid_bin_edges_in_unit",
     "spectral_grid_values_in_unit",
     "write_robert_npy_directory",
     "write_robert_npz_archive",

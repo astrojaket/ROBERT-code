@@ -21,7 +21,11 @@ from robert_exoplanets.core._immutability import immutable_mapping
 
 from .archive import load_robert_npy_directory, load_robert_npz_archive
 from .kta import KtaTable, read_kta
-from .metadata import pressure_values_in_unit, spectral_grid_values_in_unit
+from .metadata import (
+    pressure_values_in_unit,
+    spectral_grid_bin_bounds_in_unit,
+    spectral_grid_values_in_unit,
+)
 
 try:  # pragma: no cover - exercised when the optional perf extra is installed.
     from numba import njit, prange
@@ -302,16 +306,12 @@ class CorrelatedKTable:
                 "loading ExoMol cross sections requires h5py"
             ) from exc
         source = Path(path).expanduser().resolve()
-        edge_grid = SpectralGrid(
-            values=spectral_grid.bin_edges,
-            unit=spectral_grid.unit,
-            role="internal",
-        )
         target_wavelength = spectral_grid_values_in_unit(
             spectral_grid,
             "micron",
         )
-        target_edges = spectral_grid_values_in_unit(edge_grid, "micron")
+        target_bounds = spectral_grid_bin_bounds_in_unit(spectral_grid, "micron")
+        assert target_bounds is not None
         nodes, weights = np.polynomial.legendre.leggauss(int(g_points))
         g_samples = 0.5 * (nodes + 1.0)
         g_weights = 0.5 * weights
@@ -355,11 +355,9 @@ class CorrelatedKTable:
                     ),
                     dtype=float,
                 )
-                for index, (left, right) in enumerate(
-                    zip(target_edges[:-1], target_edges[1:], strict=True)
-                ):
-                    lower = min(10000.0 / left, 10000.0 / right)
-                    upper = max(10000.0 / left, 10000.0 / right)
+                for index, (left, right) in enumerate(target_bounds):
+                    lower = 10000.0 / right
+                    upper = 10000.0 / left
                     start = int(np.searchsorted(source_wavenumber, lower, side="left"))
                     stop = int(np.searchsorted(source_wavenumber, upper, side="right"))
                     if stop - start < int(g_points):
@@ -371,8 +369,8 @@ class CorrelatedKTable:
                         dtype=float,
                     )[:, :, ::-1]
                     native_wavelength = (10000.0 / source_wavenumber[start:stop])[::-1]
-                    bin_lower = min(left, right)
-                    bin_upper = max(left, right)
+                    bin_lower = left
+                    bin_upper = right
                     cell_edges = np.concatenate(
                         (
                             [bin_lower],

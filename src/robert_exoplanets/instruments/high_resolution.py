@@ -113,7 +113,7 @@ def _check_coordinate_coverage(
     minimum = float(source[0])
     maximum = float(source[-1])
     tolerance = _coverage_tolerance(minimum, maximum)
-    if requested[0] < minimum - tolerance or requested[-1] > maximum + tolerance:
+    if np.min(requested) < minimum - tolerance or np.max(requested) > maximum + tolerance:
         raise RobertCoverageError(message)
 
 
@@ -388,15 +388,9 @@ def _prepare_gaussian_operator_on_grids(
             raise RobertCoverageError(
                 "target wavelengths plus Gaussian kernel support extend outside native spectrum"
             )
-    if target_grid.bin_edges is not None:
-        edges = _ascending_values(
-            SpectralGrid(
-                values=target_grid.bin_edges,
-                unit=target_grid.unit,
-                role="target_bin_edges",
-            )
-        )
-        if edges[0] < source_min - tolerance or edges[-1] > source_max + tolerance:
+    if target_grid.bin_bounds is not None:
+        edges = np.asarray(target_grid.bin_bounds, dtype=float)
+        if np.min(edges) < source_min - tolerance or np.max(edges) > source_max + tolerance:
             raise RobertCoverageError("target bins extend outside native spectrum")
     indices, weights, row_starts = _build_gaussian_operator(
         source,
@@ -497,7 +491,17 @@ def _build_bin_integration_operator(
     indices: list[int] = []
     weights: list[float] = []
     row_starts = [0]
-    for lower, upper in zip(edges[:-1], edges[1:], strict=True):
+    if edges.ndim == 1:
+        bounds = np.column_stack(
+            (np.minimum(edges[:-1], edges[1:]), np.maximum(edges[:-1], edges[1:]))
+        )
+    elif edges.ndim == 2 and edges.shape[1] == 2:
+        bounds = edges
+    else:
+        raise RobertValidationError(
+            "bin integration requires contiguous edges or per-bin [lower, upper] bounds"
+        )
+    for lower, upper in bounds:
         first_interval = max(0, int(np.searchsorted(source, lower, side="right")) - 1)
         last_interval = min(
             source.size - 2,
@@ -676,11 +680,9 @@ class GaussianHighResolutionResponse:
                     "observation wavelengths plus Gaussian kernel support extend outside native spectrum"
                 )
 
-        if observation_grid.bin_edges is not None:
-            edges = np.asarray(observation_grid.bin_edges, dtype=float)
-            if edges[0] > edges[-1]:
-                edges = edges[::-1]
-            if edges[0] < source_min - tolerance or edges[-1] > source_max + tolerance:
+        if observation_grid.bin_bounds is not None:
+            bounds = np.asarray(observation_grid.bin_bounds, dtype=float)
+            if np.min(bounds) < source_min - tolerance or np.max(bounds) > source_max + tolerance:
                 raise RobertCoverageError("observation bins extend outside native spectrum")
 
         indices, weights, row_starts = _build_gaussian_operator(
@@ -841,13 +843,11 @@ def _prepare_doppler_operator(
         target,
         message="Doppler-shifted native spectrum does not cover the target grid",
     )
-    if target_grid.bin_edges is not None:
-        edges = np.asarray(target_grid.bin_edges, dtype=float)
-        if edges[0] > edges[-1]:
-            edges = edges[::-1]
+    if target_grid.bin_bounds is not None:
+        edges = np.asarray(target_grid.bin_bounds, dtype=float)
         _check_coordinate_coverage(
             shifted_source,
-            edges,
+            edges.ravel(),
             message="Doppler-shifted native spectrum does not cover target bin edges",
         )
     indices, weights, row_starts = _build_linear_interpolation_operator(
@@ -1089,19 +1089,17 @@ def _prepare_rotational_operator(
             target_log + half_width,
             message="target wavelengths plus rotational broadening extend outside native spectrum",
         )
-        if target_grid.bin_edges is not None:
-            edges = np.asarray(target_grid.bin_edges, dtype=float)
-            if edges[0] > edges[-1]:
-                edges = edges[::-1]
-            log_edges = np.log(edges)
+        if target_grid.bin_bounds is not None:
+            bounds = np.asarray(target_grid.bin_bounds, dtype=float)
+            log_edges = np.log(bounds)
             _check_coordinate_coverage(
                 source_log,
-                log_edges - half_width,
+                (log_edges - half_width).ravel(),
                 message="target bins plus rotational broadening extend outside native spectrum",
             )
             _check_coordinate_coverage(
                 source_log,
-                log_edges + half_width,
+                (log_edges + half_width).ravel(),
                 message="target bins plus rotational broadening extend outside native spectrum",
             )
     if projected_velocity_km_s == 0.0:
@@ -1335,15 +1333,13 @@ def _prepare_pixel_operator(
     _require_positive_grid(source_grid, "source")
     _require_positive_grid(target_grid, "target")
     source = _ascending_values(source_grid)
-    edges = np.asarray(target_grid.bin_edges, dtype=float)
-    if edges[0] > edges[-1]:
-        edges = edges[::-1]
+    bounds = np.asarray(target_grid.bin_bounds, dtype=float)
     _check_coordinate_coverage(
         source,
-        edges,
+        bounds.ravel(),
         message="observation bins extend outside native spectrum",
     )
-    indices, weights, row_starts = _build_bin_integration_operator(source, edges)
+    indices, weights, row_starts = _build_bin_integration_operator(source, bounds)
     return PreparedSpectralOperator(
         source_grid=source_grid,
         target_grid=target_grid,
@@ -1462,13 +1458,11 @@ def _prepare_linear_grid_operator(
         target,
         message="target grid extends outside native spectrum",
     )
-    if target_grid.bin_edges is not None:
-        edges = np.asarray(target_grid.bin_edges, dtype=float)
-        if edges[0] > edges[-1]:
-            edges = edges[::-1]
+    if target_grid.bin_bounds is not None:
+        bounds = np.asarray(target_grid.bin_bounds, dtype=float)
         _check_coordinate_coverage(
             source,
-            edges,
+            bounds.ravel(),
             message="target bin edges extend outside native spectrum",
         )
     indices, weights, row_starts = _build_linear_interpolation_operator(source, target)

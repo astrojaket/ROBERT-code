@@ -424,3 +424,71 @@ def test_atmosphere_builder_can_derive_mean_molecular_weight_from_composition() 
 
     expected = 1.0e-3 * 18.01528 + 0.999 * 0.75 * 2.01588 + 0.999 * 0.25 * 4.002602
     np.testing.assert_allclose(atmosphere.mean_molecular_weight, np.full(3, expected))
+
+
+def test_fastchem_full_composition_closes_mmw_against_native_backend() -> None:
+    pyfastchem = pytest.importorskip("pyfastchem")
+    fastchem_path = Path(__file__).parents[1] / "data" / "chemistry" / "fastchem"
+    if not fastchem_path.exists():
+        pytest.skip("local FastChem data files are not available")
+    pressure = PressureGrid.logspace(1.0e-4, 1.0e-2, n_layers=3, unit="bar")
+    temperature = np.full(pressure.n_layers, 3000.0)
+    parameters = {
+        "log10_O_H": -1.75,
+        "log10_C_H": -2.8,
+        "log10_Si_H": -3.45,
+    }
+    chemistry = FastChemEquilibriumChemistry(
+        fastchem_path=fastchem_path,
+        fastchem_species=("H2O1", "C1O1", "O1Si1", "H2", "He", "H"),
+        labels=("H2O", "CO", "SiO", "H2", "He", "H"),
+        metallicity_parameter_name=None,
+        carbon_to_oxygen_parameter_name=None,
+        element_log10_number_ratio_parameters={
+            "O": "log10_O_H",
+            "C": "log10_C_H",
+            "Si": "log10_Si_H",
+        },
+        full_equilibrium_composition=True,
+    )
+
+    composition = chemistry.evaluate(parameters, pressure, temperature)
+    assert {"H-", "H", "e-", "H2", "He"}.issubset(composition)
+    assert len(composition) == len(chemistry.species)
+    assert all(
+        np.all(np.isfinite(profile)) and np.all(profile >= 0.0)
+        for profile in composition.values()
+    )
+    mmw = CompositionMeanMolecularWeight(
+        molecular_masses=chemistry.full_equilibrium_molecular_masses,
+        normalization="normalize",
+    ).evaluate(composition, pressure)
+
+    fastchem = pyfastchem.FastChem(
+        str(fastchem_path / "input" / "element_abundances" / "asplund_2009.dat"),
+        str(fastchem_path / "input" / "logK" / "logK.dat"),
+        0,
+    )
+    abundances = np.asarray(fastchem.getElementAbundances(), dtype=float)
+    hydrogen = abundances[fastchem.getElementIndex("H")]
+    for element, parameter in (
+        ("O", "log10_O_H"),
+        ("C", "log10_C_H"),
+        ("Si", "log10_Si_H"),
+    ):
+        abundances[fastchem.getElementIndex(element)] = (
+            hydrogen * 10.0 ** parameters[parameter]
+        )
+    fastchem.setElementAbundances(abundances)
+    input_data = pyfastchem.FastChemInput()
+    input_data.pressure = np.asarray(pressure.centers, dtype=float)
+    input_data.temperature = temperature
+    output_data = pyfastchem.FastChemOutput()
+    assert int(fastchem.calcDensities(input_data, output_data)) == 0
+
+    np.testing.assert_allclose(
+        mmw,
+        np.asarray(output_data.mean_molecular_weight, dtype=float),
+        rtol=2.0e-11,
+        atol=0.0,
+    )
