@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import sys
@@ -19,7 +20,11 @@ from robert_exoplanets import (
     UniformPrior,
     run_multinest,
 )
-from robert_exoplanets.core import RobertConfigError
+from robert_exoplanets.core import RobertConfigError, RobertDataError
+from robert_exoplanets.retrieval.samplers.callback_supervisor import (
+    CALLBACK_FAILURE_MARKER_ENV,
+    CALLBACK_SUPERVISED_ENV,
+)
 from robert_exoplanets.retrieval.samplers.multinest import (
     MULTINEST_MAX_SEED,
     _effective_multinest_seed,
@@ -111,6 +116,111 @@ def test_multinest_adapter_transforms_prior_and_returns_common_result(
     assert (tmp_path / "sampler_status.json").is_file()
 
 
+@pytest.mark.parametrize("fatal_site", ["prior", "likelihood", "dump"])
+def test_multinest_writes_callback_marker_and_discards_partial_run(
+    monkeypatch, tmp_path, fatal_site
+) -> None:
+    marker = tmp_path / "callback-failure.json"
+    calls = {"likelihood": None, "analyzer": False}
+
+    class FailingProblem:
+        parameter_names = ("x",)
+        ndim = 1
+
+        def prior_transform(self, cube):
+            if fatal_site == "prior":
+                raise RuntimeError("prior callback failed")
+            return np.asarray(cube, dtype=float)
+
+        def log_likelihood_from_vector(self, vector):
+            del vector
+            if fatal_site == "likelihood":
+                raise RuntimeError("likelihood callback failed")
+            return -1.0
+
+    def fake_run(loglike, prior, ndim, **kwargs):
+        cube = [0.5]
+        prior(cube, ndim, ndim)
+        calls["likelihood"] = loglike(cube, ndim, ndim, -1.0e100)
+        if fatal_site == "dump":
+            kwargs["dump_callback"](
+                1,
+                10,
+                1,
+                np.empty((10, 2)),
+                np.empty((1, 3)),
+                (),
+                -1.0,
+                -1.0,
+                0.1,
+                0,
+            )
+
+    class UnexpectedAnalyzer:
+        def __init__(self, **kwargs):
+            del kwargs
+            calls["analyzer"] = True
+
+    monkeypatch.setitem(
+        sys.modules,
+        "pymultinest",
+        SimpleNamespace(run=fake_run, Analyzer=UnexpectedAnalyzer),
+    )
+    monkeypatch.setenv(CALLBACK_FAILURE_MARKER_ENV, str(marker))
+    monkeypatch.setenv(CALLBACK_SUPERVISED_ENV, "1")
+
+    def failing_dump_callback(*args):
+        del args
+        raise RuntimeError("dump callback failed")
+
+    run_kwargs = {"dump_callback": failing_dump_callback} if fatal_site == "dump" else {}
+    with pytest.raises(RobertDataError, match="callback failed"):
+        run_multinest(
+            FailingProblem(),
+            output_dir=tmp_path / "multinest",
+            n_live_points=10,
+            mpi_nprocs=1,
+            verbose=False,
+            **run_kwargs,
+        )
+
+    expected_loglike = -1.0 if fatal_site == "dump" else -1.0e100
+    assert calls["likelihood"] == expected_loglike
+    assert calls["analyzer"] is False
+    payload = json.loads(marker.read_text(encoding="utf-8"))
+    assert payload["exception_type"] == "RuntimeError"
+    assert payload["output_dir"] == str((tmp_path / "multinest").resolve())
+    status = json.loads(
+        (tmp_path / "multinest" / "sampler_status.json").read_text(encoding="utf-8")
+    )
+    assert status["state"] == "failed"
+    assert status["multinest_resume_safe"] is False
+    assert status["partial_chains_preserved"] is True
+    assert not (tmp_path / "multinest" / "result.json").exists()
+
+
+def test_multinest_refuses_to_resume_after_callback_failure(tmp_path) -> None:
+    output_dir = tmp_path / "multinest"
+    output_dir.mkdir()
+    (output_dir / "sampler_status.json").write_text(
+        json.dumps(
+            {
+                "state": "failed",
+                "callback_failure": True,
+                "multinest_resume_safe": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RobertConfigError, match="unsafe to resume"):
+        run_multinest(
+            _problem(),
+            output_dir=output_dir,
+            mpi_nprocs=1,
+        )
+
+
 def test_multinest_rejects_negative_seed(tmp_path) -> None:
     with pytest.raises(RobertConfigError, match="non-negative"):
         run_multinest(
@@ -156,6 +266,36 @@ def test_multinest_global_evidence_ignores_malformed_mode_errors(
 
     assert evidence == pytest.approx(-1.2)
     assert error == pytest.approx(0.1)
+
+
+@pytest.mark.parametrize(
+    "importance_line",
+    [
+        "Nested Importance Sampling Global Log-Evidence: "
+        "0.101855797978190647-311 +/- 0.695273390074996372-309",
+        "Nested Importance Sampling Global Log-Evidence: "
+        "0.101855797978190647-311 +/- 0.1",
+        "Nested Importance Sampling Global Log-Evidence: "
+        "2300.66686647193183 +/- 0.695273390074996372-309",
+    ],
+)
+def test_multinest_global_evidence_rejects_subnormal_importance_values(
+    tmp_path, importance_line
+) -> None:
+    stats = tmp_path / "1-stats.dat"
+    stats.write_text(
+        "Nested Sampling Global Log-Evidence: "
+        "2300.66686647193183 +/- 0.435589723883032853\n"
+        f"{importance_line}\n",
+        encoding="utf-8",
+    )
+
+    class AnalyzerMustNotBeUsed:
+        def get_stats(self):
+            raise AssertionError("stats file should be read directly")
+
+    with pytest.raises(RobertConfigError, match="subnormal"):
+        _global_evidence(AnalyzerMustNotBeUsed(), Path(stats))
 
 
 def test_multinest_reads_native_likelihood_count_from_resume_header(

@@ -15,6 +15,7 @@ from robert_exoplanets.core import (
     Spectrum,
 )
 from robert_exoplanets.core._immutability import immutable_mapping
+from robert_exoplanets.forward.virga_cloud import VirgaInvalidProposalError
 from robert_exoplanets.instruments import ObservationCollection
 from robert_exoplanets.likelihoods import (
     MultiDatasetGaussianLikelihood,
@@ -44,6 +45,7 @@ class MultiDatasetRetrievalProblem:
     invalid_loglike: float = float("-inf")
     metadata: Mapping[str, str] = field(default_factory=dict)
     opacity_identifiers: Mapping[str, str] = field(default_factory=dict)
+    strict_virga_errors: bool | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -66,7 +68,19 @@ class MultiDatasetRetrievalProblem:
                 "retrieval parameter set is missing dataset nuisance parameters: "
                 + ", ".join(missing)
             )
-        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+        metadata = dict(self.metadata)
+        strict_virga_errors = self.strict_virga_errors
+        if strict_virga_errors is None:
+            strict_virga_errors = "virga_ackerman_marley_eddy_sed" in str(
+                metadata.get("cloud_model", "")
+            )
+        metadata["virga_error_policy"] = (
+            "strict_known_invalid_proposals_only"
+            if strict_virga_errors
+            else "legacy_invalid_model_errors"
+        )
+        object.__setattr__(self, "strict_virga_errors", bool(strict_virga_errors))
+        object.__setattr__(self, "metadata", immutable_mapping(metadata))
         object.__setattr__(
             self, "opacity_identifiers", immutable_mapping(self.opacity_identifiers)
         )
@@ -139,8 +153,20 @@ class MultiDatasetRetrievalProblem:
             parameters = self.parameter_mapping(vector)
             prediction = self.forward_model(parameters)
             loglike = self.likelihood.loglike(prediction, self.observations, parameters)
-        except (RobertError, ValueError, FloatingPointError, OverflowError):
-            return float(self.invalid_loglike)
+        except Exception as exc:
+            if self.strict_virga_errors:
+                if isinstance(exc, VirgaInvalidProposalError):
+                    return float(self.invalid_loglike)
+                # Other validation, numerical, configuration, data, programmer,
+                # and library errors have no proof that they came from a bad
+                # proposal. Do not turn them into posterior mass.
+                raise
+            if isinstance(
+                exc,
+                (RobertError, ValueError, FloatingPointError, OverflowError),
+            ):
+                return float(self.invalid_loglike)
+            raise
         if not np.isfinite(loglike):
             return float(self.invalid_loglike)
         return float(loglike)

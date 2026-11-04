@@ -51,6 +51,18 @@ _SUPPORTED_MULTIPLE_SCATTERING_BACKENDS = {
 }
 
 
+class VirgaInvalidProposalError(RobertValidationError):
+    """A parameter proposal has no supported Virga fall-speed solution.
+
+    This error is used only for the version-pinned Virga 2.0.2 low-Kzz
+    no-bracket failure. Other Virga exceptions remain data or API errors.
+    """
+
+
+class VirgaConfigurationError(RobertConfigError, RobertValidationError):
+    """Virga configuration failure retaining the historical validation type."""
+
+
 @dataclass(frozen=True)
 class VirgaCloudProfileResult:
     """Validated Virga condensate and radius profiles on one pressure grid.
@@ -529,6 +541,15 @@ class VirgaEddySedCloudModel:
             # Set kz_min to the configured value. This prevents Virga's default
             # floor from silently replacing the user's constant profile.
             virga_atmosphere.ptk(df=ptk, kz_min=kz_cm2_s)
+        except Exception as exc:
+            # Setup errors do not prove that the sampled proposal is invalid.
+            # Keep them fatal, even if their text resembles a compute failure.
+            raise RobertDataError(
+                "Virga cloud evaluation failed for condensibles "
+                f"{', '.join(self.condensibles)}: {exc}"
+            ) from exc
+
+        try:
             result = virga.compute(
                 virga_atmosphere,
                 directory=str(self.mie_directory),
@@ -536,9 +557,10 @@ class VirgaEddySedCloudModel:
                 do_virtual=False,
             )
         except Exception as exc:
-            raise RobertDataError(
-                "Virga cloud evaluation failed for condensibles "
-                f"{', '.join(self.condensibles)}: {exc}"
+            raise _virga_compute_failure(
+                exc,
+                virga_version=virga_version,
+                condensibles=self.condensibles,
             ) from exc
 
         metadata = {
@@ -589,13 +611,20 @@ class VirgaEddySedCloudModel:
             fsed = self.fsed
         else:
             if self.fsed_parameter not in parameters:
-                raise RobertValidationError(
+                raise VirgaConfigurationError(
                     "Virga fsed parameter is missing: " + self.fsed_parameter
                 )
-            fsed = _finite_positive(
-                parameters[self.fsed_parameter],
-                f"Virga fsed parameter {self.fsed_parameter}",
-            )
+            try:
+                fsed = float(parameters[self.fsed_parameter])
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise VirgaInvalidProposalError(
+                    f"Virga fsed parameter {self.fsed_parameter} must be numeric"
+                ) from exc
+            if not np.isfinite(fsed) or fsed <= 0.0:
+                raise VirgaInvalidProposalError(
+                    f"Virga fsed parameter {self.fsed_parameter} must be finite "
+                    "and positive"
+                )
 
         if self.log10_kz_cm2_s_parameter is None:
             assert self.kz_cm2_s is not None
@@ -603,22 +632,22 @@ class VirgaEddySedCloudModel:
         else:
             name = self.log10_kz_cm2_s_parameter
             if name not in parameters:
-                raise RobertValidationError(
+                raise VirgaConfigurationError(
                     "Virga log10 Kzz parameter is missing: " + name
                 )
             try:
                 log10_kz = float(parameters[name])
             except (TypeError, ValueError, OverflowError) as exc:
-                raise RobertValidationError(
+                raise VirgaInvalidProposalError(
                     f"Virga log10 Kzz parameter {name} must be numeric"
                 ) from exc
             if not np.isfinite(log10_kz) or not -300.0 <= log10_kz <= 300.0:
-                raise RobertValidationError(
+                raise VirgaInvalidProposalError(
                     f"Virga log10 Kzz parameter {name} must be finite and lie in [-300, 300]"
                 )
             kz_cm2_s = float(10.0**log10_kz)
             if not np.isfinite(kz_cm2_s) or kz_cm2_s <= 0.0:
-                raise RobertValidationError(
+                raise VirgaInvalidProposalError(
                     f"Virga log10 Kzz parameter {name} does not produce a finite positive Kzz"
                 )
         return fsed, kz_cm2_s
@@ -886,6 +915,49 @@ def _load_virga():
             f"Virga version {version} is not supported; install virga-exo 2.x or newer"
         )
     return virga, version
+
+
+def _is_virga_202_low_kzz_no_solution(error: BaseException, version: str) -> bool:
+    """Match only the two exact Virga 2.0.2 low-Kzz failure messages.
+
+    Virga 2.0.2 raises a generic ``Exception`` for both this physical state and
+    unrelated input or data failures. The narrow version and message check
+    keeps those other failures fatal in strict retrievals.
+    """
+
+    if version.removeprefix("v") != "2.0.2":
+        return False
+    message = " ".join(str(error).split()).casefold()
+    known_failures = {
+        "warning: could not find a physical solution that balances w_convect "
+        "(kzz is so low that particles would need to be smaller than gas atoms "
+        "to stay in the pressure layer). please try using a higher value kzz.",
+        "warning: could not find a physical solution for spheres (needed in the "
+        "alpha calculation) that balances w_convect (kzz is so low that particles "
+        "would need to be smaller than gas atoms to stay in the pressure layer). "
+        "please try using a higher value kzz.",
+    }
+    return message in known_failures
+
+
+def _virga_compute_failure(
+    error: Exception,
+    *,
+    virga_version: str,
+    condensibles: tuple[str, ...],
+) -> RobertDataError | VirgaInvalidProposalError:
+    """Classify one Virga compute error without masking unrecognized failures."""
+
+    if _is_virga_202_low_kzz_no_solution(error, virga_version):
+        return VirgaInvalidProposalError(
+            "Virga 2.0.2 could not find a physical fall-speed solution "
+            "for this Kzz proposal; the eddy-sed cloud state is outside "
+            f"Virga's supported domain: {error}"
+        )
+    return RobertDataError(
+        "Virga cloud evaluation failed for condensibles "
+        f"{', '.join(condensibles)}: {error}"
+    )
 
 
 def _virga_gas_mole_fractions_from_mass_fractions(

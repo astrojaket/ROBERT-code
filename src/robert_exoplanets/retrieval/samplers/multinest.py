@@ -10,16 +10,22 @@ from pathlib import Path
 import re
 import socket
 import time
+import traceback
 from typing import Any, Mapping, Protocol, cast
 
 import numpy as np
 
-from robert_exoplanets.core import RobertConfigError
+from robert_exoplanets.core import RobertConfigError, RobertDataError
 
 from ..manifest import normalize_multinest_resume
 from ..protocols import SamplerRetrievalProblem
 from ..status import append_retrieval_attempt_event, write_retrieval_status
 from .base import NestedSamplerResult, validate_mpi_world_size
+from .callback_supervisor import (
+    CALLBACK_FAILURE_MARKER_ENV,
+    CALLBACK_SUPERVISED_ENV,
+    write_callback_failure_marker,
+)
 
 
 # MultiNest 3.10's bundled randomNS generator accepts two internal seeds whose
@@ -87,6 +93,31 @@ def run_multinest(
             "MultiNest invalid_loglike_floor must be finite and negative"
         )
 
+    callback_marker_value = os.environ.get(CALLBACK_FAILURE_MARKER_ENV)
+    if callback_marker_value is not None:
+        if os.environ.get(CALLBACK_SUPERVISED_ENV) != "1":
+            raise RobertConfigError(
+                "MultiNest callback markers must be set by the serial supervisor"
+            )
+        if _mpi_world_size() != 1:
+            raise RobertConfigError(
+                "callback supervision supports serial MultiNest runs only"
+            )
+        callback_marker = Path(callback_marker_value).expanduser().resolve()
+        if not callback_marker.parent.is_dir() or callback_marker.exists():
+            raise RobertConfigError(
+                "MultiNest callback marker path must be new and have an existing parent"
+            )
+    else:
+        callback_marker = None
+
+    root = Path(output_dir).expanduser().resolve()
+    if resume_flag and _callback_failure_makes_resume_unsafe(root):
+        raise RobertConfigError(
+            "the previous MultiNest run stopped after a callback failure; its partial "
+            "chains are unsafe to resume. Set resume=false or use a new output directory."
+        )
+
     try:
         import pymultinest  # type: ignore[import-untyped]
     except (ImportError, OSError, SystemExit) as exc:
@@ -95,7 +126,6 @@ def run_multinest(
             "Install both from conda-forge with `conda install multinest pymultinest`."
         ) from exc
 
-    root = Path(output_dir).expanduser().resolve()
     chains = root / "chains"
     chains.mkdir(parents=True, exist_ok=True)
     # MultiNest retains a legacy fixed-length Fortran filename buffer. Running
@@ -136,13 +166,60 @@ def run_multinest(
             root, {**status_base, "elapsed_seconds": 0.0, "n_samples": 0}
         )
 
+    fatal_callback_error: dict[str, object] | None = None
+
+    def latch_callback_error(exc: BaseException) -> None:
+        nonlocal fatal_callback_error
+        if fatal_callback_error is not None:
+            return
+        fatal_callback_error = {
+            "rank": 0,
+            "exception_type": type(exc).__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        if callback_marker is None:
+            return
+        marker_payload = {
+            **fatal_callback_error,
+            "output_dir": str(root),
+            "status_base": status_base,
+            "elapsed_seconds": max(time.monotonic() - started_monotonic, 0.0),
+        }
+        try:
+            write_callback_failure_marker(callback_marker, marker_payload)
+        except BaseException as marker_error:
+            message = (
+                "ROBERT could not write the MultiNest callback failure marker: "
+                f"{type(marker_error).__name__}: {marker_error}\n"
+            )
+            try:
+                os.write(2, message.encode("utf-8", errors="replace"))
+            finally:
+                # This child is isolated by the configured-run supervisor. Exit
+                # before returning through ctypes if its control marker fails.
+                os._exit(70)
+
     def prior(cube, ndim, nparams) -> None:
         del nparams
-        transformed = problem.prior_transform(
-            np.fromiter((cube[index] for index in range(ndim)), dtype=float, count=ndim)
-        )
-        for index, value in enumerate(transformed):
-            cube[index] = float(value)
+        if fatal_callback_error is not None:
+            for index in range(ndim):
+                cube[index] = 0.0
+            return
+        try:
+            transformed = problem.prior_transform(
+                np.fromiter(
+                    (cube[index] for index in range(ndim)), dtype=float, count=ndim
+                )
+            )
+            for index, value in enumerate(transformed):
+                cube[index] = float(value)
+        except BaseException as exc:
+            if callback_marker is None:
+                raise
+            latch_callback_error(exc)
+            for index in range(ndim):
+                cube[index] = 0.0
 
     local_likelihood_evaluations = 0
 
@@ -150,11 +227,19 @@ def run_multinest(
         nonlocal local_likelihood_evaluations
         del nparams, lnew
         local_likelihood_evaluations += 1
-        vector = np.fromiter(
-            (cube[index] for index in range(ndim)), dtype=float, count=ndim
-        )
-        value = problem.log_likelihood_from_vector(vector)
-        return invalid_floor if not np.isfinite(value) else float(value)
+        if fatal_callback_error is not None:
+            return invalid_floor
+        try:
+            vector = np.fromiter(
+                (cube[index] for index in range(ndim)), dtype=float, count=ndim
+            )
+            value = problem.log_likelihood_from_vector(vector)
+            return invalid_floor if not np.isfinite(value) else float(value)
+        except BaseException as exc:
+            if callback_marker is None:
+                raise
+            latch_callback_error(exc)
+            return invalid_floor
 
     requested_callback = run_kwargs.pop("dump_callback", None)
     if requested_callback is not None and not callable(requested_callback):
@@ -176,32 +261,41 @@ def run_multinest(
         log_evidence_error,
         context,
     ) -> None:
-        if primary:
-            write_retrieval_status(
-                root,
-                {
-                    **status_base,
-                    "elapsed_seconds": max(time.monotonic() - started_monotonic, 0.0),
-                    "n_samples": int(n_samples),
-                    "n_live": int(n_live),
-                    "best_live_log_likelihood": float(max_loglike),
-                    "log_evidence": float(log_evidence),
-                    "log_evidence_error": float(log_evidence_error),
-                },
-            )
-        if requested_callback is not None:
-            requested_callback(
-                n_samples,
-                n_live,
-                n_params,
-                live_points_array,
-                posterior,
-                parameter_constraints,
-                max_loglike,
-                log_evidence,
-                log_evidence_error,
-                context,
-            )
+        if fatal_callback_error is not None:
+            return
+        try:
+            if primary:
+                write_retrieval_status(
+                    root,
+                    {
+                        **status_base,
+                        "elapsed_seconds": max(
+                            time.monotonic() - started_monotonic, 0.0
+                        ),
+                        "n_samples": int(n_samples),
+                        "n_live": int(n_live),
+                        "best_live_log_likelihood": float(max_loglike),
+                        "log_evidence": float(log_evidence),
+                        "log_evidence_error": float(log_evidence_error),
+                    },
+                )
+            if requested_callback is not None:
+                requested_callback(
+                    n_samples,
+                    n_live,
+                    n_params,
+                    live_points_array,
+                    posterior,
+                    parameter_constraints,
+                    max_loglike,
+                    log_evidence,
+                    log_evidence_error,
+                    context,
+                )
+        except BaseException as exc:
+            if callback_marker is None:
+                raise
+            latch_callback_error(exc)
 
     try:
         with _working_directory(root):
@@ -224,6 +318,12 @@ def run_multinest(
                 dump_callback=dump_callback,
                 **run_kwargs,
             )
+            if fatal_callback_error is not None:
+                raise RobertDataError(
+                    "MultiNest callback failed; the posterior is discarded. "
+                    f"{fatal_callback_error['exception_type']}: "
+                    f"{fatal_callback_error['message']}"
+                )
             _mpi_barrier()
             likelihood_callback_evaluations = _mpi_sum(local_likelihood_evaluations)
             native_likelihood_evaluations = (
@@ -280,6 +380,15 @@ def run_multinest(
                 "exception_type": type(exc).__name__,
                 "message": str(exc),
             }
+            if fatal_callback_error is not None:
+                failure_status.update(
+                    {
+                        "callback_failure": True,
+                        "multinest_resume_safe": False,
+                        "partial_chains_preserved": True,
+                        "callback_rank": fatal_callback_error["rank"],
+                    }
+                )
             write_retrieval_status(root, failure_status)
             append_retrieval_attempt_event(root, {**failure_status, "event": "failed"})
         raise
@@ -399,6 +508,7 @@ def _global_evidence(
             f"MultiNest stats file has no global evidence line: {stats_path}"
         )
     importance = [line for line in candidates if "Importance Sampling" in line]
+    selected_importance = bool(importance)
     selected = importance[-1] if importance else candidates[0]
     try:
         _, values = selected.split(":", 1)
@@ -411,6 +521,18 @@ def _global_evidence(
         ) from exc
     if not np.isfinite(evidence):
         raise RobertConfigError("MultiNest global evidence must be finite")
+    if selected_importance:
+        subnormal_fields = []
+        if _is_subnormal(evidence):
+            subnormal_fields.append("log-evidence")
+        if error is not None and _is_subnormal(error):
+            subnormal_fields.append("uncertainty")
+        if subnormal_fields:
+            raise RobertConfigError(
+                "MultiNest importance-sampling global "
+                f"{' and '.join(subnormal_fields)} is subnormal; refusing to "
+                "report this evidence estimate"
+            )
     return float(evidence), error
 
 
@@ -421,6 +543,10 @@ def _fortran_float(value: object) -> float:
     except ValueError:
         repaired = re.sub(r"(?<=\d)([+-]\d+)$", r"E\1", text)
         return float(repaired)
+
+
+def _is_subnormal(value: float) -> bool:
+    return value != 0.0 and abs(value) < np.finfo(np.float64).tiny
 
 
 def _finite_or_none(value: object) -> float | None:
@@ -469,6 +595,26 @@ def _mpi_sum(value: int) -> int:
         return int(MPI.COMM_WORLD.allreduce(int(value), op=MPI.SUM))
     except ImportError:
         return int(value)
+
+
+def _mpi_world_size() -> int:
+    try:
+        from mpi4py import MPI
+
+        return int(MPI.COMM_WORLD.Get_size())
+    except ImportError:
+        return 1
+
+
+def _callback_failure_makes_resume_unsafe(output_dir: Path) -> bool:
+    status_path = output_dir / "sampler_status.json"
+    if not status_path.is_file():
+        return False
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(status, Mapping) and status.get("multinest_resume_safe") is False
 
 
 @contextmanager
