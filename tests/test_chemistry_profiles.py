@@ -277,6 +277,119 @@ def test_fastchem_equilibrium_chemistry_smoke_test_when_available() -> None:
     assert chemistry.metadata["fastchem_path"] == str(fastchem_path)
 
 
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"H": "log_H_H"}, "cannot change H or He"),
+        ({"Xx": "log_Xx_H"}, "unknown FastChem element"),
+        ({"O": "same", "C": "same"}, "must be unique"),
+        (
+            {"O": "log_SO2"},
+            "must be unique",
+        ),
+    ],
+)
+def test_fastchem_independent_abundance_configuration_is_validated(
+    overrides: dict[str, str], message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        FastChemEquilibriumChemistry(
+            fastchem_path="unused",
+            metallicity_parameter_name=None,
+            carbon_to_oxygen_parameter_name=None,
+            element_log10_number_ratio_parameters=overrides,
+            constant_log10_vmr_parameters={"SO2": "log_SO2"},
+            labels=("SO2",),
+            fastchem_species=("O2S1",),
+        )
+
+
+def test_fastchem_independent_elements_change_separately_and_reset() -> None:
+    pytest.importorskip("pyfastchem")
+    fastchem_path = Path(__file__).parents[1] / "data" / "chemistry" / "fastchem"
+    if not fastchem_path.exists():
+        pytest.skip("local FastChem data files are not available")
+    species = ("H2O1", "C1O1", "O1Si1", "H2", "He", "H")
+    labels = ("H2O", "CO", "SiO", "H2", "He", "H")
+    independent = FastChemEquilibriumChemistry(
+        fastchem_path=fastchem_path,
+        fastchem_species=species,
+        labels=labels,
+        metallicity_parameter_name=None,
+        carbon_to_oxygen_parameter_name=None,
+        element_log10_number_ratio_parameters={
+            "O": "log10_O_H",
+            "C": "log10_C_H",
+            "Si": "log10_Si_H",
+        },
+    )
+    legacy = FastChemEquilibriumChemistry(
+        fastchem_path=fastchem_path,
+        fastchem_species=species,
+        labels=labels,
+    )
+    runtime = independent._runtime
+    hydrogen_index = runtime.fastchem.getElementIndex("H")
+    solar = np.array(runtime.solar_abundances, copy=True)
+    parameters = {
+        f"log10_{element}_H": np.log10(
+            solar[runtime.fastchem.getElementIndex(element)] / solar[hydrogen_index]
+        )
+        for element in ("O", "C", "Si")
+    }
+    grid = PressureGrid.logspace(1.0e-4, 1.0e-2, n_layers=2, unit="bar")
+    temperature = np.full(grid.n_layers, 1500.0)
+
+    solar_result = independent.evaluate(parameters, grid, temperature)
+    # The selected equilibrium species must also form a usable bulk state.
+    # This catches a missing SiO mass before a transmission calculation starts.
+    mmw = CompositionMeanMolecularWeight(normalization="normalize").evaluate(
+        solar_result, grid
+    )
+    assert np.all(np.isfinite(mmw))
+    assert np.all((mmw > 2.0) & (mmw < 3.0))
+    solar_legacy = legacy.evaluate(
+        {
+            "metallicity": 0.0,
+            "CtoO": solar[runtime.fastchem.getElementIndex("C")]
+            / solar[runtime.fastchem.getElementIndex("O")],
+        },
+        grid,
+        temperature,
+    )
+    for label in labels:
+        np.testing.assert_allclose(solar_result[label], solar_legacy[label], rtol=1.0e-12)
+
+    oxygen_parameters = dict(parameters)
+    oxygen_parameters["log10_O_H"] += 0.5
+    oxygen_result = independent.evaluate(oxygen_parameters, grid, temperature)
+    assert not np.allclose(oxygen_result["H2O"], solar_result["H2O"], rtol=1.0e-3)
+
+    carbon_parameters = dict(parameters)
+    carbon_parameters["log10_C_H"] += 0.5
+    carbon_result = independent.evaluate(carbon_parameters, grid, temperature)
+    assert not np.allclose(carbon_result["CO"], solar_result["CO"], rtol=1.0e-3)
+
+    silicon_parameters = dict(parameters)
+    silicon_parameters["log10_Si_H"] += 0.5
+    silicon_result = independent.evaluate(silicon_parameters, grid, temperature)
+    assert not np.allclose(silicon_result["SiO"], solar_result["SiO"], rtol=1.0e-3)
+
+    repeated = independent.evaluate(parameters, grid, temperature)
+    for label in labels:
+        np.testing.assert_array_equal(repeated[label], solar_result[label])
+    np.testing.assert_array_equal(independent._runtime.solar_abundances, solar)
+    assert independent.required_parameters() == (
+        "log10_O_H",
+        "log10_C_H",
+        "log10_Si_H",
+    )
+    assert independent.metadata["abundance_mode"] == "independent_elements"
+    assert independent.metadata["element_log10_number_ratio_parameters"] == (
+        "C:log10_C_H,O:log10_O_H,Si:log10_Si_H"
+    )
+
+
 def test_atmosphere_builder_accepts_free_chemistry_model() -> None:
     grid = PressureGrid.logspace(1.0e-5, 1.0, n_layers=3)
     builder = AtmosphereBuilder(

@@ -22,6 +22,7 @@ DEFAULT_MOLECULAR_MASSES: Mapping[str, float] = {
     "H2O": 18.01528,
     "CO": 28.0101,
     "CO2": 44.0095,
+    "SiO": 44.0849,
     "CH4": 16.04246,
     "NH3": 17.03052,
     "HCN": 27.0253,
@@ -163,6 +164,13 @@ def _pressure_values_bar(pressure_grid: PressureGrid) -> NDArray[np.float64]:
 _PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _MOLECULAR_FORMULA_PATTERN = re.compile(r"(?:[A-Z][a-z]?\d*)+")
 _MOLECULAR_TOKEN_PATTERN = re.compile(r"([A-Z][a-z]?)(\d*)")
+_ELEMENT_SYMBOLS = frozenset(
+    "H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co "
+    "Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb "
+    "Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os "
+    "Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm "
+    "Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og".split()
+)
 
 
 def _validate_parameter_name(parameter_name: str, *, context: str) -> str:
@@ -876,9 +884,10 @@ class CompositionMeanMolecularWeight:
 class FastChemEquilibriumChemistry:
     """FastChem equilibrium chemistry wrapper.
 
-    FastChem is an optional runtime dependency. Metallicity is log10 relative
-    to solar, C/O is imposed by setting the carbon abundance relative to
-    oxygen, and pressure is passed to FastChem in bar.
+    FastChem is an optional runtime dependency. The default mode scales all
+    metals by a log10 metallicity and sets carbon from C/O. Independent mode
+    sets selected log10 number ratios ``n_element / n_H`` and leaves all other
+    elements at their solar values. Pressure is passed to FastChem in bar.
     """
 
     fastchem_path: str | Path
@@ -902,12 +911,13 @@ class FastChemEquilibriumChemistry:
         "H2",
         "He",
     )
-    metallicity_parameter_name: str = "metallicity"
-    carbon_to_oxygen_parameter_name: str = "CtoO"
+    metallicity_parameter_name: str | None = "metallicity"
+    carbon_to_oxygen_parameter_name: str | None = "CtoO"
     constant_log10_vmr_parameters: Mapping[str, str] = field(default_factory=dict)
     name: str = "fastchem-equilibrium"
     convention: str = "volume_mixing_ratio"
     metadata: Mapping[str, str] = field(default_factory=dict)
+    element_log10_number_ratio_parameters: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         path = Path(self.fastchem_path).expanduser()
@@ -922,10 +932,49 @@ class FastChemEquilibriumChemistry:
         labels = tuple(_validate_species_name(label) for label in self.labels)
         if len(set(labels)) != len(labels):
             raise RobertValidationError("FastChem labels must be unique")
-        if not self.metallicity_parameter_name or not self.carbon_to_oxygen_parameter_name:
-            raise RobertValidationError("FastChem parameter names must not be empty")
+        metallicity_parameter = self.metallicity_parameter_name
+        carbon_to_oxygen_parameter = self.carbon_to_oxygen_parameter_name
+        if (metallicity_parameter is None) != (carbon_to_oxygen_parameter is None):
+            raise RobertValidationError(
+                "FastChem metallicity and C/O parameters must both be set or both be None"
+            )
+        independent_elements = metallicity_parameter is None
+        elemental_parameters: dict[str, str] = {}
+        for raw_symbol, raw_parameter in self.element_log10_number_ratio_parameters.items():
+            symbol = str(raw_symbol)
+            if symbol in {"H", "He"}:
+                raise RobertValidationError(
+                    "FastChem independent abundance overrides cannot change H or He"
+                )
+            if symbol not in _ELEMENT_SYMBOLS:
+                raise RobertValidationError(f"unknown FastChem element symbol: {symbol}")
+            if not isinstance(raw_parameter, str) or not raw_parameter.strip():
+                raise RobertValidationError(
+                    "FastChem elemental abundance parameter names must not be empty"
+                )
+            elemental_parameters[symbol] = _validate_parameter_name(
+                raw_parameter,
+                context=f"{symbol} log10 number-ratio parameter name",
+            )
+        if independent_elements and not elemental_parameters:
+            raise RobertValidationError(
+                "independent FastChem abundance mode requires element parameter mappings"
+            )
+        if not independent_elements and elemental_parameters:
+            raise RobertValidationError(
+                "element abundance mappings require metallicity and C/O parameters to be None"
+            )
+        if not independent_elements:
+            metallicity_parameter = _validate_parameter_name(
+                metallicity_parameter,
+                context="FastChem metallicity parameter name",
+            )
+            carbon_to_oxygen_parameter = _validate_parameter_name(
+                carbon_to_oxygen_parameter,
+                context="FastChem carbon-to-oxygen parameter name",
+            )
         overrides = {
-            _validate_species_name(species): str(parameter)
+            _validate_species_name(species): parameter
             for species, parameter in self.constant_log10_vmr_parameters.items()
         }
         unknown_overrides = sorted(set(overrides) - set(labels))
@@ -934,17 +983,36 @@ class FastChemEquilibriumChemistry:
                 "constant FastChem overrides are not configured species: "
                 + ", ".join(unknown_overrides)
             )
-        if any(not parameter for parameter in overrides.values()):
+        if any(not isinstance(parameter, str) or not parameter.strip() for parameter in overrides.values()):
             raise RobertValidationError(
                 "constant FastChem override parameter names must not be empty"
             )
-        if len(set(overrides.values())) != len(overrides):
+        overrides = {
+            species: _validate_parameter_name(
+                parameter,
+                context=f"{species} constant log10 VMR parameter name",
+            )
+            for species, parameter in overrides.items()
+        }
+        chemistry_parameters = [
+            *(() if independent_elements else (metallicity_parameter, carbon_to_oxygen_parameter)),
+            *elemental_parameters.values(),
+            *overrides.values(),
+        ]
+        if len(set(chemistry_parameters)) != len(chemistry_parameters):
             raise RobertValidationError(
-                "constant FastChem override parameter names must be unique"
+                "FastChem abundance and constant override parameter names must be unique"
             )
         object.__setattr__(self, "fastchem_path", path)
         object.__setattr__(self, "fastchem_species", tuple(str(item) for item in self.fastchem_species))
         object.__setattr__(self, "labels", labels)
+        object.__setattr__(self, "metallicity_parameter_name", metallicity_parameter)
+        object.__setattr__(self, "carbon_to_oxygen_parameter_name", carbon_to_oxygen_parameter)
+        object.__setattr__(
+            self,
+            "element_log10_number_ratio_parameters",
+            immutable_mapping(elemental_parameters),
+        )
         object.__setattr__(
             self,
             "constant_log10_vmr_parameters",
@@ -956,8 +1024,13 @@ class FastChemEquilibriumChemistry:
             immutable_mapping(
                 {
                     "fastchem_path": str(path),
-                    "metallicity_parameter": self.metallicity_parameter_name,
-                    "carbon_to_oxygen_parameter": self.carbon_to_oxygen_parameter_name,
+                    "abundance_mode": "independent_elements" if independent_elements else "metallicity_c_to_o",
+                    "metallicity_parameter": self.metallicity_parameter_name or "",
+                    "carbon_to_oxygen_parameter": self.carbon_to_oxygen_parameter_name or "",
+                    "element_log10_number_ratio_parameters": ",".join(
+                        f"{element}:{parameter}"
+                        for element, parameter in sorted(elemental_parameters.items())
+                    ),
                     "constant_log10_vmr_parameters": ",".join(
                         f"{species}:{parameter}"
                         for species, parameter in overrides.items()
@@ -976,11 +1049,12 @@ class FastChemEquilibriumChemistry:
     def required_parameters(self) -> tuple[str, ...]:
         """Return required FastChem parameter names."""
 
-        return (
-            self.metallicity_parameter_name,
-            self.carbon_to_oxygen_parameter_name,
-            *self.constant_log10_vmr_parameters.values(),
+        abundance_parameters = (
+            tuple(self.element_log10_number_ratio_parameters.values())
+            if self.metallicity_parameter_name is None
+            else (self.metallicity_parameter_name, self.carbon_to_oxygen_parameter_name)
         )
+        return (*abundance_parameters, *self.constant_log10_vmr_parameters.values())
 
     def evaluate(
         self,
@@ -991,30 +1065,52 @@ class FastChemEquilibriumChemistry:
         """Return FastChem VMR profiles on the supplied P-T grid."""
 
         _validate_temperature_layers(temperature, pressure_grid)
-        metallicity_dex = _parameter_value(
-            parameters,
-            self.metallicity_parameter_name,
-            context="FastChem chemistry",
-        )
-        carbon_to_oxygen = _parameter_value(
-            parameters,
-            self.carbon_to_oxygen_parameter_name,
-            context="FastChem chemistry",
-        )
-        if carbon_to_oxygen < 0.0:
-            raise RobertValidationError("FastChem C/O must be non-negative")
-
         runtime = self._runtime
         element_abundances = np.array(runtime.solar_abundances, dtype=float, copy=True)
-        metallicity_scale = 10.0**metallicity_dex
-        for index in range(runtime.fastchem.getElementNumber()):
-            symbol = runtime.fastchem.getElementSymbol(index)
-            if symbol not in {"H", "He"}:
-                element_abundances[index] *= metallicity_scale
+        if self.metallicity_parameter_name is None:
+            hydrogen_index = runtime.fastchem.getElementIndex("H")
+            hydrogen_abundance = element_abundances[hydrogen_index]
+            for element, parameter_name in self.element_log10_number_ratio_parameters.items():
+                index = runtime.fastchem.getElementIndex(element)
+                if index < 0 or index >= runtime.fastchem.getElementNumber():
+                    raise RobertValidationError(
+                        f"FastChem abundance data do not include element: {element}"
+                    )
+                log10_ratio = _parameter_value(
+                    parameters,
+                    parameter_name,
+                    context="FastChem elemental abundance",
+                )
+                with np.errstate(over="ignore", under="ignore", invalid="ignore"):
+                    ratio = np.power(10.0, log10_ratio)
+                abundance = hydrogen_abundance * ratio
+                if not np.isfinite(abundance) or abundance <= 0.0:
+                    raise RobertValidationError(
+                        f"{element} number ratio must map to a finite positive abundance"
+                    )
+                element_abundances[index] = abundance
+        else:
+            metallicity_dex = _parameter_value(
+                parameters,
+                self.metallicity_parameter_name,
+                context="FastChem chemistry",
+            )
+            carbon_to_oxygen = _parameter_value(
+                parameters,
+                self.carbon_to_oxygen_parameter_name,
+                context="FastChem chemistry",
+            )
+            if carbon_to_oxygen < 0.0:
+                raise RobertValidationError("FastChem C/O must be non-negative")
+            metallicity_scale = 10.0**metallicity_dex
+            for index in range(runtime.fastchem.getElementNumber()):
+                symbol = runtime.fastchem.getElementSymbol(index)
+                if symbol not in {"H", "He"}:
+                    element_abundances[index] *= metallicity_scale
 
-        oxygen_index = runtime.fastchem.getElementIndex("O")
-        carbon_index = runtime.fastchem.getElementIndex("C")
-        element_abundances[carbon_index] = carbon_to_oxygen * element_abundances[oxygen_index]
+            oxygen_index = runtime.fastchem.getElementIndex("O")
+            carbon_index = runtime.fastchem.getElementIndex("C")
+            element_abundances[carbon_index] = carbon_to_oxygen * element_abundances[oxygen_index]
         runtime.fastchem.setElementAbundances(element_abundances)
 
         pyfastchem = runtime.pyfastchem
@@ -1085,6 +1181,18 @@ class FastChemEquilibriumChemistry:
             species_indices.append(int(index))
         if missing:
             raise RobertConfigError("FastChem does not know species: " + ", ".join(missing))
+
+        missing_elements = [
+            element
+            for element in self.element_log10_number_ratio_parameters
+            if fastchem.getElementIndex(element) >= fastchem.getElementNumber()
+            or fastchem.getElementIndex(element) < 0
+        ]
+        if missing_elements:
+            raise RobertConfigError(
+                "FastChem abundance data do not include elements: "
+                + ", ".join(missing_elements)
+            )
 
         return _FastChemRuntime(
             pyfastchem=pyfastchem,

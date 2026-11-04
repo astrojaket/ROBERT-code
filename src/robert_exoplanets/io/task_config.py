@@ -326,13 +326,31 @@ class PressureQuenchConfig(ConfigModel):
         )
 
 
+_FastChemParameterName = Annotated[
+    str,
+    Field(min_length=1, pattern=r"^[A-Za-z_][A-Za-z0-9_]*$"),
+]
+_ELEMENT_SYMBOLS = frozenset(
+    "H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co "
+    "Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb "
+    "Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os "
+    "Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm "
+    "Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og".split()
+)
+
+
 class FastChemConfig(ConfigModel):
     model: Literal["fastchem_equilibrium"]
     fastchem_path: Path
     species: tuple[ChemistrySpeciesConfig, ...] = Field(min_length=1)
-    metallicity_parameter: str = "metallicity"
-    carbon_to_oxygen_parameter: str = "CtoO"
-    constant_log10_vmr_parameters: dict[str, str] | None = Field(default_factory=dict)
+    metallicity_parameter: _FastChemParameterName | None = "metallicity"
+    carbon_to_oxygen_parameter: _FastChemParameterName | None = "CtoO"
+    element_log10_number_ratio_parameters: dict[str, _FastChemParameterName] = Field(
+        default_factory=dict
+    )
+    constant_log10_vmr_parameters: dict[str, _FastChemParameterName] | None = Field(
+        default_factory=dict
+    )
     quenching: PressureQuenchConfig | None = None
 
     @model_validator(mode="after")
@@ -350,6 +368,48 @@ class FastChemConfig(ConfigModel):
             raise ValueError("constant log10 VMR parameter names must not be empty")
         if len(set(parameters)) != len(parameters):
             raise ValueError("constant log10 VMR parameter names must be unique")
+        elemental_parameters = self.element_log10_number_ratio_parameters
+        unknown_elements = sorted(set(elemental_parameters) - _ELEMENT_SYMBOLS)
+        if unknown_elements:
+            raise ValueError(
+                "element_log10_number_ratio_parameters contains unknown elements: "
+                + ", ".join(unknown_elements)
+            )
+        if {"H", "He"}.intersection(elemental_parameters):
+            raise ValueError(
+                "element_log10_number_ratio_parameters cannot override H or He"
+            )
+        independent_mode = (
+            self.metallicity_parameter is None
+            and self.carbon_to_oxygen_parameter is None
+        )
+        if (self.metallicity_parameter is None) != (
+            self.carbon_to_oxygen_parameter is None
+        ):
+            raise ValueError(
+                "metallicity_parameter and carbon_to_oxygen_parameter must both be set or both be null"
+            )
+        if independent_mode and not elemental_parameters:
+            raise ValueError(
+                "independent FastChem abundance mode requires element parameter mappings"
+            )
+        if not independent_mode and elemental_parameters:
+            raise ValueError(
+                "element abundance mappings require metallicity_parameter and carbon_to_oxygen_parameter to be null"
+            )
+        chemistry_parameters = [
+            *(
+                ()
+                if independent_mode
+                else (self.metallicity_parameter, self.carbon_to_oxygen_parameter)
+            ),
+            *elemental_parameters.values(),
+            *parameters,
+        ]
+        if len(set(chemistry_parameters)) != len(chemistry_parameters):
+            raise ValueError(
+                "FastChem abundance and constant override parameter names must be unique"
+            )
         if self.quenching is not None:
             groups = self.quenching.resolved_groups()
             quench_species = {
@@ -362,8 +422,12 @@ class FastChemConfig(ConfigModel):
                     + ", ".join(missing)
                 )
             base_parameters = {
-                self.metallicity_parameter,
-                self.carbon_to_oxygen_parameter,
+                *(
+                    ()
+                    if independent_mode
+                    else (self.metallicity_parameter, self.carbon_to_oxygen_parameter)
+                ),
+                *elemental_parameters.values(),
                 *parameters,
             }
             quench_parameters = {
@@ -1299,8 +1363,14 @@ def _chemistry_species(config: ChemistryConfig) -> tuple[str, ...]:
 def _required_chemistry_parameters(config: ChemistryConfig) -> set[str]:
     if config.model == "fastchem_equilibrium":
         required = {
-            config.metallicity_parameter,
-            config.carbon_to_oxygen_parameter,
+            *(
+                config.element_log10_number_ratio_parameters.values()
+                if config.metallicity_parameter is None
+                else (
+                    config.metallicity_parameter,
+                    config.carbon_to_oxygen_parameter,
+                )
+            ),
             *(config.constant_log10_vmr_parameters or {}).values(),
         }
         if (

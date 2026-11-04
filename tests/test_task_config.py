@@ -20,6 +20,7 @@ from robert_exoplanets.io.configured_tasks import (
     prepare_opacity,
 )
 from robert_exoplanets.io.task_config import (
+    FastChemConfig,
     SamplerConfig,
     TaskConfig,
     configured_regions,
@@ -91,6 +92,106 @@ def test_emission_example_exposes_complete_native_mode_run() -> None:
     assert config.bodies.star.spectrum_model == "phoenix"
     assert config.bodies.star.log_g_cgs == 4.5
     assert config.bodies.star.metallicity_dex == 0.0
+
+
+def test_task_config_accepts_independent_fastchem_element_parameters() -> None:
+    config = load_task_config(EXAMPLE)
+    raw = deepcopy(config.model_dump(mode="python"))
+    chemistry = raw["atmosphere"]["chemistry"]
+    chemistry["metallicity_parameter"] = None
+    chemistry["carbon_to_oxygen_parameter"] = None
+    chemistry["element_log10_number_ratio_parameters"] = {
+        "O": "log10_O_H",
+        "C": "log10_C_H",
+        "Si": "log10_Si_H",
+    }
+    raw["parameters"] = [
+        parameter
+        for parameter in raw["parameters"]
+        if parameter["name"] not in {"metallicity", "CtoO"}
+    ]
+    raw["parameters"].extend(
+        {
+            "name": name,
+            "unit": "dex",
+            "prior": {"type": "uniform", "lower": lower, "upper": upper},
+        }
+        for name, lower, upper in (
+            ("log10_O_H", -4.0, -3.0),
+            ("log10_C_H", -4.5, -3.0),
+            ("log10_Si_H", -5.0, -4.0),
+        )
+    )
+
+    parsed = TaskConfig.model_validate(raw)
+
+    assert parsed.atmosphere.chemistry.metallicity_parameter is None
+    assert parsed.atmosphere.chemistry.carbon_to_oxygen_parameter is None
+    assert parsed.atmosphere.chemistry.element_log10_number_ratio_parameters == {
+        "O": "log10_O_H",
+        "C": "log10_C_H",
+        "Si": "log10_Si_H",
+    }
+    missing_si = deepcopy(raw)
+    missing_si["parameters"] = [
+        parameter
+        for parameter in missing_si["parameters"]
+        if parameter["name"] != "log10_Si_H"
+    ]
+    with pytest.raises(ValidationError, match="required model parameters are missing: log10_Si_H"):
+        TaskConfig.model_validate(missing_si)
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"element_log10_number_ratio_parameters": {"Xx": "log_Xx_H"}}, "unknown elements"),
+        ({"element_log10_number_ratio_parameters": {"H": "log_H_H"}}, "cannot override H or He"),
+        (
+            {
+                "metallicity_parameter": "metallicity",
+                "carbon_to_oxygen_parameter": "CtoO",
+                "element_log10_number_ratio_parameters": {"O": "log10_O_H"},
+            },
+            "require metallicity_parameter",
+        ),
+        (
+            {"metallicity_parameter": None, "carbon_to_oxygen_parameter": "CtoO"},
+            "must both be set or both be null",
+        ),
+        ({"element_log10_number_ratio_parameters": {}}, "requires element parameter mappings"),
+        (
+            {
+                "element_log10_number_ratio_parameters": {
+                    "O": "same",
+                    "C": "same",
+                }
+            },
+            "must be unique",
+        ),
+        (
+            {
+                "element_log10_number_ratio_parameters": {"O": "log_SO2"},
+                "constant_log10_vmr_parameters": {"H2O": "log_SO2"},
+            },
+            "must be unique",
+        ),
+    ],
+)
+def test_fastchem_element_config_rejects_invalid_mode_and_parameter_names(
+    changes: dict[str, object], message: str,
+) -> None:
+    raw: dict[str, object] = {
+        "model": "fastchem_equilibrium",
+        "fastchem_path": "unused",
+        "species": [{"label": "H2O", "fastchem_name": "H2O1"}],
+        "metallicity_parameter": None,
+        "carbon_to_oxygen_parameter": None,
+        "element_log10_number_ratio_parameters": {"O": "log10_O_H"},
+    }
+    raw.update(changes)
+    with pytest.raises(ValidationError, match=message):
+        FastChemConfig.model_validate(raw)
 
 
 @pytest.mark.parametrize("name", ["emission", "cloudy_emission", "optimal_estimation", "two_region_emission"])

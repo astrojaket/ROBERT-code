@@ -139,6 +139,40 @@ def test_fastchem_problem_has_no_phantom_opacity_species(monkeypatch) -> None:
     assert captured_factories["f322w2"].opacity_free_species == ()
 
 
+def test_configured_fastchem_factory_passes_elemental_parameters() -> None:
+    base = load_task_config(ROOT / "configurations" / "emission.yaml")
+    raw = deepcopy(base.model_dump(mode="python"))
+    chemistry_config = raw["atmosphere"]["chemistry"]
+    chemistry_config["metallicity_parameter"] = None
+    chemistry_config["carbon_to_oxygen_parameter"] = None
+    chemistry_config["element_log10_number_ratio_parameters"] = {
+        "Si": "log10_Si_H"
+    }
+    raw["parameters"] = [
+        item
+        for item in raw["parameters"]
+        if item["name"] not in {"metallicity", "CtoO"}
+    ]
+    raw["parameters"].append(
+        {
+            "name": "log10_Si_H",
+            "unit": "dex",
+            "prior": {"type": "uniform", "lower": -5.0, "upper": -4.0},
+        }
+    )
+    config = TaskConfig.model_validate(raw)
+
+    chemistry, _, _ = configured_tasks._base_chemistry_components(
+        config.atmosphere.chemistry
+    )
+
+    assert chemistry.element_log10_number_ratio_parameters == {
+        "Si": "log10_Si_H"
+    }
+    assert chemistry.required_parameters() == ("log10_Si_H", "log_SO2")
+    assert chemistry.metadata["abundance_mode"] == "independent_elements"
+
+
 def test_configured_two_region_problem_builds_independent_columns(monkeypatch) -> None:
     base = load_task_config(
         ROOT / "configurations" / "emission.yaml"

@@ -682,6 +682,9 @@ def _base_chemistry_components(config: ChemistryConfig):
             labels=tuple(item.label for item in config.species),
             metallicity_parameter_name=config.metallicity_parameter,
             carbon_to_oxygen_parameter_name=config.carbon_to_oxygen_parameter,
+            element_log10_number_ratio_parameters=(
+                config.element_log10_number_ratio_parameters
+            ),
             constant_log10_vmr_parameters=(config.constant_log10_vmr_parameters or {}),
         )
         return (
