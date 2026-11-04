@@ -360,64 +360,79 @@ def prepare_opacity(config: TaskConfig, observations: ObservationCollection) -> 
 
     cache = cache_directory(config)
     cache.mkdir(parents=True, exist_ok=True)
-    binning = config.opacity.binning
     for species in config.opacity.species:
-        provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
-            config.opacity.path,
-            species=(species,),
-            resolution=config.opacity.resolution,
-            name=f"ExoMol-{config.opacity.resolution}-{species}",
-            interpolation="log_pressure_temperature_log_k_clip",
-            nonfinite_policy="floor",
+        _prepare_exomol_kta_species(config, observations, cache, species)
+
+
+def _prepare_exomol_kta_species(
+    config: TaskConfig,
+    observations: ObservationCollection,
+    cache: Path,
+    species: str,
+) -> None:
+    """Prepare one KTA species, then release its full native table."""
+
+    binning = config.opacity.binning
+    provider = CorrelatedKOpacityProvider.from_exomol_kta_directory(
+        config.opacity.path,
+        species=(species,),
+        resolution=config.opacity.resolution,
+        name=f"ExoMol-{config.opacity.resolution}-{species}",
+        interpolation="log_pressure_temperature_log_k_clip",
+        nonfinite_policy="floor",
+        # This provider only bins native data. Forward-model caches are built
+        # from the compact prepared files, so a second full-sized log array is
+        # not useful here.
+        cache_log_kcoeff=False,
+    )
+    table = provider.tables[species]
+    source = Path(str(table.metadata["source_path"]))
+    source_sha = str(table.metadata["checksum_sha256"])
+    for dataset in observations.datasets:
+        target = cache / f"{dataset.name}_{species}.npz"
+        fingerprint = _preparation_fingerprint(config, dataset, species)
+        if target.exists():
+            with np.load(target, allow_pickle=False) as saved:
+                current = _cache_matches(
+                    saved,
+                    fingerprint=fingerprint,
+                    source_sha256=source_sha,
+                    species=species,
+                    resolution=config.opacity.resolution,
+                    spectral_preparation="exo_k_bin_down_cp",
+                )
+            if current:
+                continue
+        binned = provider.bin_to_spectral_grid(
+            dataset.observation.spectral_grid,
+            num=binning.num,
+            use_rebin=binning.use_rebin,
+            remove_zeros=binning.remove_zeros,
+        ).tables[species]
+        np.savez_compressed(
+            target,
+            species=species,
+            pressure_bar=binned.pressure_bar,
+            temperature_K=binned.temperature_K,
+            wavenumber_cm_inverse=binned.wavenumber_cm_inverse,
+            wavelength_micron=binned.wavelength_micron,
+            g_samples=binned.g_samples,
+            g_weights=binned.g_weights,
+            kcoeff=binned.kcoeff,
+            unit=binned.unit,
+            source_path=str(source.resolve()),
+            source_sha256=source_sha,
+            opacity_resolution=config.opacity.resolution,
+            binning_num=binning.num,
+            binning_use_rebin=binning.use_rebin,
+            binning_remove_zeros=binning.remove_zeros,
+            binning_g_points=binning.g_points,
+            opacity_format=config.opacity.format,
+            configured_species=",".join(config.opacity.species),
+            opacity_cache_schema_version=_OPACITY_CACHE_SCHEMA_VERSION,
+            preparation_fingerprint=fingerprint,
+            spectral_preparation="exo_k_bin_down_cp",
         )
-        table = provider.tables[species]
-        source = Path(str(table.metadata["source_path"]))
-        source_sha = str(table.metadata["checksum_sha256"])
-        for dataset in observations.datasets:
-            target = cache / f"{dataset.name}_{species}.npz"
-            fingerprint = _preparation_fingerprint(config, dataset, species)
-            if target.exists():
-                with np.load(target, allow_pickle=False) as saved:
-                    current = _cache_matches(
-                        saved,
-                        fingerprint=fingerprint,
-                        source_sha256=source_sha,
-                        species=species,
-                        resolution=config.opacity.resolution,
-                        spectral_preparation="exo_k_bin_down_cp",
-                    )
-                if current:
-                    continue
-            binned = provider.bin_to_spectral_grid(
-                dataset.observation.spectral_grid,
-                num=binning.num,
-                use_rebin=binning.use_rebin,
-                remove_zeros=binning.remove_zeros,
-            ).tables[species]
-            np.savez_compressed(
-                target,
-                species=species,
-                pressure_bar=binned.pressure_bar,
-                temperature_K=binned.temperature_K,
-                wavenumber_cm_inverse=binned.wavenumber_cm_inverse,
-                wavelength_micron=binned.wavelength_micron,
-                g_samples=binned.g_samples,
-                g_weights=binned.g_weights,
-                kcoeff=binned.kcoeff,
-                unit=binned.unit,
-                source_path=str(source.resolve()),
-                source_sha256=source_sha,
-                opacity_resolution=config.opacity.resolution,
-                binning_num=binning.num,
-                binning_use_rebin=binning.use_rebin,
-                binning_remove_zeros=binning.remove_zeros,
-                binning_g_points=binning.g_points,
-                opacity_format=config.opacity.format,
-                configured_species=",".join(config.opacity.species),
-                opacity_cache_schema_version=_OPACITY_CACHE_SCHEMA_VERSION,
-                preparation_fingerprint=fingerprint,
-                spectral_preparation="exo_k_bin_down_cp",
-            )
 
 
 def _prepare_exomol_cross_section_opacity(
