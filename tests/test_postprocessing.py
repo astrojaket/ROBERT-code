@@ -22,6 +22,7 @@ from robert_exoplanets import (
     PressureGrid,
     Spectrum,
 )
+from robert_exoplanets.core import RobertDataError
 from robert_exoplanets.instruments import ObservationCollection, ObservationDataset
 from robert_exoplanets.likelihoods import MultiDatasetGaussianLikelihood
 from robert_exoplanets.postprocessing import (
@@ -430,6 +431,54 @@ def test_saved_fit_replays_gaussian_nuisance_settings(
     assert diagnostics["log_likelihood_recomputed"] == pytest.approx(
         expected["log_likelihood_recomputed"]
     )
+
+
+def test_saved_prediction_dataset_order_does_not_change_dataset_names(
+    tmp_path: Path,
+) -> None:
+    names = ("f322w2", "avg", "f444w", "lrs")
+    datasets = []
+    observations = {}
+    for index, name in enumerate(names, start=1):
+        observation = Observation.from_arrays(
+            [float(index), float(index + 1)],
+            [1.0, 1.1],
+            [0.1, 0.1],
+            instrument=name,
+        )
+        datasets.append(ObservationDataset(name, observation))
+        observations[name] = observation
+
+    problem = MultiDatasetRetrievalProblem(
+        name="ordered-datasets",
+        observations=ObservationCollection(tuple(datasets)),
+        parameters=RetrievalParameterSet(
+            (RetrievalParameter("level", UniformPrior(0.5, 1.5)),)
+        ),
+        forward_model=lambda parameters: {
+            name: Spectrum.from_arrays(
+                observation.wavelength,
+                np.full(observation.wavelength.size, parameters["level"]),
+                unit=observation.flux_unit,
+                observable=observation.observable,
+            )
+            for name, observation in observations.items()
+        },
+    )
+    best = {"level": 1.0}
+    artifact = capture_best_fit_prediction(problem, best)
+    result_dir = tmp_path / "outputs" / "multinest"
+    write_best_fit_prediction(artifact, result_dir)
+
+    loaded = postprocessing_module.load_best_fit_prediction(result_dir)
+    assert tuple(loaded.datasets) == ("avg", "f322w2", "f444w", "lrs")
+    postprocessing_module._validate_saved_dataset_names(problem, loaded)
+
+    mismatched = SimpleNamespace(
+        datasets={name: None for name in ("f322w2", "avg", "f444w", "other")}
+    )
+    with pytest.raises(RobertDataError, match="dataset names do not match"):
+        postprocessing_module._validate_saved_dataset_names(problem, mismatched)
 
 
 def test_default_plot_style_is_robert_science_style() -> None:
