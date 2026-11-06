@@ -1,0 +1,642 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-11-06",
+  "status": "complete_for_stated_local_diagnostic",
+  "scope": "Synthetic fixed-temperature, cloud-free elemental-abundance sensitivity; not coverage calibration or science-grade abundance validation.",
+  "provenance": {
+    "study_source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+    "baseline_source_commit": "c211dcab7e748f9581ce6ff8bdcb21506fe7d267",
+    "baseline_products_modified": false,
+    "source_worktree_clean": true,
+    "study_configuration_sha256": "c4a61f1562c7e6a1edd2e75235bf605588576568666c79cc126ae5eb197e16d5",
+    "reference_configuration_sha256": "deacd40b4cb3b17a5e720c0d36f0e173125cbf83caeba95f3576a1afd5f71123",
+    "reference_injection_arrays_sha256": "9acb3ae9d17c7e86045667247411091f0121c268df9cb222565bb7d97f72fe94",
+    "reference_posterior_arrays_sha256": "cee902ebbf72d8de3e0889310daffa4354f826836ec6b88ea01adba7078ae654",
+    "opacity_source_sha256": {
+      "CO": "73c75b37d120eed7d0765bc3863b436c6cff486e93ca6243203f09f7d8bdebf4",
+      "H2O": "7b1f02343f65bacb9404e3b6a29374fab176a709aab7c5c8d6b7a50c430932aa",
+      "SiO": "cf35f236779aa16e77629302aefe54cf301eb3313d5ae4ecd08a1c255454f814"
+    },
+    "external_evidence_root": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/elemental-identifiability-20261106"
+  },
+  "model_and_data": {
+    "observation": {
+      "type": "synthetic transmission",
+      "wavelength_range_micron": [
+        2.8,
+        5.15
+      ],
+      "wavelength_range_definition": "bin centers; the saved observation bin edges are retained in the external inputs",
+      "bins": 48,
+      "uncertainty_ppm_per_bin": 20.0,
+      "noise_sha256": "c22bf6d69bba31361251a242430a517662cba507effc5a7f76077156d0eea5d5",
+      "noise_rms_ppm": 19.041224037700495,
+      "same_noise_used_for_all_cases": true
+    },
+    "atmosphere": {
+      "chemistry": "full FastChem equilibrium composition",
+      "temperature_k": 1800.0,
+      "temperature_profile": "isothermal",
+      "pressure_bounds_bar": [
+        100.0,
+        0.00001
+      ],
+      "pressure_layers": 80,
+      "clouds": "none",
+      "hminus": "configured; inactive at 1800 K over this wavelength band"
+    },
+    "opacity": {
+      "format": "native correlated-k KTA",
+      "resolution": "R1000",
+      "species": [
+        "H2O",
+        "CO",
+        "SiO"
+      ],
+      "g_ordinates": 20,
+      "native_opacity_copied": false,
+      "finite_grid_reference_cache_read_only": true,
+      "native_recovery_cache_policy": "Each new run generated its own prepared cache from the shared unchanged KTA inputs. No native opacity files were copied between runs."
+    },
+    "truth_and_priors": {
+      "parameter_names": [
+        "log10_O_H",
+        "log10_C_H",
+        "log10_Si_H"
+      ],
+      "reference_truth": {
+        "log10_O_H": -3.18,
+        "log10_C_H": -3.7,
+        "log10_Si_H": -4.28
+      },
+      "uniform_prior_bounds": {
+        "log10_O_H": [
+          -3.8,
+          -2.8
+        ],
+        "log10_C_H": [
+          -4.3,
+          -3.3
+        ],
+        "log10_Si_H": [
+          -4.9,
+          -3.9
+        ]
+      },
+      "native_changed_truths": {
+        "O-low": {
+          "log10_O_H": -3.7,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.28
+        },
+        "O-high": {
+          "log10_O_H": -2.9,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.28
+        },
+        "C-low": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -4.2,
+          "log10_Si_H": -4.28
+        },
+        "C-high": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -3.4,
+          "log10_Si_H": -4.28
+        },
+        "Si-low": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.8
+        },
+        "Si-high": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.0
+        }
+      },
+      "finite_grid_low_high_are_prior_endpoints": true,
+      "native_low_high_are_0_10_dex_inside_prior_edges": true
+    }
+  },
+  "finite_grid": {
+    "states": 9261,
+    "values_per_parameter": 21,
+    "worker_count": 4,
+    "nominal_grid_spacing_dex": 0.05,
+    "reference_truth_inserted_into_axes": true,
+    "configuration_sha256": "c4a61f1562c7e6a1edd2e75235bf605588576568666c79cc126ae5eb197e16d5",
+    "grid_values_sha256": "9ea9a1a65f0bce90515b0a2a06de846777a53d59e736fb5af98b73d9b46295e0",
+    "saved_spectra_sha256": "44c35cb5f408995002cb8a0965d64ad884f0eb93ddf41cfaa8948a4d7a8cfdba",
+    "profile_thresholds_delta_chi_square": {
+      "one_parameter_1_sigma": 1.0,
+      "one_parameter_2_sigma": 4.0,
+      "two_parameter_1_sigma": 2.3,
+      "two_parameter_2_sigma": 6.18
+    },
+    "reference_state_whitened_jacobian_largest_singular_value_per_dex_approx": 109.0,
+    "interpretation": "Approximate finite-grid profile diagnostic only. The inserted truth makes some steps nonuniform. Coarse nuisance sampling can cross the narrow O/C ridge and produce spikes or disconnected C/H and Si/H segments. Do not treat grid crossings as Bayesian intervals or calibrated confidence limits.",
+    "baseline_posterior_weighted_correlation": {
+      "log10_O_H_log10_C_H": 0.9446240448280868,
+      "log10_O_H_log10_Si_H": 0.24136911729121435,
+      "log10_C_H_log10_Si_H": 0.007814709057322455
+    }
+  },
+  "posterior_quantiles": {
+    "probabilities": [
+      0.02275013194817921,
+      0.15865525393145707,
+      0.5,
+      0.8413447460685429,
+      0.9772498680518208
+    ],
+    "labels": [
+      "lower_2_sigma",
+      "lower_1_sigma",
+      "median",
+      "upper_1_sigma",
+      "upper_2_sigma"
+    ],
+    "intervals_are_weighted": true,
+    "parameter_quantile_source": "all native MultiNest posterior weights",
+    "predictive_quantile_source": "the saved 100 weighted posterior draws",
+    "quantile_convention": "linear interpolation of midpoint cumulative weights"
+  },
+  "runs": {
+    "common_sampler_settings": {
+      "sampler": "PyMultiNest/MultiNest",
+      "live_points": 100,
+      "mpi_ranks": 4,
+      "numerical_threads_per_rank": 1,
+      "dlogz": 0.5,
+      "iteration_cap": "none",
+      "same_saved_noise_for_all_runs": true,
+      "noise_sha256": "c22bf6d69bba31361251a242430a517662cba507effc5a7f76077156d0eea5d5"
+    },
+    "baseline": {
+      "source_commit": "c211dcab7e748f9581ce6ff8bdcb21506fe7d267",
+      "converged": true,
+      "native_evaluations": 937,
+      "weighted_samples": 571,
+      "effective_sample_size": 350.20158567231465,
+      "log_evidence": 449.1304452196933,
+      "log_evidence_error": 0.07478795784896418,
+      "elapsed_seconds": 35.3,
+      "peak_combined_rss_mib": 1487.97,
+      "parameters": {
+        "log10_O_H": {
+          "truth": -3.18,
+          "median": -3.1943049685560276,
+          "1_sigma": [
+            -3.2740228411631196,
+            -3.062190366532328
+          ],
+          "2_sigma": [
+            -3.3102115912337755,
+            -3.0255231272530625
+          ],
+          "truth_in_1_sigma": true,
+          "truth_in_2_sigma": true,
+          "prior_bounds": [
+            -3.8,
+            -2.8
+          ],
+          "2_sigma_prior_width_fraction": 0.284688463980713
+        },
+        "log10_C_H": {
+          "truth": -3.7,
+          "median": -3.74656667514248,
+          "1_sigma": [
+            -4.098035335837708,
+            -3.412727044390166
+          ],
+          "2_sigma": [
+            -4.270854778779212,
+            -3.3219931414033197
+          ],
+          "truth_in_1_sigma": true,
+          "truth_in_2_sigma": true,
+          "prior_bounds": [
+            -4.3,
+            -3.3
+          ],
+          "2_sigma_prior_width_fraction": 0.948861637375892
+        },
+        "log10_Si_H": {
+          "truth": -4.28,
+          "median": -4.275181752712679,
+          "1_sigma": [
+            -4.615863475410489,
+            -4.0102350756419485
+          ],
+          "2_sigma": [
+            -4.848836354613645,
+            -3.9162844808096438
+          ],
+          "truth_in_1_sigma": true,
+          "truth_in_2_sigma": true,
+          "prior_bounds": [
+            -4.9,
+            -3.9
+          ],
+          "2_sigma_prior_width_fraction": 0.9325518738040004
+        }
+      }
+    },
+    "varied_native_cases": [
+      {
+        "case": "O-low",
+        "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+        "converged": true,
+        "native_evaluations": 992,
+        "weighted_samples": 469,
+        "effective_sample_size": 330.1254758747056,
+        "log_evidence": 449.3685431395936,
+        "log_evidence_error": 0.1253174658580031,
+        "elapsed_seconds": 95.81813495792449,
+        "peak_resident_mb": 1510.78125,
+        "truth": {
+          "log10_O_H": -3.7,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.28
+        },
+        "predictive_products_sha256": "7f53c30222764099719471544a3de93bf809fac64767ee656d9a3efe02502ea8",
+        "parameters": {
+          "log10_O_H": {
+            "median": -3.652774232902528,
+            "1_sigma": [
+              -3.6986279301601996,
+              -3.602365267298086
+            ],
+            "2_sigma": [
+              -3.7411296204247093,
+              -3.56559987845132
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.17552974197338944
+          },
+          "log10_C_H": {
+            "median": -3.4983662013709123,
+            "1_sigma": [
+              -3.612685970633415,
+              -3.3751296600499794
+            ],
+            "2_sigma": [
+              -3.72063201513455,
+              -3.3152905588730532
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.405341456261497
+          },
+          "log10_Si_H": {
+            "median": -4.061771429254069,
+            "1_sigma": [
+              -4.199429648548832,
+              -3.955647907244704
+            ],
+            "2_sigma": [
+              -4.342243524089871,
+              -3.9135668832462596
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.4286766408436112
+          }
+        }
+      },
+      {
+        "case": "O-high",
+        "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+        "converged": true,
+        "native_evaluations": 918,
+        "weighted_samples": 476,
+        "effective_sample_size": 313.02416918922825,
+        "log_evidence": 449.6616717472342,
+        "log_evidence_error": 0.13869160754530696,
+        "elapsed_seconds": 35.319799915887415,
+        "peak_resident_mb": 1512.359375,
+        "truth": {
+          "log10_O_H": -2.9,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.28
+        },
+        "predictive_products_sha256": "5b1b0ca7ba6ac8a3dcedf99cf5389111457fec66278e9e50a2740966b10f9cf3",
+        "parameters": {
+          "log10_O_H": {
+            "median": -2.9010738028804814,
+            "1_sigma": [
+              -2.9626671417518864,
+              -2.844329031310014
+            ],
+            "2_sigma": [
+              -2.9904389083194425,
+              -2.809338760223415
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.18110014809602726
+          },
+          "log10_C_H": {
+            "median": -3.709784645325767,
+            "1_sigma": [
+              -4.0970973823944625,
+              -3.439746314644251
+            ],
+            "2_sigma": [
+              -4.261197805023703,
+              -3.3461355761874634
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.9150622288362396
+          },
+          "log10_Si_H": {
+            "median": -4.23592990755797,
+            "1_sigma": [
+              -4.584021117576202,
+              -4.00898209804532
+            ],
+            "2_sigma": [
+              -4.83912501099435,
+              -3.913162327632953
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.925962683361397
+          }
+        }
+      },
+      {
+        "case": "C-low",
+        "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+        "converged": true,
+        "native_evaluations": 918,
+        "weighted_samples": 530,
+        "effective_sample_size": 299.51447050739,
+        "log_evidence": 449.83306471395446,
+        "log_evidence_error": 0.0786169365318479,
+        "elapsed_seconds": 35.31013454077765,
+        "peak_resident_mb": 1522.578125,
+        "truth": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -4.2,
+          "log10_Si_H": -4.28
+        },
+        "predictive_products_sha256": "a0d8bece2c3bbbe5f50c8a818a76c3ac9a7d58bf5c495cdeac0053b3cf411b33",
+        "parameters": {
+          "log10_O_H": {
+            "median": -3.113514676787165,
+            "1_sigma": [
+              -3.1671761550358895,
+              -3.031762564612509
+            ],
+            "2_sigma": [
+              -3.2174648081729016,
+              -2.987362417731527
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.23010239044137437
+          },
+          "log10_C_H": {
+            "median": -3.7554448473981306,
+            "1_sigma": [
+              -4.07750514364402,
+              -3.501715964912414
+            ],
+            "2_sigma": [
+              -4.2599315454015025,
+              -3.360584081483203
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.8993474639182995
+          },
+          "log10_Si_H": {
+            "median": -4.256269484230259,
+            "1_sigma": [
+              -4.616899710101826,
+              -4.013634211346904
+            ],
+            "2_sigma": [
+              -4.852867900031255,
+              -3.9150217773727776
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.9378461226584767
+          }
+        }
+      },
+      {
+        "case": "C-high",
+        "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+        "converged": true,
+        "native_evaluations": 1272,
+        "weighted_samples": 657,
+        "effective_sample_size": 385.48603849403247,
+        "log_evidence": 447.75781032490147,
+        "log_evidence_error": 0.06084082662520498,
+        "elapsed_seconds": 40.35226087504998,
+        "peak_resident_mb": 1521.234375,
+        "truth": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -3.4,
+          "log10_Si_H": -4.28
+        },
+        "predictive_products_sha256": "6e22d464e102a320342fa4ccaad58095dc01dc9e1bc941d0d747514b04cd223d",
+        "parameters": {
+          "log10_O_H": {
+            "median": -3.2501853256443476,
+            "1_sigma": [
+              -3.330336214242634,
+              -3.1826996237244347
+            ],
+            "2_sigma": [
+              -3.4371593030511414,
+              -3.125162554874751
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.31199674817639034
+          },
+          "log10_C_H": {
+            "median": -3.5247594273469165,
+            "1_sigma": [
+              -3.6908142385614786,
+              -3.3968163783763177
+            ],
+            "2_sigma": [
+              -4.015611546829521,
+              -3.318507803913239
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.6971037429162821
+          },
+          "log10_Si_H": {
+            "median": -4.244520598798864,
+            "1_sigma": [
+              -4.539563761261277,
+              -4.03360502459679
+            ],
+            "2_sigma": [
+              -4.771258353972103,
+              -3.9326262140515063
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.8386321399205962
+          }
+        }
+      },
+      {
+        "case": "Si-low",
+        "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+        "converged": true,
+        "native_evaluations": 906,
+        "weighted_samples": 547,
+        "effective_sample_size": 317.36806508537205,
+        "log_evidence": 449.48165290848164,
+        "log_evidence_error": 0.09475678030981817,
+        "elapsed_seconds": 35.324806875083596,
+        "peak_resident_mb": 1512.546875,
+        "truth": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.8
+        },
+        "predictive_products_sha256": "5afccc45f66c4d60d133cdfa5649e31f7e8320993ef1661ca2d7eaa6b33277ca",
+        "parameters": {
+          "log10_O_H": {
+            "median": -3.1728163074155407,
+            "1_sigma": [
+              -3.2516662018834013,
+              -3.076752303925183
+            ],
+            "2_sigma": [
+              -3.286060626658041,
+              -3.019021667725378
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.26703895893266294
+          },
+          "log10_C_H": {
+            "median": -3.692662483148765,
+            "1_sigma": [
+              -4.048225494573865,
+              -3.447359254409418
+            ],
+            "2_sigma": [
+              -4.220985363235326,
+              -3.3255339391943908
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.8954514240409353
+          },
+          "log10_Si_H": {
+            "median": -4.529025598060124,
+            "1_sigma": [
+              -4.753607719169489,
+              -4.290937858672619
+            ],
+            "2_sigma": [
+              -4.880809655938666,
+              -4.041634756016256
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.8391748999224099
+          }
+        }
+      },
+      {
+        "case": "Si-high",
+        "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+        "converged": true,
+        "native_evaluations": 1060,
+        "weighted_samples": 593,
+        "effective_sample_size": 363.5552187516765,
+        "log_evidence": 448.618441267968,
+        "log_evidence_error": 0.12151247660806029,
+        "elapsed_seconds": 35.29468804085627,
+        "peak_resident_mb": 1504.875,
+        "truth": {
+          "log10_O_H": -3.18,
+          "log10_C_H": -3.7,
+          "log10_Si_H": -4.0
+        },
+        "predictive_products_sha256": "9f7d5eef4d789f9299cd55cdd66806618c50ddc2fbb454280d8f60c0af15dc3b",
+        "parameters": {
+          "log10_O_H": {
+            "median": -3.1783332538022897,
+            "1_sigma": [
+              -3.269833251055408,
+              -3.0923964460164455
+            ],
+            "2_sigma": [
+              -3.318689332472099,
+              -3.0478079351358796
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.27088139733621963
+          },
+          "log10_C_H": {
+            "median": -3.6179304342649723,
+            "1_sigma": [
+              -3.940405770625782,
+              -3.4126797415373735
+            ],
+            "2_sigma": [
+              -4.191309607526371,
+              -3.318186668179684
+            ],
+            "truth_in_1_sigma": true,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.873122939346687
+          },
+          "log10_Si_H": {
+            "median": -4.2022935846269105,
+            "1_sigma": [
+              -4.460425709964503,
+              -4.001812699421053
+            ],
+            "2_sigma": [
+              -4.78770313556847,
+              -3.9240469410261474
+            ],
+            "truth_in_1_sigma": false,
+            "truth_in_2_sigma": true,
+            "2_sigma_prior_width_fraction": 0.8636561945423221
+          }
+        }
+      }
+    ],
+    "verification": {
+      "all_six_native_cases_passed": true,
+      "all_18_truths_inside_2_sigma": true,
+      "truths_outside_1_sigma": 8,
+      "all_product_checks_passed": true,
+      "all_native_fits_converged": true,
+      "exact_core_quantile_update_verified": true,
+      "baseline_products_modified": false,
+      "native_parameter_quantiles_use_all_weights": true,
+      "predictive_products_use_saved_100_draws": true,
+      "verified_checks_include": [
+        "clean source revision and matching imported module",
+        "configuration, truth, prior, observation, and noise identity",
+        "opacity source hashes and FastChem input hashes",
+        "no iteration caps and 4-rank sampler settings",
+        "convergence, native samples, weights, likelihoods, and effective sample size",
+        "100 saved weighted draw indices and parameter vectors match native rows",
+        "saved spectrum, temperature, VMR, and mean-molecular-weight products recompute",
+        "full-composition VMR normalization and finite arrays"
+      ]
+    }
+  }
+}

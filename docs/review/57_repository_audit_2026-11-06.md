@@ -9,6 +9,12 @@ elemental checks converge without iteration caps. See the
 audit findings below retain their dated baseline for traceability; resolved
 register items are marked explicitly.
 
+The later [Virga local tests](60_local_virga_recovery_2026-11-06.md) and
+[six abundance variations](61_elemental_abundance_sensitivity_2026-11-06.md)
+also converged without iteration caps. Their numerical products and figure
+checks pass. The Virga transmission marginal-coverage result remains an open
+science check, as recorded in the updated register.
+
 ## Result and scope
 
 The published implementation supports the documented emission, transmission,
@@ -140,13 +146,13 @@ only in the reviewed Developer tree. Neither label means science validated.
 
 | Upgrade | Status on 6 November | Evidence and next completion check |
 | --- | --- | --- |
-| Independent FastChem elemental abundances | Published; focused fixed-temperature recovery complete with 50 and 100 live points. | [Element tutorial](../tutorials/05_fastchem_elemental_abundances.md), [follow-up](59_local_elemental_recovery_2026-11-06.md). Both runs include the truth, but C/H and Si/H remain broad. General target-science validation remains open. |
+| Independent FastChem elemental abundances | Published; baseline and six varied-composition 100-live-point local fits complete. | [Baseline](59_local_elemental_recovery_2026-11-06.md), [abundance variations](61_elemental_abundance_sensitivity_2026-11-06.md). All 18 new parameter truths lie inside 2-sigma intervals. C/H and Si/H usually remain broad; the low-O/H regime gives narrower, correlated intervals. The fixed-temperature, limited-opacity model and shared noise do not establish general target-science validation. |
 | Configured H-minus and exact spectral observations | Published, implemented and tested (`19ed2d4`). | [H-minus tutorial](../tutorials/06_configured_hminus.md). Check the intended hot-atmosphere case and H-, H, electron profiles; retain physical samples and declared bin edges. |
 | Native-opacity preparation memory bound | Published (`17535f0`). | One native KTA provider is released before the next species; its unused full-size log-opacity cache is disabled. Full-table conversion can still allocate large arrays. The 4 November Dirac task reports successful preparation and deployment of this commit. Measure peak memory and numerical equality on the intended R=15000 inputs. |
 | Pressure quench and optional CH4 gradient | Published; analytic convention tested. CH4 gradient is experimental (`5767ec3`). | [Quench contract](../validation/pressure_quench.md). Independent profile parity and a declared disequilibrium science case remain open. A separate solar noise ensemble reported 93/100 and 96/100 C/O interval coverage; that does not validate all quench regimes. |
-| Virga EddySed clouds and fitted fsed/Kzz | Published, experimental (`2ed6666`, `8af6f2f`). Vapor mass-ratio correction is published (`1493f56`). | [Virga review](56_virga_cloud_experiment.md). Direct Virga parity and small forward checks exist. FastChem condensates are diagnostics, not a coupled cloud-abundance model. Complete a converged fitted P–T/cloud recovery before a new GCM cloud retrieval. |
+| Virga EddySed clouds and fitted fsed/Kzz | Published, experimental; real local emission and transmission sampler/product checks complete at `f8318de`. | [Local recovery](60_local_virga_recovery_2026-11-06.md). Both fits converged with 100 live points and four CPUs. Emission covers all four truths; transmission misses three marginal 2-sigma intervals despite exact truth/likelihood parity and small likelihood tension. Further posterior validation is required before the GCM application. FastChem condensates remain diagnostics, not coupled cloud chemistry. |
 | High-stream scattering comparison | Bounded synthetic check complete (`7fc0925`). | Four five-layer SH4/PythonicDISORT cases were compared through 64 streams. This does not complete real Mie-cloud or posterior validation. Retain phase-function, layer, and angular convergence gates. |
-| Cloud injection recovery | Pilot incomplete; replacement prepared. | Last record, 4 November: pilot hit a 512-iteration cap and had effective sample size one. Replacement uses 12 Redwood CPUs, 128 live points, no iteration cap; it was not submitted. Finish MPI checks, then run it through `addqueue` and assess recovery. |
+| Cloud injection recovery | Two local 0.6–5 micron R=100 self-injections converged without iteration caps; transmission coverage remains open. | [Measured results](60_local_virga_recovery_2026-11-06.md). Local model/product checks pass. The older capped cluster pilot and the prepared 12-CPU/128-live-point replacement are unchanged; no new cluster submission was made. Resolve the local coverage question before extending the GCM fit. |
 | Retrieval failure handling | Serial published (`54ee578`); MPI extension local and unfinished. | Native non-root failure, normal completion, and checkpoint-resume gates are required. See finding 2. |
 | Posterior spectrum and cloud products | Cloud profiles published (`ea361c9`); median-curve refinements local. | Use the same 100 weighted draws for all products. Finish saved-array, interval, curve-label, statistic-source, and figure-style checks. |
 | Joint emission/transmission composition | Published experimental Python API; checkpoint identity defect resolved. | Likelihood settings, supported covariance state, prepared observations, and parameter bindings are retained in manifests. Standard YAML still chooses one geometry. Physical joint recovery and posterior integration remain open. |
@@ -168,9 +174,9 @@ their recorded code versions unchanged.
 | Done | Correct the Virga emission test fixtures. | All 25 Virga config tests and the full suite pass without weakening schema checks. |
 | P1 | Finish and publish MPI failure handling as a separate code change. | Local checks pass; the pulled commit passes a queued non-root-rank failure test and leaves no orphan workers. |
 | Done | Correct joint-geometry likelihood identity. | Changed wrapped settings, covariance, type, velocity roles, or prepared data block resume. Old wrapper-only joint manifests are rejected. |
-| P1 | Complete the prepared P–T/cloud injection recovery. | Use 12 Redwood CPUs and no iteration cap. Save convergence, posterior recovery, prior checks, and timings. Do this before the new GCM cloud application. |
+| P1 | Validate transmission P–T/cloud marginal coverage. | The local 100-live-point fit converged and exact model/likelihood parity passes, but three truths miss 2-sigma intervals. Check larger live-point counts, joint posterior geometry, and independent noise or noiseless injections before the GCM application. Keep all runs uncapped and preserve the completed results. |
 | P1 | Check the existing Dirac WASP-178b run after SSH is restored. | Record job state, imported Git revision, opacity identity, completion status, and posterior diagnostics. |
-| P2 | Finish posterior median products and figure style. | Saved curves match saved quantiles/draws; labels identify median and diagnostic sources; visual checks pass. |
+| Done for these local tests | Verify posterior median products and figure style. | Both Virga runs and six abundance variants use 100 common weighted draws. Saved quantiles and row identities pass; PNG/PDF figures use the WASP-15b style and 1-sigma/2-sigma labels. General joint-profile collection remains a separate gate. |
 | P2 | Complete chemistry/H-minus science checks beyond the local elemental case. | The fixed-1800 K elemental check passes. A nonzero H-minus case and target-specific recovery remain required. |
 | P2 | Complete physical and output validation for the published joint prototype. | One shared-parameter emission/transmission recovery and complete posterior/result products pass. The binding and checkpoint tests are already complete. |
 | P2 | Measure whole-likelihood CPU and GPU costs before further speed work. | Use fixed inputs and proposal vectors; record setup, compilation, warm times, memory, transfers, likelihood error, and full sampler wall time. Follow the [BeAR experiment plan](58_bear_2026_performance_audit.md). |

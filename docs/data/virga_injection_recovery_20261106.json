@@ -1,0 +1,486 @@
+{
+  "schema_version": 1,
+  "record_date": "2026-11-06",
+  "status": {
+    "pipeline_functionality": "passed_for_two_separate_local_synthetic_self_injections",
+    "parameter_coverage": "open",
+    "general_validated_recovery_claim": false,
+    "summary": "Emission contains all four truths inside both 1-sigma and 2-sigma intervals. Transmission misses three truths at the 2-sigma level. The transmission cause remains unresolved."
+  },
+  "scope": {
+    "cases": ["thermal_emission", "transmission"],
+    "relationship": "separate_self_injections_with_independent_noise_seeds",
+    "physical_observations": false,
+    "joint_emission_transmission_retrieval": false,
+    "cloud_physics_validation": false
+  },
+  "source": {
+    "robert_distribution": "robert-exoplanets",
+    "robert_version": "0.3.0",
+    "git_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+    "worktree_clean_at_run_time": true,
+    "imported_module": "/private/tmp/robert-local-upgrades-20261106/src/robert_exoplanets/__init__.py",
+    "pyproject_toml_sha256": "519588529234722e7e1fd874cb1bad42e33a8654a2ac03113e61d063e8f11a59",
+    "package_init_sha256": "fe8d8795b9d74cf33c5252a595a388d848e66772b96196edbecbd883ba4581f6",
+    "python": "3.12",
+    "virga_distribution": "virga-exo",
+    "virga_version": "2.0.2",
+    "miepython_version": "3.3.1",
+    "conda_environment": "robert-exoplanets"
+  },
+  "software_checks": {
+    "standard_tests_passed": 77,
+    "real_virga_integration_checks_passed": 4,
+    "independent_saved_product_verifier": "passed",
+    "visual_review": "all eight PNGs and both final parameter PDFs visually checked"
+  },
+  "protocol": {
+    "planet": {
+      "name": "Synthetic hot Jupiter b",
+      "mass_kg": 1.1502935e27,
+      "radius_m": 80000000.0,
+      "gravity_policy": "constant scalar for gas optical depth and cloud calculations",
+      "gravity_m_s2": 11.995943604765625
+    },
+    "star": {
+      "name": "Synthetic K dwarf",
+      "radius_m": 600000000.0,
+      "spectrum_model": "blackbody",
+      "effective_temperature_k": 5000.0
+    },
+    "atmosphere": {
+      "pressure_top_bar": 1.0e-5,
+      "pressure_bottom_bar": 100.0,
+      "layers": 48,
+      "temperature_profile": "non-isothermal spline with two fitted controls",
+      "temperature_controls": {
+        "T_upper": {
+          "knot_pressure_bar": 1.0e-6,
+          "truth_k": 850.0,
+          "uniform_prior_k": [700.0, 1200.0]
+        },
+        "T_deep": {
+          "knot_pressure_bar": 1000.0,
+          "truth_k": 1800.0,
+          "uniform_prior_k": [1500.0, 2200.0]
+        }
+      },
+      "fixed_gas_vmr": {
+        "H2O": 0.001,
+        "CO": 0.001,
+        "CO2": 1.0e-5,
+        "CH4": 1.0e-5,
+        "NH3": 1.0e-6,
+        "HCN": 1.0e-7
+      },
+      "background_species": {
+        "H2": 0.8547,
+        "He": 0.1453
+      },
+      "full_gas_species": ["H2O", "CO", "CO2", "CH4", "NH3", "HCN", "H2", "He"],
+      "uniform_mean_molecular_weight_amu": 2.346538611816891
+    },
+    "cloud": {
+      "model": "Virga Ackerman-Marley eddy sedimentation",
+      "condensible": "MgSiO3",
+      "gas_mass_mixing_ratio_g_g": 0.00275,
+      "metallicity_solar": 1.0,
+      "geometric_particle_size_width": 2.0,
+      "supersaturation": 0.0,
+      "fitted_controls": {
+        "cloud_fsed": {
+          "truth": 1.5,
+          "uniform_prior": [0.5, 4.0]
+        },
+        "cloud_log10_kzz": {
+          "truth": 9.0,
+          "uniform_prior": [8.0, 10.0],
+          "unit": "log10(cm2/s)"
+        }
+      },
+      "do_virtual": false,
+      "bottom_grid_warning": "Virga did not add a sublayer when the cloud deck reached the 100 bar grid boundary",
+      "emission_multiple_scattering": "SH4 with Henyey-Greenstein closure from Virga asymmetry",
+      "transmission_cloud_treatment": "extinction only; no multiple-scattering transit solver"
+    },
+    "synthetic_observation": {
+      "bins": 212,
+      "bin_edges": 213,
+      "edge_range_micron": [0.6, 5.0],
+      "grid_definition": "geometric edges uniformly spaced in log wavelength; each center is the geometric mean of its adjacent edges",
+      "target_center_over_bin_width_resolving_power": 99.98715387501277,
+      "noise_model": "independent Gaussian",
+      "uncertainty_ppm": 20.0,
+      "noise_seeds": {
+        "emission": 20261106,
+        "transmission": 20261107
+      }
+    },
+    "sampler": {
+      "name": "MultiNest",
+      "live_points": 100,
+      "mpi_processes": 4,
+      "threads_per_process": 1,
+      "dlogz": 0.5,
+      "max_iter": 0,
+      "iteration_cap": false,
+      "wall_time_kill_limit": false,
+      "rss_kill_limit": false
+    },
+    "posterior_products": {
+      "common_weighted_draws_per_geometry": 100,
+      "draw_seed": 20261108,
+      "same_draw_rows_across_spectrum_and_profile_products": true,
+      "parameter_intervals_use_all_native_weighted_samples": true,
+      "central_quantile_probabilities": [
+        0.02275013194817921,
+        0.15865525393145707,
+        0.5,
+        0.8413447460685429,
+        0.9772498680518208
+      ],
+      "radius_summaries_condition": "positive condensate at the same species and pressure layer"
+    }
+  },
+  "inputs": {
+    "molecular_opacity": {
+      "format": "ExoMol NEMESIS KTA",
+      "upstream_source_resolution_label": "R1000",
+      "current_table_label": "R100",
+      "current_table_effective_resolution": 99.9478706053842,
+      "retained_g_ordinates": 8,
+      "upstream_source_wavelength_range_micron": [0.3, 50.0],
+      "current_table_nominal_wavelength_range_micron": [0.3, 15.0],
+      "current_table_header_wavelength_range_micron": [0.30150076746940613, 14.924962043762207],
+      "current_table_wavelength_points": 391,
+      "current_table_headers_checked_for_all_species": true,
+      "tables": {
+        "CH4": {
+          "path": "src/robert_exoplanets/data/opacities/R100/CH4_R100.kta",
+          "bytes": 7434000,
+          "sha256": "6ce90a7be60f490cca6df4e6b70a79886a0ff6a1b06f6b5ce8ecccfee491c592",
+          "upstream_R1000_source_sha256": "6c83b1d7b7cc93007fa90a6c8bdc673638dc7cfabae343219396cdf2e879778d"
+        },
+        "CO": {
+          "path": "src/robert_exoplanets/data/opacities/R100/CO_R100.kta",
+          "bytes": 7434000,
+          "sha256": "c2e05d960f70d01db35bb29938782acb6b00b6b64828d0f2a0253ac31e8b85d5",
+          "upstream_R1000_source_sha256": "f87d35061fa21a11c68e84a6dc2276f3d89e31f9321dc97b47b2c288766894d9"
+        },
+        "CO2": {
+          "path": "src/robert_exoplanets/data/opacities/R100/CO2_R100.kta",
+          "bytes": 7434000,
+          "sha256": "a4266570b030cb838e6538110ef49b571fe085344bbfeecbeef25b3335ebc320",
+          "upstream_R1000_source_sha256": "b4bc9f544115dd490ef545e03693cc758cd59195c853503920efef98287879a7"
+        },
+        "H2O": {
+          "path": "src/robert_exoplanets/data/opacities/R100/H2O_R100.kta",
+          "bytes": 7434000,
+          "sha256": "06c3feff50e905c566a4315b1d6b0c3a7bfdc315a3c5b1b21fa46f92a29b3333",
+          "upstream_R1000_source_sha256": "71c38634b391141177ae2a029f2fac00d78fd172fe52f4f10da361e975971d9f"
+        },
+        "HCN": {
+          "path": "src/robert_exoplanets/data/opacities/R100/HCN_R100.kta",
+          "bytes": 7434000,
+          "sha256": "6bbf6c7afc00bb911c32fb2c5aa03f59726205db00c2261ba608075fa55a72c7",
+          "upstream_R1000_source_sha256": "203c6b802d07becda6cee9328ab6abb4ad6b8cafed9d27f3014b06e1604f6b54"
+        },
+        "NH3": {
+          "path": "src/robert_exoplanets/data/opacities/R100/NH3_R100.kta",
+          "bytes": 7434000,
+          "sha256": "436c3e8e43efce46b9ce4a22a26e47554a34f2aa852cffbe33e75c0d0625db4b",
+          "upstream_R1000_source_sha256": "6fcb97aee63318df3c9c3ad7e2c646d5a5b8ba8284c66259b01b87caa8e911ac"
+        }
+      }
+    },
+    "mie_optical_constants": {
+      "material": "glassy enstatite MgSiO3",
+      "reference": "Dorschner et al. (1995)",
+      "native_rows": 109,
+      "native_wavelength_range_micron": [0.2, 500.0],
+      "repository_path": "data/optical_constants/exo_skryer/MgSiO3.txt",
+      "sha256": "0faef18dbd1ae853ef25be2f2766f499f9cb37d0732e0f401ca86e999c30c731"
+    },
+    "virga_refractive_index_table": {
+      "external_relative_path": "shared-inputs/refractive_index/MgSiO3.refrind",
+      "wavelength_count": 574,
+      "wavelength_range_micron": [0.4, 7.0],
+      "effective_resolution": 200.2,
+      "source_points_in_range": 35,
+      "interpolation": "linear in wavelength for n and k; no extrapolation",
+      "sha256": "f973d91a74f32873e4c2aad06bfe80a7fbe61c346e243be9706195c75d3798d3"
+    },
+    "virga_mie_table": {
+      "external_relative_path": "shared-inputs/mie/MgSiO3.mieff",
+      "bytes": 2599013,
+      "sha256": "f33137b611a6453f4a547e40cde7babcda9a3b50d37339fb80cbb7eed11221d9",
+      "generated_by": "virga-exo 2.0.2 and MiePython 3.3.1",
+      "solver": "miepython.efficiencies_mx",
+      "particle_shape": "spheres",
+      "wavelength_count": 574,
+      "wavelength_range_micron": [0.4, 7.0],
+      "radius_center_count": 60,
+      "radius_center_range_micron": [0.0001, 542.39131],
+      "sub_bin_averages_per_radius": 6,
+      "raw_efficiency_rows": 34440,
+      "readback_passed": true,
+      "Qext_Qscat_cosQ_finite": true,
+      "Qext_Qscat_nonnegative": true,
+      "Qabs_nonnegative_relative_tolerance": 2.0e-12,
+      "g_finite_and_within_minus1_plus1": true,
+      "g_range": [1.5922659758118677e-9, 0.9698739907004161]
+    }
+  },
+  "runs": {
+    "emission": {
+      "run_name": "virga-emission-r100-100live-20261106",
+      "noise_seed": 20261106,
+      "noise_sha256": "cfe028c1a156da34d23bf19781cfcc592f27affbd5f8a0a9db6adce5984f2f1e",
+      "configuration_sha256": "29a50f7144edb19c5d83ce547ace5ffd8214ae43dca55ac53a01d6bb8e6df976",
+      "input_config_sha256": "29a50f7144edb19c5d83ce547ace5ffd8214ae43dca55ac53a01d6bb8e6df976",
+      "resolved_config_sha256": "1a02638986ec6d7ddb9223bf6709ef5f2214853d70a82d95ac94e0d54ac846e8",
+      "configured_science_hash": "2071e740d8ff82c60b9a3a685cb9d01c6284aa252b5ffcd21e6490e6c1eed757",
+      "sampler_seed": 20266106,
+      "effective_multinest_seed": 21593,
+      "native_result": {
+        "converged": true,
+        "live_points": 100,
+        "mpi_processes": 4,
+        "max_iter": 0,
+        "dlogz": 0.5,
+        "weighted_rows": 831,
+        "effective_sample_size": 432.31329325937287,
+        "likelihood_evaluations": 1874,
+        "callback_evaluations": 1953,
+        "native_elapsed_seconds": 645.436931,
+        "timed_wrapper_wall_seconds": 659.90
+      },
+      "parameter_intervals_full_native_weighted_samples": {
+        "T_upper": {
+          "truth": 850.0,
+          "median": 839.5215903222569,
+          "one_sigma": [825.0992259646235, 851.0800731965708],
+          "two_sigma": [814.8889382308374, 862.4804520909796],
+          "truth_in_one_sigma": true,
+          "truth_in_two_sigma": true
+        },
+        "T_deep": {
+          "truth": 1800.0,
+          "median": 1809.1153070022624,
+          "one_sigma": [1792.9963826569995, 1827.306178414631],
+          "two_sigma": [1779.866353281424, 1838.5168210629533],
+          "truth_in_one_sigma": true,
+          "truth_in_two_sigma": true
+        },
+        "cloud_fsed": {
+          "truth": 1.5,
+          "median": 2.031718977401835,
+          "one_sigma": [1.2683242379060424, 3.1486991711434063],
+          "two_sigma": [0.9487174007544323, 3.7468896011347272],
+          "truth_in_one_sigma": true,
+          "truth_in_two_sigma": true
+        },
+        "cloud_log10_kzz": {
+          "truth": 9.0,
+          "median": 8.917241876140011,
+          "one_sigma": [8.353586200765426, 9.621468253339254],
+          "two_sigma": [8.088090802564217, 9.922924208518484],
+          "truth_in_one_sigma": true,
+          "truth_in_two_sigma": true
+        }
+      },
+      "posterior_products": {
+        "common_draw_count": 100,
+        "analysis_seconds": 368.6902700001374,
+        "cloud_diagnostic_seconds_per_draw": 2.2702682409388943,
+        "cloud_presence_fraction": 1.0,
+        "radius_support_fraction_all_species_layers": 1.0,
+        "cloud_grid_matches_observation_grid": true,
+        "median_spectral_prediction_chi_square": 194.76330565889313,
+        "degrees_of_freedom": 208,
+        "reduced_chi_square": 0.9363620464369862,
+        "product_verification_passed": true
+      },
+      "product_sha256": {
+        "injection_arrays_npz": "52ac5552cbf512f10182049869bdc941be9fd236b496b8285e13c78976b3936f",
+        "synthetic_observation_npz": "f451ad70daa085e5081b1162873880730ae9c6b1e4ddf1a6f2dbc3dafad2f0eb",
+        "multinest_result_json": "7bbe66cf73e2384f23614665c0fff930031b6c4fc7bcd224bb72f0963d4a6537",
+        "multinest_result_arrays_npz": "74cb6679b458861da2734582334f90281631820cb4ffc00cc600e1091b90068e",
+        "posterior_common_100_draws_npz": "4447754c9af0cab7bab29c4ccf083d3573c31849b4630ccbd40c348a2d9a2e9f",
+        "posterior_recovery_json": "7a429794df488899b0d43860995a8dcf46dc7827db03ba66d4fbcf68d562ab5f",
+        "posterior_intervals_json": "e79dc5c2826846dc3b1463129aeccbfc17ac396c7ee3f09ca0256b25410453a1"
+      }
+    },
+    "transmission": {
+      "run_name": "virga-transmission-r100-100live-20261106",
+      "noise_seed": 20261107,
+      "noise_sha256": "4a06389fdadf195b0454a30ffdcaa9ded3e06502feca7ad8743d544b41d13b1b",
+      "configuration_sha256": "f7af6dad6569b0e3f0a7d1979ed87d58792c95320e918b31c7c42ed43e576184",
+      "input_config_sha256": "f7af6dad6569b0e3f0a7d1979ed87d58792c95320e918b31c7c42ed43e576184",
+      "resolved_config_sha256": "70ae9904728a4d659e41024c11aa6dfaad8cd9fc22de0b7069582844d36e86cc",
+      "configured_science_hash": "8931faee9c4cef995297ea1325f13fb94cc5003bdf5de55c96f58be97da4401b",
+      "sampler_seed": 20266107,
+      "effective_multinest_seed": 21594,
+      "native_result": {
+        "converged": true,
+        "live_points": 100,
+        "mpi_processes": 4,
+        "max_iter": 0,
+        "dlogz": 0.5,
+        "weighted_rows": 900,
+        "effective_sample_size": 400.4940712690106,
+        "likelihood_evaluations": 3182,
+        "callback_evaluations": 3285,
+        "native_elapsed_seconds": 1012.017633,
+        "timed_wrapper_wall_seconds": 1025.77
+      },
+      "parameter_intervals_full_native_weighted_samples": {
+        "T_upper": {
+          "truth": 850.0,
+          "median": 795.995466278575,
+          "one_sigma": [765.3093261148111, 826.6879086527905],
+          "two_sigma": [739.2376281857921, 846.1151594068164],
+          "truth_in_one_sigma": false,
+          "truth_in_two_sigma": false
+        },
+        "T_deep": {
+          "truth": 1800.0,
+          "median": 1888.018055460487,
+          "one_sigma": [1844.504956143554, 1932.7200781590384],
+          "two_sigma": [1814.195201144591, 1965.685709303253],
+          "truth_in_one_sigma": false,
+          "truth_in_two_sigma": false
+        },
+        "cloud_fsed": {
+          "truth": 1.5,
+          "median": 2.8409652132473404,
+          "one_sigma": [2.163396572711982, 3.5662367548050953],
+          "two_sigma": [1.6686941998463687, 3.9414998740687563],
+          "truth_in_one_sigma": false,
+          "truth_in_two_sigma": false
+        },
+        "cloud_log10_kzz": {
+          "truth": 9.0,
+          "median": 8.592745220523264,
+          "one_sigma": [8.42693242091879, 8.789591605935756],
+          "two_sigma": [8.340261001722492, 9.006896028182007],
+          "truth_in_one_sigma": false,
+          "truth_in_two_sigma": true
+        }
+      },
+      "posterior_products": {
+        "common_draw_count": 100,
+        "analysis_seconds": 361.3076325408183,
+        "cloud_diagnostic_seconds_per_draw": 2.305878279171884,
+        "cloud_presence_fraction": 1.0,
+        "radius_support_fraction_all_species_layers": 1.0,
+        "cloud_grid_matches_observation_grid": true,
+        "median_spectral_prediction_chi_square": 216.8710270603616,
+        "degrees_of_freedom": 208,
+        "reduced_chi_square": 1.0426491685594308,
+        "product_verification_passed": true
+      },
+      "product_sha256": {
+        "injection_arrays_npz": "b5a3e85cb761f159d767cad0a41bf2b732567dbf98809a5dc795d7f2441247c5",
+        "synthetic_observation_npz": "3f6a5823b9dfae030cf52315614eb791b10854fedd0700fb1294b65d56d5d912",
+        "multinest_result_json": "c50da2104cf95674cdce3687679783ebc8c1fb3bd1882fc6d4af5ac7d8213a8d",
+        "multinest_result_arrays_npz": "2e050f5b7f870188fd433ecc0aa7c170d23bfa023ad81e6076348e29def8a978",
+        "posterior_common_100_draws_npz": "f7f4005618d538e895f27caf2c9cc85d7e1ce508bd8ed75f18b56e64bcc831f2",
+        "posterior_recovery_json": "4e3cabd365e99e41722b5bb597cd1440f60f69aa8f58f05e3874f20dbd1b6a60",
+        "posterior_intervals_json": "b788a47bbe6fb21c354393a3b392b75f668191babeca9a6a6320325c627d6e12"
+      }
+    }
+  },
+  "transmission_injection_diagnostic": {
+    "forward_calls": 3,
+    "truth_spectrum_matches_saved_noiseless_truth_bitwise": true,
+    "centers_edges_flux_uncertainty_match_saved_arrays": true,
+    "max_data_minus_truth_noise_difference": 1.7160887511372125e-18,
+    "manual_and_problem_gaussian_loglike_match_at_all_points": true,
+    "problem_vs_manual_loglike_absolute_delta": 0.0,
+    "truth_chi_square": 219.21914498114722,
+    "native_maximum_likelihood_chi_square": 216.73822483644273,
+    "marginal_parameter_median_chi_square": 220.91360203332437,
+    "truth_minus_maximum_likelihood_delta_chi_square": 2.4809201447044984,
+    "degrees_of_freedom": 208,
+    "configuration_sha256": "f7af6dad6569b0e3f0a7d1979ed87d58792c95320e918b31c7c42ed43e576184",
+    "configured_science_hash": "8931faee9c4cef995297ea1325f13fb94cc5003bdf5de55c96f58be97da4401b"
+  },
+  "cloud_sensitivity_at_truth": {
+    "cloud_free_max_abs_delta_ppm": {
+      "emission": 27.117952459593514,
+      "transmission": 581.5621234733538
+    },
+    "fsed_1_5_to_2_5_max_abs_delta_ppm": {
+      "emission": 18.951407193451608,
+      "transmission": 221.85993238088565
+    },
+    "log10_kzz_plus_0_5_max_abs_delta_ppm": {
+      "emission": 15.962323397152382,
+      "transmission": 184.09319854852808
+    },
+    "prior_volume_for_negligible_clouds_measured": false
+  },
+  "performance_followups": [
+    {
+      "priority": 1,
+      "proposal": "Return and reuse one typed Virga evaluation for RT optical properties and physical cloud profiles within a posterior draw.",
+      "evidence": "src/robert_exoplanets/forward/virga_cloud.py:374-420 calls _run_virga in evaluate and compute_cloud_profiles; the analysis path calculates the spectrum and cloud diagnostics separately.",
+      "correctness_and_timing_checks": [
+        "Compare optical arrays, physical profiles, metadata, spectra, and likelihoods with the current path.",
+        "Instrument virga.compute and confirm one call per posterior draw.",
+        "Measure repeated warm-draw time before and after; claim no speedup until measured.",
+        "Reuse only within the exact same atmosphere and parameter evaluation; do not cache complete outputs across proposals without a complete identity."
+      ]
+    },
+    {
+      "priority": 2,
+      "proposal": "Add a Virga-supported immutable decoded-Mie-table input or process-local cache.",
+      "evidence": "virga-exo 2.0.2 virga/justdoit.py:87-121 calls get_mie for each compute; get_mie reads and parses the .mieff file at justdoit.py:1830-1890.",
+      "correctness_and_timing_checks": [
+        "Key by file-content digest and all table options.",
+        "Check parity with uncached readback and model outputs.",
+        "Replace the file and confirm invalidation; confirm cached arrays cannot be mutated.",
+        "Confirm separate MPI worker processes use independent safe cache state.",
+        "Keep proposal-dependent sedimentation and radius-distribution optics uncached; measure before claiming a speedup."
+      ]
+    },
+    {
+      "priority": 3,
+      "proposal": "Cache fixed wavelength interpolation setup for repeated cloud spectral mappings.",
+      "evidence": "src/robert_exoplanets/forward/virga_cloud.py:850-858 maps three arrays; lines 1070-1098 repeat sorting, logarithms, and numpy.interp across layers.",
+      "correctness_and_timing_checks": [
+        "Key by exact source and target grids, units, and interpolation policy.",
+        "Compare with numpy.interp for forward and reversed source order and exact endpoints.",
+        "Compare final spectra and likelihoods; measure warm repeated calls before claiming a speedup."
+      ]
+    }
+  ],
+  "measured_cloud_adapter_time": {
+    "truth_preparation_cloud_optics_call_seconds": {
+      "emission": 1.0746,
+      "transmission": 1.0694
+    },
+    "truth_preparation_cloud_profile_call_seconds": {
+      "emission": 1.0767,
+      "transmission": 1.0685
+    },
+    "posterior_combined_cloud_diagnostic_seconds_per_draw": {
+      "emission": 2.2702682409388943,
+      "transmission": 2.305878279171884
+    },
+    "timing_scope": "includes setup, Virga, and mapping; does not isolate Mie parsing"
+  },
+  "next_validation_gates": [
+    "Run independent transmission noise realizations with fixed priors and a declared convergence rule; report empirical 1-sigma and 2-sigma coverage.",
+    "Measure how much prior mass produces negligible or absent condensate before making cloud-parameter recovery claims.",
+    "Use an independent cloud-base or high-stream cloud-scattering reference before making broader cloud-physics validation claims."
+  ],
+  "external_artifact_root": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-local-recovery-20261106",
+  "references": {
+    "review_report": "../review/60_local_virga_recovery_2026-11-06.md",
+    "prior_fixes": "../review/59_local_elemental_recovery_2026-11-06.md",
+    "elemental_sensitivity": "../review/61_elemental_abundance_sensitivity_2026-11-06.md",
+    "virga_scope": "../review/56_virga_cloud_experiment.md"
+  }
+}

@@ -154,3 +154,13 @@ and ROBERT's general posterior plot legends use the same notation.
 All Python checks and calculations used the `robert-exoplanets` environment.
 The recovery used four Open MPI 5.0.10 ranks with one numerical thread each.
 No Glamdring connection or job submission was used.
+
+## Follow-up local tests
+
+The [Virga emission and transmission tests](60_local_virga_recovery_2026-11-06.md)
+and [elemental abundance variations](61_elemental_abundance_sensitivity_2026-11-06.md)
+extend this baseline. All eight new fits converged with 100 live points,
+four CPUs, and no iteration cap. The Virga transmission marginal-coverage
+question remains open; the new report records the exact truth/likelihood
+checks and the limits of that result. The original baseline data and products
+remain unchanged.
