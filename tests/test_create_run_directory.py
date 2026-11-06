@@ -14,6 +14,7 @@ from robert_exoplanets.io.task_config import load_task_config
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_CONFIG = ROOT / "configurations" / "emission.yaml"
 OE_CONFIG = ROOT / "configurations" / "optimal_estimation.yaml"
+TWO_REGION_CONFIG = ROOT / "configurations" / "two_region_emission.yaml"
 MULTINEST_CONFIGS = (
     ROOT / "configurations" / "emission.yaml",
     ROOT / "configurations" / "two_region_emission.yaml",
@@ -151,6 +152,50 @@ def test_create_run_directory_uses_top_level_paths_and_local_writable_defaults(
     assert config.outputs.directory == run_directory / "outputs"
     assert config.opacity.cache_directory == run_directory / "opacity_cache"
     assert config.runtime.scratch_directory == run_directory / "scratch"
+
+
+def test_create_run_directory_preserves_independent_fastchem_elements(
+    tmp_path: Path,
+) -> None:
+    raw = load_task_config(TWO_REGION_CONFIG).model_dump(mode="json")
+    raw["run"]["name"] = "independent-fastchem-elements"
+    chemistry = raw["atmosphere"]["chemistry"]
+    chemistry["metallicity_parameter"] = None
+    chemistry["carbon_to_oxygen_parameter"] = None
+    chemistry["element_log10_number_ratio_parameters"] = {"Si": "log10_Si_H"}
+    raw["parameters"] = [
+        parameter
+        for parameter in raw["parameters"]
+        if parameter["name"] not in {"metallicity", "CtoO"}
+    ]
+    raw["parameters"].append(
+        {
+            "name": "log10_Si_H",
+            "unit": "dex",
+            "prior": {"type": "uniform", "lower": -5.0, "upper": -4.0},
+        }
+    )
+    raw["disk_emission"]["cold_region"]["atmosphere"]["chemistry"] = dict(
+        chemistry
+    )
+    source = tmp_path / "independent-elements.yaml"
+    source.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+    run_directory = create_run_directory(
+        project_dir=tmp_path / "runs",
+        source_config=source,
+    )
+    generated = load_task_config(run_directory / "configuration.yaml")
+    generated_top_level = generated.atmosphere.chemistry
+    generated_cold_region = generated.disk_emission.cold_region.atmosphere.chemistry
+
+    for generated_chemistry in (generated_top_level, generated_cold_region):
+        assert generated_chemistry.model == "fastchem_equilibrium"
+        assert generated_chemistry.metallicity_parameter is None
+        assert generated_chemistry.carbon_to_oxygen_parameter is None
+        assert generated_chemistry.element_log10_number_ratio_parameters == {
+            "Si": "log10_Si_H"
+        }
 
 
 def test_create_run_directory_rejects_a_destination_inside_the_checkout(

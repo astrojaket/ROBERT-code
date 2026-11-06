@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import platform
 import subprocess
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -22,6 +22,27 @@ from .protocols import SamplerRetrievalProblem
 
 RUN_MANIFEST_SCHEMA_VERSION = "1.0"
 RUN_MANIFEST_FILENAME = "manifest.json"
+
+
+@runtime_checkable
+class _LikelihoodManifestWrapper(Protocol):
+    """Explicit manifest contract for a likelihood adapter or wrapper.
+
+    Implementations expose only the wrapped likelihood and the parameter
+    mapping that changes its scientific meaning. The manifest layer records
+    the wrapped likelihood through its known-field allowlist; it does not
+    inspect arbitrary wrapper state.
+    """
+
+    @property
+    def manifest_wrapped_likelihood(self) -> object: ...
+
+    @property
+    def manifest_parameter_bindings(self) -> Mapping[str, str]: ...
+
+    @property
+    def manifest_likelihood_parameters(self) -> tuple[str, ...]: ...
+
 
 # These values mirror the public ``run_multinest`` defaults.  Keeping them in
 # the manifest layer makes an omitted value and an explicit default produce the
@@ -439,10 +460,13 @@ def _observation_identity(problem: SamplerRetrievalProblem) -> dict[str, object]
             if explicit_observation is not None:
                 data_identity = _observation_data_identity(explicit_observation)
             else:
+                component_likelihood = getattr(component, "likelihood", None)
+                if isinstance(component_likelihood, _LikelihoodManifestWrapper):
+                    component_likelihood = (
+                        component_likelihood.manifest_wrapped_likelihood
+                    )
                 embedded_observation = getattr(
-                    getattr(component, "likelihood", None),
-                    "observation",
-                    None,
+                    component_likelihood, "observation", None
                 )
                 data_identity = _observation_data_identity(embedded_observation)
             component_records.append(
@@ -615,6 +639,29 @@ def _qualified_type(value: object) -> str:
 def _single_likelihood_record(likelihood: object) -> dict[str, object]:
     """Return compact, JSON-safe likelihood configuration metadata."""
 
+    if isinstance(likelihood, _LikelihoodManifestWrapper):
+        wrapped_likelihood = likelihood.manifest_wrapped_likelihood
+        wrapped_record = _single_likelihood_record(wrapped_likelihood)
+        wrapped_record["qualified_type"] = _qualified_type(wrapped_likelihood)
+        if hasattr(wrapped_likelihood, "invalid_model_loglike"):
+            wrapped_record["invalid_model_loglike"] = getattr(
+                wrapped_likelihood, "invalid_model_loglike"
+            )
+        wrapped_record.update(_wrapped_likelihood_identity(wrapped_likelihood))
+        return _json_mapping(
+            {
+                "type": type(likelihood).__name__,
+                "name": str(getattr(likelihood, "name", type(likelihood).__name__)),
+                "wrapped_likelihood": wrapped_record,
+                "parameter_bindings": dict(
+                    likelihood.manifest_parameter_bindings
+                ),
+                "likelihood_parameters": list(
+                    likelihood.manifest_likelihood_parameters
+                ),
+            }
+        )
+
     record: dict[str, object] = {
         "type": type(likelihood).__name__,
         "name": str(getattr(likelihood, "name", type(likelihood).__name__)),
@@ -649,6 +696,65 @@ def _single_likelihood_record(likelihood: object) -> dict[str, object]:
     if projection is not None and hasattr(projection, "degree"):
         record["prepared_projection_degree"] = projection.degree
     return record
+
+
+def _wrapped_likelihood_identity(likelihood: object) -> dict[str, object]:
+    """Return extra identities for explicitly supported wrapped likelihoods."""
+
+    from robert_exoplanets.likelihoods.correlated import (
+        CorrelatedGaussianLikelihood,
+        DenseCovariance,
+        PositiveSemidefiniteCovariance,
+    )
+    from robert_exoplanets.likelihoods.time_resolved_high_resolution import (
+        PreparedTimeResolvedHighResolutionLikelihood,
+        TimeResolvedHighResolutionLikelihood,
+    )
+
+    if isinstance(
+        likelihood,
+        (
+            TimeResolvedHighResolutionLikelihood,
+            PreparedTimeResolvedHighResolutionLikelihood,
+        ),
+    ):
+        return {
+            name: getattr(likelihood, name)
+            for name in ("kp_parameter", "dVsys_parameter", "dphi_parameter")
+        }
+
+    if not isinstance(likelihood, CorrelatedGaussianLikelihood):
+        return {}
+
+    covariance = likelihood.covariance
+    covariance_type = _qualified_type(covariance)
+    covariance_identity: dict[str, object] = {
+        "operator_type": covariance_type,
+    }
+    if (
+        isinstance(covariance, DenseCovariance)
+        and type(covariance) is DenseCovariance
+    ):
+        covariance_identity["matrix"] = _array_identity(covariance.matrix)
+    elif isinstance(
+        covariance, PositiveSemidefiniteCovariance
+    ) and type(covariance) is PositiveSemidefiniteCovariance:
+        covariance_identity.update(
+            {
+                "matrix": _array_identity(covariance.matrix),
+                "rank_rtol": covariance.rank_rtol,
+                "rank_atol": covariance.rank_atol,
+                "support_rtol": covariance.support_rtol,
+                "support_atol": covariance.support_atol,
+            }
+        )
+    else:
+        raise RobertConfigError(
+            "cannot build a safe joint run manifest for custom covariance "
+            f"operator '{covariance_type}'; use DenseCovariance or "
+            "PositiveSemidefiniteCovariance"
+        )
+    return {"covariance_identity": covariance_identity}
 
 
 def write_run_manifest(manifest: RunManifest, output_dir: str | Path) -> Path:

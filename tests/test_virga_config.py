@@ -50,7 +50,8 @@ def _write_config(
 ) -> Path:
     raw = load_task_config(base_path).model_dump(mode="json")
     raw["clouds"] = cloud
-    raw["radiative_transfer"]["gravity_model"] = gravity_model
+    if raw["radiative_transfer"]["model"] == "transmission":
+        raw["radiative_transfer"]["gravity_model"] = gravity_model
     if extra_parameters:
         raw["parameters"].extend(extra_parameters)
     if virga_mie_directory is not None:

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Corrected Virga configuration tests so emission fixtures do not set the
+  transmission-only gravity option. The public schema still rejects that
+  invalid emission input.
+- Preserved the null legacy abundance parameters when creating independent
+  FastChem elemental runs, including explicit regional chemistry overrides.
+- Published the experimental Python joint emission/transmission composition
+  API with explicit parameter bindings. Joint manifests retain the underlying
+  likelihood identity and settings so incompatible checkpoints cannot resume.
+  The standard YAML workflow still selects one geometry; joint posterior
+  collection and production post-processing remain separate work.
+
 - Added the 6 November code audit, current upgrade register, and ordered
   completion checks. Recorded existing Virga fixture failures and the local
   joint-likelihood manifest defect without publishing unfinished source work.

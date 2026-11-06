@@ -27,6 +27,26 @@ does. Other solvers can continue to use the full scalar likelihood.
   the protocol.
 - Optional backends must pass the same reference tests as built-ins.
 
+### 1.1 Joint emission and transmission composition
+
+`retrieval.joint_geometry` provides a Python API to combine forward models
+with different geometries. Each component defines its forward model and
+likelihood. It may carry an explicit observation or use prepared-likelihood
+inputs. Explicit local-to-global parameter bindings map the components to one
+`RetrievalParameterSet`. A repeated global name ties values across
+components. Each component keeps its own prediction and likelihood term. The
+run manifest records the wrapped likelihood settings, nuisance parameter
+roles, and bindings for checkpoint compatibility.
+
+The API does not add new radiative-transfer physics. Standard YAML still
+selects one geometry. Posterior collection and post-processing do not yet
+handle component-specific state, offsets, profile bands, or saved predictions
+as one joint result. Use this API as a software-composition prototype; do not
+claim a production joint workflow or scientific validation from API tests.
+Theory-aware evidence also requires a normalized prior that represents the
+theory distribution. Do not clip samples inside the likelihood to impose a
+theory constraint.
+
 ## 2. Radiative Transfer Engines
 
 Purpose:

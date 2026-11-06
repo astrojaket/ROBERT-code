@@ -277,6 +277,33 @@ def create_run_directory(
     shutil.copy2(ROOT / "submit.sh", run_directory / "submit.sh")
 
     generated = config.model_dump(mode="json", exclude_none=True)
+    chemistry = config.atmosphere.chemistry
+    if chemistry.model == "fastchem_equilibrium":
+        generated_chemistry = generated["atmosphere"]["chemistry"]
+        generated_chemistry["metallicity_parameter"] = chemistry.metallicity_parameter
+        generated_chemistry["carbon_to_oxygen_parameter"] = (
+            chemistry.carbon_to_oxygen_parameter
+        )
+    disk_emission = config.disk_emission
+    if disk_emission.model in {"two_region", "2tp"}:
+        for region_name in ("hot_region", "cold_region"):
+            regional_chemistry = getattr(
+                getattr(disk_emission, region_name).atmosphere,
+                "chemistry",
+            )
+            if (
+                regional_chemistry is not None
+                and regional_chemistry.model == "fastchem_equilibrium"
+            ):
+                generated_chemistry = generated["disk_emission"][region_name][
+                    "atmosphere"
+                ]["chemistry"]
+                generated_chemistry["metallicity_parameter"] = (
+                    regional_chemistry.metallicity_parameter
+                )
+                generated_chemistry["carbon_to_oxygen_parameter"] = (
+                    regional_chemistry.carbon_to_oxygen_parameter
+                )
     configured_paths = config.paths
     paths = (
         {}

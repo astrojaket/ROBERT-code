@@ -25,6 +25,11 @@ from .heterogeneous import (
     HeterogeneousLikelihoodComponent,
     HeterogeneousRetrievalProblem,
 )
+from .joint_geometry import (
+    JointGeometryComponent,
+    JointGeometryForwardModel,
+    build_joint_geometry_problem,
+)
 from .optimal_estimation import (
     OptimalEstimationResult,
     log_pressure_correlated_covariance,
@@ -74,6 +79,8 @@ __all__ = [
     "HeterogeneousLikelihood",
     "HeterogeneousLikelihoodComponent",
     "HeterogeneousRetrievalProblem",
+    "JointGeometryComponent",
+    "JointGeometryForwardModel",
     "LogUniformPrior",
     "InferenceRunConfig",
     "NestedSamplerResult",
@@ -93,6 +100,7 @@ __all__ = [
     "UniformPrior",
     "centered_log_ratio_prior_transform",
     "build_retrieval_problem",
+    "build_joint_geometry_problem",
     "build_run_manifest",
     "load_observation_npz",
     "load_observation_table",
