@@ -22,6 +22,9 @@ postprocess_saved_best_fit_output(
 )
 ```
 
+Plot legends use **1-sigma** and **2-sigma** notation. The numerical
+probability intervals remain recorded in the saved posterior products.
+
 ## YAML settings
 
 ```yaml

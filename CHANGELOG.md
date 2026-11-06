@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Changed posterior plot legends to 1-sigma and 2-sigma notation. Saved
+  probability intervals and numerical posterior products are unchanged.
+
 - Corrected Virga configuration tests so emission fixtures do not set the
   transmission-only gravity option. The public schema still rejects that
   invalid emission input.

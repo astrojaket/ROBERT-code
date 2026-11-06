@@ -1377,7 +1377,7 @@ def _plot_profile_quantiles(
         color=ROBERT_COLOR,
         alpha=0.12,
         linewidth=0.0,
-        label="95.45% interval",
+        label="2-sigma interval",
     )
     axis.fill_betweenx(
         pressure,
@@ -1386,7 +1386,7 @@ def _plot_profile_quantiles(
         color=ROBERT_COLOR,
         alpha=0.28,
         linewidth=0.0,
-        label="68.27% interval",
+        label="1-sigma interval",
     )
     axis.plot(
         quantiles[2],
@@ -1457,7 +1457,7 @@ def _plot_fit(
                 color=ROBERT_COLOR,
                 alpha=0.12,
                 linewidth=0.0,
-                label="Native-grid 95.45% posterior predictive interval",
+                label="Native-grid 2-sigma posterior predictive interval",
             )
             fit_axis.fill_between(
                 native_wavelength,
@@ -1466,7 +1466,7 @@ def _plot_fit(
                 color=ROBERT_COLOR,
                 alpha=0.28,
                 linewidth=0.0,
-                label="Native-grid 68.27% posterior predictive interval",
+                label="Native-grid 1-sigma posterior predictive interval",
             )
             fit_axis.plot(
                 native_wavelength,
@@ -1523,7 +1523,7 @@ def _plot_fit(
                     alpha=0.12,
                     linewidth=0.0,
                     label=(
-                        "95.45% posterior predictive interval"
+                        "2-sigma posterior predictive interval"
                         if dataset is problem.observations.datasets[0]
                         else None
                     ),
@@ -1536,7 +1536,7 @@ def _plot_fit(
                     alpha=0.28,
                     linewidth=0.0,
                     label=(
-                        "68.27% posterior predictive interval"
+                        "1-sigma posterior predictive interval"
                         if dataset is problem.observations.datasets[0]
                         else None
                     ),
