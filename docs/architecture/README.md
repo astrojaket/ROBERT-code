@@ -18,6 +18,7 @@ User-facing status:
 - [Supported Methods and Validation Status](../supported_methods.md)
 - [6 November Code Audit and Upgrade Register](../review/57_repository_audit_2026-11-06.md)
 - [BeAR Performance Audit and Experiment Plan](../review/58_bear_2026_performance_audit.md)
+- [Local Fixes and Elemental Recovery](../review/59_local_elemental_recovery_2026-11-06.md)
 
 Expanded reference:
 

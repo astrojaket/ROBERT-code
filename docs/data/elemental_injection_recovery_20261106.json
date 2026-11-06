@@ -1,0 +1,334 @@
+{
+  "schema_version": "1.0",
+  "date": "2026-11-06",
+  "scope": "One fixed-1800 K cloud-free FastChem elemental transmission recovery, repeated with 50 and 100 live points; not a calibration ensemble or target-science validation",
+  "temperature_k": 1800,
+  "pressure_layers": 80,
+  "pressure_bounds_bar": [
+    100,
+    1e-05
+  ],
+  "wavelength_bins": 48,
+  "wavelength_bounds_micron": [
+    2.8,
+    5.15
+  ],
+  "uncertainty_ppm": 20,
+  "opacity": "R1000 native KTA subsets, 639 wavelengths, 22 pressure and 27 temperature nodes, all 20 g ordinates",
+  "hminus": "configured but contributes zero under the existing temperature and wavelength validity policies",
+  "same_injection_arrays_for_both_runs": true,
+  "interval_probabilities": [
+    0.02275,
+    0.158655,
+    0.5,
+    0.841345,
+    0.97725
+  ],
+  "interval_labels": [
+    "2-sigma lower",
+    "1-sigma lower",
+    "median",
+    "1-sigma upper",
+    "2-sigma upper"
+  ],
+  "software_checks": {
+    "portable_suite_passed": 1089,
+    "portable_suite_skipped": 40,
+    "coverage_percent": 73,
+    "coverage_floor_percent": 70,
+    "postprocessing_after_notation_change_passed": 13,
+    "ruff": "passed",
+    "scoped_mypy": "passed, two files",
+    "sdist_and_wheel": "passed"
+  },
+  "cases": [
+    {
+      "case": "elemental-fullstate-r1000-20261106",
+      "source_commit": "cef1216c7b7beb0177671edb16acdfecea0ec76b",
+      "source_dirty": false,
+      "live_points": 50,
+      "mpi_ranks": 4,
+      "threads_per_rank": 1,
+      "iteration_cap": null,
+      "native_max_iter_setting": 0,
+      "dlogz": 0.5,
+      "seed": 20261104,
+      "converged": true,
+      "native_likelihood_evaluations": 560,
+      "posterior_samples": 264,
+      "posterior_effective_sample_size": 156.27612170932778,
+      "reported_log_evidence": 449.06310798446503,
+      "reported_log_evidence_error": 0.06346240946008828,
+      "evidence_source": "PyMultiNest global evidence field; matches the importance-nested-sampling estimate in the native log",
+      "mpi_job_wall_seconds": 30.249300291761756,
+      "peak_monitored_combined_rss_mib": 1218.234375,
+      "all_truths_inside_one_sigma": true,
+      "all_truths_inside_two_sigma": true,
+      "diagnostic_source": "pointwise posterior median spectrum from 100 weighted draws",
+      "median_prediction_chi_squared": 43.06050162367592,
+      "median_prediction_chi_squared_over_45": 0.956900036081687,
+      "parameters": {
+        "log10_C_H": {
+          "truth": -3.7,
+          "median": -3.5360629904270806,
+          "one_sigma_interval": [
+            -3.895141027923036,
+            -3.395559244779725
+          ],
+          "two_sigma_interval": [
+            -4.219066448577798,
+            -3.3286501948783154
+          ],
+          "prior_bounds": [
+            -4.3,
+            -3.3
+          ],
+          "two_sigma_width_over_full_prior_width": 0.8904162536994824
+        },
+        "log10_O_H": {
+          "truth": -3.18,
+          "median": -3.126049585308909,
+          "one_sigma_interval": [
+            -3.2228608933067293,
+            -3.0609151659004237
+          ],
+          "two_sigma_interval": [
+            -3.29339649793463,
+            -3.009484081428467
+          ],
+          "prior_bounds": [
+            -3.8,
+            -2.8
+          ],
+          "two_sigma_width_over_full_prior_width": 0.28391241650616283
+        },
+        "log10_Si_H": {
+          "truth": -4.28,
+          "median": -4.280982609002484,
+          "one_sigma_interval": [
+            -4.601234618001989,
+            -4.037480476322996
+          ],
+          "two_sigma_interval": [
+            -4.842612440759026,
+            -3.9506326274639956
+          ],
+          "prior_bounds": [
+            -4.9,
+            -3.9
+          ],
+          "two_sigma_width_over_full_prior_width": 0.8919798132950296
+        }
+      },
+      "noise_sha256": "c22bf6d69bba31361251a242430a517662cba507effc5a7f76077156d0eea5d5",
+      "opacity_sha256": {
+        "CO": "73c75b37d120eed7d0765bc3863b436c6cff486e93ca6243203f09f7d8bdebf4",
+        "H2O": "7b1f02343f65bacb9404e3b6a29374fab176a709aab7c5c8d6b7a50c430932aa",
+        "SiO": "cf35f236779aa16e77629302aefe54cf301eb3313d5ae4ecd08a1c255454f814"
+      },
+      "forward_change_from_4_November_ppm": {
+        "maximum": 0.0,
+        "maximum_absolute": 0.0,
+        "minimum": 0.0,
+        "rms": 0.0
+      },
+      "posterior_draw_count": 100,
+      "profile_species_count": 523,
+      "verification": {
+        "draw_vectors_match_selected_samples": true,
+        "all_quantiles_match_saved_draws": true,
+        "draw_count": 100,
+        "quantile_probabilities": [
+          0.02275,
+          0.158655,
+          0.5,
+          0.841345,
+          0.97725
+        ],
+        "effective_sample_size": 156.27612170932778,
+        "vmr_sum_min": 0.9999999999974835,
+        "vmr_sum_max": 1.0000000000030638,
+        "same_numerical_samples_as_4_November": true,
+        "same_numerical_weights_as_4_November": true
+      },
+      "artifacts": {
+        "injection_arrays.npz": {
+          "sha256": "9acb3ae9d17c7e86045667247411091f0121c268df9cb222565bb7d97f72fe94",
+          "bytes": 4562
+        },
+        "posterior_predictive_quantiles.npz": {
+          "sha256": "7ba7e5deab133198e555dc7db3e3e3d105a3cbe252478f76b7699296c00cfce9",
+          "bytes": 34423556
+        },
+        "posterior_recovery.json": {
+          "sha256": "735f0ace7f89a7f16beb7a15a589948ad99a3f49bdb9f3dcade384b5dc31a755",
+          "bytes": 5972
+        },
+        "verification.json": {
+          "sha256": "0a39e6915ee93113e2be4ccd4b924565431f893c73fcf4d416a2d109385db9fd",
+          "bytes": 428
+        },
+        "elemental_spectrum_residual.png": {
+          "sha256": "7c8b6740d180bc835c94479f380598e443dbf77a60a0d352b1f4df2e300a454b",
+          "bytes": 177556
+        },
+        "elemental_spectrum_residual.pdf": {
+          "sha256": "6246bab1f4e06b109fdb1f0ec189795692ca2998dfc3d6dee525d1ba8cb98bbd",
+          "bytes": 18691
+        },
+        "elemental_posterior.png": {
+          "sha256": "cc2f859681a1df77a088e7a93d69e02b6409387ec921bb64af07d97c9a3523fc",
+          "bytes": 62878
+        },
+        "elemental_posterior.pdf": {
+          "sha256": "211af16df083fc64a7b529ab6441fdb11b4b055cd5d47cbe93f0c69efe924f94",
+          "bytes": 21427
+        }
+      }
+    },
+    {
+      "case": "elemental-fullstate-r1000-100live-20261106",
+      "source_commit": "c211dcab7e748f9581ce6ff8bdcb21506fe7d267",
+      "source_dirty": false,
+      "live_points": 100,
+      "mpi_ranks": 4,
+      "threads_per_rank": 1,
+      "iteration_cap": null,
+      "native_max_iter_setting": 0,
+      "dlogz": 0.5,
+      "seed": 20261104,
+      "converged": true,
+      "native_likelihood_evaluations": 937,
+      "posterior_samples": 571,
+      "posterior_effective_sample_size": 350.20158567231465,
+      "reported_log_evidence": 449.1304452196933,
+      "reported_log_evidence_error": 0.07478795784896418,
+      "evidence_source": "PyMultiNest global evidence field; matches the importance-nested-sampling estimate in the native log",
+      "mpi_job_wall_seconds": 35.300661999732256,
+      "peak_monitored_combined_rss_mib": 1487.96875,
+      "all_truths_inside_one_sigma": true,
+      "all_truths_inside_two_sigma": true,
+      "diagnostic_source": "pointwise posterior median spectrum from 100 weighted draws",
+      "median_prediction_chi_squared": 43.3198019244682,
+      "median_prediction_chi_squared_over_45": 0.9626622649881823,
+      "parameters": {
+        "log10_C_H": {
+          "truth": -3.7,
+          "median": -3.7465666751424807,
+          "one_sigma_interval": [
+            -4.098035358387052,
+            -3.4127268525292473
+          ],
+          "two_sigma_interval": [
+            -4.27085487577107,
+            -3.3219930932694672
+          ],
+          "prior_bounds": [
+            -4.3,
+            -3.3
+          ],
+          "two_sigma_width_over_full_prior_width": 0.9488617825016026
+        },
+        "log10_O_H": {
+          "truth": -3.18,
+          "median": -3.1943049685560276,
+          "one_sigma_interval": [
+            -3.2740231798959263,
+            -3.0621903408033666
+          ],
+          "two_sigma_interval": [
+            -3.3102116041265766,
+            -3.025523127070187
+          ],
+          "prior_bounds": [
+            -3.8,
+            -2.8
+          ],
+          "two_sigma_width_over_full_prior_width": 0.28468847705638956
+        },
+        "log10_Si_H": {
+          "truth": -4.28,
+          "median": -4.275181752712679,
+          "one_sigma_interval": [
+            -4.615863635497064,
+            -4.010235045176308
+          ],
+          "two_sigma_interval": [
+            -4.848836716039649,
+            -3.9162844119871876
+          ],
+          "prior_bounds": [
+            -4.9,
+            -3.9
+          ],
+          "two_sigma_width_over_full_prior_width": 0.9325523040524613
+        }
+      },
+      "noise_sha256": "c22bf6d69bba31361251a242430a517662cba507effc5a7f76077156d0eea5d5",
+      "opacity_sha256": {
+        "CO": "73c75b37d120eed7d0765bc3863b436c6cff486e93ca6243203f09f7d8bdebf4",
+        "H2O": "7b1f02343f65bacb9404e3b6a29374fab176a709aab7c5c8d6b7a50c430932aa",
+        "SiO": "cf35f236779aa16e77629302aefe54cf301eb3313d5ae4ecd08a1c255454f814"
+      },
+      "forward_change_from_4_November_ppm": {
+        "maximum": 0.0,
+        "maximum_absolute": 0.0,
+        "minimum": 0.0,
+        "rms": 0.0
+      },
+      "posterior_draw_count": 100,
+      "profile_species_count": 523,
+      "verification": {
+        "draw_vectors_match_selected_samples": true,
+        "all_quantiles_match_saved_draws": true,
+        "draw_count": 100,
+        "quantile_probabilities": [
+          0.02275,
+          0.158655,
+          0.5,
+          0.841345,
+          0.97725
+        ],
+        "effective_sample_size": 350.20158567231465,
+        "vmr_sum_min": 0.9999999999972699,
+        "vmr_sum_max": 1.000000000003142,
+        "same_numerical_samples_as_4_November": false,
+        "same_numerical_weights_as_4_November": false
+      },
+      "artifacts": {
+        "injection_arrays.npz": {
+          "sha256": "9acb3ae9d17c7e86045667247411091f0121c268df9cb222565bb7d97f72fe94",
+          "bytes": 4562
+        },
+        "posterior_predictive_quantiles.npz": {
+          "sha256": "135d806d295326b70e0b82e39c6febbcab7e5b6280476fe723f332f479037278",
+          "bytes": 34438357
+        },
+        "posterior_recovery.json": {
+          "sha256": "ab0d5affb26e785f7da22c845e1ebff69655eb0f2f9bc520129cd7315523ecd7",
+          "bytes": 5996
+        },
+        "verification.json": {
+          "sha256": "0d914197a22bb299840580d504258c5aab2c373eb4bca0721005557534f82def",
+          "bytes": 429
+        },
+        "elemental_spectrum_residual.png": {
+          "sha256": "164f5a94e754c7ac6fae744778b4fc1d14bb9ae12e382369ba94af3cc53178c1",
+          "bytes": 177152
+        },
+        "elemental_spectrum_residual.pdf": {
+          "sha256": "ce5cc26e13760a3e402db452840c576c058fc812051d1b4b07bd61a520d46b14",
+          "bytes": 18692
+        },
+        "elemental_posterior.png": {
+          "sha256": "c7ab7b9dcd3a575f23f7e793856b7aefd862a9019f813781927fc8dc975e2f34",
+          "bytes": 56017
+        },
+        "elemental_posterior.pdf": {
+          "sha256": "14703cf1a34e404f2a1f3dfd0561ece0f4d1c5db41706ca7f59239e4a8a8a914",
+          "bytes": 21157
+        }
+      }
+    }
+  ]
+}

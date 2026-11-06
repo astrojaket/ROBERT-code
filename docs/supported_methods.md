@@ -7,8 +7,10 @@ commands and YAML fields.
 
 Status reviewed: 2026-11-06. The
 [code audit and upgrade register](review/57_repository_audit_2026-11-06.md)
-records the software checks and remaining work. Its published baseline has 11
-Virga configuration test failures; the audit identifies a fixture defect.
+records the software checks and remaining work. The
+[local follow-up](review/59_local_elemental_recovery_2026-11-06.md) fixes the
+Virga fixture failures and joint checkpoint identity, and records a passing
+1089-test suite plus the elemental recovery results.
 
 The labels below keep implementation status separate from scientific scope:
 
@@ -36,7 +38,8 @@ The labels below keep implementation status separate from scientific scope:
 
 FastChem supports independent elemental parameters using
 `log10(n_element/n_H)`. Backend parity and parameter-response tests pass;
-target-specific elemental injection recovery remains a separate gate. See the
+the fixed-temperature 50/100-live-point injection checks also pass. General
+target-specific elemental validation remains a separate gate. See the
 [element tutorial](tutorials/05_fastchem_elemental_abundances.md).
 
 Configured H-minus requires explicit H-, atomic H, and electron profiles.

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Recorded converged local elemental injection recoveries with 50 and 100
+  live points on four CPUs, without iteration caps. Saved common-draw spectra
+  and atmospheric profiles outside Git and retained compact numerical evidence.
+  C/H and Si/H remain broad in this fixed-temperature case.
+
 - Changed posterior plot legends to 1-sigma and 2-sigma notation. Saved
   probability intervals and numerical posterior products are unchanged.
 

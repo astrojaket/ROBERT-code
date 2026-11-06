@@ -1,5 +1,14 @@
 # ROBERT code and upgrade audit — 6 November 2026
 
+Follow-up on the same date: the Virga fixture failures and joint checkpoint
+identity defect are corrected. Independent-element run creation now preserves
+its required null fields. The full code suite passes 1089 tests, with 40
+optional/external checks skipped and 73% coverage. Local 50/100-live-point
+elemental checks converge without iteration caps. See the
+[follow-up record](59_local_elemental_recovery_2026-11-06.md). The original
+audit findings below retain their dated baseline for traceability; resolved
+register items are marked explicitly.
+
 ## Result and scope
 
 The published implementation supports the documented emission, transmission,
@@ -131,7 +140,7 @@ only in the reviewed Developer tree. Neither label means science validated.
 
 | Upgrade | Status on 6 November | Evidence and next completion check |
 | --- | --- | --- |
-| Independent FastChem elemental abundances | Published, implemented and tested (`526926b`). | [Element tutorial](../tutorials/05_fastchem_elemental_abundances.md). Complete target-specific injection recovery and record the solar abundance convention and recovered elemental ratios. |
+| Independent FastChem elemental abundances | Published; focused fixed-temperature recovery complete with 50 and 100 live points. | [Element tutorial](../tutorials/05_fastchem_elemental_abundances.md), [follow-up](59_local_elemental_recovery_2026-11-06.md). Both runs include the truth, but C/H and Si/H remain broad. General target-science validation remains open. |
 | Configured H-minus and exact spectral observations | Published, implemented and tested (`19ed2d4`). | [H-minus tutorial](../tutorials/06_configured_hminus.md). Check the intended hot-atmosphere case and H-, H, electron profiles; retain physical samples and declared bin edges. |
 | Native-opacity preparation memory bound | Published (`17535f0`). | One native KTA provider is released before the next species; its unused full-size log-opacity cache is disabled. Full-table conversion can still allocate large arrays. The 4 November Dirac task reports successful preparation and deployment of this commit. Measure peak memory and numerical equality on the intended R=15000 inputs. |
 | Pressure quench and optional CH4 gradient | Published; analytic convention tested. CH4 gradient is experimental (`5767ec3`). | [Quench contract](../validation/pressure_quench.md). Independent profile parity and a declared disequilibrium science case remain open. A separate solar noise ensemble reported 93/100 and 96/100 C/O interval coverage; that does not validate all quench regimes. |
@@ -140,7 +149,7 @@ only in the reviewed Developer tree. Neither label means science validated.
 | Cloud injection recovery | Pilot incomplete; replacement prepared. | Last record, 4 November: pilot hit a 512-iteration cap and had effective sample size one. Replacement uses 12 Redwood CPUs, 128 live points, no iteration cap; it was not submitted. Finish MPI checks, then run it through `addqueue` and assess recovery. |
 | Retrieval failure handling | Serial published (`54ee578`); MPI extension local and unfinished. | Native non-root failure, normal completion, and checkpoint-resume gates are required. See finding 2. |
 | Posterior spectrum and cloud products | Cloud profiles published (`ea361c9`); median-curve refinements local. | Use the same 100 weighted draws for all products. Finish saved-array, interval, curve-label, statistic-source, and figure-style checks. |
-| Joint emission/transmission composition | Local Python prototype and tests. | `retrieval/joint_geometry.py` has explicit local/global parameter bindings. Standard YAML still chooses one geometry. Add a physical shared-parameter recovery and a portable result/manifest example before publishing a supported workflow. |
+| Joint emission/transmission composition | Published experimental Python API; checkpoint identity defect resolved. | Likelihood settings, supported covariance state, prepared observations, and parameter bindings are retained in manifests. Standard YAML still chooses one geometry. Physical joint recovery and posterior integration remain open. |
 | LBL/HRS and WASP-77Ab joint HRS/LRS | Method/operator gates exist; full real-data atmospheric runs deferred. | [Method review](51_line_by_line_high_resolution_retrieval_methods.md), [target review](52_wasp77ab_real_joint_retrieval.md). Native stride 1 passed the recorded gate; stride 2 did not. Fixed-template recovery is not the full atmospheric retrieval. |
 | JAX/Metal and opacity-sampling acceleration | Implemented experimental paths. | [Metal review](48_jax_metal_backend.md), [opacity-sampling review](50_jax_opacity_sampling_accelerator.md). Benefit depends on grid, hardware, and full likelihood cost. Posterior equivalence and long-run memory checks remain open. See the [new BeAR audit](58_bear_2026_performance_audit.md). |
 | Reflected light and HWO | Planned. | A direct-beam source diagnostic exists inside thermal emission. A reflecting surface, reflected-light multiple scattering, disc/phase integration, and an HWO observation/noise model are still needed. |
@@ -156,14 +165,14 @@ their recorded code versions unchanged.
 
 | Priority | Action | Completion check |
 | --- | --- | --- |
-| P1 | Correct the Virga emission test fixtures. | Virga config tests and the portable suite pass without weakening schema checks. |
+| Done | Correct the Virga emission test fixtures. | All 25 Virga config tests and the full suite pass without weakening schema checks. |
 | P1 | Finish and publish MPI failure handling as a separate code change. | Local checks pass; the pulled commit passes a queued non-root-rank failure test and leaves no orphan workers. |
-| P1 | Correct joint-geometry likelihood identity before production use. | A change in a wrapped likelihood setting changes the manifest and blocks checkpoint resume. |
+| Done | Correct joint-geometry likelihood identity. | Changed wrapped settings, covariance, type, velocity roles, or prepared data block resume. Old wrapper-only joint manifests are rejected. |
 | P1 | Complete the prepared P–T/cloud injection recovery. | Use 12 Redwood CPUs and no iteration cap. Save convergence, posterior recovery, prior checks, and timings. Do this before the new GCM cloud application. |
 | P1 | Check the existing Dirac WASP-178b run after SSH is restored. | Record job state, imported Git revision, opacity identity, completion status, and posterior diagnostics. |
 | P2 | Finish posterior median products and figure style. | Saved curves match saved quantiles/draws; labels identify median and diagnostic sources; visual checks pass. |
-| P2 | Validate the new chemistry/H-minus combinations. | A bounded injection test recovers the injected elemental state; charge/species conventions, input provenance, and resolution checks are recorded. |
-| P2 | Review and publish the joint-geometry prototype separately. | One shared-parameter emission/transmission recovery, invalid-binding checks, normalized priors, and manifest/result round trip pass. |
+| P2 | Complete chemistry/H-minus science checks beyond the local elemental case. | The fixed-1800 K elemental check passes. A nonzero H-minus case and target-specific recovery remain required. |
+| P2 | Complete physical and output validation for the published joint prototype. | One shared-parameter emission/transmission recovery and complete posterior/result products pass. The binding and checkpoint tests are already complete. |
 | P2 | Measure whole-likelihood CPU and GPU costs before further speed work. | Use fixed inputs and proposal vectors; record setup, compilation, warm times, memory, transfers, likelihood error, and full sampler wall time. Follow the [BeAR experiment plan](58_bear_2026_performance_audit.md). |
 | P2 | Complete the deferred shared-atmosphere HRS/LRS target test. | Match the declared physics, priors, opacity, filter, and data operators; compare separate and joint posteriors and calibration. |
 | P2 | Finish the paper/release evidence. | Scientific author review, reproducible revision/input manifests, final figures, availability text, and a tagged release agree. |

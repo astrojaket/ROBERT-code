@@ -47,3 +47,10 @@ constant species overrides and pressure quenching continue to apply. The
 resulting VMR profiles come from FastChem's equilibrium calculation; this
 configuration change does not by itself establish physical validation for a
 retrieval.
+
+The [6 November local recovery record](../review/59_local_elemental_recovery_2026-11-06.md)
+reports matched 50- and 100-live-point fixed-temperature injections on four
+CPUs, run to convergence without iteration caps. All three truths lie inside
+their 1-sigma and 2-sigma intervals, but C/H and Si/H remain broad. This is
+one controlled noise realization, not target-science or calibration evidence.
+The configured H-minus contribution is zero in that case.

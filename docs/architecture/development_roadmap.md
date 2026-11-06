@@ -8,22 +8,26 @@ See the [supported-methods and validation summary](../supported_methods.md) for 
 and limitations.
 
 The [code audit and upgrade register](../review/57_repository_audit_2026-11-06.md)
-contains the current status, test evidence, and ordered to-do list. The audited
-published revision has 11 Virga configuration test failures caused by emission
-fixtures that set a transmission-only field. Restore that gate before the next
-code release. The [BeAR performance audit](../review/58_bear_2026_performance_audit.md)
+contains the audit evidence and ordered to-do list. The
+[local follow-up](../review/59_local_elemental_recovery_2026-11-06.md) corrects
+the 11 Virga fixture failures, joint likelihood checkpoint identity, and
+independent-element run serialization. The full code suite passes 1089 tests.
+The fixed-temperature elemental checks converge with 50 and 100 live points
+on four CPUs, without iteration caps. The
+[BeAR performance audit](../review/58_bear_2026_performance_audit.md)
 defines proposed speed experiments; it makes no new ROBERT speed claim.
 
 ## Immediate work
 
-1. Correct the Virga test fixtures and restore the portable suite.
-2. Complete native MPI failure supervision before the cloud recovery run.
-3. Correct wrapped-likelihood identity before joint-geometry checkpoint use.
-4. Complete the prepared P–T/cloud recovery with 12 Redwood CPUs and no
+1. Complete native MPI failure supervision before the cloud recovery run.
+2. Complete the prepared P–T/cloud recovery with 12 Redwood CPUs and no
    iteration cap, then assess the new GCM cloud application.
-5. Finish posterior median products, figure style, chemistry/H-minus recovery,
-   and joint-geometry result/post-processing integration.
-6. Measure complete likelihood and sampler costs before selecting a new
+3. Finish posterior median products, figure style beyond the completed
+   interval-notation change, nonzero H-minus validation, and joint-geometry
+   result/post-processing integration. The fixed-temperature elemental
+   recovery is complete within its stated bounds.
+4. Complete the deferred shared-atmosphere HRS/LRS target checks.
+5. Measure complete likelihood and sampler costs before selecting a new
    accelerator implementation.
 
 Each item has a completion check in the audit. Existing Dirac retrievals need
@@ -52,10 +56,11 @@ use the outcome gates below for new work.
 Recent published changes include independent FastChem elemental abundances,
 configured H-minus, exact spectral bin bounds, one-species-at-a-time native
 opacity preparation, experimental Virga clouds, and serial retrieval failure
-supervision. MPI supervision, posterior refinements, and a generic joint
-emission/transmission API were local changes at the audit date. Standard YAML
-still selects one geometry. FastChem condensate diagnostics do not yet supply
-cloud abundances to Virga.
+supervision. The generic joint emission/transmission Python API and its
+checkpoint identity fix are now published as an experimental route. MPI
+supervision and broader posterior refinements remain local work. Standard
+YAML still selects one geometry. FastChem condensate diagnostics do not yet
+supply cloud abundances to Virga.
 
 ## 1. Establish one supported workflow contract
 
