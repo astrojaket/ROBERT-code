@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Added the 6 November code audit, current upgrade register, and ordered
+  completion checks. Recorded existing Virga fixture failures and the local
+  joint-likelihood manifest defect without publishing unfinished source work.
+- Reviewed the new BeAR code and paper for computation-time improvements;
+  documented candidate experiments and numerical/posterior gates. Refreshed
+  the roadmap, method boundaries, and implemented experimental GPU status.
+- Documented recent published FastChem elemental parameters, configured
+  H-minus, exact spectral bins, native-opacity memory changes, experimental
+  Virga clouds, and retrieval failure supervision in the upgrade register.
+
 - Made public simulations default to external `ROBERT-runs/` directories.
   Run creation isolates generated observations, caches, Slurm logs, and results;
   small runner wrappers use the current checkout after software updates.

@@ -5,6 +5,11 @@ evidence that supports each method. Use [forward-model generation](forward_model
 [running retrievals](retrievals.md), and [configuration](configuration.md) for
 commands and YAML fields.
 
+Status reviewed: 2026-11-06. The
+[code audit and upgrade register](review/57_repository_audit_2026-11-06.md)
+records the software checks and remaining work. Its published baseline has 11
+Virga configuration test failures; the audit identifies a fixture defect.
+
 The labels below keep implementation status separate from scientific scope:
 
 - **implemented** means that the package has the method and its interface;
@@ -20,13 +25,24 @@ The labels below keep implementation status separate from scientific scope:
 | Method | Current route | Validation boundary |
 |---|---|---|
 | Clear thermal emission | Schema-v2 YAML, correlated-k gas opacity, CIA, and the absorbing formal solution | Stable petitRADTRANS 3.3.3 comparisons support the declared clear cases; they do not validate arbitrary opacity databases or clouds. |
-| Cloudy thermal emission | Deck, haze, or Mie properties with Toon or thermal SH4/P3 | Matched PICASO/Virga and molecular-opacity comparisons cover declared closures; a high-stream reference is still required for a general cloud-science claim. |
+| Cloudy thermal emission | Deck, haze, or Mie properties with Toon or thermal SH4/P3; experimental Virga provider | Matched PICASO/Virga and molecular-opacity comparisons cover declared closures. Four synthetic SH4/high-stream cases have also been checked; general Mie-cloud and cloud-retrieval validation remain open. |
+| CPU opacity sampling | Beta `OpacitySamplingProvider` and dedicated Python forward-model construction | Preserves declared physical spectral samples. It is separate from the standard YAML correlated-k preparation route and from the experimental GPU implementation; resolution/convergence evidence is case-specific. |
 | Transmission | Spherical shell chords with correlated-k or dedicated LBL input | Absorption-dominated and continuous reference comparisons are covered; returned scattered light, multiple scattering, and refraction remain outside the supported route. |
 | Free and equilibrium chemistry | `FreeChemistry`, optional FastChem, and explicit composition/MMW models | FastChem and free-chemistry checks cover their configured inputs. They do not establish a complete chemical network or photochemical model. |
 | Nested retrieval | PyMultiNest through the configured runner | R=100 injection checks and the documented target records cover validation-scale runs. Posterior calibration across broad seeds and all target regimes remains open. |
 | Optimal estimation | Independent Gaussian observations through the configured runner | It rejects CLR and unsupported likelihood structures. Covariance and profiled high-resolution objectives need an explicit future residual/Jacobian contract. |
 
 ## Chemistry boundaries
+
+FastChem supports independent elemental parameters using
+`log10(n_element/n_H)`. Backend parity and parameter-response tests pass;
+target-specific elemental injection recovery remains a separate gate. See the
+[element tutorial](tutorials/05_fastchem_elemental_abundances.md).
+
+Configured H-minus requires explicit H-, atomic H, and electron profiles.
+The continuum and composition have reference checks. Complete physical
+emission/transmission recovery is not implied by configuration-wiring tests.
+See the [H-minus tutorial](tutorials/06_configured_hminus.md).
 
 Centered-log-ratio (CLR) composition priors use one joint unit-cube transform
 for direct nested sampling. The derived background category is included in the
@@ -53,6 +69,20 @@ profile above its quench pressure. The default is unchanged. The signed,
 dimensionless slope is an empirical retrieval parameter, not a chemical rate
 or a transport calculation. See the [chemistry guide](theory/chemistry.md#optional-ch4-gradient-above-the-quench-pressure)
 for the equation, composition limits, and validation status.
+
+## Experimental cloud formation
+
+The Virga EddySed adapter supports fixed or retrieved sedimentation efficiency
+and Kzz. Its physical vapor mass-ratio conversion is recorded explicitly.
+Earlier results made before that correction must not be interpreted as using
+the stated vapor abundance. FastChem equilibrium-condensate diagnostics remain
+separate from the Virga input abundances.
+
+Direct Virga parity, small forward checks, and a four-case synthetic
+PythonicDISORT comparison do not establish cloud-formation or posterior
+recovery validation. The capped pilot did not converge. The prepared replacement
+had not been submitted at the last recorded check. See the
+[Virga review](review/56_virga_cloud_experiment.md) and dated upgrade register.
 
 ## Stellar contamination
 
@@ -102,6 +132,10 @@ validation. The [JAX Metal review](review/48_jax_metal_backend.md),
 record the measured limits. Use the maintained Numba/NumPy CPU route for
 production retrievals unless a separate release record approves another
 backend.
+
+The [new BeAR audit](review/58_bear_2026_performance_audit.md) compares
+whole-likelihood GPU design with these paths. Proposed experiments have no
+approved ROBERT speed-up or scientific release claim yet.
 
 ## Evidence map
 

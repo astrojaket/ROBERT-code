@@ -24,6 +24,11 @@ they are not all options in the standard YAML schema. See the
 [development roadmap](docs/architecture/development_roadmap.md) for current
 interfaces, validation limits, and next steps.
 
+The [6 November code audit and upgrade register](docs/review/57_repository_audit_2026-11-06.md)
+records current test failures, published and local upgrades, and an ordered
+to-do list. The [BeAR performance audit](docs/review/58_bear_2026_performance_audit.md)
+sets out proposed speed experiments and their accuracy checks.
+
 PyMultiNest is the supported nested sampler. Optimal Estimation supports
 deterministic retrievals and future detailed sounding models.
 

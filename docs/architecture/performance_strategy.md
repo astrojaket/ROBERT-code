@@ -1,6 +1,9 @@
 # Performance Strategy
 
 ROBERT optimizes only after correctness, tests, and interfaces are stable.
+Status reviewed: 2026-11-06. The
+[BeAR performance audit](../review/58_bear_2026_performance_audit.md) records
+source evidence, candidate improvements, and measurable completion gates.
 
 ## 1. Performance Principles
 
@@ -52,7 +55,8 @@ Avoid:
 
 Role:
 
-- Future optional differentiable/GPU backend.
+- Implemented optional experimental CPU/GPU paths, including JAX Metal and
+  direct opacity sampling. These are not general production replacements.
 
 Allowed when:
 
@@ -136,7 +140,11 @@ Rules:
 
 ## 6. GPU Support
 
-GPU support is future optional functionality.
+GPU paths are implemented as optional experimental functionality. The current
+Numba/NumPy route remains the production reference. Existing component parity
+and single-proposal timings do not establish posterior equivalence, native
+hardware accuracy, or long-run memory safety. See the
+[supported-methods boundaries](../supported_methods.md#accelerator-boundaries).
 
 Requirements:
 
@@ -177,6 +185,15 @@ Benchmarks should measure:
 - Likelihood calls per second.
 - End-to-end tiny retrieval time.
 - Peak memory.
+- Host/device transfer volume and synchronization cost for accelerator paths.
+- Full sampler wall time and number of likelihood calls, separately from
+  fixed-proposal throughput.
+
+Compare matched physics, opacity, grids, data, and proposal vectors. Record
+compilation and setup separately from warm execution. Synchronize asynchronous
+device work before timing it. Keep numerical error, posterior calibration, and
+evidence checks beside each speed result. A direct-cross-section GPU timing is
+not a speed measurement for the correlated-k/Virga/SH4 workflow.
 
 Benchmarks should report:
 

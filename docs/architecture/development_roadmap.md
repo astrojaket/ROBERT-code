@@ -1,11 +1,34 @@
 # Development roadmap
 
-Status: 2026-09-07. ROBERT is production-ready for its documented and
+Status: 2026-11-06. ROBERT is production-ready for its documented and
 benchmarked emission, transmission, and retrieval regimes. This roadmap records
 extensions, including high-resolution and accelerator work with separate
 validation requirements.
 See the [supported-methods and validation summary](../supported_methods.md) for evidence
 and limitations.
+
+The [code audit and upgrade register](../review/57_repository_audit_2026-11-06.md)
+contains the current status, test evidence, and ordered to-do list. The audited
+published revision has 11 Virga configuration test failures caused by emission
+fixtures that set a transmission-only field. Restore that gate before the next
+code release. The [BeAR performance audit](../review/58_bear_2026_performance_audit.md)
+defines proposed speed experiments; it makes no new ROBERT speed claim.
+
+## Immediate work
+
+1. Correct the Virga test fixtures and restore the portable suite.
+2. Complete native MPI failure supervision before the cloud recovery run.
+3. Correct wrapped-likelihood identity before joint-geometry checkpoint use.
+4. Complete the prepared P–T/cloud recovery with 12 Redwood CPUs and no
+   iteration cap, then assess the new GCM cloud application.
+5. Finish posterior median products, figure style, chemistry/H-minus recovery,
+   and joint-geometry result/post-processing integration.
+6. Measure complete likelihood and sampler costs before selecting a new
+   accelerator implementation.
+
+Each item has a completion check in the audit. Existing Dirac retrievals need
+a fresh read-only status check when the authenticated SSH session is available.
+The audit does not establish their present queue state.
 
 ## Current position
 
@@ -25,6 +48,14 @@ operator checks and fixed-template recovery do not establish their completion.
 The package version is `0.3.0`. It does not indicate which scientific regimes
 are validated. The old version-by-feature sequence in RFC-0001 is historical;
 use the outcome gates below for new work.
+
+Recent published changes include independent FastChem elemental abundances,
+configured H-minus, exact spectral bin bounds, one-species-at-a-time native
+opacity preparation, experimental Virga clouds, and serial retrieval failure
+supervision. MPI supervision, posterior refinements, and a generic joint
+emission/transmission API were local changes at the audit date. Standard YAML
+still selects one geometry. FastChem condensate diagnostics do not yet supply
+cloud abundances to Virga.
 
 ## 1. Establish one supported workflow contract
 
@@ -83,3 +114,15 @@ darkening, active-region evolution, and surface maps), calibrated JWST
 products, disequilibrium chemistry beyond the analytic pressure-quench
 decorator, phase curves, and reflected light. Do not expand these areas before
 the existing workflow and validation contracts are clear.
+
+### Reflected light and HWO
+
+Status: planned. The direct-beam source diagnostic in thermal emission does
+not establish reflected-light spectra of habitable worlds.
+
+The required sequence is a reflected-light multiple-scattering solver with a
+reflecting surface, terrestrial gas/Rayleigh inputs, illuminated-disc and
+orbital-phase integration, independent clear/cloudy reference checks, and a
+versioned HWO response and noise model. Add a reproducible YAML example only
+after the physical and numerical gates pass. Record its atmosphere, cloud,
+surface, wavelength, and phase limits.
