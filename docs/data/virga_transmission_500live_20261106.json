@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "record_date": "2026-11-06",
+  "status": {
+    "native_fits": "both_converged",
+    "saved_product_checks": "175_passed_zero_failed",
+    "science_validation": "single_realization_comparison_only",
+    "general_virga_recovery_claim": false,
+    "summary": "The noisy 500-live-point run places all four truths inside 2-sigma intervals, but none inside 1-sigma. The noiseless 500-live-point run places all four truths inside both intervals. This does not establish calibrated coverage or diagnose the earlier 100-live-point result."
+  },
+  "scope": {
+    "geometry": "transmission",
+    "cloud_model": "Virga Ackerman-Marley eddy sedimentation",
+    "physical_observations": false,
+    "synthetic_self_injections": true,
+    "joint_emission_transmission_fit": false,
+    "wavelength_micron": [0.6, 5.0],
+    "bins": 212,
+    "bin_edges": 213,
+    "spectral_grid": "log-spaced edges; geometric-mean centers; nominal R=100",
+    "uncertainty_ppm": 20.0,
+    "noise_model": "independent Gaussian",
+    "gas_composition": "fixed",
+    "retrieved_parameters": ["T_upper", "T_deep", "cloud_fsed", "cloud_log10_kzz"],
+    "temperature_structure": "two fitted spline controls on a 48-layer atmosphere",
+    "cloud_condensate": "MgSiO3",
+    "cloud_scattering": "transmission extinction only; no multiple-scattering transit solver"
+  },
+  "source": {
+    "distribution": "robert-exoplanets",
+    "version": "0.3.0",
+    "truth_generation_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+    "preflight_and_fit_commit": "6f1cf1c17aab982b3e5c8c1b4942fed75d27e910",
+    "preflight_and_fit_worktree_clean": true,
+    "preflight_imported_module": "/private/tmp/robert-local-upgrades-20261106/src/robert_exoplanets/__init__.py",
+    "source_relation": "The later commit is a documentation-only successor for this experiment. Root verified that src, data, scripts, project configuration, and runner are unchanged from the truth-generation commit.",
+    "conda_environment": "robert-exoplanets",
+    "python": "3.12",
+    "virga_exo": "2.0.2",
+    "miepython": "3.3.1"
+  },
+  "protocol": {
+    "truth": {
+      "T_upper_K": 850.0,
+      "T_deep_K": 1800.0,
+      "cloud_fsed": 1.5,
+      "cloud_log10_kzz": 9.0
+    },
+    "uniform_priors": {
+      "T_upper_K": [700.0, 1200.0],
+      "T_deep_K": [1500.0, 2200.0],
+      "cloud_fsed": [0.5, 4.0],
+      "cloud_log10_kzz": [8.0, 10.0]
+    },
+    "fixed_trace_gas_vmr": {
+      "H2O": 0.001,
+      "CO": 0.001,
+      "CO2": 1e-5,
+      "CH4": 1e-5,
+      "NH3": 1e-6,
+      "HCN": 1e-7
+    },
+    "background_gas_proportions": {
+      "H2": 0.8547,
+      "He": 0.1453
+    },
+    "background_gas_note": "H2 and He fill the remaining abundance after the six fixed trace-gas VMRs; these proportions are not the final normalized H2 and He VMRs.",
+    "configured_noise_seed": 20261107,
+    "effective_multinest_seed": "21594",
+    "multinest": {
+      "software": "PyMultiNest/MultiNest",
+      "live_points_new_runs": 500,
+      "mpi_ranks": 4,
+      "threads_per_rank": 1,
+      "dlogz": 0.5,
+      "max_iter": 0,
+      "iteration_cap": false,
+      "wall_time_kill_limit": false,
+      "rss_kill_limit": false,
+      "resume": false
+    },
+    "posterior_products": {
+      "parameter_quantiles_use_all_native_weighted_rows": true,
+      "shared_weighted_draw_count_for_spectra_and_profiles": 100,
+      "same_draw_rows_across_products": true,
+      "central_quantile_probabilities": [0.02275013194817921, 0.15865525393145707, 0.5, 0.8413447460685429, 0.9772498680518208],
+      "labels": ["lower_2_sigma", "lower_1_sigma", "median", "upper_1_sigma", "upper_2_sigma"]
+    }
+  },
+  "input_hashes": {
+    "noisy_observation_sha256": "3f6a5823b9dfae030cf52315614eb791b10854fedd0700fb1294b65d56d5d912",
+    "noisy_injection_arrays_sha256": "b5a3e85cb761f159d767cad0a41bf2b732567dbf98809a5dc795d7f2441247c5",
+    "noisy_vector_sha256": "4a06389fdadf195b0454a30ffdcaa9ded3e06502feca7ad8743d544b41d13b1b",
+    "noiseless_observation_sha256": "4a0210084665ba576f1c681bb16566d2742d97ac787178415464d751f64bde15",
+    "noiseless_injection_arrays_sha256": "cdd9ad7e428a2f599305948890bbd5467363a441565a5df33a110d5dfe96ac0c",
+    "noiseless_vector_sha256": "bf75520ae2a2df40c3d8b29b71564bac7a99659315d2e1c83b750c96807a078d",
+    "shared_truth_spectrum_sha256": "7d40f32ae65fcb5ca9bcb21eb6247364d467a8c61a66b1bc7b9102c72872a861",
+    "native_r100_kta_sha256": {
+      "CH4": "6ce90a7be60f490cca6df4e6b70a79886a0ff6a1b06f6b5ce8ecccfee491c592",
+      "CO": "c2e05d960f70d01db35bb29938782acb6b00b6b64828d0f2a0253ac31e8b85d5",
+      "CO2": "a4266570b030cb838e6538110ef49b571fe085344bbfeecbeef25b3335ebc320",
+      "H2O": "06c3feff50e905c566a4315b1d6b0c3a7bfdc315a3c5b1b21fa46f92a29b3333",
+      "HCN": "6bbf6c7afc00bb911c32fb2c5aa03f59726205db00c2261ba608075fa55a72c7",
+      "NH3": "436c3e8e43efce46b9ce4a22a26e47554a34f2aa852cffbe33e75c0d0625db4b"
+    },
+    "mie_refractive_index_sha256": "f973d91a74f32873e4c2aad06bfe80a7fbe61c346e243be9706195c75d3798d3",
+    "mie_efficiency_table_sha256": "f33137b611a6453f4a547e40cde7babcda9a3b50d37339fb80cbb7eed11221d9",
+    "source_optical_constants_sha256": "0faef18dbd1ae853ef25be2f2766f499f9cb37d0732e0f401ca86e999c30c731"
+  },
+  "runs": {
+    "noisy_100live_reference": {
+      "source_commit": "f8318defe95491e9bc50ddbd538e363327147ca9",
+      "live_points": 100,
+      "mpi_ranks": 4,
+      "max_iter": 0,
+      "converged": true,
+      "weighted_rows": 900,
+      "effective_sample_size": 400.4940712690106,
+      "inference_seconds": 1012.017633,
+      "timed_shell_wall_seconds": 1025.77,
+      "native_likelihood_evaluations": 3182,
+      "callback_evaluations": 3285,
+      "reported_INS_log_evidence": 1978.3579993917497,
+      "reported_INS_log_evidence_error": 0.03316485443878292,
+      "truth_coverage": {"1_sigma": 0, "2_sigma": 1, "parameters": 4},
+      "parameters": {
+        "T_upper_K": {"truth": 850.0, "median": 795.995466278575, "1_sigma": [765.3093261148111, 826.6879086527905], "2_sigma": [739.2376281857921, 846.1151594068164], "prior": [700.0, 1200.0]},
+        "T_deep_K": {"truth": 1800.0, "median": 1888.018055460487, "1_sigma": [1844.504956143554, 1932.7200781590384], "2_sigma": [1814.195201144591, 1965.685709303253], "prior": [1500.0, 2200.0]},
+        "cloud_fsed": {"truth": 1.5, "median": 2.8409652132473404, "1_sigma": [2.163396572711982, 3.5662367548050953], "2_sigma": [1.6686941998463687, 3.9414998740687563], "prior": [0.5, 4.0]},
+        "cloud_log10_kzz": {"truth": 9.0, "median": 8.592745220523264, "1_sigma": [8.42693242091879, 8.789591605935756], "2_sigma": [8.340261001722492, 9.006896028182007], "prior": [8.0, 10.0]}
+      },
+      "result_arrays_sha256": "2e050f5b7f870188fd433ecc0aa7c170d23bfa023ad81e6076348e29def8a978",
+      "manifest_sha256": "65d5da65f1ce7926e77da267ce173985f3a2fd7193f69d3f3dad6b85583f5ac9"
+    },
+    "noisy_500live": {
+      "run_id": "virga-transmission-noisy-r100-500live-20261106",
+      "source_commit": "6f1cf1c17aab982b3e5c8c1b4942fed75d27e910",
+      "converged": true,
+      "live_points": 500,
+      "mpi_ranks": 4,
+      "max_iter": 0,
+      "dlogz": 0.5,
+      "weighted_rows": 4393,
+      "effective_sample_size": 2045.9996216179948,
+      "inference_seconds": 4271.279563,
+      "timed_shell_wall_seconds": 4286.49,
+      "native_likelihood_evaluations": 13741,
+      "callback_evaluations": 14030,
+      "reported_INS_log_evidence": 1980.581176269246,
+      "reported_INS_log_evidence_error": 0.8404701518647761,
+      "final_native_NS_log_evidence": 1979.009247,
+      "native_log_ln_ev": 1979.2774985857161,
+      "native_log_ln_ev_error": 0.13935046776038712,
+      "observation_sha256": "3f6a5823b9dfae030cf52315614eb791b10854fedd0700fb1294b65d56d5d912",
+      "noise_sha256": "4a06389fdadf195b0454a30ffdcaa9ded3e06502feca7ad8743d544b41d13b1b",
+      "injection_arrays_sha256": "b5a3e85cb761f159d767cad0a41bf2b732567dbf98809a5dc795d7f2441247c5",
+      "manifest_sha256": "cc4d50bc4a69827ac52f8252ac8dcbc6859cce8c822142267522df84238fa3e8",
+      "result_arrays_sha256": "66d931b9e64e033b3910087da2f6ee1150ffc5d35c635f131faec4ba0d9c8a44",
+      "truth_coverage": {"1_sigma": 0, "2_sigma": 4, "parameters": 4},
+      "parameters": {
+        "T_upper_K": {"truth": 850.0, "median": 804.7842797267331, "1_sigma": [773.0559472095899, 838.4773200793541], "2_sigma": [742.0628953553022, 866.7472664377002], "prior": [700.0, 1200.0]},
+        "T_deep_K": {"truth": 1800.0, "median": 1874.995210218674, "1_sigma": [1824.6267956476547, 1921.4664022660163], "2_sigma": [1779.8128001410087, 1963.3441367221048], "prior": [1500.0, 2200.0]},
+        "cloud_fsed": {"truth": 1.5, "median": 2.638029107905623, "1_sigma": [1.8256555807772368, 3.4826705428788096], "2_sigma": [1.2321178832201054, 3.9238434951170866], "prior": [0.5, 4.0]},
+        "cloud_log10_kzz": {"truth": 9.0, "median": 8.634708570036354, "1_sigma": [8.434926455303902, 8.913887888826077], "2_sigma": [8.335985033534634, 9.219542317152607], "prior": [8.0, 10.0]}
+      }
+    },
+    "noiseless_500live": {
+      "run_id": "virga-transmission-noiseless-r100-500live-20261106",
+      "source_commit": "6f1cf1c17aab982b3e5c8c1b4942fed75d27e910",
+      "converged": true,
+      "live_points": 500,
+      "mpi_ranks": 4,
+      "max_iter": 0,
+      "dlogz": 0.5,
+      "weighted_rows": 4680,
+      "effective_sample_size": 2270.6962171915247,
+      "inference_seconds": 4598.415416,
+      "timed_shell_wall_seconds": 4613.53,
+      "native_likelihood_evaluations": 14841,
+      "callback_evaluations": 15098,
+      "reported_INS_log_evidence": 2086.563922784761,
+      "reported_INS_log_evidence_error": 0.03426440335396502,
+      "final_native_NS_log_evidence": 2086.789879,
+      "native_log_ln_ev": 2087.0471743878516,
+      "native_log_ln_ev_error": 0.14082260639714947,
+      "observation_sha256": "4a0210084665ba576f1c681bb16566d2742d97ac787178415464d751f64bde15",
+      "zero_noise_sha256": "bf75520ae2a2df40c3d8b29b71564bac7a99659315d2e1c83b750c96807a078d",
+      "truth_spectrum_sha256": "7d40f32ae65fcb5ca9bcb21eb6247364d467a8c61a66b1bc7b9102c72872a861",
+      "injection_arrays_sha256": "cdd9ad7e428a2f599305948890bbd5467363a441565a5df33a110d5dfe96ac0c",
+      "manifest_sha256": "4f9038a56130bcdbf8e2bd292df04524ef6927ec87c0c2d50462191baa5b6022",
+      "result_arrays_sha256": "473292a5178e311354568120a75e1bd2d6bea0f1b265883fc8d556599c44d4af",
+      "truth_coverage": {"1_sigma": 4, "2_sigma": 4, "parameters": 4},
+      "parameters": {
+        "T_upper_K": {"truth": 850.0, "median": 826.9712091551348, "1_sigma": [789.5043018124019, 861.2028611746682], "2_sigma": [750.5257197681967, 888.5148067819262], "prior": [700.0, 1200.0]},
+        "T_deep_K": {"truth": 1800.0, "median": 1834.9020714140083, "1_sigma": [1781.9554342149254, 1892.4870004834393], "2_sigma": [1737.3160081894243, 1947.9260046969873], "prior": [1500.0, 2200.0]},
+        "cloud_fsed": {"truth": 1.5, "median": 1.8602041056923906, "1_sigma": [1.253702654988543, 2.8037189716600746], "2_sigma": [0.8810371273945297, 3.682698886387691], "prior": [0.5, 4.0]},
+        "cloud_log10_kzz": {"truth": 9.0, "median": 8.85841298527637, "1_sigma": [8.566459163060106, 9.156248149018765], "2_sigma": [8.364055970786408, 9.49189083790636], "prior": [8.0, 10.0]}
+      }
+    }
+  },
+  "likelihood_diagnostics": {
+    "forward_evaluations_for_check": 0,
+    "noisy_truth_chi_square": 219.21914498114722,
+    "noisy_saved_maximum_likelihood_chi_square": 216.62336175757505,
+    "noisy_truth_minus_maximum_likelihood_delta_chi_square": 2.5957832235721696,
+    "noisy_pointwise_median_prediction_chi_square": 216.35204469084678,
+    "noiseless_truth_chi_square": 0.0,
+    "noiseless_saved_maximum_likelihood_chi_square": 0.09548250769775264,
+    "noiseless_pointwise_median_prediction_chi_square": 0.3917432252969079,
+    "interpretation": "Independent normalized-Gaussian checks on saved vectors only. They confirm input and likelihood consistency; they do not explain marginal posterior coverage."
+  },
+  "evidence_convention": {
+    "result_record": "The reported result.log_evidence and log_evidence_error are the final Importance Nested Sampling (INS) values. The native log also prints the ordinary NS trace value as Nested Sampling ln(Z), followed by its ln(ev) estimate and error.",
+    "native_log": "Both ordinary NS log entries are preserved: the final Nested Sampling ln(Z) trace and the post-sampling ln(ev) estimate with its error.",
+    "distinction": "dlogz=0.5 is the sampler stopping threshold for remaining evidence. It is not the quoted INS uncertainty. INS and ordinary NS are separate estimates and their uncertainties must not be interchanged."
+  },
+  "verification": {
+    "saved_product_checks_passed": 175,
+    "saved_product_checks_failed": 0,
+    "saved_product_verifier_sha256": "4d14ceadabca128009d212214c973249792c561e10b7483b1f98adc4cd3b1516",
+    "final_visual_qa_record_sha256": "7346a128aff31bf8b5edbfa9b0366eab7037f39852283fefc6b12f35a8363b29",
+    "combined_spectrum_residual_png_sha256": "4a45f7627425e3efc39261513d4cf6c18256f8a0b680dbe076161859756ff5a8",
+    "combined_spectrum_residual_pdf_sha256": "e6fea5444e173e3579c883289a657c2ba26c4b9800db7d0f038d59715d55fcc1",
+    "saved_row_weight_grid_physical_and_interval_checks": "passed",
+    "source_guard_and_clean_worktree": "passed",
+    "noisy_data_equals_truth_plus_saved_noise": true,
+    "noiseless_data_equals_truth_plus_zero_noise": true,
+    "preflight_exactly_matches_archived_truth": true,
+    "native_logs_report_sampling_finished": true,
+    "native_convergence_metadata_matches_runs": true,
+    "figures": "Final visual review passed for all ten PNGs and ten rendered PDF pages, including the interval comparison and combined spectrum/residual plot. The two posterior-parameter figures use shorter labels and improved y-axis headroom. Root re-hashed ten protected numerical files; their hashes are unchanged. The combined-plot band and caption say model interval and distinguish model uncertainty from 20 ppm data errors."
+  },
+  "open_gates": [
+    "Repeat the fixed noisy and noiseless 500-live-point cases with independent sampler seeds. Compare native-weighted medians and tails, and both NS and INS evidence estimates; increase live points if these estimates still shift. The present noisy INS error is larger than the 100-live-point value, but this pair does not identify a unique cause.",
+    "Repeat the recovery over independent noise seeds to estimate coverage; this three-run comparison is not a calibrated coverage study.",
+    "Measure prior support for negligible or absent clouds. The current posterior draws do not measure that prior fraction.",
+    "Check cloud-base handling and high-stream cloud scattering against independent references.",
+    "Measure per-evaluation and full-sampler performance before claiming or tuning speed improvements.",
+    "Keep the result scoped to this fixed-composition, four-parameter, local synthetic transmission experiment; it is not general Virga or target-science validation."
+  ],
+  "external_artifact_root": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-transmission-500live-20261106",
+  "git_policy": "Only this compact record is a candidate for Git. Do not add run arrays, chains, plots, logs, or configurations."
+}

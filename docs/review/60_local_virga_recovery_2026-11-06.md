@@ -1,6 +1,14 @@
 # Local Virga cloud recovery: 6 November 2026
 
-**Result:** The two local retrieval pipelines ran to native convergence. The saved posterior products passed numerical checks. Emission contains all four injected parameters inside both the 1-sigma and 2-sigma intervals. Transmission misses three injected parameters at the 2-sigma level. Parameter-coverage validation remains open. These two injections do not establish general recovery performance.
+**Dated follow-up, 6 November 2026:** A later comparison reran transmission
+with 500 live points for both the original noisy data and a noiseless data
+vector. All four truths fall inside the noisy 2-sigma intervals, though none
+falls inside its 1-sigma intervals; the noiseless case contains all four
+truths inside 1-sigma. The earlier 100-live-point result below remains the
+baseline record. This follow-up does not establish calibrated coverage or a
+general Virga recovery result. See the [500-live-point comparison](62_virga_transmission_500live_2026-11-06.md).
+
+**Original 100-live-point baseline:** The two local retrieval pipelines ran to native convergence. The saved posterior products passed numerical checks. Emission contains all four injected parameters inside both the 1-sigma and 2-sigma intervals. Transmission misses three injected parameters at the 2-sigma level. Parameter-coverage validation remains open. These two injections do not establish general recovery performance.
 
 ## Scope and result
 
@@ -86,9 +94,22 @@ The compact hash and result record is [`virga_injection_recovery_20261106.json`]
 
 ## Validation status and next gates
 
-The local retrieval and posterior-product pipeline is functional for these two separate cases. The parameter-coverage gate remains open because transmission misses three truths at the 2-sigma level. The result does not support a general claim that ROBERT recovers Virga parameters.
+The original 100-live-point transmission run misses three truths at the
+2-sigma level. The later 500-live-point noisy run includes all four truths at
+2-sigma, and its noiseless counterpart includes all four at 1-sigma. The
+coverage gate remains open: these runs do not measure coverage across
+independent noise realizations or sampler seeds. They do not support a general
+claim that ROBERT recovers Virga parameters.
 
-Before making a parameter-coverage claim, run transmission self-injections with independent noise realizations and report coverage across the runs. Keep priors, model, and a native convergence rule fixed before comparing those runs. Separately measure what fraction of the cloud-control prior produces negligible or absent condensate. Do not infer that fraction from the posterior draws, since all posterior draws here contain clouds. An independent cloud-base or high-stream cloud-scattering comparison also remains outside this validation.
+Repeat the fixed 500-live-point cases with independent sampler seeds and
+compare their native-weighted marginals and evidence estimates. Then run
+transmission self-injections with independent noise realizations and report
+coverage across the runs. Keep priors, model, and a native convergence rule
+fixed. Separately measure what fraction of the cloud-control prior produces
+negligible or absent condensate. Do not infer that fraction from the posterior
+draws, since all posterior draws here contain clouds. An independent cloud-
+base or high-stream cloud-scattering comparison also remains outside this
+validation.
 
 ## Performance follow-ups
 
