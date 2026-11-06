@@ -146,7 +146,7 @@ and ROBERT's general posterior plot legends use the same notation.
 
 ## Software checks
 
-- Final code suite: 1089 passed, 40 optional/external checks skipped.
+- Final code suite: 1090 passed, 40 optional/external checks skipped.
 - Coverage: 73%, above the 70% floor.
 - Ruff, the two-file mypy gate, and sdist/wheel builds passed.
 - After the legend-only update: all 13 post-processing tests and lint passed.

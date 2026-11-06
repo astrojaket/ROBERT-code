@@ -10,7 +10,7 @@ Status reviewed: 2026-11-06. The
 records the software checks and remaining work. The
 [local follow-up](review/59_local_elemental_recovery_2026-11-06.md) fixes the
 Virga fixture failures and joint checkpoint identity, and records a passing
-1089-test suite plus the elemental recovery results.
+1090-test suite plus the elemental recovery results.
 
 The labels below keep implementation status separate from scientific scope:
 

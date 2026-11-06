@@ -32,14 +32,16 @@
     "2-sigma upper"
   ],
   "software_checks": {
-    "portable_suite_passed": 1089,
+    "portable_suite_passed": 1090,
     "portable_suite_skipped": 40,
     "coverage_percent": 73,
     "coverage_floor_percent": 70,
     "postprocessing_after_notation_change_passed": 13,
     "ruff": "passed",
     "scoped_mypy": "passed, two files",
-    "sdist_and_wheel": "passed"
+    "sdist_and_wheel": "passed",
+    "pre_integration_suite_passed": 1089,
+    "postprocessing_in_integrated_suite_passed": 14
   },
   "cases": [
     {

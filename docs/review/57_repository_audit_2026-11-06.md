@@ -2,7 +2,7 @@
 
 Follow-up on the same date: the Virga fixture failures and joint checkpoint
 identity defect are corrected. Independent-element run creation now preserves
-its required null fields. The full code suite passes 1089 tests, with 40
+its required null fields. The full code suite passes 1090 tests, with 40
 optional/external checks skipped and 73% coverage. Local 50/100-live-point
 elemental checks converge without iteration caps. See the
 [follow-up record](59_local_elemental_recovery_2026-11-06.md). The original

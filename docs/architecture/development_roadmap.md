@@ -11,7 +11,7 @@ The [code audit and upgrade register](../review/57_repository_audit_2026-11-06.m
 contains the audit evidence and ordered to-do list. The
 [local follow-up](../review/59_local_elemental_recovery_2026-11-06.md) corrects
 the 11 Virga fixture failures, joint likelihood checkpoint identity, and
-independent-element run serialization. The full code suite passes 1089 tests.
+independent-element run serialization. The full code suite passes 1090 tests.
 The fixed-temperature elemental checks converge with 50 and 100 live points
 on four CPUs, without iteration caps. The
 [BeAR performance audit](../review/58_bear_2026_performance_audit.md)
