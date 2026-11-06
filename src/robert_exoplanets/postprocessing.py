@@ -534,8 +534,8 @@ def _validate_saved_dataset_names(
     datasets = getattr(collection, "datasets", None)
     if datasets is None:
         return
-    expected = tuple(str(dataset.name) for dataset in datasets)
-    if tuple(artifact.datasets) != expected:
+    expected = {str(dataset.name) for dataset in datasets}
+    if set(artifact.datasets) != expected:
         raise RobertDataError(
             "saved best-fit prediction dataset names do not match the configured problem"
         )
