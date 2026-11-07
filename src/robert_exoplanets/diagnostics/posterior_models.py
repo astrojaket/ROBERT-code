@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -173,31 +174,33 @@ def collect_posterior_models(
     clouds: dict[str, dict[str, list[FloatArray]]] = {r.name: {} for r in regions}
     cloud_units: dict[tuple[str, str], str] = {}
     unsupported: dict[str, dict[str, str]] = {}
+    virga_draw_scope = _virga_draw_scope_factory(regions)
 
     for draw in draws:
-        parameters = _parameters(mapper, draw)
-        spectra = _spectra(_evaluate(problem, parameters))
-        _check_names(spectra, expected_names, spectrum_samples)
-        for name, spectrum in spectra.items():
-            reference = spectrum_reference.get(name)
-            if reference is None:
-                spectrum_reference[name] = spectrum
-                spectrum_samples[name] = []
-                spectrum_masks[name] = _mask(
-                    observations.get(name), spectrum.values.size
-                )
-            else:
-                _same_grid(reference, spectrum, name)
-            values = np.array(spectrum.values, dtype=float, copy=True)
-            offset = _offset_parameter(problem, name)
-            if offset and offset in parameters:
-                values += float(parameters[offset])
-            values.setflags(write=False)
-            spectrum_samples[name].append(values)
-        for region in regions:
-            state = _build(region.builder, parameters, region.name)
-            _state_values(region.name, state, states, temperatures, vmrs, vmr_units)
-            _cloud_values(region, state, parameters, clouds, cloud_units, unsupported)
+        with virga_draw_scope():
+            parameters = _parameters(mapper, draw)
+            spectra = _spectra(_evaluate(problem, parameters))
+            _check_names(spectra, expected_names, spectrum_samples)
+            for name, spectrum in spectra.items():
+                reference = spectrum_reference.get(name)
+                if reference is None:
+                    spectrum_reference[name] = spectrum
+                    spectrum_samples[name] = []
+                    spectrum_masks[name] = _mask(
+                        observations.get(name), spectrum.values.size
+                    )
+                else:
+                    _same_grid(reference, spectrum, name)
+                values = np.array(spectrum.values, dtype=float, copy=True)
+                offset = _offset_parameter(problem, name)
+                if offset and offset in parameters:
+                    values += float(parameters[offset])
+                values.setflags(write=False)
+                spectrum_samples[name].append(values)
+            for region in regions:
+                state = _build(region.builder, parameters, region.name)
+                _state_values(region.name, state, states, temperatures, vmrs, vmr_units)
+                _cloud_values(region, state, parameters, clouds, cloud_units, unsupported)
 
     _lengths(spectrum_samples, draws.shape[0], "spectrum")
     _lengths(temperatures, draws.shape[0], "temperature")
@@ -395,6 +398,32 @@ def _named_regions(model: object, *, prefix: str = "primary") -> tuple[_Region, 
     if isinstance(models, Mapping) and models:
         return _named_regions(next(iter(models.values())), prefix=prefix)
     return ()
+
+
+def _virga_draw_scope_factory(
+    regions: tuple[_Region, ...],
+) -> Callable[[], AbstractContextManager[None]]:
+    """Return a per-draw scope factory when a region uses the Virga adapter."""
+
+    cloud_models = tuple(
+        cloud_model
+        for region in regions
+        for cloud_model in (getattr(region.model, "cloud_model", None),)
+        if cloud_model is not None
+    )
+    if not cloud_models:
+        return nullcontext
+
+    # This adapter module does not import the optional Virga package. Its own
+    # dependency loader remains lazy until a cloud calculation is requested.
+    from robert_exoplanets.forward import virga_cloud
+
+    if any(
+        isinstance(cloud_model, virga_cloud.VirgaEddySedCloudModel)
+        for cloud_model in cloud_models
+    ):
+        return virga_cloud._reuse_virga_runs_for_draw
+    return nullcontext
 
 
 def _build(builder: object, parameters: Mapping[str, float], name: str) -> object:

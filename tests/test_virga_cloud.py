@@ -16,7 +16,9 @@ from robert_exoplanets.core import (
     RobertDataError,
     RobertValidationError,
     SpectralGrid,
+    Spectrum,
 )
+from robert_exoplanets.diagnostics.posterior_models import collect_posterior_models
 from robert_exoplanets.forward import virga_cloud
 from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
 from robert_exoplanets.opacity import (
@@ -327,6 +329,187 @@ def test_virga_cloud_profiles_use_validated_outputs_and_pressure_order(
         == str(orientation == "decreasing").lower()
     )
     assert fake_atmospheres[0].gravity_call["gravity"] == pytest.approx(1500.0)
+
+
+def test_virga_evaluate_with_profiles_runs_once_and_matches_separate_apis(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    model = _model(directory)
+    gas = _gas_optical_depth()
+
+    paired_optics, paired_profiles = model.evaluate_with_profiles(gas, {})
+    separate_optics = model.evaluate(gas, {})
+    separate_profiles = model.compute_cloud_profiles(
+        gas.atmosphere,
+        gas.gravity_m_s2,
+        {},
+    )
+
+    assert len(fake_atmospheres) == 3
+    assert len(paired_optics) == len(separate_optics) == 1
+    for name in ("extinction_tau", "single_scattering_albedo", "asymmetry_factor"):
+        np.testing.assert_array_equal(
+            getattr(paired_optics[0], name), getattr(separate_optics[0], name)
+        )
+    assert paired_optics[0].metadata == separate_optics[0].metadata
+    np.testing.assert_array_equal(
+        paired_profiles.condensate_mass_mixing_ratio_kg_kg,
+        separate_profiles.condensate_mass_mixing_ratio_kg_kg,
+    )
+    np.testing.assert_array_equal(
+        paired_profiles.effective_particle_radius_micron,
+        separate_profiles.effective_particle_radius_micron,
+    )
+    assert paired_profiles.metadata == separate_profiles.metadata
+
+
+def test_posterior_collection_reuses_one_virga_run_per_equal_draw(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    selected_cloud_model = _model(
+        directory,
+        fsed=None,
+        fsed_parameter="cloud_fsed",
+        kz_cm2_s=None,
+        log10_kz_cm2_s_parameter="log10_kzz",
+    )
+    atmosphere = _gas_optical_depth().atmosphere
+
+    class _Builder:
+        calls = 0
+
+        def build(self, _parameters):
+            self.calls += 1
+            return atmosphere
+
+    builder = _Builder()
+
+    class _Forward:
+        atmosphere_builder = builder
+        cloud_model = selected_cloud_model
+        gravity_m_s2 = 15.0
+        calls = 0
+
+        def __call__(self, parameters):
+            self.calls += 1
+            (cloud,) = self.cloud_model.evaluate(
+                _gas_optical_depth(), parameters
+            )
+            values = np.mean(cloud.extinction_tau, axis=0)
+            return Spectrum.from_arrays(
+                [2.0, 4.0], values, "eclipse_depth", "eclipse_depth"
+            )
+
+    forward = _Forward()
+
+    class _Problem:
+        forward_model = forward
+        observation = SimpleNamespace(mask=None)
+        likelihood = SimpleNamespace(offset_parameter=None)
+
+        @staticmethod
+        def parameter_mapping(vector):
+            return {"cloud_fsed": float(vector[0]), "log10_kzz": float(vector[1])}
+
+        def model_spectrum(self, parameters):
+            return self.forward_model(parameters)
+
+    draws = np.asarray([[0.5, 6.0], [0.5, 6.0]])
+    products = collect_posterior_models(_Problem(), draws)
+
+    # The forward spectrum and profile collection share inside each draw.
+    # The second equal vector starts a fresh scope and performs a new run.
+    assert len(fake_atmospheres) == 2
+    assert forward.calls == 2
+    assert builder.calls == 2
+    np.testing.assert_array_equal(products.draw_vectors, draws)
+    assert "condensate_mass_mixing_ratio_MgSiO3" in products.cloud_profiles[
+        "primary"
+    ]
+    np.testing.assert_array_equal(
+        products.cloud_profiles["primary"][
+            "condensate_mass_mixing_ratio_MgSiO3"
+        ].values,
+        np.tile(np.asarray([1.0e-5, 2.0e-5]), (5, 1)),
+    )
+
+
+def test_draw_scope_does_not_reuse_a_run_after_control_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    model = _model(
+        directory,
+        fsed=None,
+        fsed_parameter="cloud_fsed",
+        kz_cm2_s=None,
+        log10_kz_cm2_s_parameter="log10_kzz",
+    )
+    gas = _gas_optical_depth()
+    atmosphere = gas.atmosphere
+
+    with virga_cloud._reuse_virga_runs_for_draw():
+        model.evaluate(gas, {"cloud_fsed": 0.5, "log10_kzz": 6.0})
+        model.compute_cloud_profiles(
+            atmosphere, 15.0, {"cloud_fsed": 0.5, "log10_kzz": 6.0}
+        )
+        model.compute_cloud_profiles(
+            atmosphere, 15.0, {"cloud_fsed": 1.0, "log10_kzz": 6.0}
+        )
+
+    assert len(fake_atmospheres) == 2
+
+
+def test_ordinary_virga_evaluation_skips_draw_cache_array_serialization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    _install_fake_virga(monkeypatch)
+    monkeypatch.setattr(
+        virga_cloud,
+        "_array_cache_token",
+        lambda _values: pytest.fail("ordinary evaluation serialized cache arrays"),
+    )
+
+    _model(directory).evaluate(_gas_optical_depth(), {})
+
+
+def test_failed_virga_run_is_not_cached_inside_draw_scope(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    directory = _mie_directory(tmp_path)
+    fake_atmospheres = _install_fake_virga(monkeypatch)
+    virga, _ = virga_cloud._load_virga()
+    compute_calls = 0
+
+    def compute(_atmosphere, **_kwargs):
+        nonlocal compute_calls
+        compute_calls += 1
+        if compute_calls == 1:
+            raise RuntimeError("temporary Virga failure")
+        return _result()
+
+    virga.compute = compute
+    model = _model(directory)
+    gas = _gas_optical_depth()
+
+    with virga_cloud._reuse_virga_runs_for_draw():
+        with pytest.raises(RobertDataError, match="Virga cloud evaluation failed"):
+            model.evaluate(gas, {})
+        model.evaluate(gas, {})
+
+    assert compute_calls == 2
+    assert len(fake_atmospheres) == 2
 
 
 @pytest.mark.parametrize(

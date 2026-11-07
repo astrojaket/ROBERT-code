@@ -18,10 +18,12 @@ that Virga's gas-property function converts it back to the requested value.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from importlib import import_module, metadata as importlib_metadata
 from pathlib import Path
-from typing import TYPE_CHECKING, Mapping
+from typing import TYPE_CHECKING, Iterator, Mapping
 
 import numpy as np
 from numpy.typing import NDArray
@@ -49,6 +51,39 @@ _SUPPORTED_MULTIPLE_SCATTERING_BACKENDS = {
     "sh4",
     "p3",
 }
+
+
+@dataclass(frozen=True)
+class _VirgaRunCacheEntry:
+    """One successful raw Virga result kept for a single diagnostics draw."""
+
+    model: object
+    result: object
+    version: str
+    metadata: Mapping[str, str]
+
+
+_VIRGA_RUNS_FOR_DRAW: ContextVar[
+    dict[tuple[object, ...], _VirgaRunCacheEntry] | None
+] = ContextVar("robert_virga_runs_for_draw", default=None)
+
+
+@contextmanager
+def _reuse_virga_runs_for_draw() -> Iterator[None]:
+    """Reuse identical successful Virga runs inside one diagnostics draw."""
+
+    token = _VIRGA_RUNS_FOR_DRAW.set({})
+    try:
+        yield
+    finally:
+        _VIRGA_RUNS_FOR_DRAW.reset(token)
+
+
+def _array_cache_token(values: object) -> tuple[tuple[int, ...], bytes]:
+    """Return an exact, normalized token for a validated numeric array."""
+
+    array = np.ascontiguousarray(np.asarray(values, dtype=np.float64))
+    return tuple(int(size) for size in array.shape), array.tobytes()
 
 
 class VirgaInvalidProposalError(RobertValidationError):
@@ -392,6 +427,35 @@ class VirgaEddySedCloudModel:
         )
         return (cloud,)
 
+    def evaluate_with_profiles(
+        self,
+        gas_optical_depth: GasOpticalDepth,
+        parameters: Mapping[str, float],
+    ) -> tuple[tuple[CloudOpticalProperties, ...], VirgaCloudProfileResult]:
+        """Run Virga once and return both optics and physical cloud profiles."""
+
+        atmosphere = gas_optical_depth.atmosphere
+        result, virga_version, model_metadata = self._run_virga(
+            atmosphere,
+            gas_optical_depth.gravity_m_s2,
+            parameters,
+        )
+        cloud = _cloud_optics_from_virga(
+            result,
+            gas_optical_depth,
+            condensibles=self.condensibles,
+            virga_version=virga_version,
+            model_metadata=model_metadata,
+        )
+        profiles = _cloud_profiles_from_virga(
+            result,
+            pressure_grid=atmosphere.pressure_grid,
+            condensibles=self.condensibles,
+            virga_version=virga_version,
+            model_metadata=model_metadata,
+        )
+        return (cloud,), profiles
+
     def compute_cloud_profiles(
         self,
         atmosphere: AtmosphereState,
@@ -400,9 +464,10 @@ class VirgaEddySedCloudModel:
     ) -> "VirgaCloudProfileResult":
         """Run Virga and return its physical layer profiles on ROBERT's grid.
 
-        This runs a fresh Virga calculation for each call. It uses the same
-        atmosphere, gravity, retrieved controls, and fixed cloud settings as
-        :meth:`evaluate`; it does not reuse state from another posterior draw.
+        This runs a fresh Virga calculation outside the short-lived scope used
+        by posterior diagnostics. It uses the same atmosphere, gravity,
+        retrieved controls, and fixed cloud settings as :meth:`evaluate`; it
+        does not reuse state between posterior draws.
         The returned condensate mass fraction uses the numeric g/g values from
         Virga, which are also the mass-ratio values in kg/kg. Radius values
         come from Virga's ``droplet_eff_r`` field in microns.
@@ -425,7 +490,7 @@ class VirgaEddySedCloudModel:
         gravity_profile: object,
         parameters: Mapping[str, float],
     ) -> tuple[object, str, Mapping[str, str]]:
-        """Run Virga once after validating the shared physical state."""
+        """Run Virga after validation or reuse it inside a diagnostics draw."""
 
         fsed, kz_cm2_s = self._resolved_controls(parameters)
         pressure_grid = atmosphere.pressure_grid
@@ -498,6 +563,27 @@ class VirgaEddySedCloudModel:
             raise RobertValidationError(
                 "atmosphere.temperature_edges must be finite and positive"
             )
+
+        run_cache = _VIRGA_RUNS_FOR_DRAW.get()
+        cache_key: tuple[object, ...] | None = None
+        if run_cache is not None:
+            cache_key = (
+                id(self),
+                fsed,
+                kz_cm2_s,
+                gravity_m_s2,
+                pressure_grid.unit,
+                pressure_grid.orientation,
+                _array_cache_token(pressure_grid.edges),
+                atmosphere.temperature_unit,
+                _array_cache_token(temperature_edges),
+                atmosphere.mean_molecular_weight_unit,
+                _array_cache_token(mean_molecular_weight_profile),
+                mean_molecular_weight,
+            )
+            cached = run_cache.get(cache_key)
+            if cached is not None and cached.model is self:
+                return cached.result, cached.version, cached.metadata
 
         # Virga sorts ptk rows into increasing pressure. Supply edge-level state
         # in that order, then map returned rows back to ROBERT's edge order.
@@ -600,6 +686,13 @@ class VirgaEddySedCloudModel:
                 "ROBERT_gas_and_rt_use_original_atmosphere_profile"
             ),
         }
+        if run_cache is not None and cache_key is not None:
+            run_cache[cache_key] = _VirgaRunCacheEntry(
+                model=self,
+                result=result,
+                version=virga_version,
+                metadata=metadata,
+            )
         return result, virga_version, metadata
 
     def _resolved_controls(

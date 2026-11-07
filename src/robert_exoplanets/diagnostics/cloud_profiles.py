@@ -75,8 +75,9 @@ def cloud_profiles(
     cloud implementations raise :class:`CloudProfileUnavailableError` so a
     collector can record an explicit unavailable diagnostic. Virga returns a
     separate mass-fraction and effective-radius profile for each condensible.
-    Its adapter runs Virga for each call with the supplied atmosphere and
-    parameters; it does not reuse cloud state between posterior draws.
+    Its adapter uses the supplied atmosphere and parameters. During posterior
+    collection, matching optical and profile requests share one raw Virga run
+    within that draw; the result is discarded before the next draw.
     """
 
     cloud_model, owner = _resolve_cloud_model(model)
