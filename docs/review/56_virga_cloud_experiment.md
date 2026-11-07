@@ -60,9 +60,12 @@ constant table must be supplied explicitly.
 
 For posterior diagnostics, the Virga provider can return per-species layer
 condensate mass mixing ratios and effective radii from Virga's own result.
-The collector evaluates Virga with each saved posterior draw. This adds one
-cloud calculation per draw and reports a mass ratio relative to gas, not a
-gas-plus-condensate mass fraction.
+The collector shares the same Virga result for spectra and profiles within
+a draw when the inputs match. The mass ratio uses the gas mass as its
+denominator. Python forward-model studies can call
+`VirgaEddySedCloudModel.evaluate_with_profiles` to get both products from
+one native Virga calculation. See the [local grid tests and reuse
+benchmark](64_virga_grid_convergence_2026-11-07.md).
 
 The optional real Virga integration check is enabled by
 `ROBERT_RUN_VIRGA_TESTS=1`; it generates an MgSiO3 Mie table from the bundled

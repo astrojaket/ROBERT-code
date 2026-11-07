@@ -287,23 +287,22 @@ summary numbers, settings, file hashes and evidence paths.
 
 ## Concrete next steps
 
-1. Test the strong low-fsed cases against a higher atmosphere top, using gas
-   opacity inputs valid at the added pressures. Repeat the top-limited
-   silicate cases and record spectral changes; do not extrapolate the present
-   tables without a separate validation.
-2. Add explicit particle-support diagnostics to the Virga workflow. Expand
-   the radius grid where physical particle sizes require it, and reject or
-   flag states below the microphysics validity range. Repeat the 57 tail
-   cases and the upper-layer radius failures before using their amplitudes.
-3. Expose cloud optics and diagnostic profiles from one Virga evaluation.
-   Preserve exact spectra/profile parity and checkpoint identity. Benchmark
-   the full calculation; the measured duplicate Virga work is the main cost.
-4. Check emission angular/stream convergence for selected strong Fe,
+The [local follow-up](64_virga_grid_convergence_2026-11-07.md) tests pressure
+and radius grids for selected cases. It also verifies exact results from the
+single-call Virga path and measures its effect on posterior calculation time.
+
+1. Obtain a consistent low-pressure gas-opacity set and repeat the
+   top-sensitive cases with it. The local extension tests use explicit gas
+   opacity assumptions above the original pressure floor.
+2. Add particle-support diagnostics to the Virga workflow. Repeat the 57
+   tail cases with suitable radius coverage and record states outside the
+   fall-speed validity range.
+3. Check emission angular/stream convergence for selected strong Fe,
    silicate and Al2O3 cases. Then run injection recovery over the selected
    wavelength windows with temperature, gases, reference radius and clouds
    free. Run those retrievals to native convergence without an iteration cap.
    This tests constraints and degeneracies that the forward grid cannot.
-5. Obtain a valid current HyVO correlated-k artifact or validate a proper
+4. Obtain a valid current HyVO correlated-k artifact or validate a proper
    format conversion that retains all g ordinates. Keep VOMYT and both
    original files with their provenance, then repeat a controlled VO opacity
    comparison.
