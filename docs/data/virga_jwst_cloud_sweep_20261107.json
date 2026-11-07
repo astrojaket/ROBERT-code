@@ -1,0 +1,1467 @@
+{
+  "schema_version": 1,
+  "title": "Virga JWST-range solar-composition cloud forward sensitivity sweep",
+  "date": "2026-11-07",
+  "artifact_root": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107",
+  "protocol": {
+    "name": "Virga solar-composition JWST-range forward sensitivity sweep",
+    "date": "2026-11-07",
+    "source_root": "/private/tmp/robert-virga-sweep-20261107",
+    "source_commit": "9ae7ca287199a1d2a5084143d2db69d4325e6081",
+    "conda_environment": "robert-exoplanets",
+    "maximum_numerical_workers": 4,
+    "threads_per_worker": 1,
+    "planet": {
+      "radius_m": 80000000,
+      "mass_kg": 1.1502935e+27,
+      "reference_pressure_bar": 1,
+      "gravity_model": "constant"
+    },
+    "star": {
+      "radius_m": 600000000,
+      "temperature_k": 5000,
+      "spectrum": "blackbody"
+    },
+    "spectral_grid": {
+      "edge_min_micron": 0.6,
+      "edge_max_micron": 12,
+      "bins": 300,
+      "edge_spacing": "logarithmic",
+      "centers": "geometric means",
+      "native_opacity_resolution": "R1000",
+      "g_points": 20
+    },
+    "opacity_directory": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/opacities",
+    "canonical_opacity_directory": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol",
+    "additional_opacity_paths": {
+      "TiO": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/nemesispy/nemesispy_agni-scatter/nemesispy/data/ktables_exomol/TiO_R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "VO": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/VO_R1000.kta"
+    },
+    "opacity_species": [
+      "H2O",
+      "CO",
+      "CO2",
+      "CH4",
+      "NH3",
+      "HCN",
+      "H2S",
+      "Na",
+      "K",
+      "SiO",
+      "SO2",
+      "C2H2",
+      "PH3",
+      "TiO",
+      "VO"
+    ],
+    "pressure": {
+      "top_bar": 1e-05,
+      "bottom_bar": 100,
+      "layers": 64
+    },
+    "temperature_pressure_knots_bar": [
+      1e-05,
+      0.01,
+      1,
+      100
+    ],
+    "temperature_interpolation": "tabulated linear in log10 pressure, no extrapolation",
+    "temperature_profiles_k": {
+      "cool": [
+        700,
+        1000,
+        1400,
+        2800
+      ],
+      "reference": [
+        1000,
+        1300,
+        1700,
+        2900
+      ],
+      "hot": [
+        1300,
+        1600,
+        2000,
+        3000
+      ]
+    },
+    "chemistry": {
+      "model": "FastChem gas-phase equilibrium",
+      "abundance_reference": "Asplund 2009 bundled file",
+      "metallicity_dex": 0,
+      "carbon_to_oxygen": 0.5495408738576248,
+      "full_equilibrium_composition": true,
+      "gas_cloud_element_depletion_coupling": false,
+      "quenching": false
+    },
+    "cloud_species": [
+      "MgSiO3",
+      "Mg2SiO4",
+      "Fe",
+      "Al2O3",
+      "MnS",
+      "Na2S",
+      "KCl"
+    ],
+    "cloud_inventory": "Each installed Virga2.0.2 solar gas_properties default at the profile's Virga MMW; record physical gas mass ratio g/g and reference. Single-species cases; no sum of competing elemental reservoirs.",
+    "cloud_mmw_policy": "Median complete FastChem MMW per profile for Virga only; ROBERT gas/RT retains original pressure-dependent MMW.",
+    "cloud_grid": {
+      "fsed": [
+        0.1,
+        0.3,
+        1,
+        3,
+        10
+      ],
+      "log10_kzz_cm2_s": [
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "geometric_stddev_main": 2,
+      "geometric_stddev_extra_at_fiducial": [
+        1.5,
+        3
+      ],
+      "fiducial_fsed": 1,
+      "fiducial_log10_kzz_cm2_s": 9,
+      "supersaturation": 0,
+      "metallicity_linear_solar": 1,
+      "do_virtual": false,
+      "particle_distribution": "lognormal homogeneous spheres"
+    },
+    "mie": {
+      "edge_min_micron": 0.4,
+      "edge_max_micron": 14,
+      "target_log_resolution": 200,
+      "radius_grid": "Virga default60 radii; verify exact grid and distribution support",
+      "refractive_index_extrapolation": "raise",
+      "source_catalogue": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer"
+    },
+    "radiative_transfer": {
+      "emission_geometry": "gauss_legendre_disk",
+      "emission_geometry_points": 4,
+      "emission": "thermal emission, SH4 HG closure for both cloudy and clear; no reflected stellar beam",
+      "transmission": "spherical-shell extinction, constant gravity, impact quadrature6",
+      "include_cia": true,
+      "include_rayleigh": true,
+      "hminus": "Include equilibrium H-,H,e- through supported continuum after alias validation",
+      "shared_cloud_optics_between_geometries": true
+    },
+    "expected_models": {
+      "cloud_states": 567,
+      "cloudy_spectra": 1134,
+      "clear_spectra": 6,
+      "total_spectra": 1140
+    },
+    "interpretation": "Controlled forward differences at prescribed TP and solar gas; no radiative-convective feedback or coupled cloud gas depletion. Not retrieval constraints or observational detectability.",
+    "required_checks": [
+      "pinned source/import/input hashes",
+      "KTA size/header/PT domain",
+      "Mie coverage/physical bounds/radius support",
+      "high-level pilot parity",
+      "same-SH4 clear/zero-cloud equality",
+      "fixed gas/TP/gravity/grid within each profile",
+      "finite spectra/VMR closure/cloud bounds/absence classification",
+      "all arrays/differences/profiles/settings/hashes/timing saved",
+      "conditional parameter ranges at fixed other controls",
+      "WASP15b PNG/PDF visual QA, deterministic model-range labels"
+    ],
+    "rejected_opacity_input_history": {
+      "HyVO_R1000": {
+        "reason": "Local R1000 file has inconsistent header: irec0=5221 allows 5116 wavelength records but header declares5119. Rejected without altering source or applying a reader exception.",
+        "sha256": "2d95e4c69f0d9514dd5e01dabe9f210f9d6ee0b0ebf36e6c6984305d4aba7128",
+        "download_url": "https://exomol.com/db/VO/51V-16O/HyVO/51V-16O__HyVO_HITEMP.R1000_0.3-50mu.ktable.NEMESIS.kta"
+      }
+    },
+    "vo_opacity": {
+      "dataset": "VOMYT",
+      "line_list_year": 2016,
+      "download_url": "https://exomol.com/db/VO/51V-16O/VOMYT/51V-16O__VOMYT.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "sha256": "0fcbe5a46bc55d0a1bf516caa6462b28a716e8e9c19eb8d64707ed89257aaf15",
+      "size_bytes": 243275760,
+      "provenance_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/VO_R1000.provenance.json",
+      "selection": "New official download; validated alternative after malformed HyVO header rejection."
+    }
+  },
+  "producer": {
+    "source_commit": "9ae7ca287199a1d2a5084143d2db69d4325e6081",
+    "source_import_path": "/private/tmp/robert-virga-sweep-20261107/src/robert_exoplanets/__init__.py",
+    "source_worktree_clean": true,
+    "source_revision": {
+      "path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/drivers/source_revision.json",
+      "bytes": 427,
+      "sha256": "0db2e20dd21aa8781c725a4dd7a076579ac45884194f39b58f36146262ac2fc5"
+    },
+    "protocol_sha256": "2dab44cb06830dd67f66b03b6620ede013eba648b32074c719150b671919b834",
+    "setup_summary_sha256": "69f236f23fe83c1ca3e1aad9180ef44c981ba8b6d3177185c3d27c03a0417ac3",
+    "run_manifest_sha256": "15ff0be324fb4f7d73ad46f62b12108e9669eba996a48afa2b83808c8b225dae",
+    "state_index_sha256": "1fd9fb323aa1dc8fb3093a19804eff9ab8a0790c2cc5d25be0d2ce4839784519",
+    "input_manifest_sha256": "5c12d9762b6239af8fa048469b017e35b24a0f58f73830e7ea84bd2d9120a950",
+    "external_harness_sha256": {
+      "drivers/run_sweep.py": "fd5c2e578fb6f2780e3d68ba69690e9787c856c7dc1aa59d55a8397e541d13b0",
+      "drivers/setup_sweep.py": "3124524ea828d78196b83d5896f15b78f278024d61772ef9344162cc9df419a6",
+      "drivers/source_guard.py": "8675a2784d9fa1e2cd59602679158db8a2e15e6eba35c50e70f5ec0bfee14d94"
+    },
+    "external_harness_unchanged": true,
+    "execution": {
+      "start_utc": "2026-11-07T04:06:43Z",
+      "end_utc": "2026-11-07T04:14:53Z",
+      "wall_seconds": 491.0825869576074,
+      "actual_workers": 3,
+      "threads_per_worker": 1,
+      "setup_wall_seconds": 21.241236708126962,
+      "opacity_preparation_seconds": 4.935469374991953,
+      "aggregate_new_state_stage_seconds": {
+        "emission_solve": 171.87225821241736,
+        "transmission_solve": 16.82672595512122,
+        "virga_optics": 382.1397337820381,
+        "virga_profiles": 380.77729966584593
+      },
+      "workers": {
+        "cool": {
+          "wall_seconds": 488.81557679129764,
+          "peak_rss_bytes": 1956282368,
+          "attempted": 189,
+          "calculated_this_invocation": 184,
+          "physical_invalid": 5,
+          "failed_rows": 0,
+          "skipped_current": 0
+        },
+        "hot": {
+          "wall_seconds": 154.32817066693678,
+          "peak_rss_bytes": 1976991744,
+          "attempted": 189,
+          "calculated_this_invocation": 184,
+          "physical_invalid": 5,
+          "failed_rows": 0,
+          "skipped_current": 0
+        },
+        "reference": {
+          "wall_seconds": 372.3634872501716,
+          "peak_rss_bytes": 1968373760,
+          "attempted": 189,
+          "calculated_this_invocation": 180,
+          "physical_invalid": 8,
+          "failed_rows": 0,
+          "skipped_current": 1
+        }
+      }
+    },
+    "invalid_proposal_groups": [
+      {
+        "fsed_values": [
+          0.1,
+          0.3,
+          1.0,
+          3.0,
+          10.0
+        ],
+        "log10_kzz_cm2_s": 7.0,
+        "profile": "cool",
+        "sigma": 2.0,
+        "species": "Fe"
+      },
+      {
+        "fsed_values": [
+          0.1,
+          0.3,
+          1.0,
+          3.0,
+          10.0
+        ],
+        "log10_kzz_cm2_s": 7.0,
+        "profile": "hot",
+        "sigma": 2.0,
+        "species": "Al2O3"
+      },
+      {
+        "fsed_values": [
+          3.0,
+          10.0
+        ],
+        "log10_kzz_cm2_s": 7.0,
+        "profile": "reference",
+        "sigma": 2.0,
+        "species": "Al2O3"
+      },
+      {
+        "fsed_values": [
+          0.1,
+          0.3,
+          1.0,
+          3.0,
+          10.0
+        ],
+        "log10_kzz_cm2_s": 7.0,
+        "profile": "reference",
+        "sigma": 2.0,
+        "species": "Fe"
+      },
+      {
+        "fsed_values": [
+          10.0
+        ],
+        "log10_kzz_cm2_s": 7.0,
+        "profile": "reference",
+        "sigma": 2.0,
+        "species": "MnS"
+      }
+    ],
+    "invalid_reason": "VirgaInvalidProposalError: fall-speed constraint would require particles smaller than gas atoms; preserved as invalid proposals.",
+    "run_directory": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/runs/virga-jwst-forward-sweep-20261107",
+    "execution_log": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/drivers/full_sweep_15gas_20261107.log",
+    "launch_time_file": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/drivers/full_sweep_launch_time_utc.txt",
+    "pilot_snapshot_manifest": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/runs/virga-jwst-forward-sweep-20261107/pilot_snapshot_before_full_20261107/snapshot_manifest.json"
+  },
+  "input_sources": {
+    "molecular_opacity_table_count": 15,
+    "molecular_opacity_tables": {
+      "C2H2": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/C2H2_R1000.kta",
+        "kta_sha256": "7b052d1f4096831c872469d4b5d7c45d52077cdf6c0e39d94a7fcf0b10604c2f",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_C2H2.npz",
+        "cache_sha256": "a8c1f1db018986f73255bcda53e059d91f8337c74c292c4294e095a445e53c02",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "CH4": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/CH4_R1000.kta",
+        "kta_sha256": "6c83b1d7b7cc93007fa90a6c8bdc673638dc7cfabae343219396cdf2e879778d",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_CH4.npz",
+        "cache_sha256": "a047fffa5649e7c78052c2882149d8de01ae4eea2508d40d7504edf8e45fd390",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "CO": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/CO_R1000.kta",
+        "kta_sha256": "f87d35061fa21a11c68e84a6dc2276f3d89e31f9321dc97b47b2c288766894d9",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_CO.npz",
+        "cache_sha256": "a1122e1762021459c724ddf0d2b9ee6b197f398d7ea949f298f6e36aa16884f8",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "CO2": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/CO2_R1000.kta",
+        "kta_sha256": "b4bc9f544115dd490ef545e03693cc758cd59195c853503920efef98287879a7",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_CO2.npz",
+        "cache_sha256": "3197ab94ec9515043eaf6b27cbf16d01c706853d0f8367d5457267009ae500b3",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "H2O": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/H2O_R1000.kta",
+        "kta_sha256": "71c38634b391141177ae2a029f2fac00d78fd172fe52f4f10da361e975971d9f",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_H2O.npz",
+        "cache_sha256": "94ed948740f3136f542f4939f99a4f6f38bec21d0623841c0e49803f6f504ffc",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "H2S": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/H2S_R1000.kta",
+        "kta_sha256": "b2d7107e60c1c2bd7c69853975616d143d3c4812b6ffc32b3f06566e0ffb47dc",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_H2S.npz",
+        "cache_sha256": "4fd41458da9e3c9094719c8d99234eeab453a8e57a64234e6d5aa9b4f9705a22",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "HCN": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/HCN_R1000.kta",
+        "kta_sha256": "203c6b802d07becda6cee9328ab6abb4ad6b8cafed9d27f3014b06e1604f6b54",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_HCN.npz",
+        "cache_sha256": "3411e20ca3ff862686d40f79c36db4d28b125a48519e8420273bb7d215a225b6",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "K": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/K_R1000.kta",
+        "kta_sha256": "d5478ccb94c0d538c7df50e545a7da654077cf0db310a505a89d5d6fdb803081",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_K.npz",
+        "cache_sha256": "63939615c8a0f2b03045ccacd4ba4b42688e454940cf5107a875a85f9351082b",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "NH3": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/NH3_R1000.kta",
+        "kta_sha256": "6fcb97aee63318df3c9c3ad7e2c646d5a5b8ba8284c66259b01b87caa8e911ac",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_NH3.npz",
+        "cache_sha256": "ab9c857cfc219b2362b7d0f720e76bd630851023127bf46d73f5d25107ee7eab",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "Na": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/Na_R1000.kta",
+        "kta_sha256": "a395ddcc61f6441974b3c6f227064403e721d6d0839064788a7e949eeb8ef861",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_Na.npz",
+        "cache_sha256": "57f8217f086ab959d40d716181d406961b64ec00484695d1fbc86e99f0bf5149",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "PH3": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/PH3_R1000.kta",
+        "kta_sha256": "507c35a31cf4b573ab9c00faf35fc5fa3a5787ca73c183c0085d1e838f48a55e",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_PH3.npz",
+        "cache_sha256": "a1cc5e1fa413bd273fdb0f6e68e9d54c7c009a60d4edd32a5881896d3680d4b8",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "SO2": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/SO2_R1000.kta",
+        "kta_sha256": "dcbde137f1b7e9ed8bb79e0a72a964acfef9b8bfd1163dd2c705227da80a088d",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_SO2.npz",
+        "cache_sha256": "666da7749b032013195f36a59c0f63ffebba074d67d88013c0c404eaac5ea21b",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "SiO": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/nemesispy/NemesisPy-Docker/ktables_exomol/SiO_R1000.kta",
+        "kta_sha256": "ad2c1125249c0907f0ba9002c0d942647e0d37324d4fc6b78673116a76268e3b",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_SiO.npz",
+        "cache_sha256": "f0a4d972c760dcd065e024e4a0d897a5b7f70616bc8d10d76a4afb9736a77a6d",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "TiO": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/nemesispy/nemesispy_agni-scatter/nemesispy/data/ktables_exomol/TiO_R1000_0.3-50mu.ktable.NEMESIS.kta",
+        "kta_sha256": "cf5ec9b6eea0564c78cdf8d54af0c9dd1f148a75c71f7a91aa3e1c3d37f31c44",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_TiO.npz",
+        "cache_sha256": "6aff06aace81c6b7663eaad812abb00de6730474ed5492375f0f134f134dfd20",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      },
+      "VO": {
+        "kta_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/VO_R1000.kta",
+        "kta_sha256": "0fcbe5a46bc55d0a1bf516caa6462b28a716e8e9c19eb8d64707ed89257aaf15",
+        "bytes": 243275760,
+        "cache_path": "shared-inputs/opacity_cache/R1000/sweep_grid_VO.npz",
+        "cache_sha256": "ebc2a82d708eef713a4249df828d954d60305ba6f3db79827143a548814c16e2",
+        "g_points": 20,
+        "native_g_preserved": true,
+        "native_wavelength_micron": [
+          0.3001500070095062,
+          49.997337341308594
+        ],
+        "prepared_wavelength_micron": [
+          0.6030032234123808,
+          11.940234679435667
+        ]
+      }
+    },
+    "native_resolution": "R1000",
+    "prepared_bins": 300,
+    "prepared_wavelength_micron": [
+      0.6030032234123808,
+      11.940234679435667
+    ],
+    "native_g_points": 20,
+    "all_native_g_grids_preserved_exactly": true,
+    "vo_table": {
+      "dataset": "VOMYT",
+      "line_list_year": 2016,
+      "download_url": "https://exomol.com/db/VO/51V-16O/VOMYT/51V-16O__VOMYT.R1000_0.3-50mu.ktable.NEMESIS.kta",
+      "installed_path": "/Users/jaketaylor/Developer/ROBERT-code/opacity_data/ktables_exomol/VO_R1000.kta",
+      "sha256": "0fcbe5a46bc55d0a1bf516caa6462b28a716e8e9c19eb8d64707ed89257aaf15",
+      "bytes": 243275760,
+      "validation_status": "passed",
+      "rejected_alternative": {
+        "reason": "Local R1000 file has inconsistent header: irec0=5221 allows 5116 wavelength records but header declares5119. Rejected without altering source or applying a reader exception.",
+        "sha256": "2d95e4c69f0d9514dd5e01dabe9f210f9d6ee0b0ebf36e6c6984305d4aba7128",
+        "download_url": "https://exomol.com/db/VO/51V-16O/HyVO/51V-16O__HyVO_HITEMP.R1000_0.3-50mu.ktable.NEMESIS.kta"
+      }
+    },
+    "mie_manifest_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/inputs_manifest.json",
+    "mie_manifest_sha256": "5c12d9762b6239af8fa048469b017e35b24a0f58f73830e7ea84bd2d9120a950",
+    "virga_version": "2.0.2",
+    "catalogue": {
+      "catalogue_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer",
+      "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+      "catalogue_license": "AGPL-3.0; see LICENSE-AGPL-3.0.txt in the optical-constant snapshot"
+    },
+    "mie_grid": {
+      "wavelength_count": 713,
+      "wavelength_micron": [
+        0.4,
+        14.0
+      ],
+      "target_log_resolution": 200,
+      "effective_R_from_step": 199.76210293469165,
+      "radius_count": 60,
+      "center_bounds_micron": [
+        0.0001,
+        542.39131
+      ],
+      "outer_bin_edge_bounds_micron": [
+        8.693416654828844e-05,
+        613.2592552211564
+      ],
+      "tail_support_uses_actual_outer_bin_edges": true,
+      "center_extrema_are_diagnostic_only": true
+    },
+    "mie_materials": {
+      "Al2O3": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/Al2O3.mieff",
+        "mie_sha256": "7231184536a337f41c0729a48ec017bb7d1a3666b7c8934a144d2d8b2ee79572",
+        "mie_bytes": 3225379,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/Al2O3.refrind",
+        "refractive_index_sha256": "e661e244546cc9b0b8d8738d02f3bf0bd102e3e957a1493c7c74a97e4c803e37",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/Al2O3.txt",
+        "source_sha256": "e4f231dc1541b380bbbaef44d1db0083ee1367da21eb4b9255597a8010244a91",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/Al2O3.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.2,
+          500.0
+        ]
+      },
+      "Fe": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/Fe.mieff",
+        "mie_sha256": "431edf3dade3a2e529fe6fd7cc0a8b64f870fc2cfd70cb76d9c9a940edfd12c2",
+        "mie_bytes": 3227827,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/Fe.refrind",
+        "refractive_index_sha256": "f42f6e3932fc59c6990b7d4989475b6cee7215ba8b80540c4c3763bfb365c191",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/Fe.txt",
+        "source_sha256": "a450b2318ca3192410026fd6514978ceddf83b6928cb97572ce2cc1ecc4257ea",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/Fe.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.000124,
+          285.7
+        ]
+      },
+      "KCl": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/KCl.mieff",
+        "mie_sha256": "36d59c8f72add7ce2d65af468332b2f9ced9102990283f620bbbd76225589144",
+        "mie_bytes": 3235238,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/KCl.refrind",
+        "refractive_index_sha256": "d1e21987e6f35d59fa88cd140581de126b0193af334ace8f999505a9eb54347f",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/KCl.txt",
+        "source_sha256": "9d88bb3c63947a4b215be6eab5542e33b2cfc85a39037cc9fbe366c2149b70fb",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/KCl.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.0067,
+          166.6667
+        ]
+      },
+      "Mg2SiO4": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/Mg2SiO4.mieff",
+        "mie_sha256": "fb87670f8141175e2fd27192802212163617a809a2d1ccc08b0140a280837eb7",
+        "mie_bytes": 3231630,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/Mg2SiO4.refrind",
+        "refractive_index_sha256": "56dcc976a86475d32c0de5897c4ef2ed1ce4d38961b37be4f7916da5b97aba51",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/Mg2SiO4.txt",
+        "source_sha256": "77d49791ef9e36f766c64e67c35c2d57cfe22835949d7139b752f1992d4fdd79",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/Mg2SiO4.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.1,
+          1000.0
+        ]
+      },
+      "MgSiO3": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/MgSiO3.mieff",
+        "mie_sha256": "24fca7b8ff73d10cb688ef4e3ad99a2001fc05698544b8f9e98ac1ceea02bda1",
+        "mie_bytes": 3230675,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/MgSiO3.refrind",
+        "refractive_index_sha256": "4278cce579e6809961f454f5890055d7d5ac0b103489bb22955d98b51cd75463",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/MgSiO3.txt",
+        "source_sha256": "0faef18dbd1ae853ef25be2f2766f499f9cb37d0732e0f401ca86e999c30c731",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/MgSiO3.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.2,
+          500.0
+        ]
+      },
+      "MnS": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/MnS.mieff",
+        "mie_sha256": "4e85fe920bf6a51beca741249e0953d2d1b0a1c5efcd27e45e1c9f20de057da8",
+        "mie_bytes": 3221246,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/MnS.refrind",
+        "refractive_index_sha256": "d42fd3895c9e8d724c8a505cb1a93b4a68f7f135b50a272ead82959e5db81f28",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/MnS.txt",
+        "source_sha256": "b0329874f452cd46ffc24d7b1443225dbfc2e21fcec086c5a48665fa7c95b8e5",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/MnS.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.09000652,
+          190.0
+        ]
+      },
+      "Na2S": {
+        "mie_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/mie/Na2S.mieff",
+        "mie_sha256": "ac7491518024767a842a4814228421a9583e2a6d9ff75578cf104d9dc9d9b5ff",
+        "mie_bytes": 3228201,
+        "refractive_index_path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/shared-inputs/refrind/Na2S.refrind",
+        "refractive_index_sha256": "2df27a38cd4ded0f3e196b85f1523ec268348333d3ecf799a4c4790aa88022c4",
+        "source_path": "/private/tmp/robert-virga-sweep-20261107/data/optical_constants/exo_skryer/Na2S.txt",
+        "source_sha256": "4a6311ba3ecc38bae8f96b4425a64b45769656dd429d2058d0ebdd33e965214c",
+        "source_url": "https://github.com/ELeeAstro/Exo_Skryer/blob/abde13e1e39753f0528e271227decec503211c64/nk_data/Na2S.txt",
+        "catalogue_commit": "abde13e1e39753f0528e271227decec503211c64",
+        "source_coverage_micron": [
+          0.04132806,
+          200.0
+        ]
+      }
+    }
+  },
+  "profiles": {
+    "cool": {
+      "temperature_knots_pressure_bar": [
+        1e-05,
+        0.01,
+        1.0,
+        100.0
+      ],
+      "temperature_knots_K": [
+        700,
+        1000,
+        1400,
+        2800
+      ],
+      "layers": 64,
+      "gas_species_count": 523,
+      "gas_vmr_sum_min": 0.9999999999992639,
+      "gas_vmr_sum_max": 1.00000000000069,
+      "gravity_m_s2": 11.995943604765625,
+      "profile_mmw_amu_min_median_max": [
+        2.3260910005210196,
+        2.3342313622039548,
+        2.334301663067614
+      ],
+      "virga_mmw_override_amu": 2.3342313622039548,
+      "profile_common_sha256": "e58a9543e65d84709a208cb3b2be327339a9d86d109d1e0bc2d30f54ba4effab",
+      "profile_csv_sha256": "a9745b972237c16452359f1c1f7295d61801157affa3881a5aa37c874e9a7a61",
+      "emission_angle_cosines": [
+        0.06943184420297371,
+        0.33000947820757187,
+        0.6699905217924281,
+        0.9305681557970262
+      ],
+      "emission_angle_weights": [
+        0.024152203412833216,
+        0.21521408227178512,
+        0.43693107259076136,
+        0.32370264172462027
+      ],
+      "profile_common_path": "shared-inputs/atmospheres/cool/profile_common.npz",
+      "profile_csv_path": "drivers/temperature_profiles/cool.csv"
+    },
+    "hot": {
+      "temperature_knots_pressure_bar": [
+        1e-05,
+        0.01,
+        1.0,
+        100.0
+      ],
+      "temperature_knots_K": [
+        1300,
+        1600,
+        2000,
+        3000
+      ],
+      "layers": 64,
+      "gas_species_count": 523,
+      "gas_vmr_sum_min": 0.9999999999992455,
+      "gas_vmr_sum_max": 0.9999999999999738,
+      "gravity_m_s2": 11.995943604765625,
+      "profile_mmw_amu_min_median_max": [
+        2.3176978660169953,
+        2.3333135402604093,
+        2.3338193100301914
+      ],
+      "virga_mmw_override_amu": 2.3333135402604093,
+      "profile_common_sha256": "b84f7232f78296634d2a7ab01273b85b9ad7390cef8e3bbc1d4a97d6af911359",
+      "profile_csv_sha256": "7e2749205e455449ebd06e60a4dc978654491c39426a6b7f19298dbd6391f3f5",
+      "emission_angle_cosines": [
+        0.06943184420297371,
+        0.33000947820757187,
+        0.6699905217924281,
+        0.9305681557970262
+      ],
+      "emission_angle_weights": [
+        0.024152203412833216,
+        0.21521408227178512,
+        0.43693107259076136,
+        0.32370264172462027
+      ],
+      "profile_common_path": "shared-inputs/atmospheres/hot/profile_common.npz",
+      "profile_csv_path": "drivers/temperature_profiles/hot.csv"
+    },
+    "reference": {
+      "temperature_knots_pressure_bar": [
+        1e-05,
+        0.01,
+        1.0,
+        100.0
+      ],
+      "temperature_knots_K": [
+        1000,
+        1300,
+        1700,
+        2900
+      ],
+      "layers": 64,
+      "gas_species_count": 523,
+      "gas_vmr_sum_min": 0.9999999999987519,
+      "gas_vmr_sum_max": 0.9999999999999746,
+      "gravity_m_s2": 11.995943604765625,
+      "profile_mmw_amu_min_median_max": [
+        2.3224701831779364,
+        2.3341821518438572,
+        2.334211438679768
+      ],
+      "virga_mmw_override_amu": 2.3341821518438572,
+      "profile_common_sha256": "55685417da0e067dfab9b3d50509e35b5bef51033b3283ef25fd1dde3dc883cc",
+      "profile_csv_sha256": "5ac8ebb97fa6631077792efcba596c1f27944fa41e8c0a6fc5b5f57a3f6c5f77",
+      "emission_angle_cosines": [
+        0.06943184420297371,
+        0.33000947820757187,
+        0.6699905217924281,
+        0.9305681557970262
+      ],
+      "emission_angle_weights": [
+        0.024152203412833216,
+        0.21521408227178512,
+        0.43693107259076136,
+        0.32370264172462027
+      ],
+      "profile_common_path": "shared-inputs/atmospheres/reference/profile_common.npz",
+      "profile_csv_path": "drivers/temperature_profiles/reference.csv"
+    }
+  },
+  "result_summary": {
+    "status": "complete_with_physical_invalid_proposals",
+    "requested_states": 567,
+    "calculated_states_with_spectra": 549,
+    "reused_compatible_pilot_states": 1,
+    "physical_invalid_proposals": 18,
+    "failed_state_rows": 0,
+    "worker_failures": 0,
+    "interpretation": "All requested rows are accounted for. Virga rejected 18 physical settings; the runner did not replace them with clear cases. Completion means calculated, not scientifically validated.",
+    "spectral_products": {
+      "clear_controls_across_3_profiles": 6,
+      "cloud_configured_emission_and_transmission_arrays": 1098,
+      "total_saved_spectral_products": 1104,
+      "calculated_cloud_states": 549
+    }
+  },
+  "results": {
+    "state_accounting": {
+      "expected": 567,
+      "calculated_with_spectra": 549,
+      "physical_invalid": 18,
+      "failed_rows": 0,
+      "all_expected_rows_accounted_for": true,
+      "fully_supported_grid": false,
+      "unique_spectra": {
+        "clear_controls_across_3_profiles": 6,
+        "cloudy_emission_and_transmission_arrays": 1098,
+        "total_unique_emission_transmission_arrays": 1104,
+        "valid_cloudy_states": 549
+      }
+    },
+    "raw_grid_maxima_six": [
+      {
+        "profile": "cool",
+        "geometry": "transmission",
+        "observable": "transit_depth",
+        "cloud_species": "Al2O3",
+        "fsed": 0.1,
+        "log10_kzz_cm2_s": 7.0,
+        "geometric_stddev": 2.0,
+        "state_id": "cool_Al2O3_fsed-0p1_logKzz-7_sigma-2",
+        "sign_convention": "cloudy minus clear",
+        "signed_delta_ppm": 1155.7160258370698,
+        "absolute_delta_ppm": 1155.7160258370698,
+        "peak_wavelength_micron": 1.0339630832504552,
+        "support_classification": "effective_radius_outside_center_grid",
+        "effective_radius_outside_center_grid_cells": 10,
+        "effective_radius_inside_center_fraction": 0.8181818181818182,
+        "effective_radius_inside_outer_bin_fraction": 0.8363636363636363,
+        "area_tail_fraction_outside_outer_bins": 7.331811331470548e-06,
+        "mass_tail_fraction_outside_outer_bins": 4.0050206555272685e-06,
+        "top_boundary_condensate": true,
+        "top_boundary_pressure_bar": 1.134194403502757e-05,
+        "top_boundary_max_vertical_tau": 0.6329740306469087,
+        "same_state_transit_upper_edge_context": {
+          "gap_below_opaque_edge_ppm": 0.15717313510410502,
+          "top_layer_reff_micron": 1.151532901534507e-05,
+          "top_reff_inside_mie_centers": false,
+          "top_reff_inside_outer_bins": false,
+          "active_layers_outside_center_range": 10,
+          "active_layers_outside_outer_bins": 9,
+          "max_top_layer_tau": 0.6329740306469087
+        }
+      },
+      {
+        "profile": "cool",
+        "geometry": "emission",
+        "observable": "eclipse_depth",
+        "cloud_species": "Mg2SiO4",
+        "fsed": 0.1,
+        "log10_kzz_cm2_s": 7.0,
+        "geometric_stddev": 2.0,
+        "state_id": "cool_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2",
+        "sign_convention": "cloudy minus clear",
+        "signed_delta_ppm": -2176.5926089311824,
+        "absolute_delta_ppm": 2176.5926089311824,
+        "peak_wavelength_micron": 9.681457939350151,
+        "support_classification": "effective_radius_outside_center_grid",
+        "effective_radius_outside_center_grid_cells": 9,
+        "effective_radius_inside_center_fraction": 0.82,
+        "effective_radius_inside_outer_bin_fraction": 0.84,
+        "area_tail_fraction_outside_outer_bins": 2.0484226719194168e-05,
+        "mass_tail_fraction_outside_outer_bins": 1.1059093507620113e-05,
+        "top_boundary_condensate": true,
+        "top_boundary_pressure_bar": 1.134194403502757e-05,
+        "top_boundary_max_vertical_tau": 82.70590687622861,
+        "same_state_transit_upper_edge_context": {
+          "gap_below_opaque_edge_ppm": 0.0,
+          "top_layer_reff_micron": 1.4284883878089855e-05,
+          "top_reff_inside_mie_centers": false,
+          "top_reff_inside_outer_bins": false,
+          "active_layers_outside_center_range": 9,
+          "active_layers_outside_outer_bins": 8,
+          "max_top_layer_tau": 82.70590687622861
+        }
+      },
+      {
+        "profile": "reference",
+        "geometry": "transmission",
+        "observable": "transit_depth",
+        "cloud_species": "Al2O3",
+        "fsed": 0.1,
+        "log10_kzz_cm2_s": 7.0,
+        "geometric_stddev": 2.0,
+        "state_id": "reference_Al2O3_fsed-0p1_logKzz-7_sigma-2",
+        "sign_convention": "cloudy minus clear",
+        "signed_delta_ppm": 1371.2915659207235,
+        "absolute_delta_ppm": 1371.2915659207235,
+        "peak_wavelength_micron": 1.2751965603965636,
+        "support_classification": "effective_radius_outside_center_grid",
+        "effective_radius_outside_center_grid_cells": 12,
+        "effective_radius_inside_center_fraction": 0.7647058823529411,
+        "effective_radius_inside_outer_bin_fraction": 0.7843137254901961,
+        "area_tail_fraction_outside_outer_bins": 3.6477743673601585e-05,
+        "mass_tail_fraction_outside_outer_bins": 2.048937528948011e-05,
+        "top_boundary_condensate": true,
+        "top_boundary_pressure_bar": 1.134194403502757e-05,
+        "top_boundary_max_vertical_tau": 3.228884289278801,
+        "same_state_transit_upper_edge_context": {
+          "gap_below_opaque_edge_ppm": 0.00023819376332445685,
+          "top_layer_reff_micron": 6.768597156834456e-06,
+          "top_reff_inside_mie_centers": false,
+          "top_reff_inside_outer_bins": false,
+          "active_layers_outside_center_range": 12,
+          "active_layers_outside_outer_bins": 11,
+          "max_top_layer_tau": 3.228884289278801
+        }
+      },
+      {
+        "profile": "reference",
+        "geometry": "emission",
+        "observable": "eclipse_depth",
+        "cloud_species": "Mg2SiO4",
+        "fsed": 0.1,
+        "log10_kzz_cm2_s": 7.0,
+        "geometric_stddev": 2.0,
+        "state_id": "reference_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2",
+        "sign_convention": "cloudy minus clear",
+        "signed_delta_ppm": -3248.9124496932836,
+        "absolute_delta_ppm": 3248.9124496932836,
+        "peak_wavelength_micron": 9.778619100031705,
+        "support_classification": "effective_radius_outside_center_grid",
+        "effective_radius_outside_center_grid_cells": 11,
+        "effective_radius_inside_center_fraction": 0.75,
+        "effective_radius_inside_outer_bin_fraction": 0.7727272727272727,
+        "area_tail_fraction_outside_outer_bins": 0.00036378870365514054,
+        "mass_tail_fraction_outside_outer_bins": 0.0002030105581651258,
+        "top_boundary_condensate": true,
+        "top_boundary_pressure_bar": 1.134194403502757e-05,
+        "top_boundary_max_vertical_tau": 475.6283240831212,
+        "same_state_transit_upper_edge_context": {
+          "gap_below_opaque_edge_ppm": -3.469446951953614e-12,
+          "top_layer_reff_micron": 8.396514251467353e-06,
+          "top_reff_inside_mie_centers": false,
+          "top_reff_inside_outer_bins": false,
+          "active_layers_outside_center_range": 11,
+          "active_layers_outside_outer_bins": 10,
+          "max_top_layer_tau": 475.6283240831212
+        }
+      },
+      {
+        "profile": "hot",
+        "geometry": "transmission",
+        "observable": "transit_depth",
+        "cloud_species": "Al2O3",
+        "fsed": 0.1,
+        "log10_kzz_cm2_s": 11.0,
+        "geometric_stddev": 2.0,
+        "state_id": "hot_Al2O3_fsed-0p1_logKzz-11_sigma-2",
+        "sign_convention": "cloudy minus clear",
+        "signed_delta_ppm": 1177.8298109897944,
+        "absolute_delta_ppm": 1177.8298109897944,
+        "peak_wavelength_micron": 1.2879941760740192,
+        "support_classification": "within_1pct_radius_tails",
+        "effective_radius_outside_center_grid_cells": 0,
+        "effective_radius_inside_center_fraction": 1.0,
+        "effective_radius_inside_outer_bin_fraction": 1.0,
+        "area_tail_fraction_outside_outer_bins": 6.701478535090055e-07,
+        "mass_tail_fraction_outside_outer_bins": 1.683958917259694e-05,
+        "top_boundary_condensate": true,
+        "top_boundary_pressure_bar": 1.134194403502757e-05,
+        "top_boundary_max_vertical_tau": 0.0005408575988199162,
+        "same_state_transit_upper_edge_context": {
+          "gap_below_opaque_edge_ppm": 414.23743135172305,
+          "top_layer_reff_micron": 0.045729709874198575,
+          "top_reff_inside_mie_centers": true,
+          "top_reff_inside_outer_bins": true,
+          "active_layers_outside_center_range": 0,
+          "active_layers_outside_outer_bins": 0,
+          "max_top_layer_tau": 0.0005408575988199162
+        }
+      },
+      {
+        "profile": "hot",
+        "geometry": "emission",
+        "observable": "eclipse_depth",
+        "cloud_species": "Al2O3",
+        "fsed": 0.1,
+        "log10_kzz_cm2_s": 10.0,
+        "geometric_stddev": 2.0,
+        "state_id": "hot_Al2O3_fsed-0p1_logKzz-10_sigma-2",
+        "sign_convention": "cloudy minus clear",
+        "signed_delta_ppm": -1060.8640842068535,
+        "absolute_delta_ppm": 1060.8640842068535,
+        "peak_wavelength_micron": 3.941229858582236,
+        "support_classification": "within_1pct_radius_tails",
+        "effective_radius_outside_center_grid_cells": 0,
+        "effective_radius_inside_center_fraction": 1.0,
+        "effective_radius_inside_outer_bin_fraction": 1.0,
+        "area_tail_fraction_outside_outer_bins": 6.565763741562916e-12,
+        "mass_tail_fraction_outside_outer_bins": 5.931844710347802e-10,
+        "top_boundary_condensate": true,
+        "top_boundary_pressure_bar": 1.134194403502757e-05,
+        "top_boundary_max_vertical_tau": 0.00025328354737384886,
+        "same_state_transit_upper_edge_context": {
+          "gap_below_opaque_edge_ppm": 844.8683656194847,
+          "top_layer_reff_micron": 0.004572970987419858,
+          "top_reff_inside_mie_centers": true,
+          "top_reff_inside_outer_bins": true,
+          "active_layers_outside_center_range": 0,
+          "active_layers_outside_outer_bins": 0,
+          "max_top_layer_tau": 0.00025328354737384886
+        }
+      }
+    ],
+    "top_conditional_fsed_kzz_responses": [
+      {
+        "varied_parameter": "fsed",
+        "profile": "reference",
+        "cloud_species": "Mg2SiO4",
+        "geometry": "emission",
+        "fixed_log10_kzz_cm2_s": 7.0,
+        "fixed_fsed": null,
+        "geometric_stddev": 2.0,
+        "tested_values": [
+          0.1,
+          0.3,
+          1.0,
+          3.0,
+          10.0
+        ],
+        "missing_values": [],
+        "supported_count": 5,
+        "peak_conditional_span_ppm": 2951.6819843677417,
+        "max_effect_at_peak_ppm": -275.30948765134343,
+        "min_effect_at_peak_ppm": -3226.991472019085,
+        "peak_wavelength_micron": 9.681457939350151,
+        "maximum_state_id": "reference_Mg2SiO4_fsed-10_logKzz-7_sigma-2",
+        "minimum_state_id": "reference_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2"
+      },
+      {
+        "varied_parameter": "fsed",
+        "profile": "cool",
+        "cloud_species": "Mg2SiO4",
+        "geometry": "emission",
+        "fixed_log10_kzz_cm2_s": 7.0,
+        "fixed_fsed": null,
+        "geometric_stddev": 2.0,
+        "tested_values": [
+          0.1,
+          0.3,
+          1.0,
+          3.0,
+          10.0
+        ],
+        "missing_values": [],
+        "supported_count": 5,
+        "peak_conditional_span_ppm": 2176.578229745413,
+        "max_effect_at_peak_ppm": -0.014379185769592545,
+        "min_effect_at_peak_ppm": -2176.5926089311824,
+        "peak_wavelength_micron": 9.681457939350151,
+        "maximum_state_id": "cool_Mg2SiO4_fsed-10_logKzz-7_sigma-2",
+        "minimum_state_id": "cool_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2"
+      },
+      {
+        "varied_parameter": "log10_kzz_cm2_s",
+        "profile": "reference",
+        "cloud_species": "Mg2SiO4",
+        "geometry": "emission",
+        "fixed_log10_kzz_cm2_s": null,
+        "fixed_fsed": 0.1,
+        "geometric_stddev": 2.0,
+        "tested_values": [
+          7.0,
+          8.0,
+          9.0,
+          10.0,
+          11.0
+        ],
+        "missing_values": [],
+        "supported_count": 5,
+        "peak_conditional_span_ppm": 2065.012746772137,
+        "max_effect_at_peak_ppm": -1183.899702921147,
+        "min_effect_at_peak_ppm": -3248.9124496932836,
+        "peak_wavelength_micron": 9.778619100031705,
+        "maximum_state_id": "reference_Mg2SiO4_fsed-0p1_logKzz-9_sigma-2",
+        "minimum_state_id": "reference_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2"
+      },
+      {
+        "varied_parameter": "fsed",
+        "profile": "reference",
+        "cloud_species": "Fe",
+        "geometry": "emission",
+        "fixed_log10_kzz_cm2_s": 11.0,
+        "fixed_fsed": null,
+        "geometric_stddev": 2.0,
+        "tested_values": [
+          0.1,
+          0.3,
+          1.0,
+          3.0,
+          10.0
+        ],
+        "missing_values": [],
+        "supported_count": 5,
+        "peak_conditional_span_ppm": 2021.2324649818027,
+        "max_effect_at_peak_ppm": -0.1218441215110333,
+        "min_effect_at_peak_ppm": -2021.3543091033137,
+        "peak_wavelength_micron": 11.472704193936366,
+        "maximum_state_id": "reference_Fe_fsed-10_logKzz-11_sigma-2",
+        "minimum_state_id": "reference_Fe_fsed-0p1_logKzz-11_sigma-2"
+      }
+    ],
+    "maximum_fiducial_width_response": {
+      "profile": "cool",
+      "cloud_species": "Mg2SiO4",
+      "geometry": "emission",
+      "fsed": 1.0,
+      "log10_kzz_cm2_s": 9.0,
+      "tested_widths": [
+        1.5,
+        2.0,
+        3.0
+      ],
+      "supported_count": 3,
+      "expected_count": 3,
+      "maximum_spectral_span_ppm": 395.5203831920106,
+      "band_mean_spectral_span_ppm": 107.60711581717663,
+      "wavelength_at_peak": null,
+      "note": "The saved range table records the peak span, but it does not record the wavelength coordinate."
+    },
+    "support_and_boundary": {
+      "radius_and_boundary_counts": {
+        "bottom_boundary_condensate": 0,
+        "effective_radius_outside_center_grid": 39,
+        "no_condensation": 243,
+        "radius_tail_gt_1pct": 57,
+        "top_boundary_condensate": 306,
+        "top_boundary_max_cloud_tau_overall": 475.6283240831212
+      },
+      "states_failing_any_mie_support_condition": 80,
+      "support_failure_component_counts_overlap": true,
+      "support_criteria": {
+        "mie": "All condensate-layer effective radii inside Mie center extrema and condensate-pressure-weighted area/mass tails <=1%; cloud-free cases retained.",
+        "top_tau": "Optional exploratory display filter: maximum top-layer vertical cloud optical depth <0.01. This is not a grid-convergence test and does not imply optically thin slant paths."
+      },
+      "support_subset_metrics": {
+        "status": "passed",
+        "groups": {
+          "mie_support_checks_only": {
+            "distinct_states": 469,
+            "criterion": "All condensate-layer effective radii inside Mie center extrema and condensate-pressure-weighted area/mass tails <=1%; cloud-free cases retained."
+          },
+          "mie_checks_and_top_vertical_tau_below_0p01": {
+            "distinct_states": 455,
+            "criterion": "All condensate-layer effective radii inside Mie center extrema and condensate-pressure-weighted area/mass tails <=1%; cloud-free cases retained. AND Optional exploratory display filter: maximum top-layer vertical cloud optical depth <0.01. This is not a grid-convergence test and does not imply optically thin slant paths."
+          }
+        }
+      },
+      "upper_boundary_diagnostics": {
+        "status": "completed_saved_geometry_and_spectrum_only",
+        "states_scanned": 549,
+        "scan_counts": {
+          "states_with_any_bin_within_absolute_1ppm": 14,
+          "states_with_any_bin_within_absolute_10ppm": 23,
+          "states_with_any_bin_exceeding_bound": 4
+        },
+        "maximum_roundoff_overshoot": {
+          "overshoot_ppm": 3.469446951953614e-12,
+          "profile": "reference",
+          "state_id": "reference_Al2O3_fsed-0p1_logKzz-7_sigma-2",
+          "wavelength_micron": 10.486604675088197
+        },
+        "top_condensate_and_tau_by_profile": {
+          "cool": {
+            "completed_states": 184,
+            "maximum_top_layer_q_kg_kg": 0.0005394539543148437,
+            "maximum_top_layer_tau": 82.70590687622861,
+            "state_at_maximum_top_layer_tau": "cool_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2",
+            "states_with_condensate_any_layer": 157,
+            "states_with_top_layer_condensate": 157,
+            "states_with_top_layer_support": 157,
+            "states_with_top_layer_tau_positive": 157,
+            "wavelength_at_maximum_top_layer_tau_micron": 9.681457939350151
+          },
+          "hot": {
+            "completed_states": 184,
+            "maximum_top_layer_q_kg_kg": 3.8665780464995e-05,
+            "maximum_top_layer_tau": 0.019423785840401327,
+            "state_at_maximum_top_layer_tau": "hot_Al2O3_fsed-0p1_logKzz-8_sigma-2",
+            "states_with_condensate_any_layer": 22,
+            "states_with_top_layer_condensate": 22,
+            "states_with_top_layer_support": 22,
+            "states_with_top_layer_tau_positive": 22,
+            "wavelength_at_maximum_top_layer_tau_micron": 11.472704193936366
+          },
+          "reference": {
+            "completed_states": 181,
+            "maximum_top_layer_q_kg_kg": 0.0006761382239678178,
+            "maximum_top_layer_tau": 475.6283240831212,
+            "state_at_maximum_top_layer_tau": "reference_Mg2SiO4_fsed-0p1_logKzz-7_sigma-2",
+            "states_with_condensate_any_layer": 127,
+            "states_with_top_layer_condensate": 127,
+            "states_with_top_layer_support": 127,
+            "states_with_top_layer_tau_positive": 127,
+            "wavelength_at_maximum_top_layer_tau_micron": 9.681457939350151
+          }
+        }
+      }
+    }
+  },
+  "verification": {
+    "saved_product_verifier": {
+      "path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/verification/saved_products_verification.json",
+      "sha256": "0f992d80f74127b4ca5013c979c56bf70dbea961cc7ab2789bd1ef209a7bf551",
+      "checks_passed": 9150,
+      "checks_failed": 0,
+      "calculated_states_with_spectra": 549,
+      "physical_invalid_proposals": 18,
+      "status_counts": {
+        "complete": 549,
+        "invalid_proposal": 18
+      },
+      "scope": "saved-product verification only; no forward model, RT, or retrieval calls"
+    },
+    "independent_saved_analysis_crosscheck": {
+      "path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/root_checks/analysis_crosscheck.json",
+      "sha256": "15127658ad74f2bba035400d0d9cb0d6b46609015edbf002f40f1fb070ae1daf",
+      "status": "passed",
+      "headline_peak_checks": 6,
+      "conditional_span_checks": 420,
+      "maximum_absolute_conditional_difference_ppm": 0.0
+    },
+    "full_ledger_check": {
+      "path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/root_checks/full_ledger_verification.json",
+      "sha256": "5a55997a670a46941aafa362a329de1c9057c3f957cf86d9d6d04ae25984453b",
+      "status": "passed",
+      "unique_attempted_states": 567,
+      "unique_valid_spectra": 1104,
+      "physical_invalid_cases": {
+        "cool/Fe": 5,
+        "hot/Al2O3": 5,
+        "reference/Al2O3": 2,
+        "reference/Fe": 5,
+        "reference/MnS": 1
+      },
+      "producer_hashes_unchanged": true
+    },
+    "figure_visual_review": {
+      "path": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/root_checks/figure_visual_qa.json",
+      "sha256": "c6a31c5bfac70218c08786c20a46290860f702b48ee6450d65df7e90769973a7",
+      "status": "passed",
+      "png_count": 7,
+      "pdf_count": 7,
+      "style": "WASP-15b"
+    }
+  },
+  "visualization": {
+    "status": "passed_root_visual_review_7_png_7_pdf",
+    "scientific_style": "WASP-15b",
+    "figure_directory": "/Users/jaketaylor/.codex/visualizations/2026/11/06/01a1b0d4-f26e-7571-83c0-e1a6be3d8b9a/virga-jwst-parameter-sweep-20261107/analysis/figures",
+    "captions": {
+      "fiducial_spectral_effects": "Absolute cloud-minus-matched-clear eclipse-depth change for emission and transit-depth change for transmission at fsed=1, log10(Kzz)=9, and geometric standard deviation 2. Top row is emission; bottom row is transmission. Columns are cool, reference, and hot T\u2013P profiles. Curves are deterministic forward-model outputs; they are not posterior medians or intervals.",
+      "fsed_conditional_response": "For each fixed log$_{10}$ K$_{zz}$ (cm$^2$ s$^{-1}$), the color is the maximum over wavelength of the max-minus-min fsed cloud depth change at geometric standard deviation 2, computed over supported parameter values when at least two states are available. Cells labeled n/N show the number of supported parameter values out of the expected count; 0/N is masked and 1/N has no range estimate. Partial ranges and per-dex values use the actual supported interval only. See conditional_parameter_ranges.csv for supported, missing, and physical-invalid values. Emission uses absolute eclipse-depth change; transmission uses absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. These deterministic ranges are not local derivatives, Fisher information, or posterior intervals.",
+      "grid_max_impact": "Maximum absolute cloud\u2013matched-clear depth change over completed, physically supported fsed, log10(Kzz), and width states. Expected physical-invalid proposals are excluded from the maximum and remain in the status ledger; grid_wide_ranges.csv records supported and invalid counts. A masked cell means that no supported spectrum exists for that profile and condensate. Emission is absolute eclipse-depth change; transmission is absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. Each geometry row has its own logarithmic color scale. This is a grid maximum, not a posterior interval or one-at-a-time response.",
+      "log10_kzz_cm2_s_conditional_response": "For each fixed fsed, the color is the maximum over wavelength of the max-minus-min log10_kzz_cm2_s cloud depth change at geometric standard deviation 2, computed over supported parameter values when at least two states are available. Cells labeled n/N show the number of supported parameter values out of the expected count; 0/N is masked and 1/N has no range estimate. Partial ranges and per-dex values use the actual supported interval only. See conditional_parameter_ranges.csv for supported, missing, and physical-invalid values. Emission uses absolute eclipse-depth change; transmission uses absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. These deterministic ranges are not local derivatives, Fisher information, or posterior intervals.",
+      "temperature_and_fiducial_condensation_profiles": "Top row shows the prescribed temperature\u2013pressure profiles. Bottom row shows Virga condensate mass mixing ratios at fsed=1, log10(Kzz)=9, and geometric standard deviation 2 for each single-condensate case. Only positive-condensate support cells are shown. Radius-tail and effective-radius flags remain attached to cases in the status ledger; the cloud profiles use the Virga-only median-MMW override, while gas and radiative-transfer MMW remain pressure dependent.",
+      "width_fiducial_response": "Maximum over wavelength of the max-minus-min cloud depth change across the supported geometric standard deviations 1.5, 2, and 3 at fixed fsed=1 and log10(Kzz)=9. A cell needs at least two supported widths for a range; cells labeled n/3 show the supported count, 0/3 is masked, and 1/3 has no range estimate. The status ledger gives missing and physical-invalid cases. Emission uses absolute eclipse-depth change; transmission uses absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. This is a deterministic width range at the fiducial state.",
+      "temperature_pressure_profiles": "Saved cool, reference, and hot FastChem atmosphere T-P profiles used for the Virga sensitivity sweep. Pressure and temperature arrays are read directly from the prepared shared profile files; this plot makes no model or radiative-transfer calls."
+    },
+    "figures": [
+      {
+        "stem": "fiducial_spectral_effects",
+        "caption": "Absolute cloud-minus-matched-clear eclipse-depth change for emission and transit-depth change for transmission at fsed=1, log10(Kzz)=9, and geometric standard deviation 2. Top row is emission; bottom row is transmission. Columns are cool, reference, and hot T\u2013P profiles. Curves are deterministic forward-model outputs; they are not posterior medians or intervals.",
+        "png_sha256": "e38b29655f3df28a4c77a7088500fe39cb8f5989b338e94269b925b94bd3f768",
+        "pdf_sha256": "8180010ee140ce3e9ad9c3f6164734673e69cc5b248a61616cd3b0ae9c3ec23e",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      },
+      {
+        "stem": "fsed_conditional_response",
+        "caption": "For each fixed log$_{10}$ K$_{zz}$ (cm$^2$ s$^{-1}$), the color is the maximum over wavelength of the max-minus-min fsed cloud depth change at geometric standard deviation 2, computed over supported parameter values when at least two states are available. Cells labeled n/N show the number of supported parameter values out of the expected count; 0/N is masked and 1/N has no range estimate. Partial ranges and per-dex values use the actual supported interval only. See conditional_parameter_ranges.csv for supported, missing, and physical-invalid values. Emission uses absolute eclipse-depth change; transmission uses absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. These deterministic ranges are not local derivatives, Fisher information, or posterior intervals.",
+        "png_sha256": "eb97ea9fb6ab67dba927ba72443815c57a7a39d3245461f8afa8409ed9bdc3ad",
+        "pdf_sha256": "fe0f1f6d92568231acfd6d980d77df75032e7f4312f081f86991a436c731655e",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      },
+      {
+        "stem": "grid_max_impact",
+        "caption": "Maximum absolute cloud\u2013matched-clear depth change over completed, physically supported fsed, log10(Kzz), and width states. Expected physical-invalid proposals are excluded from the maximum and remain in the status ledger; grid_wide_ranges.csv records supported and invalid counts. A masked cell means that no supported spectrum exists for that profile and condensate. Emission is absolute eclipse-depth change; transmission is absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. Each geometry row has its own logarithmic color scale. This is a grid maximum, not a posterior interval or one-at-a-time response.",
+        "png_sha256": "f565e2b506d0b1d8169cfcf5aa82595d18d48e9ecde3f6c5956c48e212cae23e",
+        "pdf_sha256": "0255c1d322a70df79b31c5a48143add48f1290fa19ad82efae0b760fef6aa4f6",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      },
+      {
+        "stem": "log10_kzz_cm2_s_conditional_response",
+        "caption": "For each fixed fsed, the color is the maximum over wavelength of the max-minus-min log10_kzz_cm2_s cloud depth change at geometric standard deviation 2, computed over supported parameter values when at least two states are available. Cells labeled n/N show the number of supported parameter values out of the expected count; 0/N is masked and 1/N has no range estimate. Partial ranges and per-dex values use the actual supported interval only. See conditional_parameter_ranges.csv for supported, missing, and physical-invalid values. Emission uses absolute eclipse-depth change; transmission uses absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. These deterministic ranges are not local derivatives, Fisher information, or posterior intervals.",
+        "png_sha256": "1415265b288b28ba3503e9640d92b47a989f3f785fb906e952b9cfff6929eedd",
+        "pdf_sha256": "34a4e5c292331cd3420f799da703a04f6d6155995834c1f509fa04f04c1478f3",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      },
+      {
+        "stem": "temperature_and_fiducial_condensation_profiles",
+        "caption": "Top row shows the prescribed temperature\u2013pressure profiles. Bottom row shows Virga condensate mass mixing ratios at fsed=1, log10(Kzz)=9, and geometric standard deviation 2 for each single-condensate case. Only positive-condensate support cells are shown. Radius-tail and effective-radius flags remain attached to cases in the status ledger; the cloud profiles use the Virga-only median-MMW override, while gas and radiative-transfer MMW remain pressure dependent.",
+        "png_sha256": "547eb3f86ae13f820921a4c2fb0df5de978af51421d1a39d516c7d541ae521fb",
+        "pdf_sha256": "3158b5d21c0bea7caf42f0495f4bd231c5954c2a277c4e7ca0b371cae566bd5e",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      },
+      {
+        "stem": "temperature_pressure_profiles",
+        "caption": "Saved cool, reference, and hot FastChem atmosphere T-P profiles used for the Virga sensitivity sweep. Pressure and temperature arrays are read directly from the prepared shared profile files; this plot makes no model or radiative-transfer calls.",
+        "png_sha256": "cff986bc8de26ff2133c6eda62207044a8e54b45740bc505325c69ffe77a3f06",
+        "pdf_sha256": "8394adc8331dcfb871fef0879379c88ee58f1a813e2c3b7859a5518fd4b72c3c",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      },
+      {
+        "stem": "width_fiducial_response",
+        "caption": "Maximum over wavelength of the max-minus-min cloud depth change across the supported geometric standard deviations 1.5, 2, and 3 at fixed fsed=1 and log10(Kzz)=9. A cell needs at least two supported widths for a range; cells labeled n/3 show the supported count, 0/3 is masked, and 1/3 has no range estimate. The status ledger gives missing and physical-invalid cases. Emission uses absolute eclipse-depth change; transmission uses absolute transit-depth change. Rows are emission and transmission; columns are cool, reference, and hot T\u2013P profiles. This is a deterministic width range at the fiducial state.",
+        "png_sha256": "b858b590c3c9877bccbfca99cb2ce9d20d1f96f0a7962d4a4bcd525d843888fb",
+        "pdf_sha256": "5c876f366621497235a06f38254a80247ddd615bc93c4d4c4ce42b7ca1dc5320",
+        "png_visual_review": "passed",
+        "rendered_pdf_visual_review": "passed"
+      }
+    ]
+  },
+  "interpretation_limits": {
+    "scope": "Deterministic cloud-minus-clear forward differences at prescribed T-P profiles and solar equilibrium gas composition. Not retrieval posterior constraints, observational detectability estimates, or radiative-convective results.",
+    "raw_maxima": "The six global raw maxima are not filtered by Mie-radius support or top-layer diagnostics. Some peak cases exceed center or outer-bin support. Treat these raw extremes as sensitivity flags, not robust physical predictions.",
+    "support": "Effective-radius and lognormal-tail flags are diagnostics. They overlap and do not remove calculated spectra from the raw grid.",
+    "upper_boundary": "The study uses do_virtual=false. It reports top-layer condensate and optical depth. Some transit spectra approach the opaque upper-edge bound; this does not establish independent cloud-base validation.",
+    "cloud_chemistry": "Each cloud species runs alone. Cloud depletion is not coupled back into FastChem. The Virga-only median MMW override differs from the pressure-dependent gas/RT MMW.",
+    "radiative_transfer": "SH4/Henyey-Greenstein scattering is used for emission only. Transmission uses spherical-shell cloud extinction, not a multiple-scattering transit solver.",
+    "resolution": "Input KTA tables are R1000. The calculated grid has 300 logarithmic bins over 0.6-12 micron and retains all 20 native g ordinates; its effective resolution is nominal R100.",
+    "product_counts": "Spectral-product counts refer to saved state/geometry products, not distinct numerical spectra. Zero-condensate cases can match clear spectra exactly. Calculated states are not all scientifically validated."
+  },
+  "artifact_hashes": {
+    "protocol": "2dab44cb06830dd67f66b03b6620ede013eba648b32074c719150b671919b834",
+    "setup_summary": "69f236f23fe83c1ca3e1aad9180ef44c981ba8b6d3177185c3d27c03a0417ac3",
+    "input_manifest": "5c12d9762b6239af8fa048469b017e35b24a0f58f73830e7ea84bd2d9120a950",
+    "run_manifest": "15ff0be324fb4f7d73ad46f62b12108e9669eba996a48afa2b83808c8b225dae",
+    "state_index": "1fd9fb323aa1dc8fb3093a19804eff9ab8a0790c2cc5d25be0d2ce4839784519",
+    "execution_rollup": "e7cd558c68f65fb8acc4eb066832bdfcaf4d51327b3f4dc3bc5b274885805a5b",
+    "analysis_files": {
+      "analysis_summary.json": {
+        "path": "analysis/analysis_summary.json",
+        "sha256": "83bae5c7df3515a332c487704afc131e4e1f19960953464542562d4b7f141295",
+        "bytes": 14251
+      },
+      "spectrum_metrics.csv": {
+        "path": "analysis/spectrum_metrics.csv",
+        "sha256": "440e8fec726c39047bfa265c13fccf152257fdaa1f5b47b626029542ba3bce66",
+        "bytes": 379524
+      },
+      "grid_wide_ranges.csv": {
+        "path": "analysis/grid_wide_ranges.csv",
+        "sha256": "c26fbe426375d5827c46175e40a6230b977ae6524bb60a392cb0df569178d3d5",
+        "bytes": 14215
+      },
+      "conditional_parameter_ranges.csv": {
+        "path": "analysis/conditional_parameter_ranges.csv",
+        "sha256": "433658880d9b1d4fbc2ef0ce4987e02d16b10c61173ac48304c444b1363208b0",
+        "bytes": 71312
+      },
+      "state_status_ledger.csv": {
+        "path": "analysis/state_status_ledger.csv",
+        "sha256": "03a222404a838f386b1b3758fd1350b5e7b53d4e89ef14e389a57cdf1f959235",
+        "bytes": 481312
+      },
+      "captions.json": {
+        "path": "analysis/captions.json",
+        "sha256": "2a7e3e8b3d7998026708c838c95cd4c857d39e9f0f74c364961873996e9cbab3",
+        "bytes": 4025
+      },
+      "profile_plot_captions.json": {
+        "path": "analysis/profile_plot_captions.json",
+        "sha256": "81c5b6151afe548f99494c725eebb104be3039711785353338ab3d49a94ddcc9",
+        "bytes": 287
+      },
+      "spectral_effects.npz": {
+        "path": "analysis/spectral_effects.npz",
+        "sha256": null,
+        "bytes": 1383171
+      }
+    },
+    "independent_saved_metrics": "fc52b9b452e78e691e804b1a2a6a23d2deeaf4451b3f4dd884bc1b3ec061ffbd",
+    "upper_boundary_diagnostics": "1a95f8edd89ccbae24788afae25dbcebcbe5fedda62b426f02d095764b4df28f",
+    "support_subset_metrics": "f2cc9be7dbc89bf998ceedaed1caad6a9e53d929e2f949be9290863eeda71fe1",
+    "analysis_crosscheck": "15127658ad74f2bba035400d0d9cb0d6b46609015edbf002f40f1fb070ae1daf",
+    "saved_product_verifier": "0f992d80f74127b4ca5013c979c56bf70dbea961cc7ab2789bd1ef209a7bf551",
+    "figure_visual_qa": "c6a31c5bfac70218c08786c20a46290860f702b48ee6450d65df7e90769973a7"
+  }
+}

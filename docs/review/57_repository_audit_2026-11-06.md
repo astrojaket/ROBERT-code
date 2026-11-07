@@ -17,6 +17,15 @@ checks pass. A follow-up comparison of noisy and noiseless transmission at
 and all four inside the noiseless 1-sigma intervals. It does not close the
 coverage gate. See the [500-live-point record](62_virga_transmission_500live_2026-11-06.md).
 
+The [7 November Virga forward sweep](63_virga_jwst_cloud_sweep_2026-11-07.md)
+now accounts for 567 solar-composition cloud states over 0.6-12 microns in
+both geometries. It produced 1,104 spectral products, with 18 explicit Virga
+domain rejections and no program failures. Saved-product checks pass. Strong
+response regimes are identified, but some extrema reach the atmosphere-top
+or particle-radius limits. Those convergence gates remain open. A fresh,
+validated ExoMol VOMYT VO table is installed locally; heavy inputs remain
+ignored by Git.
+
 ## Result and scope
 
 The published implementation supports the documented emission, transmission,
@@ -152,7 +161,7 @@ only in the reviewed Developer tree. Neither label means science validated.
 | Configured H-minus and exact spectral observations | Published, implemented and tested (`19ed2d4`). | [H-minus tutorial](../tutorials/06_configured_hminus.md). Check the intended hot-atmosphere case and H-, H, electron profiles; retain physical samples and declared bin edges. |
 | Native-opacity preparation memory bound | Published (`17535f0`). | One native KTA provider is released before the next species; its unused full-size log-opacity cache is disabled. Full-table conversion can still allocate large arrays. The 4 November Dirac task reports successful preparation and deployment of this commit. Measure peak memory and numerical equality on the intended R=15000 inputs. |
 | Pressure quench and optional CH4 gradient | Published; analytic convention tested. CH4 gradient is experimental (`5767ec3`). | [Quench contract](../validation/pressure_quench.md). Independent profile parity and a declared disequilibrium science case remain open. A separate solar noise ensemble reported 93/100 and 96/100 C/O interval coverage; that does not validate all quench regimes. |
-| Virga EddySed clouds and fitted fsed/Kzz | Published, experimental; local emission and transmission retrieval/product checks complete. | [100-live-point results](60_local_virga_recovery_2026-11-06.md), [500-live-point transmission follow-up](62_virga_transmission_500live_2026-11-06.md). The original fits used 100 live points at `f8318de`; the controlled transmission follow-up used 500 live points at clean docs-only successor `6f1cf1c`, with source and inputs checked unchanged. All four noisy truths enter 2-sigma, none enters 1-sigma; all four noiseless truths enter 1-sigma. This single noise realization does not measure coverage or establish general Virga validation. FastChem condensates remain diagnostics, not coupled cloud chemistry. |
+| Virga EddySed clouds and fitted fsed/Kzz | Published, experimental; local recovery and solar forward-sweep checks complete. Physical convergence gates remain open. | [100-live-point results](60_local_virga_recovery_2026-11-06.md), [500-live-point follow-up](62_virga_transmission_500live_2026-11-06.md), [0.6-12 micron sweep](63_virga_jwst_cloud_sweep_2026-11-07.md). The sweep tests seven separate cloud species and three prescribed T-P profiles: 549 calculated states and 18 physical domain rejections. Some low-fsed extrema reach the upper boundary or Mie radius limits. Duplicate Virga optics/profile calculations are the measured performance target. Recovery coverage, coupled depletion, and broad physical validation remain open. |
 | High-stream scattering comparison | Bounded synthetic check complete (`7fc0925`). | Four five-layer SH4/PythonicDISORT cases were compared through 64 streams. This does not complete real Mie-cloud or posterior validation. Retain phase-function, layer, and angular convergence gates. |
 | Cloud injection recovery | Local 0.6–5 micron R=100 cases converged without iteration caps; coverage remains open. | [100-live-point baseline](60_local_virga_recovery_2026-11-06.md), [500-live-point noisy/noiseless comparison](62_virga_transmission_500live_2026-11-06.md). The 500-live-point noisy run expands the 2-sigma marginal tails enough to include all four truths; the noiseless run includes all four at 1-sigma. Saved-product and final plot checks pass. This is not a calibrated coverage study. The older capped cluster pilot and prepared 12-CPU/128-live-point replacement are unchanged; no new cluster submission was made. |
 | Retrieval failure handling | Serial published (`54ee578`); MPI extension local and unfinished. | Native non-root failure, normal completion, and checkpoint-resume gates are required. See finding 2. |
