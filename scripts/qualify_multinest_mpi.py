@@ -43,7 +43,7 @@ from robert_exoplanets.retrieval.samplers.multinest import (  # noqa: E402
 INJECTED_LEVEL = 0.72
 DEFAULT_RANKS = 4
 DEFAULT_LIVE_POINTS = 64
-DEFAULT_CHECKPOINT_ITERATIONS = 256
+DEFAULT_CHECKPOINT_ITERATIONS = 32
 
 
 def _mpi_identity() -> tuple[int, int]:
