@@ -131,7 +131,7 @@ def _worker(args: argparse.Namespace) -> int:
     )
 
     if rank == 0:
-        weights = np.asarray(result.weights, dtype=float)
+        weights = np.array(result.weights, dtype=float, copy=True)
         weights /= weights.sum()
         samples = np.asarray(result.samples[:, 0], dtype=float)
         mean = float(np.sum(weights * samples))
