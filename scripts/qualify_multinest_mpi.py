@@ -128,6 +128,7 @@ def _worker(args: argparse.Namespace) -> int:
         seed=args.seed,
         verbose=False,
         n_iter_before_update=32,
+        importance_nested_sampling=False,
     )
 
     if rank == 0:
