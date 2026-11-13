@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 import signal
 import sys
-import time
 import traceback
 from typing import Iterator
 
@@ -149,6 +148,9 @@ def _worker(args: argparse.Namespace) -> int:
             "weight_effective_sample_size": float(1.0 / np.sum(weights**2)),
             "weighted_mean": mean,
             "weighted_standard_deviation": float(np.sqrt(variance)),
+            "weighted_quantiles_02_50_98": [
+                _weighted_quantile(samples, weights, q) for q in (0.025, 0.5, 0.975)
+            ],
             "weighted_quantiles_16_50_84": [
                 _weighted_quantile(samples, weights, q) for q in (0.16, 0.5, 0.84)
             ],
@@ -266,10 +268,10 @@ def _weighted_result_checks(
         "resumed_mean_matches_reference": abs(mean_resumed - mean_reference) <= mean_limit,
         "resumed_median_matches_reference": abs(median_resumed - median_reference) <= median_limit,
         "resumed_evidence_matches_reference": abs(logz_resumed - logz_reference) <= logz_limit,
-        "injected_value_within_resumed_68_percent_interval": (
-            float(resumed["weighted_quantiles_16_50_84"][0])
+        "injected_value_within_resumed_95_percent_interval": (
+            float(resumed["weighted_quantiles_02_50_98"][0])
             <= INJECTED_LEVEL
-            <= float(resumed["weighted_quantiles_16_50_84"][2])
+            <= float(resumed["weighted_quantiles_02_50_98"][2])
         ),
         "best_fit_near_injected_value": (
             abs(float(resumed["best_fit_level"]) - INJECTED_LEVEL) <= 0.15
@@ -499,6 +501,10 @@ def main() -> int:
         parser.error("--checkpoint-iterations must be positive")
     if args.seed < 0:
         parser.error("--seed must be non-negative")
+    if args.evidence_tolerance <= 0:
+        parser.error("--evidence-tolerance must be positive")
+    if args.phase_timeout_seconds <= 0:
+        parser.error("--phase-timeout-seconds must be positive")
     if not args.output_dir.expanduser().resolve().parent.is_dir():
         parser.error("the output directory parent must already exist")
 

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import ctypes
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import signal
 import socket
 import subprocess
 import tempfile
+from functools import lru_cache
 import time
 import uuid
 from typing import Mapping, Sequence
@@ -122,12 +125,52 @@ def _linux_process_info(pid: int) -> tuple[str, str] | None:
     return fields_after_comm[19], fields_after_comm[0]
 
 
+@lru_cache(maxsize=1)
+def _pidfd_operations():
+    open_pidfd = getattr(os, "pidfd_open", None)
+    send_signal = getattr(signal, "pidfd_send_signal", None)
+    if callable(open_pidfd) and callable(send_signal):
+        return open_pidfd, send_signal
+    if platform.system() != "Linux" or platform.machine() != "x86_64":
+        return None
+
+    # Conda can build against headers that predate the Python wrappers.
+    # Use the Linux x86-64 syscall ABI and retain PID identity verification.
+    syscall = ctypes.CDLL(None, use_errno=True).syscall
+    syscall.restype = ctypes.c_long
+
+    def checked_syscall(number, *args):
+        result = syscall(ctypes.c_long(number), *args)
+        if result < 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+        return result
+
+    def open_pidfd(pid, flags):
+        return checked_syscall(434, ctypes.c_int(pid), ctypes.c_uint(flags))
+
+    def send_signal(fd, sig, _info, flags):
+        return checked_syscall(
+            424, ctypes.c_int(fd), ctypes.c_int(sig), ctypes.c_void_p(), ctypes.c_uint(flags)
+        )
+
+    return open_pidfd, send_signal
+
+
 def _supports_linux_pidfds() -> bool:
-    return (
-        Path("/proc/self/stat").is_file()
-        and callable(getattr(os, "pidfd_open", None))
-        and callable(getattr(signal, "pidfd_send_signal", None))
-    )
+    operations = _pidfd_operations()
+    if operations is None or not Path("/proc/self/stat").is_file():
+        return False
+    open_pidfd, send_signal = operations
+    try:
+        fd = open_pidfd(os.getpid(), 0)
+        try:
+            send_signal(fd, 0, None, 0)
+        finally:
+            os.close(fd)
+    except OSError:
+        return False
+    return True
 
 
 def supervise_retrieval_command(
@@ -635,8 +678,12 @@ def _signal_recorded_rank(record: Mapping[str, object], sig: int) -> bool:
     except (KeyError, TypeError, ValueError, OverflowError):
         return False
     start_time = str(record.get("process_start_time"))
+    operations = _pidfd_operations()
+    if operations is None:
+        return False
+    open_pidfd, send_signal = operations
     try:
-        pidfd = os.pidfd_open(pid, 0)
+        pidfd = open_pidfd(pid, 0)
     except ProcessLookupError:
         return True
     except OSError:
@@ -649,7 +696,7 @@ def _signal_recorded_rank(record: Mapping[str, object], sig: int) -> bool:
             or current[0] != start_time
         ):
             return True
-        signal.pidfd_send_signal(pidfd, sig, None, 0)
+        send_signal(pidfd, sig, None, 0)
         return True
     except ProcessLookupError:
         return True
