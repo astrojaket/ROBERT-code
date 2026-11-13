@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -26,7 +27,10 @@ def main() -> int:
     parser.add_argument(
         "--supervise-callback-failures",
         action="store_true",
-        help="run a serial MultiNest child and stop it if a Python callback fails",
+        help=(
+            "run a fresh MultiNest child and stop it if a Python callback fails; "
+            "MPI supervision supports one-node Open MPI allocations"
+        ),
     )
     actions = parser.add_mutually_exclusive_group()
     actions.add_argument("--validate-only", action="store_true", help="validate and print the resolved run")
@@ -41,8 +45,15 @@ def main() -> int:
         config = load_task_config(args.config)
         if "multinest" not in config.sampler.engine:
             parser.error("--supervise-callback-failures requires a MultiNest workflow")
-        if config.runtime.mpi_processes not in {"auto", 1}:
-            parser.error("callback supervision requires runtime.mpi_processes=auto or 1")
+        rank_count = _supervised_rank_count(config.runtime.mpi_processes, parser)
+        mpi_launcher = None
+        if rank_count > 1:
+            mpi_launcher = os.environ.get("ROBERT_MPIEXEC")
+            if not mpi_launcher:
+                parser.error(
+                    "multi-rank callback supervision requires ROBERT_MPIEXEC to "
+                    "name the validated Open MPI executable"
+                )
         nested_output_dir = (
             config.outputs.directory / "multinest"
             if config.sampler.engine == "multinest"
@@ -58,6 +69,8 @@ def main() -> int:
         return supervise_retrieval_command(
             command,
             fallback_output_dir=nested_output_dir,
+            mpi_nprocs=rank_count,
+            mpi_launcher=mpi_launcher,
         )
 
     config = load_task_config(args.config)
@@ -77,6 +90,28 @@ def main() -> int:
         return 0
     run_retrieval_task(config, args.config)
     return 0
+
+
+def _supervised_rank_count(configured: object, parser: argparse.ArgumentParser) -> int:
+    environment_count = os.environ.get("ROBERT_MPI_RANKS") or os.environ.get(
+        "SLURM_NTASKS"
+    )
+    if configured == "auto":
+        raw_count = environment_count or "1"
+    else:
+        raw_count = configured
+        if environment_count is not None and str(environment_count) != str(configured):
+            parser.error(
+                "ROBERT_MPI_RANKS or SLURM_NTASKS does not match "
+                "runtime.mpi_processes"
+            )
+    try:
+        rank_count = int(raw_count)
+    except (TypeError, ValueError, OverflowError):
+        parser.error("the supervised MPI rank count must be a positive integer")
+    if isinstance(raw_count, bool) or rank_count < 1:
+        parser.error("the supervised MPI rank count must be a positive integer")
+    return rank_count
 
 
 if __name__ == "__main__":

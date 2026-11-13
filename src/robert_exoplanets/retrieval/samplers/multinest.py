@@ -23,8 +23,10 @@ from ..status import append_retrieval_attempt_event, write_retrieval_status
 from .base import NestedSamplerResult, validate_mpi_world_size
 from .callback_supervisor import (
     CALLBACK_FAILURE_MARKER_ENV,
+    CALLBACK_FAILURE_MARKER_DIR_ENV,
     CALLBACK_SUPERVISED_ENV,
     write_callback_failure_marker,
+    write_callback_rank_record,
 )
 
 
@@ -94,22 +96,54 @@ def run_multinest(
         )
 
     callback_marker_value = os.environ.get(CALLBACK_FAILURE_MARKER_ENV)
-    if callback_marker_value is not None:
+    callback_marker_dir_value = os.environ.get(CALLBACK_FAILURE_MARKER_DIR_ENV)
+    if callback_marker_value is not None and callback_marker_dir_value is not None:
+        raise RobertConfigError(
+            "serial and MPI callback marker settings cannot be used together"
+        )
+    callback_marker = None
+    callback_marker_dir = None
+    callback_rank = _mpi_rank()
+    if callback_marker_value is not None or callback_marker_dir_value is not None:
         if os.environ.get(CALLBACK_SUPERVISED_ENV) != "1":
             raise RobertConfigError(
-                "MultiNest callback markers must be set by the serial supervisor"
+                "MultiNest callback markers must be set by the external supervisor"
             )
-        if _mpi_world_size() != 1:
-            raise RobertConfigError(
-                "callback supervision supports serial MultiNest runs only"
-            )
-        callback_marker = Path(callback_marker_value).expanduser().resolve()
-        if not callback_marker.parent.is_dir() or callback_marker.exists():
-            raise RobertConfigError(
-                "MultiNest callback marker path must be new and have an existing parent"
-            )
-    else:
-        callback_marker = None
+        if callback_marker_value is not None:
+            if _mpi_world_size() != 1:
+                raise RobertConfigError(
+                    "the serial callback marker requires a one-rank MPI world"
+                )
+            callback_marker = Path(callback_marker_value).expanduser().resolve()
+            if not callback_marker.parent.is_dir() or callback_marker.exists():
+                raise RobertConfigError(
+                    "MultiNest callback marker path must be new and have an existing parent"
+                )
+        else:
+            expected_value = os.environ.get("ROBERT_MPI_RANKS")
+            try:
+                expected_ranks = int(expected_value or "")
+            except ValueError as exc:
+                raise RobertConfigError(
+                    "MPI callback supervision requires ROBERT_MPI_RANKS"
+                ) from exc
+            if expected_ranks < 2 or _mpi_world_size() != expected_ranks:
+                raise RobertConfigError(
+                    "MPI callback supervision rank count does not match MPI.COMM_WORLD"
+                )
+            if not Path("/proc/self/stat").is_file():
+                raise RobertConfigError(
+                    "MPI callback supervision requires Linux /proc process identities"
+                )
+            callback_marker_dir = Path(callback_marker_dir_value).expanduser().resolve()
+            if not callback_marker_dir.is_dir():
+                raise RobertConfigError(
+                    "MPI callback marker directory does not exist"
+                )
+            if callback_rank < 0 or callback_rank >= expected_ranks:
+                raise RobertConfigError(
+                    "MPI callback supervision rank is outside the configured world"
+                )
 
     root = Path(output_dir).expanduser().resolve()
     if resume_flag and _callback_failure_makes_resume_unsafe(root):
@@ -173,12 +207,12 @@ def run_multinest(
         if fatal_callback_error is not None:
             return
         fatal_callback_error = {
-            "rank": 0,
+            "rank": callback_rank,
             "exception_type": type(exc).__name__,
             "message": str(exc),
             "traceback": traceback.format_exc(),
         }
-        if callback_marker is None:
+        if callback_marker is None and callback_marker_dir is None:
             return
         marker_payload = {
             **fatal_callback_error,
@@ -187,7 +221,16 @@ def run_multinest(
             "elapsed_seconds": max(time.monotonic() - started_monotonic, 0.0),
         }
         try:
-            write_callback_failure_marker(callback_marker, marker_payload)
+            if callback_marker is not None:
+                write_callback_failure_marker(callback_marker, marker_payload)
+            else:
+                assert callback_marker_dir is not None
+                write_callback_rank_record(
+                    callback_marker_dir,
+                    "failure",
+                    callback_rank,
+                    marker_payload,
+                )
         except BaseException as marker_error:
             message = (
                 "ROBERT could not write the MultiNest callback failure marker: "
@@ -215,7 +258,7 @@ def run_multinest(
             for index, value in enumerate(transformed):
                 cube[index] = float(value)
         except BaseException as exc:
-            if callback_marker is None:
+            if callback_marker is None and callback_marker_dir is None:
                 raise
             latch_callback_error(exc)
             for index in range(ndim):
@@ -236,7 +279,7 @@ def run_multinest(
             value = problem.log_likelihood_from_vector(vector)
             return invalid_floor if not np.isfinite(value) else float(value)
         except BaseException as exc:
-            if callback_marker is None:
+            if callback_marker is None and callback_marker_dir is None:
                 raise
             latch_callback_error(exc)
             return invalid_floor
@@ -293,12 +336,20 @@ def run_multinest(
                     context,
                 )
         except BaseException as exc:
-            if callback_marker is None:
+            if callback_marker is None and callback_marker_dir is None:
                 raise
             latch_callback_error(exc)
 
     try:
         with _working_directory(root):
+            if callback_marker_dir is not None:
+                write_callback_rank_record(
+                    callback_marker_dir,
+                    "ready",
+                    callback_rank,
+                    {"attempt_id": attempt_id},
+                )
+                _mpi_barrier()
             pymultinest.run(
                 loglike,
                 prior,
@@ -366,6 +417,13 @@ def run_multinest(
             }
             write_retrieval_status(root, final_status)
             append_retrieval_attempt_event(root, {**final_status, "event": "finished"})
+        if callback_marker_dir is not None:
+            write_callback_rank_record(
+                callback_marker_dir,
+                "complete",
+                callback_rank,
+                {"attempt_id": attempt_id},
+            )
         return result
     except BaseException as exc:
         if primary:
@@ -604,6 +662,15 @@ def _mpi_world_size() -> int:
         return int(MPI.COMM_WORLD.Get_size())
     except ImportError:
         return 1
+
+
+def _mpi_rank() -> int:
+    try:
+        from mpi4py import MPI
+
+        return int(MPI.COMM_WORLD.Get_rank())
+    except ImportError:
+        return 0
 
 
 def _callback_failure_makes_resume_unsafe(output_dir: Path) -> bool:
