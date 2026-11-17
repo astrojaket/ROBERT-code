@@ -194,7 +194,10 @@ def test_fastchem_element_config_rejects_invalid_mode_and_parameter_names(
         FastChemConfig.model_validate(raw)
 
 
-@pytest.mark.parametrize("name", ["emission", "cloudy_emission", "optimal_estimation", "two_region_emission"])
+@pytest.mark.parametrize(
+    "name",
+    ["emission", "cloudy_emission", "cloudy_emission_virga", "optimal_estimation", "two_region_emission"],
+)
 def test_published_emission_examples_exclude_derived_overlap_average(name) -> None:
     config = load_task_config(CONFIGURATIONS / f"{name}.yaml")
     observations = load_configured_observations(config)
@@ -1497,7 +1500,7 @@ def test_tabulated_temperature_profile_has_an_explicit_path() -> None:
 
 
 def test_all_public_configurations_resolve_and_validate() -> None:
-    assert len(DEFAULTS) == 7
+    assert len(DEFAULTS) == 8
     resolutions = []
     for path in DEFAULTS:
         config = load_task_config(path)
@@ -1596,6 +1599,7 @@ def test_public_configurations_keep_shared_input_paths() -> None:
     expected_observations = {
         "emission.yaml": ROOT / "data" / "wasp69b_schlawin2024",
         "cloudy_emission.yaml": ROOT / "data" / "wasp69b_schlawin2024",
+        "cloudy_emission_virga.yaml": ROOT / "data" / "wasp69b_schlawin2024",
         "optimal_estimation.yaml": ROOT / "data" / "wasp69b_schlawin2024",
         "two_region_emission.yaml": ROOT / "data" / "wasp69b_schlawin2024",
         "rocky_transmission_clr.yaml": (

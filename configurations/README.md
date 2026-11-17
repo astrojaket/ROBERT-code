@@ -10,6 +10,7 @@ test. The complete schema and every supported option are in
 | [`quickstart.yaml`](quickstart.yaml) | Bundled R=100 emission injection recovery | The generated synthetic observation under `../ROBERT-runs/quickstart-emission-r100/outputs/` |
 | [`emission.yaml`](emission.yaml) | WASP-69b cloud-free hot-Jupiter emission at R=1000 | `data/wasp69b_schlawin2024/`, `data/chemistry/fastchem/`, PHOENIX data, and `opacity_data/ktables_exomol/` |
 | [`cloudy_emission.yaml`](cloudy_emission.yaml) | WASP-69b PG14 emission with a fixed MgSiO3 Mie cloud | The emission inputs plus `data/optical_constants/exo_skryer/` |
+| [`cloudy_emission_virga.yaml`](cloudy_emission_virga.yaml) | WASP-69b observed emission with a Virga MgSiO3 cloud | The emission inputs plus `opacity_data/virga_mie/MgSiO3.mieff` |
 | [`transmission.yaml`](transmission.yaml) | Bundled R=100 hot-Jupiter free-chemistry transmission | The generated synthetic observation under `../ROBERT-runs/hot-jupiter-transmission-r100/outputs/` |
 | [`rocky_transmission_clr.yaml`](rocky_transmission_clr.yaml) | L 98-59 b terrestrial transmission with a joint CLR composition prior | `data/observations/l98_59b_bello_arufe2025/` and R=1000 K-tables |
 | [`optimal_estimation.yaml`](optimal_estimation.yaml) | WASP-69b cloud-free emission with optimal estimation | The same inputs as `emission.yaml` |
@@ -31,6 +32,23 @@ The rocky example is explicitly for **L 98-59 b**. Its loader,
 `bello_arufe2025_l9859b`, points to the published b spectrum and must remain
 matched to that planet. CLR composition priors require direct MultiNest
 sampling; see the prior section in the configuration reference.
+
+`cloudy_emission_virga.yaml` uses the observed WASP-69b spectrum. The uniform
+MgSiO3 priors come from the WASP-107b synthetic recovery test: `fsed` from
+0.1 to 3 and `log10(Kzz / [cm² s⁻¹])` from 6 to 10. Review these illustrative
+ranges for the target atmosphere before fitting. Set `paths.virga_mie_directory`
+to the directory containing the prepared `MgSiO3.mieff` table. To validate the
+YAML from the repository root:
+
+```bash
+conda run -n robert-exoplanets python run_retrieval.py --config configurations/cloudy_emission_virga.yaml --validate-only
+```
+
+The conditional KCl injections used different priors. At 500 K they used
+`fsed` from 0.5 to 2.5 and `log10(Kzz / [cm² s⁻¹])` from 7.95 to 9.5. At
+600 K they used `fsed` from 0.35 to 2.5 and `log10(Kzz / [cm² s⁻¹])` from
+7.1 to 9.5. Those ranges apply to the tested cool profiles and their narrow
+thermal priors.
 
 All posterior plots use `mediumpurple` by default and request 100 posterior
 predictive samples. Run `scripts/create_run_directory.py` to create an
