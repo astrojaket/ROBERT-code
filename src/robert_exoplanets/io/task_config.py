@@ -535,6 +535,27 @@ class CloudFreeConfig(ConfigModel):
     model: Literal["none"] = "none"
 
 
+class GreyDeckCloudConfig(ConfigModel):
+    """Grey absorbing deck with a fixed integrated optical depth."""
+
+    model: Literal["grey_deck"]
+    log10_cloud_top_pressure_bar_parameter: str = Field(
+        default="log_cloud_top_pressure_bar",
+        min_length=1,
+    )
+    optical_depth: PositiveFloat = 100.0
+
+    @model_validator(mode="after")
+    def validate_grey_deck(self) -> "GreyDeckCloudConfig":
+        parameter = self.log10_cloud_top_pressure_bar_parameter.strip()
+        if not parameter:
+            raise ValueError("grey-deck cloud-top pressure parameter must be non-empty")
+        if not isfinite(self.optical_depth):
+            raise ValueError("grey-deck optical depth must be finite")
+        object.__setattr__(self, "log10_cloud_top_pressure_bar_parameter", parameter)
+        return self
+
+
 class DeckHazeCloudConfig(ConfigModel):
     """Shared grey-deck and well-mixed power-law haze parameterization."""
 
@@ -738,6 +759,7 @@ class VirgaEddySedCloudConfig(ConfigModel):
 
 CloudsConfig = Annotated[
     CloudFreeConfig
+    | GreyDeckCloudConfig
     | DeckHazeCloudConfig
     | MieCatalogCloudConfig
     | MieDirectNkCloudConfig
@@ -1201,6 +1223,22 @@ class TaskConfig(ConfigModel):
                 region.atmosphere.temperature
             )
             cloud_parameters = _required_cloud_parameters(region.clouds)
+            if region.clouds.model == "grey_deck":
+                pressure_parameter = parameter_configs.get(
+                    region.clouds.log10_cloud_top_pressure_bar_parameter
+                )
+                if pressure_parameter is not None:
+                    if pressure_parameter.prior.type != "uniform":
+                        raise ValueError(
+                            "grey-deck log10 cloud-top pressure requires a uniform prior"
+                        )
+                    bottom_log_pressure = log10(region.atmosphere.pressure.bottom_bar)
+                    if pressure_parameter.prior.upper >= bottom_log_pressure:
+                        raise ValueError(
+                            "grey-deck cloud-top pressure prior upper bound must be "
+                            "below the atmosphere bottom pressure so the deck has "
+                            "at least one active layer"
+                        )
             required.update(chemistry_parameters)
             required.update(temperature_parameters)
             required.update(cloud_parameters)
@@ -1566,6 +1604,8 @@ def _required_temperature_parameters(config: TemperatureConfig) -> set[str]:
 
 
 def _required_cloud_parameters(config: CloudsConfig) -> set[str]:
+    if config.model == "grey_deck":
+        return {config.log10_cloud_top_pressure_bar_parameter}
     if config.model == "deck_haze":
         return {
             config.log10_cloud_top_pressure_bar_parameter,

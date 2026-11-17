@@ -11,6 +11,7 @@ import yaml
 from pydantic import ValidationError
 
 from robert_exoplanets.io.configured_tasks import (
+    _cloud_model,
     _configured_science_sha256,
     _load_cached_table,
     _preparation_fingerprint,
@@ -92,6 +93,52 @@ def test_emission_example_exposes_complete_native_mode_run() -> None:
     assert config.bodies.star.spectrum_model == "phoenix"
     assert config.bodies.star.log_g_cgs == 4.5
     assert config.bodies.star.metallicity_dex == 0.0
+
+
+def test_strict_yaml_grey_deck_uses_one_log_pressure_parameter() -> None:
+    config = load_task_config(TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    bottom_log_pressure = np.log10(raw["atmosphere"]["pressure"]["bottom_bar"])
+    raw["parameters"] = list(raw["parameters"])
+    raw["clouds"] = {"model": "grey_deck"}
+    raw["parameters"].append(
+        {
+            "name": "log_cloud_top_pressure_bar",
+            "prior": {
+                "type": "uniform",
+                "lower": -6.0,
+                "upper": float(bottom_log_pressure - 0.01),
+            },
+        }
+    )
+
+    parsed = TaskConfig.model_validate(raw)
+    cloud = _cloud_model(parsed.clouds)
+
+    assert cloud.required_parameters == ("log_cloud_top_pressure_bar",)
+    assert cloud.optical_depth == 100.0
+    assert cloud.multiple_scattering_backend == "none"
+    assert cloud.manifest_metadata["cloud_model"] == "grey_deck_only"
+
+    missing_pressure = deepcopy(raw)
+    missing_pressure["parameters"] = [
+        item
+        for item in missing_pressure["parameters"]
+        if item["name"] != "log_cloud_top_pressure_bar"
+    ]
+    with pytest.raises(
+        ValidationError,
+        match="required model parameters are missing: log_cloud_top_pressure_bar",
+    ):
+        TaskConfig.model_validate(missing_pressure)
+
+    reaches_bottom = deepcopy(raw)
+    reaches_bottom["parameters"][-1]["prior"]["upper"] = float(bottom_log_pressure)
+    with pytest.raises(
+        ValidationError,
+        match="grey-deck cloud-top pressure prior upper bound must be below",
+    ):
+        TaskConfig.model_validate(reaches_bottom)
 
 
 def test_task_config_accepts_independent_fastchem_element_parameters() -> None:

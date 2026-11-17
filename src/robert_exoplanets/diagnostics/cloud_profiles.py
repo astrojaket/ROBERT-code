@@ -24,6 +24,7 @@ from robert_exoplanets.core import (
 )
 from robert_exoplanets.forward.clouds import (
     ParameterizedDeckHazeCloudModel,
+    ParameterizedGreyDeckCloudModel,
     ParameterizedMieCloudModel,
     pressure_slab_layer_fractions,
 )
@@ -68,10 +69,11 @@ def cloud_profiles(
 ) -> CloudProfileMapping:
     """Return physical cloud profiles for one forward-model leaf.
 
-    The mapping is empty for a cloud-free model.  A shared Mie cloud returns
-    ``condensate_mass_fraction`` and ``particle_radius``.  A deck plus haze
-    returns layer extinction optical depths at the model's haze reference
-    wavelength; that wavelength is part of each profile name.  Unsupported
+    The mapping is empty for a cloud-free model. A shared Mie cloud returns
+    ``condensate_mass_fraction`` and ``particle_radius``. A grey deck returns
+    its layer extinction optical depth at 1 micron. A deck plus haze returns
+    layer extinction optical depths at the model's haze reference wavelength;
+    that wavelength is part of each profile name. Unsupported
     cloud implementations raise :class:`CloudProfileUnavailableError` so a
     collector can record an explicit unavailable diagnostic. Virga returns a
     separate mass-fraction and effective-radius profile for each condensible.
@@ -86,6 +88,8 @@ def cloud_profiles(
 
     if isinstance(cloud_model, ParameterizedMieCloudModel):
         return _mie_profiles(cloud_model, atmosphere, parameters)
+    if isinstance(cloud_model, ParameterizedGreyDeckCloudModel):
+        return _grey_deck_profiles(cloud_model, atmosphere, parameters)
     if isinstance(cloud_model, ParameterizedDeckHazeCloudModel):
         return _deck_haze_profiles(cloud_model, owner, atmosphere, parameters)
 
@@ -125,7 +129,14 @@ def _resolve_cloud_model(model: object) -> tuple[object | None, object]:
 
     if model is None:
         return None, model
-    if isinstance(model, (ParameterizedMieCloudModel, ParameterizedDeckHazeCloudModel)):
+    if isinstance(
+        model,
+        (
+            ParameterizedMieCloudModel,
+            ParameterizedGreyDeckCloudModel,
+            ParameterizedDeckHazeCloudModel,
+        ),
+    ):
         return model, model
 
     from robert_exoplanets.forward.virga_cloud import VirgaEddySedCloudModel
@@ -215,6 +226,37 @@ def _mie_profiles(
             "values": radius_profile,
             "unit": "micron",
         },
+    }
+
+
+def _grey_deck_profiles(
+    cloud_model: ParameterizedGreyDeckCloudModel,
+    atmosphere: AtmosphereState,
+    parameters: Mapping[str, float],
+) -> CloudProfileMapping:
+    """Return the fixed grey-deck optical depth by atmospheric layer."""
+
+    cloud_top_pressure = _ten_power(
+        parameters,
+        cloud_model.log10_cloud_top_pressure_bar_parameter,
+        "cloud top pressure",
+    )
+    reference_grid = SpectralGrid.from_array([1.0], unit="micron", role="diagnostic")
+    deck = grey_cloud_deck(
+        atmosphere.pressure_grid,
+        reference_grid,
+        cloud_top_pressure=cloud_top_pressure,
+        cloud_top_pressure_unit="bar",
+        optical_depth=cloud_model.optical_depth,
+        single_scattering_albedo=0.0,
+        asymmetry_factor=0.0,
+        name="grey absorbing deck",
+    )
+    return {
+        "deck_extinction_optical_depth_at_1_micron": {
+            "values": _readonly_profile(deck.extinction_tau[:, 0]),
+            "unit": deck.unit,
+        }
     }
 
 

@@ -3,6 +3,7 @@
 from .clouds import (
     ParameterizedCloudModel,
     ParameterizedDeckHazeCloudModel,
+    ParameterizedGreyDeckCloudModel,
     ParameterizedMieCloudModel,
 )
 from robert_exoplanets.rt import HMinusContinuumConfig
@@ -74,6 +75,7 @@ __all__ = [
     "ParameterizedEmissionFactoryConfig",
     "ParameterizedCloudModel",
     "ParameterizedDeckHazeCloudModel",
+    "ParameterizedGreyDeckCloudModel",
     "ParameterizedMieCloudModel",
     "ParameterizedEmissionForwardModel",
     "ParameterizedTransmissionFactoryConfig",

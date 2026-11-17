@@ -108,6 +108,94 @@ def _positive_pressure(value: float, name: str) -> float:
 
 
 @dataclass(frozen=True)
+class ParameterizedGreyDeckCloudModel:
+    """Grey absorbing deck with one retrieved cloud-top pressure.
+
+    ``optical_depth`` is the fixed integrated vertical extinction optical
+    depth below the deck top. A value of 100 keeps the deck opaque in
+    transmission while avoiding an infinite optical depth.
+    """
+
+    log10_cloud_top_pressure_bar_parameter: str = "log_cloud_top_pressure_bar"
+    optical_depth: float = 100.0
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        parameter = str(self.log10_cloud_top_pressure_bar_parameter).strip()
+        if not parameter:
+            raise RobertValidationError(
+                "cloud-top pressure parameter name must not be empty"
+            )
+        optical_depth = float(self.optical_depth)
+        if not np.isfinite(optical_depth) or optical_depth <= 0.0:
+            raise RobertValidationError(
+                "grey-deck optical depth must be finite and positive"
+            )
+        object.__setattr__(self, "log10_cloud_top_pressure_bar_parameter", parameter)
+        object.__setattr__(self, "optical_depth", optical_depth)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+
+    @property
+    def required_parameters(self) -> tuple[str, ...]:
+        return (self.log10_cloud_top_pressure_bar_parameter,)
+
+    @property
+    def multiple_scattering_backend(self) -> str:
+        """Return the no-scattering backend for this absorbing deck."""
+
+        return "none"
+
+    @property
+    def manifest_metadata(self) -> Mapping[str, str]:
+        return immutable_mapping(
+            {
+                "cloud_model": "grey_deck_only",
+                "cloud_log10_top_pressure_parameter": (
+                    self.log10_cloud_top_pressure_bar_parameter
+                ),
+                "cloud_fixed_vertical_optical_depth": (f"{self.optical_depth:.17g}"),
+                "cloud_single_scattering_albedo": "0",
+                **dict(self.metadata),
+            }
+        )
+
+    def evaluate(
+        self,
+        gas_optical_depth: GasOpticalDepth,
+        parameters: Mapping[str, float],
+    ) -> tuple[CloudOpticalProperties, ...]:
+        """Return one grey absorbing deck on the model pressure and wavelength grids."""
+
+        name = self.log10_cloud_top_pressure_bar_parameter
+        if name not in parameters:
+            raise RobertValidationError(f"cloud parameter is missing: {name}")
+        log_pressure = float(parameters[name])
+        if not np.isfinite(log_pressure):
+            raise RobertValidationError(f"cloud parameter {name!r} must be finite")
+        try:
+            pressure_bar = 10.0**log_pressure
+        except OverflowError as exc:
+            raise RobertValidationError(
+                "cloud-top pressure is outside the numeric range"
+            ) from exc
+        if not np.isfinite(pressure_bar) or pressure_bar <= 0.0:
+            raise RobertValidationError(
+                "cloud-top pressure is outside the numeric range"
+            )
+        deck = grey_cloud_deck(
+            gas_optical_depth.pressure_grid,
+            gas_optical_depth.spectral_grid,
+            cloud_top_pressure=pressure_bar,
+            cloud_top_pressure_unit="bar",
+            optical_depth=self.optical_depth,
+            single_scattering_albedo=0.0,
+            asymmetry_factor=0.0,
+            name="grey absorbing deck",
+        )
+        return (deck,)
+
+
+@dataclass(frozen=True)
 class ParameterizedDeckHazeCloudModel:
     """Shared finite grey-deck plus well-mixed power-law haze model.
 

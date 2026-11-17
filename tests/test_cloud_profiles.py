@@ -10,6 +10,7 @@ import pytest
 from robert_exoplanets import (
     AtmosphereState,
     ParameterizedDeckHazeCloudModel,
+    ParameterizedGreyDeckCloudModel,
     ParameterizedMieCloudModel,
     PressureGrid,
     RefractiveIndexSpectrum,
@@ -117,6 +118,42 @@ def test_deck_haze_profiles_use_existing_layer_optical_depth_equations() -> None
     assert profiles[deck_name]["unit"] == "dimensionless"
     assert profiles[haze_name]["unit"] == "dimensionless"
     assert reference_grid.role == "diagnostic"
+
+
+def test_grey_deck_only_returns_opaque_deck_without_haze() -> None:
+    atmosphere = _atmosphere()
+    cloud = ParameterizedGreyDeckCloudModel()
+    parameters = {"log_cloud_top_pressure_bar": -3.0}
+    spectral_grid = SpectralGrid.from_array([1.0, 2.0], unit="micron", role="observed")
+
+    evaluated = cloud.evaluate(
+        SimpleNamespace(
+            pressure_grid=atmosphere.pressure_grid,
+            spectral_grid=spectral_grid,
+        ),
+        parameters,
+    )
+
+    profiles = cloud_profiles(cloud, atmosphere, parameters)
+
+    expected = grey_cloud_deck(
+        atmosphere.pressure_grid,
+        SpectralGrid.from_array([1.0], unit="micron", role="diagnostic"),
+        cloud_top_pressure=1.0e-3,
+        cloud_top_pressure_unit="bar",
+        optical_depth=100.0,
+        name="grey absorbing deck",
+    )
+    assert tuple(profiles) == ("deck_extinction_optical_depth_at_1_micron",)
+    assert len(evaluated) == 1
+    assert np.sum(evaluated[0].extinction_tau[:, 0]) == pytest.approx(100.0)
+    np.testing.assert_allclose(
+        profiles["deck_extinction_optical_depth_at_1_micron"]["values"],
+        expected.extinction_tau[:, 0],
+    )
+    assert np.sum(
+        profiles["deck_extinction_optical_depth_at_1_micron"]["values"]
+    ) == pytest.approx(100.0)
 
 
 def test_transmission_owner_uses_its_hydrostatic_gravity_profile() -> None:

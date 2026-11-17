@@ -36,6 +36,7 @@ from robert_exoplanets.forward import (
     ParameterizedEmissionFactoryConfig,
     ParameterizedEmissionModelConfig,
     ParameterizedDeckHazeCloudModel,
+    ParameterizedGreyDeckCloudModel,
     ParameterizedMieCloudModel,
     ParameterizedTransmissionFactoryConfig,
     ParameterizedTransmissionModelConfig,
@@ -774,6 +775,13 @@ def _base_chemistry_components(config: ChemistryConfig):
 def _cloud_model(config: CloudsConfig):
     if config.model == "none":
         return None
+    if config.model == "grey_deck":
+        return ParameterizedGreyDeckCloudModel(
+            log10_cloud_top_pressure_bar_parameter=(
+                config.log10_cloud_top_pressure_bar_parameter
+            ),
+            optical_depth=config.optical_depth,
+        )
     if config.model == "deck_haze":
         return ParameterizedDeckHazeCloudModel(
             log10_cloud_top_pressure_bar_parameter=(
