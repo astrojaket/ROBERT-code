@@ -1,45 +1,47 @@
 # ROBERT
 
-ROBERT is a general-purpose radiative-transfer and atmospheric-retrieval
-framework. It combines typed planet, star, atmosphere, opacity, observation,
-instrument, forward-model, likelihood, and inference components behind a
-strict YAML workflow.
+ROBERT calculates and fits exoplanet thermal-emission and transmission
+spectra. A YAML file specifies the planet, star, atmosphere, gases, clouds,
+observations, and parameters. The forward model calculates a spectrum for
+specified parameter values on each instrument grid. A retrieval compares
+these spectra with the data through a likelihood to estimate the parameters.
+ROBERT saves the resolved configuration, input
+metadata, numerical results, and plots.
 
-ROBERT is production-ready for its documented and benchmarked emission,
-transmission, and retrieval regimes. The documentation states the validation
-boundaries and unsupported scope for each workflow.
+The YAML workflow supports correlated-k radiative transfer, equilibrium
+and free chemistry, cloud-free and cloudy models, and one- and two-region
+emission. Use PyMultiNest for nested sampling or optimal estimation for
+supported Gaussian problems. Python APIs and dedicated scripts also cover
+opacity sampling and line-by-line calculations.
+[Supported methods and validation limits](docs/supported_methods.md) ·
+[Development roadmap](docs/architecture/development_roadmap.md)
 
-ROBERT supports thermal-emission and transmission spectra, correlated-k and
-opacity-sampling inputs, equilibrium and free chemistry, cloud-free and cloudy
-atmospheres, one- and two-region emission, instrument binning, Gaussian
-likelihoods, optimal estimation and PyMultiNest. Runs produce
-portable configuration snapshots, manifests, numerical results, diagnostics,
-and plots.
+## Start here
 
-The standard YAML runners cover the configured emission and transmission
-workflows. Line-by-line opacity, high-resolution observations, covariance
-likelihoods, and accelerator paths also have Python APIs and dedicated scripts;
-they are not all options in the standard YAML schema. See the
-[supported methods](docs/supported_methods.md) and
-[development roadmap](docs/architecture/development_roadmap.md) for current
-interfaces, validation limits, and next steps.
-
-The [6 November code audit and upgrade register](docs/review/57_repository_audit_2026-11-06.md)
-records audit findings, published and local upgrades, and an ordered
-to-do list. The [local fixes and elemental recovery](docs/review/59_local_elemental_recovery_2026-11-06.md)
-records the corrected tests/checkpoint identity and the converged 50/100-live-point
-checks. The [BeAR performance audit](docs/review/58_bear_2026_performance_audit.md)
-sets out proposed speed experiments and their accuracy checks.
-
-PyMultiNest is the supported nested sampler. Optimal Estimation supports
-deterministic retrievals and future detailed sounding models.
-
-The Python distribution is named `robert-exoplanets`.
+1. **Install ROBERT.** Use the Conda environment below. Set up GitHub SSH
+   access before running the clone command.
+2. **Run the bundled R=100 exercise.** Generate a synthetic observation,
+   run a forward model, and retrieve the injected water abundance. Check
+   the recovery report and plots. [Bundled tutorial](docs/tutorials/01_bundled_forward_and_retrieval.md)
+3. **Fit a published JWST spectrum.** Use the included WASP-69b observations.
+   Download the six R=1000 ExoMolOP tables, prepare the opacity for each
+   instrument, and run the retrieval. [First JWST retrieval with WASP-69b](docs/tutorials/07_first_jwst_retrieval_wasp69b.md)
+4. **Set up your target in a new run folder.** Use a reduced transit- or
+   eclipse-depth spectrum with uncertainties, units, and bin edges. Keep
+   each instrument in its own dataset. Check that the gas tables cover the
+   wavelengths, pressures, and temperatures your model uses.
+   [Observation format](docs/configuration.md#observations) ·
+   [Opacity inputs](docs/theory/opacity_data.md)
+5. **Check the model before sampling.** Validate the YAML, prepare opacity,
+   and run one likelihood with `--smoke-only`. Inspect a forward spectrum
+   on the data grid and review the priors. Then run MultiNest to convergence
+   with `multinest_max_iterations: 0`. [Retrieval guide](docs/retrievals.md)
 
 ## Installation
 
 Install Conda, then obtain ROBERT and create its environment. Conda supplies
-Python 3.12 and the required libraries:
+Python 3.12 and the required libraries. The Python distribution is named
+`robert-exoplanets`.
 
 ```bash
 git clone git@github.com:astrojaket/ROBERT-code.git
@@ -227,4 +229,11 @@ and post-processing.
 - [Maintained configurations](configurations/README.md)
 - [Supported methods](docs/supported_methods.md)
 - [Bundled forward and retrieval tutorial](docs/tutorials/01_bundled_forward_and_retrieval.md)
+- [First JWST retrieval with WASP-69b](docs/tutorials/07_first_jwst_retrieval_wasp69b.md)
 - [External inputs and specialised retrieval tutorial](docs/tutorials/02_external_inputs_and_specialised_retrievals.md)
+
+## Development and validation records
+
+- [Code audit and upgrade register](docs/review/57_repository_audit_2026-11-06.md)
+- [Local fixes and elemental recovery tests](docs/review/59_local_elemental_recovery_2026-11-06.md)
+- [BeAR performance audit and proposed speed tests](docs/review/58_bear_2026_performance_audit.md)
