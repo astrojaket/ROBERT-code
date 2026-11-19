@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate, prepare, smoke-test, or run OE/UltraNest/MultiNest from YAML."""
+"""Validate, prepare, smoke-test, or run OE/MultiNest from YAML."""
 
 from __future__ import annotations
 

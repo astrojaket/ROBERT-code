@@ -5,7 +5,7 @@ evidence that supports each method. Use [forward-model generation](forward_model
 [running retrievals](retrievals.md), and [configuration](configuration.md) for
 commands and YAML fields.
 
-Status reviewed: 2026-11-06. The
+Status reviewed on 19 November 2026. The
 [code audit and upgrade register](review/57_repository_audit_2026-11-06.md)
 records the software checks and remaining work. The
 [local follow-up](review/59_local_elemental_recovery_2026-11-06.md) fixes the
@@ -81,11 +81,18 @@ Earlier results made before that correction must not be interpreted as using
 the stated vapor abundance. FastChem equilibrium-condensate diagnostics remain
 separate from the Virga input abundances.
 
-Direct Virga parity, small forward checks, and a four-case synthetic
-PythonicDISORT comparison do not establish cloud-formation or posterior
-recovery validation. The capped pilot did not converge. The prepared replacement
-had not been submitted at the last recorded check. See the
-[Virga review](review/56_virga_cloud_experiment.md) and dated upgrade register.
+Two 500-live-point MgSiO3 transmission tests converged with fixed gas
+abundances and no iteration cap. The noiseless test recovered all four
+injected values inside their 1-sigma intervals. The noisy test recovered
+all four inside their 2-sigma intervals for one noise realization.
+Coverage across noise realizations remains open.
+[Local recovery checks](review/62_virga_transmission_500live_2026-11-06.md)
+
+The maintained Virga emission YAML describes the R=1000 workflow.
+The solar forward grid shows that some strong cloud signals depend on the
+model top and radius range. The local checks cover selected controlled cases.
+[Emission YAML](../configurations/cloudy_emission_virga.yaml),
+[Grid tests](review/64_virga_grid_convergence_2026-11-07.md)
 
 ## Stellar contamination
 

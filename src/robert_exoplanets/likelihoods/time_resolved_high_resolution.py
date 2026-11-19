@@ -150,13 +150,6 @@ def _low_rank_reconstruction(
     )
 
 
-def _freeze_in_place(array: np.ndarray) -> FloatArray:
-    """Set a temporary NumPy array read-only and return it."""
-
-    array.setflags(write=False)
-    return array
-
-
 @dataclass(frozen=True)
 class TimeResolvedHighResolutionModel:
     """Diagnostic arrays for one reprocessed trial model."""

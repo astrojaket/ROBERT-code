@@ -160,6 +160,11 @@ def test_configured_factory_passes_hminus_to_selected_forward_model(
     )
     monkeypatch.setattr(
         configured_tasks,
+        "_chemistry_components",
+        lambda _config: (object(), object(), ()),
+    )
+    monkeypatch.setattr(
+        configured_tasks,
         "ParameterizedEmissionFactoryConfig",
         lambda **kwargs: SimpleNamespace(**kwargs),
     )

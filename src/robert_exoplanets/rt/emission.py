@@ -980,11 +980,6 @@ def disk_average_quadrature(
     return geometry.emission_angle_cosines, geometry.emission_angle_weights
 
 
-def _normal_emission_quadrature() -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    geometry = normal_emission_geometry()
-    return geometry.emission_angle_cosines, geometry.emission_angle_weights
-
-
 def _resolve_emission_geometry(
     geometry: DiscGeometry | None,
     emission_angle_cosines: ArrayLike | None,

@@ -107,7 +107,9 @@ jobs:
       - name: Test exo_k binning bridge
         env:
           NUMBA_CACHE_DIR: /tmp/robert-numba-cache
-        run: python -m pytest tests/test_opacity_kta.py -k exok
+        run: |
+          python -m pytest tests/test_opacity_kta.py -k exok
+          python -m pytest tests/test_exact_bin_bounds.py
 
   high-resolution-helpers:
     name: LBL/HRS helper tests (no external data)

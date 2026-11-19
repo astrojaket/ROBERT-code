@@ -424,62 +424,6 @@ def _scaled_hemispheric_transfer(
     return identity + (np.tanh(argument) / eigenvalue) * coefficient, inverse_scale
 
 
-def _layer_source_integral(
-    flux_top: NDArray[np.float64],
-    layer_tau: float,
-    omega: float,
-    asymmetry: float,
-    planck_top: float,
-    planck_bottom: float,
-    mu: float,
-    unit_nodes: NDArray[np.float64],
-    unit_weights: NDArray[np.float64],
-) -> float:
-    if layer_tau == 0.0:
-        return 0.0
-    total = 0.0
-    particular_top, _ = _linear_planck_particular_flux(
-        layer_tau,
-        omega,
-        asymmetry,
-        planck_top,
-        planck_bottom,
-    )
-    for node, weight in zip(unit_nodes, unit_weights, strict=True):
-        optical_depth = layer_tau * float(node)
-        partial_matrix = _hemispheric_transfer_matrix(
-            optical_depth,
-            omega,
-            asymmetry,
-        )
-        planck = planck_top + (planck_bottom - planck_top) * float(node)
-        particular, _ = _linear_planck_particular_flux(
-            layer_tau,
-            omega,
-            asymmetry,
-            planck_top,
-            planck_bottom,
-            optical_depth=optical_depth,
-        )
-        flux = particular + partial_matrix @ (flux_top - particular_top)
-        mean_intensity = (flux[0] + flux[1]) / (2.0 * np.pi)
-        first_moment = (flux[0] - flux[1]) / (4.0 * np.pi)
-        source = (1.0 - omega) * planck + omega * (
-            mean_intensity + 3.0 * asymmetry * mu * first_moment
-        )
-        total += float(weight) * source * np.exp(-optical_depth / mu)
-    return layer_tau * total / mu
-
-
-def _hemispheric_transfer_matrix(tau: float, omega: float, asymmetry: float) -> NDArray[np.float64]:
-    scaled, inverse_scale = _scaled_hemispheric_transfer(tau, omega, asymmetry)
-    if inverse_scale == 0.0:
-        raise RobertValidationError(
-            "angular source reconstruction requires vertical refinement for this layer optical depth"
-        )
-    return scaled / inverse_scale
-
-
 def _linear_planck_particular_flux(
     layer_tau: float,
     omega: float,

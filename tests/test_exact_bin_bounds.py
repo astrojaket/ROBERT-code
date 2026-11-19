@@ -309,6 +309,7 @@ def test_correlated_k_exact_windows_match_independent_exok_bins(
     cache.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache))
     _ensure_writable_numba_cache()
+    pytest.importorskip("exo_k")
     source = _write_small_kta(tmp_path / "H2O_exact_windows.kta")
     provider = CorrelatedKOpacityProvider.from_kta_paths({"H2O": source})
     grid = _bounds_grid()
@@ -350,6 +351,7 @@ def test_regular_kta_exact_windows_match_legacy_single_bin_results(
     cache.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache))
     _ensure_writable_numba_cache()
+    pytest.importorskip("exo_k")
     source = _write_small_regular_kta(tmp_path / "H2O_regular_windows.kta")
     provider = CorrelatedKOpacityProvider.from_kta_paths({"H2O": source})
     grid = _bounds_grid()
@@ -384,6 +386,7 @@ def test_exact_windows_reject_cached_table_with_non_native_grid(
     cache.mkdir()
     monkeypatch.setenv("NUMBA_CACHE_DIR", str(cache))
     _ensure_writable_numba_cache()
+    pytest.importorskip("exo_k")
     source = _write_small_kta(tmp_path / "H2O_non_native.kta")
     provider = CorrelatedKOpacityProvider.from_kta_paths({"H2O": source})
     native_table = provider.tables["H2O"]

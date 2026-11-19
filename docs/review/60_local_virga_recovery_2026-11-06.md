@@ -113,9 +113,14 @@ validation.
 
 ## Performance follow-ups
 
-These are proposed upgrades. None has been implemented or benchmarked. No speedup is claimed.
+The paired Virga API and per-draw reuse are complete. The follow-up records
+exact spectra and profile agreement and the measured posterior batch times.
+The other two items remain proposals.
+[Virga reuse benchmark](64_virga_grid_convergence_2026-11-07.md)
 
-1. **Reuse one Virga result for radiative transfer and cloud profiles.** [`VirgaEddySedCloudModel.evaluate`](../../src/robert_exoplanets/forward/virga_cloud.py#L374) runs Virga and maps optical properties. `compute_cloud_profiles` starts a separate Virga calculation at lines 395–420. Posterior analysis also calculates the spectrum before asking for cloud diagnostics. Add a typed result that retains the one raw Virga evaluation and its mapped optical and physical profiles. Check exact profile and metadata parity, confirm one `virga.compute` call per draw, and compare spectra and likelihoods against the current path. Do not cache complete outputs across different proposals without a complete state identity.
+1. **Complete.** `VirgaEddySedCloudModel.evaluate_with_profiles` returns
+   optical properties and physical cloud profiles from one run. The posterior
+   collector reuses the Virga result within each draw when the inputs match.
 2. **Cache decoded Mie tables through a supported Virga API.** In `virga-exo 2.0.2`, `virga.justdoit.compute` calls `get_mie` for each evaluation (`justdoit.py:87–121`); `get_mie` reads and parses the `.mieff` file (`justdoit.py:1830–1890`). Add an immutable table input or a process-local cache keyed by file-content hash and table options. Check numerical parity, invalidation after file replacement, array immutability, and independent use by MPI worker processes. Keep proposal-dependent sedimentation and radius-distribution optics uncached.
 3. **Cache fixed wavelength-mapping setup.** `_cloud_optics_from_virga` interpolates three arrays at [`virga_cloud.py`](../../src/robert_exoplanets/forward/virga_cloud.py#L850), and `_interpolate_spectrum` repeats source sorting, logarithms, and `numpy.interp` for each layer at lines 1070–1098. Cache only the mapping setup. Key it by exact source and target grids, units, and interpolation policy. Check parity for both wavelength orders and exact endpoints, then compare spectra and likelihoods.
 

@@ -1439,44 +1439,6 @@ class PreparedPixelIntegrationResponse:
     apply = observe
 
 
-def _prepare_linear_grid_operator(
-    source_grid: SpectralGrid,
-    target_grid: SpectralGrid,
-    *,
-    name: str,
-) -> PreparedSpectralOperator:
-    """Prepare a strict, non-extrapolating linear grid mapping."""
-
-    if source_grid.unit != target_grid.unit:
-        raise RobertValidationError("source and target spectral units must match")
-    _require_positive_grid(source_grid, "source")
-    _require_positive_grid(target_grid, "target")
-    source = _ascending_values(source_grid)
-    target = _ascending_values(target_grid)
-    _check_coordinate_coverage(
-        source,
-        target,
-        message="target grid extends outside native spectrum",
-    )
-    if target_grid.bin_bounds is not None:
-        bounds = np.asarray(target_grid.bin_bounds, dtype=float)
-        _check_coordinate_coverage(
-            source,
-            bounds.ravel(),
-            message="target bin edges extend outside native spectrum",
-        )
-    indices, weights, row_starts = _build_linear_interpolation_operator(source, target)
-    return PreparedSpectralOperator(
-        source_grid=source_grid,
-        target_grid=target_grid,
-        indices=indices,
-        weights=weights,
-        row_starts=row_starts,
-        name=name,
-        metadata={"mapping": "piecewise_linear_no_extrapolation"},
-    )
-
-
 def _stage_rank(stage: object) -> int:
     """Return the required physical ordering rank for one response stage."""
 
