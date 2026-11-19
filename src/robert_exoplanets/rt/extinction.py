@@ -125,9 +125,12 @@ class HMinusContinuumConfig:
     model (or provide equivalent profiles from another chemistry model).
 
     The Gray (2008) free-free fit is evaluated only for temperatures at or
-    above 2500 K.  ``temperature_extrapolation="zero"`` matches the current
-    petitRADTRANS behaviour below that bound.  ``"raise"`` is available for
-    strict coverage checks.  The free-free wavelength fit is valid from
+    above 2500 K. ``temperature_extrapolation="zero"`` matches the current
+    petitRADTRANS behaviour below that bound. ``"raise"`` is available for
+    strict coverage checks. ``"clip"`` evaluates the free-free coefficient at
+    2500 K in colder layers. It clips only the temperature passed to that
+    coefficient; the atmosphere temperature, pressure, and H/e abundance
+    profiles remain unchanged. The free-free wavelength fit is valid from
     2600 to 113900 Angstrom (0.26 to 11.39 micron); the spectral policy
     controls requests outside this range.
     """
@@ -158,9 +161,9 @@ class HMinusContinuumConfig:
                 "H-minus continuum species names must be unique"
             )
         temperature_policy = str(self.temperature_extrapolation).strip().lower()
-        if temperature_policy not in {"zero", "raise"}:
+        if temperature_policy not in {"zero", "raise", "clip"}:
             raise RobertValidationError(
-                "H-minus temperature_extrapolation must be 'zero' or 'raise'"
+                "H-minus temperature_extrapolation must be 'zero', 'raise', or 'clip'"
             )
         spectral_policy = str(self.spectral_extrapolation).strip().lower()
         if spectral_policy not in {"zero", "raise"}:
@@ -532,6 +535,11 @@ def hminus_optical_depth(
     works for correlated-k, opacity-sampling, and line-by-line gas optical
     depths because it uses only their physical column density.
 
+    With ``temperature_extrapolation="clip"``, only the temperature passed
+    to the Gray free-free coefficient is raised to its 2500 K lower bound.
+    The actual atmosphere temperature, layer column, pressure, and H/e VMRs
+    are used everywhere else. The bound-free term is unchanged.
+
     ``config`` defaults to the petitRADTRANS composition keys ``H-``, ``H``,
     and ``e-``.  All three keys must be present when this contribution is
     enabled.  Missing keys are an error rather than an implicit zero or an
@@ -628,9 +636,15 @@ def hminus_optical_depth(
         electron_partial_pressure_dyn_cm2 = (
             pressure_pa[layer_index] * 10.0 * electron[layer_index]
         )
+        coefficient_temperature = float(layer_temperature)
+        if continuum.temperature_extrapolation == "clip":
+            coefficient_temperature = max(
+                coefficient_temperature,
+                HMINUS_FREE_FREE_MIN_TEMPERATURE_K,
+            )
         cross_section_cm2 = _hminus_free_free_cross_section(
             wavelength_angstrom,
-            float(layer_temperature),
+            coefficient_temperature,
             float(electron_partial_pressure_dyn_cm2),
         )
         # The fit returns cm^2 per H particle after multiplication by p_e.
@@ -674,6 +688,11 @@ def hminus_optical_depth(
             ),
             "free_free_temperature_min_K": f"{HMINUS_FREE_FREE_MIN_TEMPERATURE_K:g}",
             "temperature_extrapolation": continuum.temperature_extrapolation,
+            "free_free_temperature_argument": (
+                "max(layer_temperature_K, free_free_temperature_min_K)"
+                if continuum.temperature_extrapolation == "clip"
+                else "layer_temperature_K"
+            ),
             "spectral_extrapolation": continuum.spectral_extrapolation,
             **dict(continuum.metadata),
         },

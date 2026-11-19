@@ -220,6 +220,95 @@ def test_hminus_point_grid_and_validity_policy() -> None:
         )
 
 
+def test_hminus_clip_changes_only_gray_free_free_temperature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spectral_grid = SpectralGrid.from_array(
+        [1.0, 2.0, 5.0],
+        unit="micron",
+        role="opacity",
+    )
+    gas_tau = _gas_tau(spectral_grid)
+    atmosphere = replace(
+        gas_tau.atmosphere,
+        temperature=np.array([2000.0, 2500.0]),
+        composition={
+            **dict(gas_tau.atmosphere.composition),
+            "H-": np.array([1.0e-8, 2.0e-8]),
+            "H": np.array([0.1, 0.2]),
+            "e-": np.full(2, 1.0e-4),
+        },
+    )
+    gas_tau = replace(gas_tau, atmosphere=atmosphere)
+    original_temperature = gas_tau.atmosphere.temperature.copy()
+    original_column = gas_tau.layer_column_density_molecules_m2.copy()
+
+    original_free_free = extinction_module._hminus_free_free_cross_section
+    calls: list[tuple[float, float]] = []
+
+    def record_free_free_inputs(
+        wavelengths_angstrom: np.ndarray,
+        temperature_K: float,
+        electron_partial_pressure_dyn_cm2: float,
+    ) -> np.ndarray:
+        calls.append((temperature_K, electron_partial_pressure_dyn_cm2))
+        return original_free_free(
+            wavelengths_angstrom,
+            temperature_K,
+            electron_partial_pressure_dyn_cm2,
+        )
+
+    monkeypatch.setattr(
+        extinction_module,
+        "_hminus_free_free_cross_section",
+        record_free_free_inputs,
+    )
+    clipped = hminus_optical_depth(
+        gas_tau,
+        HMinusContinuumConfig(temperature_extrapolation="clip"),
+    )
+
+    assert [temperature for temperature, _ in calls] == [2500.0, 2500.0]
+    np.testing.assert_allclose(
+        [pressure for _, pressure in calls],
+        [0.01, 1.0],
+        rtol=1.0e-15,
+        atol=0.0,
+    )
+    assert clipped.metadata["temperature_extrapolation"] == "clip"
+    assert clipped.metadata["free_free_temperature_argument"] == (
+        "max(layer_temperature_K, free_free_temperature_min_K)"
+    )
+    np.testing.assert_array_equal(gas_tau.atmosphere.temperature, original_temperature)
+    np.testing.assert_array_equal(
+        gas_tau.layer_column_density_molecules_m2,
+        original_column,
+    )
+
+    zero = hminus_optical_depth(gas_tau, HMinusContinuumConfig())
+    assert zero.metadata["temperature_extrapolation"] == "zero"
+    assert zero.metadata["free_free_temperature_argument"] == "layer_temperature_K"
+    expected_free_free = (
+        original_column[0]
+        * 0.1
+        * original_free_free(
+            np.array([1.0, 2.0, 5.0]) * 1.0e4,
+            2500.0,
+            0.01,
+        )
+        * 1.0e-4
+    )
+    # The difference is only the clipped free-free term; bound-free is intact.
+    np.testing.assert_allclose(
+        clipped.tau[0] - zero.tau[0],
+        expected_free_free,
+        rtol=1.0e-12,
+        atol=0.0,
+    )
+    # At the validity limit, clip and the default zero policy are identical.
+    np.testing.assert_array_equal(clipped.tau[1], zero.tau[1])
+
+
 def test_hminus_requires_all_three_explicit_composition_species() -> None:
     gas_tau = _gas_tau(SpectralGrid.from_array([2.0], unit="micron", role="opacity"))
     with pytest.raises(RobertValidationError, match="explicit composition species: H-"):
