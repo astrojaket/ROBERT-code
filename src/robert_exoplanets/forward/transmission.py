@@ -48,9 +48,10 @@ class ParameterizedTransmissionModelConfig:
 
     ``planet.radius_m`` is interpreted as the reference radius at
     ``reference_pressure_bar``. An optional radius-scale parameter retrieves a
-    multiplicative correction to that anchor. ``inverse_square`` is a
-    constrained variable-gravity model; ``constant`` retains one gravity value
-    throughout the atmosphere.
+    multiplicative correction to that anchor. An optional mass-scale parameter
+    multiplies ``planet.mass_kg`` and updates the reference gravity together
+    with any radius scale. ``inverse_square`` is a constrained variable-gravity
+    model; ``constant`` retains one gravity value throughout the atmosphere.
     """
 
     opacity_species: tuple[str, ...]
@@ -65,6 +66,7 @@ class ParameterizedTransmissionModelConfig:
     impact_quadrature_order: int = 8
     metadata: Mapping[str, str] = field(default_factory=dict)
     hminus_continuum: HMinusContinuumConfig | None = None
+    mass_scale_parameter: str | None = None
 
     def __post_init__(self) -> None:
         species = tuple(str(item).strip() for item in self.opacity_species)
@@ -83,6 +85,13 @@ class ParameterizedTransmissionModelConfig:
             if not radius_parameter:
                 raise RobertValidationError(
                     "radius_scale_parameter must be non-empty when provided"
+                )
+        mass_parameter = self.mass_scale_parameter
+        if mass_parameter is not None:
+            mass_parameter = str(mass_parameter).strip()
+            if not mass_parameter:
+                raise RobertValidationError(
+                    "mass_scale_parameter must be non-empty when provided"
                 )
         gravity_model = self.gravity_model.strip().lower().replace("-", "_")
         if gravity_model not in {"constant", "inverse_square"}:
@@ -119,6 +128,7 @@ class ParameterizedTransmissionModelConfig:
         object.__setattr__(self, "opacity_species", species)
         object.__setattr__(self, "reference_pressure_bar", reference_pressure)
         object.__setattr__(self, "radius_scale_parameter", radius_parameter)
+        object.__setattr__(self, "mass_scale_parameter", mass_parameter)
         object.__setattr__(self, "gravity_model", gravity_model)
         object.__setattr__(
             self,
@@ -152,6 +162,10 @@ class ParameterizedTransmissionForwardModel:
         if self.planet.radius_m is None:
             raise RobertValidationError(
                 "parameterized transmission requires planet.radius_m"
+            )
+        if self.config.mass_scale_parameter is not None and self.planet.mass_kg is None:
+            raise RobertValidationError(
+                "mass_scale_parameter requires planet.mass_kg"
             )
         if self.star.radius_m is None:
             raise RobertValidationError(
@@ -192,7 +206,7 @@ class ParameterizedTransmissionForwardModel:
             )
         if len(set(self.required_parameters)) != len(self.required_parameters):
             raise RobertValidationError(
-                "temperature, chemistry, radius, cloud, and stellar-contamination parameter names must be unique"
+                "temperature, chemistry, radius, mass, cloud, and stellar-contamination parameter names must be unique"
             )
         prepared = self.opacity_provider.prepare(
             self.spectral_grid,
@@ -225,6 +239,8 @@ class ParameterizedTransmissionForwardModel:
             )
         if self.config.radius_scale_parameter is not None:
             parameters.append(self.config.radius_scale_parameter)
+        if self.config.mass_scale_parameter is not None:
+            parameters.append(self.config.mass_scale_parameter)
         if self.cloud_model is not None:
             parameters.extend(self.cloud_model.required_parameters)
         if self.stellar_contamination is not None:
@@ -255,6 +271,11 @@ class ParameterizedTransmissionForwardModel:
                 "forward_model": "parameterized_transmission",
                 "planet_name": self.planet.name,
                 "planet_reference_radius_m": f"{self.planet.radius_m:.17g}",
+                "planet_reference_mass_kg": (
+                    ""
+                    if self.planet.mass_kg is None
+                    else f"{self.planet.mass_kg:.17g}"
+                ),
                 "reference_pressure_bar": (
                     f"{self.config.reference_pressure_bar:.17g}"
                 ),
@@ -294,6 +315,7 @@ class ParameterizedTransmissionForwardModel:
                 else self.config.hminus_continuum.spectral_extrapolation,
                 "impact_quadrature_order": str(self.config.impact_quadrature_order),
                 "radius_scale_parameter": (self.config.radius_scale_parameter or ""),
+                "mass_scale_parameter": (self.config.mass_scale_parameter or ""),
                 "pressure_grid_layers": str(self.pressure_grid.n_layers),
                 "pressure_grid_sha256": _array_signature(
                     self.pressure_grid.edges,
@@ -375,8 +397,15 @@ class ParameterizedTransmissionForwardModel:
         )
         if radius_scale <= 0.0:
             raise RobertValidationError("radius scale must be positive")
+        mass_scale = (
+            1.0
+            if self.config.mass_scale_parameter is None
+            else parameter_values[self.config.mass_scale_parameter]
+        )
+        if mass_scale <= 0.0:
+            raise RobertValidationError("mass scale must be positive")
         reference_radius = float(self.planet.radius_m) * radius_scale
-        reference_gravity = self._reference_gravity(reference_radius)
+        reference_gravity = self._reference_gravity(reference_radius, mass_scale)
         if self.config.gravity_model == "inverse_square":
             path_geometry = inverse_square_hydrostatic_path_geometry(
                 atmosphere,
@@ -425,6 +454,13 @@ class ParameterizedTransmissionForwardModel:
             "gravity_model": self.config.gravity_model,
             "reference_pressure_bar": (f"{self.config.reference_pressure_bar:.17g}"),
             "reference_gravity_m_s2": f"{reference_gravity:.17g}",
+            "reference_radius_m": f"{reference_radius:.17g}",
+            "mass_scale": f"{mass_scale:.17g}",
+            "planet_mass_kg": (
+                ""
+                if self.planet.mass_kg is None
+                else f"{float(self.planet.mass_kg) * mass_scale:.17g}"
+            ),
         }
         uncontaminated_transit_depth = Spectrum(
             spectral_grid=result.transit_depth.spectral_grid,
@@ -451,13 +487,23 @@ class ParameterizedTransmissionForwardModel:
             metadata=forward_metadata,
         )
 
-    def _reference_gravity(self, reference_radius_m: float) -> float:
+    def _reference_gravity(
+        self,
+        reference_radius_m: float,
+        mass_scale: float = 1.0,
+    ) -> float:
+        mass_scale = float(mass_scale)
+        if not np.isfinite(mass_scale) or mass_scale <= 0.0:
+            raise RobertValidationError("mass scale must be finite and positive")
         if self.planet.mass_kg is not None:
             return float(
                 GRAVITATIONAL_CONSTANT_M3_KG_S2
                 * self.planet.mass_kg
+                * mass_scale
                 / reference_radius_m**2
             )
+        if mass_scale != 1.0:
+            raise RobertValidationError("mass scaling requires planet.mass_kg")
         if self.planet.gravity_m_s2 is None:
             raise RobertValidationError(
                 "transmission requires planet mass or reference gravity"

@@ -30,7 +30,7 @@ these groups with `# Shared`, `# Emission only`, and `# Transmission only`.
 | Shared | `clouds` extinction and profile settings; `radiative_transfer.include_rayleigh`, `radiative_transfer.gas_combination`, optional `radiative_transfer.hminus_continuum` | Set atmospheric opacity terms used by either mode. Cloud `multiple_scattering_backend` settings are emission-only. |
 | Shared | `bodies.star.radius_m`, `bodies.star.spectrum_model` | The stellar radius is used in both modes. `spectrum_model` supplies the stellar spectrum for emission eclipse depth and for transmission when stellar contamination is enabled. |
 | Emission only | `disk_emission` (including region weights), `radiative_transfer.geometry`, `radiative_transfer.thermal_integration_backend`, `radiative_transfer.sh4_boundary_backend`, cloud `multiple_scattering_backend` | Set the emitting disk, thermal integration, and cloud-scattering treatment. Omit transmission-only controls. |
-| Transmission only | `stellar_contamination`, `radiative_transfer.reference_pressure_bar`, `radiative_transfer.radius_scale_parameter`, `radiative_transfer.gravity_model`, `radiative_transfer.impact_quadrature_order` | Set stellar contamination and the reference radius, gravity, and impact-ray integration. Omit emission-only controls. |
+| Transmission only | `stellar_contamination`, `radiative_transfer.reference_pressure_bar`, `radiative_transfer.radius_scale_parameter`, `radiative_transfer.mass_scale_parameter`, `radiative_transfer.gravity_model`, `radiative_transfer.impact_quadrature_order` | Set stellar contamination and the reference radius, mass, gravity, and impact-ray integration. Omit emission-only controls. |
 
 H-minus is off when `radiative_transfer.hminus_continuum` is absent. The
 optional shared block accepts `hminus_species`, `hydrogen_species`,
@@ -483,10 +483,16 @@ ExoMol links, filenames, and separate high-resolution input routes.
 For transmission, set `model: transmission`. The radius in
 `bodies.planet.radius_m` is anchored at `reference_pressure_bar`. Set
 `radius_scale_parameter` only when you want to retrieve a multiplicative radius
-correction, and add that parameter to `parameters`. `gravity_model` accepts
-`constant` or `inverse_square`; `impact_quadrature_order` sets the number of
-quadrature points for the transit annulus. The top-level `stellar_contamination`
-block is also transmission-only.
+correction, and add that parameter to `parameters`. The optional
+`mass_scale_parameter` names a positive multiplicative factor on
+`bodies.planet.mass_kg`; add it to `parameters` and provide a planet mass. ROBERT
+derives reference gravity from the scaled mass and scaled reference radius for
+every draw. The resulting reference gravity anchors either the constant-gravity
+profile or the inverse-square profile. If the mass-scale parameter is omitted,
+the configured planet mass and existing gravity behavior are unchanged.
+`gravity_model` accepts `constant` or `inverse_square`;
+`impact_quadrature_order` sets the number of quadrature points for the transit
+annulus. The top-level `stellar_contamination` block is also transmission-only.
 
 An optional shared H-minus block looks like this:
 

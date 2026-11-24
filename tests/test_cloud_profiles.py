@@ -149,6 +149,45 @@ def test_transmission_owner_uses_its_hydrostatic_gravity_profile() -> None:
     )
 
 
+def test_transmission_cloud_profiles_use_retrieved_mass_scale() -> None:
+    atmosphere = _atmosphere()
+    cloud = ParameterizedDeckHazeCloudModel()
+    reference_radius = 7.0e7
+    owner = SimpleNamespace(
+        cloud_model=cloud,
+        planet=SimpleNamespace(radius_m=reference_radius),
+        config=SimpleNamespace(
+            radius_scale_parameter="radius_scale",
+            mass_scale_parameter="mass_scale",
+            gravity_model="constant",
+            reference_pressure_bar=1.0e-2,
+        ),
+        _reference_gravity=lambda radius, mass_scale: (
+            10.0 * mass_scale * (reference_radius / radius) ** 2
+        ),
+    )
+    parameters = {
+        "log_cloud_top_pressure_bar": -3.0,
+        "log_cloud_optical_depth": -1.0,
+        "log_haze_mass_extinction": 0.0,
+        "haze_slope": -4.0,
+        "radius_scale": 1.1,
+        "mass_scale": 2.0,
+    }
+
+    profiles = cloud_profiles(owner, atmosphere, parameters)
+
+    pressure_edges_pa = atmosphere.pressure_grid.edges * 1.0e5
+    expected_gravity = 10.0 * parameters["mass_scale"] / parameters[
+        "radius_scale"
+    ] ** 2
+    expected_haze = 0.1 * np.abs(np.diff(pressure_edges_pa)) / expected_gravity
+    np.testing.assert_allclose(
+        profiles["haze_extinction_optical_depth_at_1_micron"]["values"],
+        expected_haze,
+    )
+
+
 def test_cloud_free_returns_empty_and_custom_cloud_is_explicitly_unavailable() -> None:
     atmosphere = _atmosphere()
 

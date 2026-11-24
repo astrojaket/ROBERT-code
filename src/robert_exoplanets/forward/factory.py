@@ -499,6 +499,11 @@ class ParameterizedTransmissionFactoryConfig:
                 raise RobertConfigError(
                     f"{label} does not implement its ROBERT protocol"
                 )
+        if (
+            self.model.mass_scale_parameter is not None
+            and self.planet.mass_kg is None
+        ):
+            raise RobertConfigError("mass_scale_parameter requires planet.mass_kg")
         source_species = self.opacity_source.species
         missing_source = tuple(
             species

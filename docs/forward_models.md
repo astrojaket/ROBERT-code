@@ -209,15 +209,20 @@ radiative_transfer:
   model: transmission
   reference_pressure_bar: 1.0
   radius_scale_parameter: radius_scale
+  mass_scale_parameter: mass_scale
   gravity_model: inverse_square
   impact_quadrature_order: 8
   include_rayleigh: true
   gas_combination: random_overlap
 ```
 
-The named `radius_scale` must also appear in `parameters`. Transmission output
-is a transit-depth spectrum; emission output is a planet-to-star eclipse-depth
-spectrum after applying the configured stellar model.
+The named `radius_scale` must also appear in `parameters`. The optional
+`mass_scale_parameter` is a positive multiplicative factor on the configured
+planet mass, and its named parameter must appear in `parameters`. It requires
+`bodies.planet.mass_kg`; ROBERT combines the mass and radius scales to derive
+the reference gravity for each draw. Transmission output is a transit-depth
+spectrum; emission output is a planet-to-star eclipse-depth spectrum after
+applying the configured stellar model.
 
 ### Observation bins
 

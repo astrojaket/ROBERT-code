@@ -1193,6 +1193,42 @@ def test_transmission_radius_parameter_must_be_in_retrieval_parameters() -> None
         TaskConfig.model_validate(raw)
 
 
+def test_transmission_mass_scale_requires_mass_and_positive_parameter() -> None:
+    config = load_task_config(HDF_TRANSMISSION)
+    raw = deepcopy(config.model_dump(mode="python"))
+    raw["radiative_transfer"]["mass_scale_parameter"] = "mass_scale"
+    raw["parameters"] = [
+        *raw["parameters"],
+        {
+            "name": "mass_scale",
+            "prior": {"type": "uniform", "lower": 0.5, "upper": 1.5},
+        },
+    ]
+
+    parsed = TaskConfig.model_validate(raw)
+    assert parsed.radiative_transfer.mass_scale_parameter == "mass_scale"
+
+    missing_parameter = deepcopy(raw)
+    missing_parameter["parameters"] = [
+        item for item in missing_parameter["parameters"] if item["name"] != "mass_scale"
+    ]
+    with pytest.raises(ValidationError, match="mass_scale"):
+        TaskConfig.model_validate(missing_parameter)
+
+    non_positive_prior = deepcopy(raw)
+    next(item for item in non_positive_prior["parameters"] if item["name"] == "mass_scale")[
+        "prior"
+    ]["lower"] = 0.0
+    with pytest.raises(ValidationError, match="positive lower bound"):
+        TaskConfig.model_validate(non_positive_prior)
+
+    missing_mass = deepcopy(raw)
+    missing_mass["bodies"]["planet"]["mass_kg"] = None
+    missing_mass["bodies"]["planet"]["gravity_m_s2"] = 10.0
+    with pytest.raises(ValidationError, match="requires bodies.planet.mass_kg"):
+        TaskConfig.model_validate(missing_mass)
+
+
 def test_yaml_configures_joint_centered_log_ratio_chemistry() -> None:
     config = load_task_config(TRANSMISSION)
     raw = deepcopy(config.model_dump(mode="python"))
@@ -1276,6 +1312,7 @@ def test_clr_and_phantom_configuration_is_geometry_agnostic() -> None:
     for key in (
         "reference_pressure_bar",
         "radius_scale_parameter",
+        "mass_scale_parameter",
         "gravity_model",
         "impact_quadrature_order",
     ):

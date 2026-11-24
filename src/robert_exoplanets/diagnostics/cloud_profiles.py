@@ -331,7 +331,16 @@ def _gravity_profile(
         if radius_scale <= 0.0:
             raise RobertValidationError("radius scale must be positive")
     reference_radius = float(planet.radius_m) * radius_scale
-    reference_gravity = float(reference_gravity_method(reference_radius))
+    mass_parameter = getattr(config, "mass_scale_parameter", None)
+    if mass_parameter is None:
+        reference_gravity = float(reference_gravity_method(reference_radius))
+    else:
+        mass_scale = _parameter_value(parameters, mass_parameter)
+        if mass_scale <= 0.0:
+            raise RobertValidationError("mass scale must be positive")
+        reference_gravity = float(
+            reference_gravity_method(reference_radius, mass_scale)
+        )
 
     from robert_exoplanets.rt import (
         hydrostatic_path_geometry,

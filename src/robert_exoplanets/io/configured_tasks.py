@@ -927,6 +927,7 @@ def build_problem(
             include_rayleigh=rt.include_rayleigh,
             gas_combination=rt.gas_combination,
             impact_quadrature_order=rt.impact_quadrature_order,
+            mass_scale_parameter=rt.mass_scale_parameter,
             hminus_continuum=_hminus_continuum_config(rt.hminus_continuum),
             metadata={"configured_model": "transmission"},
         )

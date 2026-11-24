@@ -853,6 +853,7 @@ class RadiativeTransferConfig(ConfigModel):
     sh4_boundary_backend: Literal["auto", "scipy", "numba"] = "auto"
     reference_pressure_bar: PositiveFloat = 1.0
     radius_scale_parameter: str | None = None
+    mass_scale_parameter: str | None = None
     gravity_model: Literal["constant", "inverse_square"] = "inverse_square"
     impact_quadrature_order: int = Field(default=8, ge=2)
 
@@ -860,6 +861,15 @@ class RadiativeTransferConfig(ConfigModel):
     def validate_model_options(self) -> "RadiativeTransferConfig":
         if self.radius_scale_parameter is not None and not self.radius_scale_parameter:
             raise ValueError("radius_scale_parameter must be non-empty")
+        if self.mass_scale_parameter is not None and not self.mass_scale_parameter:
+            raise ValueError("mass_scale_parameter must be non-empty")
+        if (
+            self.mass_scale_parameter is not None
+            and self.mass_scale_parameter == self.radius_scale_parameter
+        ):
+            raise ValueError(
+                "mass_scale_parameter and radius_scale_parameter must be distinct"
+            )
         explicit = self.model_fields_set
         if self.model == "transmission":
             unused = {
@@ -891,6 +901,7 @@ class RadiativeTransferConfig(ConfigModel):
                 {
                     "reference_pressure_bar",
                     "radius_scale_parameter",
+                    "mass_scale_parameter",
                     "gravity_model",
                     "impact_quadrature_order",
                 }
@@ -898,6 +909,7 @@ class RadiativeTransferConfig(ConfigModel):
                 if (
                     (name == "reference_pressure_bar" and self.reference_pressure_bar != 1.0)
                     or (name == "radius_scale_parameter" and self.radius_scale_parameter is not None)
+                    or (name == "mass_scale_parameter" and self.mass_scale_parameter is not None)
                     or (name == "gravity_model" and self.gravity_model != "inverse_square")
                     or (name == "impact_quadrature_order" and self.impact_quadrature_order != 8)
                 )
@@ -1364,6 +1376,20 @@ class TaskConfig(ConfigModel):
             if radiative_transfer.radius_scale_parameter is not None:
                 required.add(radiative_transfer.radius_scale_parameter)
                 non_virga_required.add(radiative_transfer.radius_scale_parameter)
+            if radiative_transfer.mass_scale_parameter is not None:
+                if self.bodies.planet.mass_kg is None:
+                    raise ValueError(
+                        "radiative_transfer.mass_scale_parameter requires "
+                        "bodies.planet.mass_kg"
+                    )
+                mass_parameter = radiative_transfer.mass_scale_parameter
+                required.add(mass_parameter)
+                non_virga_required.add(mass_parameter)
+                parameter = parameter_configs.get(mass_parameter)
+                if parameter is not None and parameter.prior.lower <= 0.0:
+                    raise ValueError(
+                        "mass_scale_parameter requires a prior with positive lower bound"
+                    )
         clr_parameters = {
             item.name: item.prior
             for item in self.parameters

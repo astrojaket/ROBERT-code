@@ -26,7 +26,8 @@ from robert_exoplanets import (
     StellarHeterogeneity,
     build_parameterized_transmission_model,
 )
-from robert_exoplanets.core import RobertValidationError
+from robert_exoplanets.core import RobertConfigError, RobertValidationError
+from robert_exoplanets.forward.transmission import GRAVITATIONAL_CONSTANT_M3_KG_S2
 
 
 def _spectral_grid() -> SpectralGrid:
@@ -129,6 +130,120 @@ def test_parameterized_transmission_factory_builds_transit_depth() -> None:
     assert spectrum.metadata["forward_model"] == "parameterized_transmission"
     assert model.manifest_metadata["reference_pressure_bar"] == "10"
     assert model.opacity_identifiers == {"H2O": "h2o-transmission-test"}
+
+
+@pytest.mark.parametrize("gravity_model", ["constant", "inverse_square"])
+def test_mass_scale_updates_transmission_gravity_and_provenance(
+    gravity_model: str,
+) -> None:
+    base_factory = _factory()
+    model_config = replace(
+        base_factory.model,
+        gravity_model=gravity_model,
+        mass_scale_parameter="mass_scale",
+    )
+    model = build_parameterized_transmission_model(
+        replace(base_factory, model=model_config),
+        spectral_grid=_spectral_grid(),
+    )
+    baseline = {
+        "temperature": 1000.0,
+        "log_h2o": -3.0,
+        "radius_scale": 1.1,
+        "mass_scale": 1.0,
+    }
+    scaled = {**baseline, "mass_scale": 1.6}
+    baseline_result = model.evaluate_result(baseline)
+    scaled_result = model.evaluate_result(scaled)
+    expected_gravity = (
+        GRAVITATIONAL_CONSTANT_M3_KG_S2
+        * float(base_factory.planet.mass_kg)
+        * scaled["mass_scale"]
+        / (float(base_factory.planet.radius_m) * scaled["radius_scale"]) ** 2
+    )
+
+    assert model.required_parameters[-2:] == ("radius_scale", "mass_scale")
+    assert model.manifest_metadata["mass_scale_parameter"] == "mass_scale"
+    assert model.manifest_metadata["planet_reference_mass_kg"] == (
+        f"{base_factory.planet.mass_kg:.17g}"
+    )
+    assert scaled_result.transit_depth.metadata["planet_mass_kg"] == (
+        f"{base_factory.planet.mass_kg * scaled['mass_scale']:.17g}"
+    )
+    assert float(
+        scaled_result.transit_depth.metadata["reference_gravity_m_s2"]
+    ) == pytest.approx(expected_gravity)
+    if gravity_model == "constant":
+        np.testing.assert_allclose(
+            scaled_result.path_geometry.gravity_m_s2,
+            expected_gravity,
+        )
+        np.testing.assert_allclose(
+            scaled_result.path_geometry.gravity_m_s2
+            / baseline_result.path_geometry.gravity_m_s2,
+            scaled["mass_scale"] / baseline["mass_scale"],
+        )
+    else:
+        assert scaled_result.path_geometry.metadata["gravity_model"] == (
+            "inverse_square_layer_center_fixed_point"
+        )
+        expected_layer_gravity = (
+            GRAVITATIONAL_CONSTANT_M3_KG_S2
+            * float(base_factory.planet.mass_kg)
+            * scaled["mass_scale"]
+            / scaled_result.path_geometry.center_radius_m**2
+        )
+        np.testing.assert_allclose(
+            scaled_result.path_geometry.gravity_m_s2,
+            expected_layer_gravity,
+        )
+
+    legacy = build_parameterized_transmission_model(
+        replace(
+            base_factory,
+            model=replace(base_factory.model, gravity_model=gravity_model),
+        ),
+        spectral_grid=_spectral_grid(),
+    )
+    np.testing.assert_array_equal(
+        baseline_result.transit_depth.values,
+        legacy(
+            {
+                "temperature": baseline["temperature"],
+                "log_h2o": baseline["log_h2o"],
+                "radius_scale": baseline["radius_scale"],
+            }
+        ).values,
+    )
+
+
+def test_mass_scale_requires_a_mass_and_a_positive_runtime_value() -> None:
+    base_factory = _factory()
+    model_config = replace(base_factory.model, mass_scale_parameter="mass_scale")
+    with pytest.raises(RobertConfigError, match="requires planet.mass_kg"):
+        replace(
+            base_factory,
+            planet=Planet(
+                name="Transmission b",
+                radius_m=8.0e7,
+                gravity_m_s2=12.0,
+            ),
+            model=model_config,
+        )
+
+    model = build_parameterized_transmission_model(
+        replace(base_factory, model=model_config),
+        spectral_grid=_spectral_grid(),
+    )
+    with pytest.raises(RobertValidationError, match="mass scale must be positive"):
+        model(
+            {
+                "temperature": 1000.0,
+                "log_h2o": -3.0,
+                "radius_scale": 1.0,
+                "mass_scale": 0.0,
+            }
+        )
 
 
 def test_transmission_discovers_quench_parameters_and_manifest_metadata() -> None:

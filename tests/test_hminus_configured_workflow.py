@@ -146,6 +146,17 @@ def test_configured_factory_passes_hminus_to_selected_forward_model(
     config = _configured_hminus(
         rt_model=rt_model, chemistry_model="fastchem_equilibrium"
     )
+    if rt_model == "transmission":
+        raw = config.model_dump(mode="python")
+        raw["radiative_transfer"]["mass_scale_parameter"] = "mass_scale"
+        raw["parameters"] = [
+            *raw["parameters"],
+            {
+                "name": "mass_scale",
+                "prior": {"type": "uniform", "lower": 0.5, "upper": 1.5},
+            },
+        ]
+        config = TaskConfig.model_validate(raw)
     observation = Observation.from_arrays(
         wavelength=[2.0, 2.5],
         flux=[1.0e-3, 1.1e-3],
@@ -196,7 +207,12 @@ def test_configured_factory_passes_hminus_to_selected_forward_model(
     else:
 
         def capture(factory, *, spectral_grid):
-            captured.append(factory.model.hminus_continuum)
+            captured.append(
+                (
+                    factory.model.hminus_continuum,
+                    factory.model.mass_scale_parameter,
+                )
+            )
             return SimpleNamespace(opacity_identifiers={}, manifest_metadata={})
 
         monkeypatch.setattr(
@@ -205,7 +221,11 @@ def test_configured_factory_passes_hminus_to_selected_forward_model(
 
     configured_tasks.build_problem(config, observations)
 
-    assert captured == [HMinusContinuumConfig()]
+    assert captured == (
+        [HMinusContinuumConfig()]
+        if rt_model == "emission"
+        else [(HMinusContinuumConfig(), "mass_scale")]
+    )
 
 
 def test_mode_specific_radiative_transfer_options_are_checked_only_when_explicit() -> (
