@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
 from functools import cached_property
+from hashlib import sha256
 from pathlib import Path
 import re
 from typing import Mapping, Protocol
@@ -11,7 +13,12 @@ from typing import Mapping, Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from robert_exoplanets.core import PressureGrid, RobertConfigError, RobertValidationError
+from robert_exoplanets.core import (
+    PressureGrid,
+    RobertConfigError,
+    RobertDataError,
+    RobertValidationError,
+)
 from robert_exoplanets.core._immutability import immutable_mapping
 
 
@@ -157,6 +164,19 @@ def _pressure_values_bar(pressure_grid: PressureGrid) -> NDArray[np.float64]:
     pressure = np.array(_pressure_values_pa(pressure_grid) / 1.0e5, copy=True)
     pressure.setflags(write=False)
     return pressure
+
+
+def _pressure_scale_to_bar(unit: str) -> float:
+    normalized = unit.strip().lower()
+    if normalized in {"bar", "bars"}:
+        return 1.0
+    if normalized in {"pa", "pascal", "pascals"}:
+        return 1.0e-5
+    if normalized in {"mbar", "millibar", "millibars"}:
+        return 1.0e-3
+    if normalized in {"atm", "atmosphere", "atmospheres"}:
+        return 1.01325
+    raise RobertValidationError(f"unsupported pressure unit: {unit}")
 
 
 _PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -1023,6 +1043,243 @@ class ConstantChemistry:
         for species, ratio in self.mixing_ratios.items():
             profiles[species] = _readonly_constant_profile(ratio, pressure_grid.n_layers)
         return profiles
+
+
+@dataclass(frozen=True)
+class TabulatedChemistry:
+    """Fixed VMR profiles interpolated in log pressure and log VMR.
+
+    Each tabulated gas must have a positive VMR at every source pressure. The
+    remaining volume fraction is assigned to the declared background mixture.
+    ``endpoint_policy='constant'`` keeps the nearest source VMR outside the
+    tabulated pressure range. No chemistry is inferred between gases.
+    """
+
+    pressure: NDArray[np.float64]
+    mixing_ratios: Mapping[str, NDArray[np.float64]]
+    pressure_unit: str
+    background: BackgroundGasMixture | Mapping[str, float]
+    endpoint_policy: str
+    name: str = "tabulated-chemistry"
+    convention: str = field(default="volume_mixing_ratio", init=False)
+    source_path: Path | None = None
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise RobertValidationError("chemistry name must not be empty")
+        if self.convention != "volume_mixing_ratio":
+            raise RobertValidationError(
+                "TabulatedChemistry requires volume_mixing_ratio convention"
+            )
+        if not self.pressure_unit or not self.pressure_unit.strip():
+            raise RobertValidationError("pressure_unit must not be empty")
+        _pressure_scale_to_bar(self.pressure_unit)
+        if self.endpoint_policy != "constant":
+            raise RobertValidationError(
+                "endpoint_policy must be 'constant' for tabulated chemistry"
+            )
+
+        pressure = np.array(self.pressure, dtype=float, copy=True)
+        if pressure.ndim != 1 or pressure.size < 2:
+            raise RobertValidationError(
+                "tabulated chemistry pressure must contain at least two values"
+            )
+        if not np.all(np.isfinite(pressure)) or np.any(pressure <= 0.0):
+            raise RobertValidationError(
+                "tabulated chemistry pressure values must be finite and positive"
+            )
+        if not self.mixing_ratios:
+            raise RobertValidationError(
+                "tabulated chemistry must contain at least one species"
+            )
+
+        background = self.background
+        if not isinstance(background, BackgroundGasMixture):
+            background = BackgroundGasMixture(background)
+
+        order = np.argsort(pressure)
+        sorted_pressure = np.array(pressure[order], dtype=float, copy=True)
+        if np.any(np.diff(sorted_pressure) <= 0.0):
+            raise RobertValidationError(
+                "tabulated chemistry pressure values must be unique"
+            )
+
+        profiles: dict[str, NDArray[np.float64]] = {}
+        for species, values in self.mixing_ratios.items():
+            label = _validate_species_name(species)
+            if label in background.species:
+                raise RobertValidationError(
+                    f"tabulated and background species must be distinct: {label}"
+                )
+            profile = np.array(values, dtype=float, copy=True)
+            if profile.ndim != 1 or profile.shape != pressure.shape:
+                raise RobertValidationError(
+                    f"{label} VMR must match tabulated pressure values"
+                )
+            if not np.all(np.isfinite(profile)) or np.any(profile <= 0.0):
+                raise RobertValidationError(
+                    f"{label} VMR values must be finite and positive"
+                )
+            profile = np.array(profile[order], dtype=float, copy=True)
+            profile.setflags(write=False)
+            profiles[label] = profile
+
+        active_sum = np.sum(np.stack(tuple(profiles.values())), axis=0)
+        if np.any(active_sum > 1.0):
+            raise RobertValidationError(
+                "tabulated VMR profiles must sum to no more than one at each pressure"
+            )
+
+        sorted_pressure.setflags(write=False)
+        object.__setattr__(self, "pressure", sorted_pressure)
+        object.__setattr__(self, "mixing_ratios", immutable_mapping(profiles))
+        object.__setattr__(self, "background", background)
+        object.__setattr__(self, "metadata", immutable_mapping(self.metadata))
+        if self.source_path is not None:
+            object.__setattr__(self, "source_path", Path(self.source_path).expanduser())
+
+    @classmethod
+    def from_csv(
+        cls,
+        path: str | Path,
+        *,
+        pressure_column: str,
+        species: tuple[str, ...],
+        pressure_unit: str,
+        background: BackgroundGasMixture | Mapping[str, float],
+        endpoint_policy: str,
+        name: str = "tabulated-chemistry",
+    ) -> "TabulatedChemistry":
+        """Load explicitly selected pressure and VMR columns from CSV."""
+
+        csv_path = Path(path).expanduser()
+        if not csv_path.is_file():
+            raise RobertDataError(f"chemistry profile CSV does not exist: {csv_path}")
+        if not pressure_column.strip():
+            raise RobertValidationError("pressure_column must not be empty")
+        species = tuple(_validate_species_name(item) for item in species)
+        if not species or len(set(species)) != len(species):
+            raise RobertValidationError(
+                "tabulated chemistry species must be non-empty and unique"
+            )
+
+        pressure_values: list[float] = []
+        profile_values = {label: [] for label in species}
+        with csv_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise RobertDataError("chemistry profile CSV is missing a header row")
+            if len(set(reader.fieldnames)) != len(reader.fieldnames):
+                raise RobertDataError(
+                    "chemistry profile CSV contains duplicate columns"
+                )
+            missing = {pressure_column, *species}.difference(reader.fieldnames)
+            if missing:
+                raise RobertDataError(
+                    "chemistry profile CSV is missing required columns: "
+                    + ", ".join(sorted(missing))
+                )
+            for row_number, row in enumerate(reader, start=2):
+                if all(
+                    value is None or not str(value).strip() for value in row.values()
+                ):
+                    continue
+                try:
+                    pressure_values.append(float(row[pressure_column]))
+                    for label in species:
+                        profile_values[label].append(float(row[label]))
+                except (TypeError, ValueError) as exc:
+                    raise RobertDataError(
+                        "invalid numeric value in chemistry profile CSV row "
+                        f"{row_number}"
+                    ) from exc
+
+        digest = sha256()
+        with csv_path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+
+        metadata = {
+            "source_path": str(csv_path.resolve()),
+            "source_sha256": digest.hexdigest(),
+            "pressure_column": pressure_column,
+            "pressure_unit": pressure_unit,
+            "species": ",".join(species),
+            "interpolation": "linear in log10 pressure and log10 VMR",
+            "endpoint_policy": endpoint_policy,
+        }
+        return cls(
+            pressure=np.asarray(pressure_values, dtype=float),
+            mixing_ratios={
+                label: np.asarray(values, dtype=float)
+                for label, values in profile_values.items()
+            },
+            pressure_unit=pressure_unit,
+            background=background,
+            endpoint_policy=endpoint_policy,
+            name=name,
+            source_path=csv_path,
+            metadata=metadata,
+        )
+
+    @property
+    def species(self) -> tuple[str, ...]:
+        """Return tabulated gases followed by background gases."""
+
+        return tuple(self.mixing_ratios) + self.background.species
+
+    def required_parameters(self) -> tuple[str, ...]:
+        """Return required parameter names; this fixed model has none."""
+
+        return ()
+
+    def evaluate(
+        self,
+        parameters: Mapping[str, float],
+        pressure_grid: PressureGrid,
+        temperature: NDArray[np.float64],
+    ) -> dict[str, NDArray[np.float64]]:
+        """Interpolate VMRs and assign the residual fraction to H2/He."""
+
+        _validate_temperature_layers(temperature, pressure_grid)
+        source_pressure_bar = self.pressure * _pressure_scale_to_bar(self.pressure_unit)
+        target_pressure_bar = _pressure_values_bar(pressure_grid)
+        clipped_pressure_bar = np.clip(
+            target_pressure_bar,
+            source_pressure_bar[0],
+            source_pressure_bar[-1],
+        )
+        log_source_pressure = np.log10(source_pressure_bar)
+        log_target_pressure = np.log10(clipped_pressure_bar)
+
+        composition: dict[str, NDArray[np.float64]] = {}
+        for species, profile in self.mixing_ratios.items():
+            values = np.power(
+                10.0,
+                np.interp(
+                    log_target_pressure,
+                    log_source_pressure,
+                    np.log10(profile),
+                ),
+            )
+            composition[species] = _readonly_layer_array(
+                values, f"{species} VMR", pressure_grid.n_layers
+            )
+
+        active_sum = np.sum(np.stack(tuple(composition.values())), axis=0)
+        if np.any(~np.isfinite(active_sum)) or np.any(active_sum > 1.0):
+            raise RobertValidationError(
+                "interpolated tabulated VMR profiles must sum to no more than one"
+            )
+        residual = 1.0 - active_sum
+        for species, fraction in self.background.fractions.items():
+            composition[species] = _readonly_layer_array(
+                residual * fraction,
+                f"{species} background VMR",
+                pressure_grid.n_layers,
+            )
+        return composition
 
 
 @dataclass(frozen=True)

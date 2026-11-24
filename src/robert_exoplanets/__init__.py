@@ -20,6 +20,7 @@ from .atmosphere import (
     QuenchDiagnostics,
     QuenchGroup,
     SplineTemperatureProfile,
+    TabulatedChemistry,
     TabulatedTemperatureProfile,
     TemperatureProfile,
 )
@@ -645,6 +646,7 @@ __all__ = [
     "StellarHeterogeneity",
     "StellarHeterogeneityDefinition",
     "StellarSpectrumModel",
+    "TabulatedChemistry",
     "TabulatedTemperatureProfile",
     "TemperatureProfile",
     "ThermalEmissionIntegrationResult",

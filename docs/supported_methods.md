@@ -22,7 +22,7 @@ The labels below keep implementation status separate from scientific scope:
 | Clear thermal emission | Schema-v2 YAML, correlated-k gas opacity, CIA, and the absorbing formal solution | Stable petitRADTRANS 3.3.3 comparisons support the declared clear cases; they do not validate arbitrary opacity databases or clouds. |
 | Cloudy thermal emission | Deck, haze, or Mie properties with Toon or thermal SH4/P3 | Matched PICASO/Virga and molecular-opacity comparisons cover declared closures; a high-stream reference is still required for a general cloud-science claim. |
 | Transmission | Spherical shell chords with correlated-k or dedicated LBL input | Absorption-dominated and continuous reference comparisons are covered; returned scattered light, multiple scattering, and refraction remain outside the supported route. |
-| Free and equilibrium chemistry | `FreeChemistry`, optional FastChem, and explicit composition/MMW models | FastChem and free-chemistry checks cover their configured inputs. They do not establish a complete chemical network or photochemical model. |
+| Free, equilibrium, and fixed-profile chemistry | `FreeChemistry`, optional FastChem, `TabulatedChemistry`, and explicit composition/MMW models | Input, interpolation, and composition-closure checks cover fixed profiles. They do not establish a complete chemical network or photochemical model. |
 | Nested retrieval | PyMultiNest through the configured runner | R=100 injection checks and the documented target records cover validation-scale runs. Posterior calibration across broad seeds and all target regimes remains open. |
 | Optimal estimation | Independent Gaussian observations through the configured runner | It rejects CLR and unsupported likelihood structures. Covariance and profiled high-resolution objectives need an explicit future residual/Jacobian contract. |
 
@@ -38,6 +38,13 @@ A phantom background gas fills the remaining VMR and has no line, CIA, or
 Rayleigh opacity. Its fitted molecular mass changes the mean molecular weight
 and hydrostatic scale height. It is a composition category, not a hidden
 opacity species.
+
+`TabulatedChemistry` accepts positive fixed VMR columns with an explicit
+pressure unit. It interpolates log VMR against log pressure and fills the
+remaining fraction with the declared H2/He split. Strict YAML uses a constant
+endpoint policy when the pressure grid extends past the source profile. The
+profile CSV checksum is recorded in model metadata. These input checks do not
+validate the chemistry that produced the profile.
 
 Pressure quenching is an analytic decorator around a base chemistry model. The
 implemented rule keeps the base profile below the quench pressure and uses the

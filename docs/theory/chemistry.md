@@ -14,6 +14,8 @@ Current chemistry types:
   split between inactive/background gases.
 - `FreeChemistry`: evaluates layer-constant free abundances for active gases
   and can fill the remaining VMR budget with a background mixture.
+- `TabulatedChemistry`: interpolates explicitly selected fixed VMR profiles
+  from CSV and fills the remaining VMR budget with a background mixture.
 - `CompositionMeanMolecularWeight`: derives layer mean molecular weight from
   evaluated VMR profiles and molecular masses.
 - `FixedMeanMolecularWeight`: returns one fixed mean molecular weight for every
@@ -37,6 +39,24 @@ metallicity and C/O state. The FastChem path, parameter names, species mapping,
 and elemental-abundance source are recorded in model provenance. FastChem
 remains an optional dependency, each MPI process owns its own solver instance,
 and the bundled upstream files retain their GPL-3.0 license.
+
+## Fixed tabulated chemistry
+
+`TabulatedChemistry` reads an explicit pressure column and selected species
+columns from CSV. The caller must declare the pressure unit. Each source VMR
+must be finite and positive because interpolation is linear in `log10(VMR)` as
+a function of `log10(pressure)`. Source VMRs are not renormalized; their sum
+must be no greater than one at every source pressure. The remaining fraction is
+assigned to the configured background mixture, which is H2/He in strict YAML
+configuration. Background fractions are relative shares and are normalized by
+`BackgroundGasMixture`.
+
+Strict YAML requires `endpoint_policy: constant`. At target pressures outside
+the source interval, the nearest endpoint VMR is held constant. The CSV SHA-256
+and selected columns are recorded in chemistry metadata, so retrieval
+manifests can identify a changed source file. These rules define profile input
+and interpolation behavior; they do not add chemical reactions or establish
+agreement with an equilibrium or photochemical model.
 
 ## Pressure-quench chemistry
 

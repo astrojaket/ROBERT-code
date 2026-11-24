@@ -225,7 +225,26 @@ atmosphere:
 
 Temperature models are `parmentier_guillot_2014`, `isothermal`, `tabulated`,
 `madhusudhan_seager_2009`, and `spline`. Chemistry models are
-`fastchem_equilibrium` and `free`. Start from the maintained
+`fastchem_equilibrium`, `free`, and `tabulated`. A fixed VMR profile uses an
+explicit CSV pressure column and unit, a list of species columns, H2/He
+background fractions, and the required `endpoint_policy: constant` setting:
+
+```yaml
+chemistry:
+  model: tabulated
+  profile_path: chemistry.csv
+  pressure_column: Pressure
+  pressure_unit: bar
+  species: [H2O, CO, CO2, CH4, NH3, SO2, H2S]
+  background_fractions: {H2: 0.85, He: 0.15}
+  endpoint_policy: constant
+```
+
+Each selected VMR column must be finite and positive. The selected gases must
+sum to no more than one at each source pressure. ROBERT interpolates log VMR
+against log pressure and assigns the remaining VMR to H2 and He in the declared
+relative fractions. The constant endpoint policy applies below and above the
+source pressure range. Start from the maintained
 [examples](../configurations/README.md), then validate each change with
 `--validate-only` to check its required fields.
 

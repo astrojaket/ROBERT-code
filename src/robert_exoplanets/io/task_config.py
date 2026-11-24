@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from math import log10
+from math import isfinite, log10
 from pathlib import Path
 import os
 from typing import Annotated, Literal
@@ -425,8 +425,52 @@ class FreeChemistryConfig(ConfigModel):
         return self
 
 
+class TabulatedChemistryConfig(ConfigModel):
+    """Fixed VMR columns loaded from a CSV profile."""
+
+    model: Literal["tabulated"]
+    profile_path: Path
+    pressure_column: str = Field(min_length=1)
+    pressure_unit: str = Field(min_length=1)
+    species: tuple[str, ...] = Field(min_length=1)
+    background_fractions: dict[str, float]
+    endpoint_policy: Literal["constant"]
+
+    @model_validator(mode="after")
+    def validate_profile(self) -> "TabulatedChemistryConfig":
+        if len(set(self.species)) != len(self.species):
+            raise ValueError("tabulated chemistry species must be unique")
+        if any(not species.strip() for species in self.species):
+            raise ValueError("tabulated chemistry species names must be non-empty")
+        if set(self.species).intersection({"H2", "He"}):
+            raise ValueError(
+                "tabulated chemistry species must not overlap H2/He background gases"
+            )
+        if not self.pressure_column.strip():
+            raise ValueError("pressure_column must not be empty")
+        if self.pressure_unit.strip().lower() not in {
+            "bar", "bars", "pa", "pascal", "pascals", "mbar", "millibar",
+            "millibars", "atm", "atmosphere", "atmospheres",
+        }:
+            raise ValueError(f"unsupported tabulated chemistry pressure unit: {self.pressure_unit}")
+        if set(self.background_fractions) != {"H2", "He"}:
+            raise ValueError(
+                "tabulated chemistry background_fractions must define H2 and He"
+            )
+        fractions = tuple(float(value) for value in self.background_fractions.values())
+        if any(not isfinite(value) or value < 0.0 for value in fractions):
+            raise ValueError(
+                "tabulated chemistry background fractions must be finite and non-negative"
+            )
+        if sum(fractions) <= 0.0:
+            raise ValueError(
+                "tabulated chemistry background fractions must sum to a positive value"
+            )
+        return self
+
+
 ChemistryConfig = Annotated[
-    FastChemConfig | FreeChemistryConfig,
+    FastChemConfig | FreeChemistryConfig | TabulatedChemistryConfig,
     Field(discriminator="model"),
 ]
 
@@ -1089,6 +1133,8 @@ def _resolve_region(
 def _chemistry_species(config: ChemistryConfig) -> tuple[str, ...]:
     if config.model == "fastchem_equilibrium":
         return tuple(item.label for item in config.species)
+    if config.model == "tabulated":
+        return config.species + ("H2", "He")
     return config.species + config.background_species
 
 
@@ -1099,6 +1145,8 @@ def _required_chemistry_parameters(config: ChemistryConfig) -> set[str]:
             config.carbon_to_oxygen_parameter,
             *(config.constant_log10_vmr_parameters or {}).values(),
         }
+    if config.model == "tabulated":
+        return set()
     required = _retrieved_free_chemistry_parameters(config)
     if config.phantom_mean_molecular_weight_parameter is not None:
         required.add(config.phantom_mean_molecular_weight_parameter)
@@ -1176,14 +1224,17 @@ def load_task_config(path: str | Path) -> TaskConfig:
     for keys in (
         ("observations", "path"),
         ("atmosphere", "chemistry", "fastchem_path"),
+        ("atmosphere", "chemistry", "profile_path"),
         ("atmosphere", "temperature", "profile_path"),
         ("opacity", "path"),
         ("opacity", "cache_directory"),
         ("clouds", "optical_constants_path"),
         ("disk_emission", "hot_region", "atmosphere", "chemistry", "fastchem_path"),
+        ("disk_emission", "hot_region", "atmosphere", "chemistry", "profile_path"),
         ("disk_emission", "hot_region", "atmosphere", "temperature", "profile_path"),
         ("disk_emission", "hot_region", "clouds", "optical_constants_path"),
         ("disk_emission", "cold_region", "atmosphere", "chemistry", "fastchem_path"),
+        ("disk_emission", "cold_region", "atmosphere", "chemistry", "profile_path"),
         ("disk_emission", "cold_region", "atmosphere", "temperature", "profile_path"),
         ("disk_emission", "cold_region", "clouds", "optical_constants_path"),
         ("paths", "project_directory"),

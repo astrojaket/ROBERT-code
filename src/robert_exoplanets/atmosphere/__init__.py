@@ -13,6 +13,7 @@ from .chemistry import (
     PressureQuenchChemistry,
     QuenchDiagnostics,
     QuenchGroup,
+    TabulatedChemistry,
 )
 from .state import AtmosphereState
 from .temperature import (
@@ -38,6 +39,7 @@ __all__ = [
     "PressureQuenchChemistry",
     "QuenchDiagnostics",
     "QuenchGroup",
+    "TabulatedChemistry",
     "IsothermalTemperatureProfile",
     "MadhusudhanSeager2009TemperatureProfile",
     "ParmentierGuillot2014TemperatureProfile",

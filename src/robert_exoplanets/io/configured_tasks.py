@@ -25,6 +25,7 @@ from robert_exoplanets.atmosphere import (
     MadhusudhanSeager2009TemperatureProfile,
     ParmentierGuillot2014TemperatureProfile,
     SplineTemperatureProfile,
+    TabulatedChemistry,
     TabulatedTemperatureProfile,
 )
 from robert_exoplanets.bodies import Planet, Star
@@ -687,6 +688,21 @@ def _base_chemistry_components(config: ChemistryConfig):
             CompositionMeanMolecularWeight(normalization="raw_sum"),
             (),
         )
+    if config.model == "tabulated":
+        chemistry = TabulatedChemistry.from_csv(
+            config.profile_path,
+            pressure_column=config.pressure_column,
+            species=config.species,
+            pressure_unit=config.pressure_unit,
+            background=BackgroundGasMixture(
+                {
+                    "H2": config.background_fractions["H2"],
+                    "He": config.background_fractions["He"],
+                }
+            ),
+            endpoint_policy=config.endpoint_policy,
+        )
+        return chemistry, CompositionMeanMolecularWeight(normalization="require"), ()
     if config.fill_background:
         fractions = config.background_fractions
         background = BackgroundGasMixture(
